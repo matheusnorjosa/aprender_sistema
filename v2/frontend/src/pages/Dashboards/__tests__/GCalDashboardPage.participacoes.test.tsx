@@ -28,6 +28,10 @@ vi.mock('../../../api/gcal', () => ({
 
 import GCalDashboardPage from '../GCalDashboardPage';
 
+// Tela pesada (AntD + tabelas): na CI, cerca de 4x mais lenta que local, o caso passou dos 5 s padrão
+// (27/10/2026, 2 vezes seguidas). Só o limite de tempo muda, nenhuma asserção.
+vi.setConfig({ testTimeout: 20_000 });
+
 const participacao = (over: Record<string, unknown>) => ({
   usuario: null,
   guest_email: null,

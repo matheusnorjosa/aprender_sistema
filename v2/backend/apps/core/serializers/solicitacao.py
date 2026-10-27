@@ -259,8 +259,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {
                         "non_field_errors": [
-                            "Este evento está no Google Agenda pela planilha; mudar aqui não muda a agenda. "
-                            "Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle."
+                            "Este evento está no Google Agenda pela planilha e o sistema não o adotou: mudar aqui não "
+                            "muda a agenda. Ajuste no Google, ou peça a adoção."
                         ]
                     }
                 )

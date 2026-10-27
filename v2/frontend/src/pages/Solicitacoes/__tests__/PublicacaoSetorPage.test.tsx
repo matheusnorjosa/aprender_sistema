@@ -786,6 +786,33 @@ describe('PublicacaoSetorPage — excluir evento que está no Google (decisão d
     await waitFor(() => expect(message.error).toHaveBeenCalledWith(motivo));
     expect(message.success).not.toHaveBeenCalled();
     expect(screen.getByLabelText(/^Excluir: Vidas Em Rede/)).toBeInTheDocument();
+    // A recusa pode chegar depois de o Google já ter sido limpo: a lista recarrega para contar a verdade.
+    await waitFor(() => expect(listCalls()).toHaveLength(2));
+  });
+
+  test('Google desconectado ao excluir: avisa e recarrega o status da conexão', async () => {
+    listResponse = pageOf([makeSolic({ ...NO_GOOGLE, pode_excluir: true })]);
+    deleteResult = () =>
+      Promise.reject(apiError(403, { code: 'google_not_connected', detail: 'Conecte sua conta Google' }));
+    renderPage();
+    const antes = googleHook.fetchStatus.mock.calls.length;
+
+    await confirmAction(/^Excluir: Vidas Em Rede/, 'Excluir evento?', 'Sim, excluir');
+
+    await waitFor(() => expect(googleHook.fetchStatus.mock.calls.length).toBeGreaterThan(antes));
+    expect(message.warning).toHaveBeenCalledWith('Sua conta Google não está conectada. Conecte-a para publicar.');
+  });
+
+  test('evento em erro: o aviso de sucesso não afirma que ele estava no Google', async () => {
+    listResponse = pageOf([makeSolic({ ...NO_GOOGLE, gcal_status: 'ERROR', external_event_id: null, pode_excluir: true })]);
+    deleteResult = () => Promise.resolve(undefined);
+    renderPage();
+
+    await confirmAction(/^Excluir: Vidas Em Rede/, 'Excluir evento?', 'Sim, excluir');
+
+    await waitFor(() =>
+      expect(message.success).toHaveBeenCalledWith('Evento excluído do sistema e do Google Agenda, se estava lá.'),
+    );
   });
 
   test('a explicação do topo diz a diferença entre tirar só do Google e excluir', async () => {

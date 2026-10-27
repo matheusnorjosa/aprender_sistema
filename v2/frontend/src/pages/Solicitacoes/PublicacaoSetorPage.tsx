@@ -323,14 +323,23 @@ export default function PublicacaoSetorPage(): JSX.Element {
           await deleteSolicitacao(row.id);
         } catch (error) {
           const err = error as ApiErrorLike;
-          if ((err.response?.status ?? err.status) === 404) {
+          const httpStatus = err.response?.status ?? err.status;
+          const code = err.response?.data?.code;
+          // Conexão com o Google, 404, 409 e 429: o mesmo tratamento das outras ações (recarrega o status).
+          if (httpStatus === 404 || httpStatus === 409 || httpStatus === 429 || code === 'google_not_connected') {
             handleActionError(error);
           } else {
             message.error(err.response?.data?.detail || `Não foi possível excluir: ${err.message ?? 'erro desconhecido'}`);
           }
+          // A recusa pode chegar depois de o Google já ter sido limpo: recarrega para a linha dizer a verdade.
+          if (httpStatus !== 404) void load();
           return;
         }
-        message.success('Evento excluído do sistema e do Google Agenda.');
+        message.success(
+          row.gcal_status === 'ERROR' && !row.external_event_id
+            ? 'Evento excluído do sistema e do Google Agenda, se estava lá.'
+            : 'Evento excluído do sistema e do Google Agenda.',
+        );
         await load();
       },
     });

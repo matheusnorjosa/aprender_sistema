@@ -230,3 +230,26 @@ describe('PreAgendaPage — modo Eventos Google Calendar', () => {
     expect(listSolicitacoesMock.mock.calls.length).toBe(solCountBefore);
   });
 });
+
+describe('PreAgendaPage — volta da conexão com o Google', () => {
+  test('?google=connected: mostra o sucesso e limpa a URL', async () => {
+    window.history.pushState({}, '', '/pre-agenda?google=connected');
+    render(<PreAgendaPage />);
+
+    const ok = await screen.findByText('Conta Google conectada.');
+    expect(ok.closest('[role="status"]')).not.toBeNull();
+    expect(window.location.search).toBe('');
+  });
+
+  test('?google=error&reason=server_error: diz que o Google não respondeu e limpa a URL', async () => {
+    window.history.pushState({}, '', '/pre-agenda?google=error&reason=server_error');
+    render(<PreAgendaPage />);
+
+    const err = await screen.findByText(
+      'Não foi possível falar com o Google agora. Tente conectar de novo em alguns minutos.',
+    );
+    expect(err.closest('[role="alert"]')).not.toBeNull();
+    expect(window.location.search).toBe('');
+    window.history.pushState({}, '', '/');
+  });
+});

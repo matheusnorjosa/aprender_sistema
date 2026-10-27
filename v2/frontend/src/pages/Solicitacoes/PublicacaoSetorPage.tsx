@@ -25,6 +25,8 @@ import {
 import { MeetLink } from '../../components/MeetLink';
 import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard';
+import { OAuthRetornoAlert } from '../../components/google/OAuthRetornoAlert';
+import { lerOAuthRetorno, type OAuthRetorno } from '../../utils/oauthRetorno';
 import { TIMING } from '../../constants/timing';
 import useGoogleIntegration from '../../hooks/useGoogleIntegration';
 import { usePolling } from '../../hooks/usePolling';
@@ -64,18 +66,6 @@ const BLOCK_REASON_TEXT: Record<PublishBlockReason, string> = {
 };
 
 const OAUTH_SUCCESS_TEXT = 'Conta Google conectada. Você já pode publicar os eventos do seu setor.';
-const OAUTH_ERROR_TEXT: Record<string, string> = {
-  access_denied:
-    'Você não autorizou o acesso à sua conta Google. Para publicar, conecte de novo e aceite as permissões.',
-  validation:
-    'Não foi possível validar essa conta Google. Conecte com a sua conta corporativa (e-mail de trabalho).',
-  invalid_state: 'A conexão com o Google expirou ou foi interrompida. Tente conectar de novo.',
-  // Item 38: o início do OAuth também volta com este motivo; o alerta da DAT logo abaixo diz o que fazer.
-  no_setor_scope: 'A conta Google não foi conectada porque seu cadastro não tem setor vigente.',
-};
-const OAUTH_ERROR_FALLBACK =
-  'Não foi possível conectar sua conta Google. Tente de novo; se o erro continuar, avise o Controle.';
-
 interface ActionConfig {
   /** Texto do botão; também abre o aria-label (nome acessível contém o visível). */
   label: string;
@@ -144,8 +134,6 @@ interface ApiErrorLike {
   response?: { status?: number; data?: { code?: string; detail?: string } };
 }
 
-type OAuthReturn = { ok: true } | { ok: false; reason: string | null };
-
 /** Motivo visível de as ações estarem desabilitadas (null = pode publicar). */
 function blockedMessage(
   ready: boolean,
@@ -170,7 +158,7 @@ export default function PublicacaoSetorPage(): JSX.Element {
   // A lista não carregou: o motivo vai no lugar das linhas. Antes só um toast de 3 s, e a tabela
   // ficava no vazio "Nenhum evento aprovado do seu setor", como se não houvesse o que publicar.
   const [erroCarga, setErroCarga] = useState<string | null>(null);
-  const [oauthReturn, setOauthReturn] = useState<OAuthReturn | null>(null);
+  const [oauthReturn, setOauthReturn] = useState<OAuthRetorno | null>(null);
 
   // Latest-wins: polling, paginação e ações disparam cargas concorrentes; só a
   // mais recente grava na tela.
@@ -234,10 +222,9 @@ export default function PublicacaoSetorPage(): JSX.Element {
   // Volta do OAuth (?google=connected | ?google=error&reason=…): mostra o resultado,
   // tira os parâmetros da URL e recarrega o status da integração.
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const google = params.get('google');
-    if (!google) return;
-    setOauthReturn(google === 'connected' ? { ok: true } : { ok: false, reason: params.get('reason') });
+    const retorno = lerOAuthRetorno(location.search);
+    if (!retorno) return;
+    setOauthReturn(retorno);
     void navigate(location.pathname, { replace: true });
     void fetchStatus();
   }, [location.search, location.pathname, navigate, fetchStatus]);
@@ -437,16 +424,7 @@ export default function PublicacaoSetorPage(): JSX.Element {
           </header>
         </Card>
 
-        {oauthReturn &&
-          (oauthReturn.ok ? (
-            <Alert type="success" role="status" showIcon message={OAUTH_SUCCESS_TEXT} />
-          ) : (
-            <Alert
-              type="error"
-              showIcon
-              message={(oauthReturn.reason && OAUTH_ERROR_TEXT[oauthReturn.reason]) || OAUTH_ERROR_FALLBACK}
-            />
-          ))}
+        {oauthReturn && <OAuthRetornoAlert retorno={oauthReturn} textoSucesso={OAUTH_SUCCESS_TEXT} />}
 
         {blocked && (
           <Alert

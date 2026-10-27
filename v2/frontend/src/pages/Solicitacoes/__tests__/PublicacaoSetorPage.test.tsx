@@ -446,6 +446,15 @@ describe('PublicacaoSetorPage — conexão e prontidão', () => {
     );
   });
 
+  test('(e) volta do start com ?google=error&reason=server_error: diz que o Google não respondeu', async () => {
+    renderPage('/solicitacoes/publicacao?google=error&reason=server_error');
+
+    const err = await screen.findByText(
+      'Não foi possível falar com o Google agora. Tente conectar de novo em alguns minutos.',
+    );
+    expect(err.closest('[role="alert"]')).not.toBeNull();
+  });
+
   test('(e) item 38: volta do start com ?google=error&reason=no_setor_scope diz por que não conectou, sem mandar tentar de novo', async () => {
     googleHook.status = { ...NOT_CONNECTED, publishBlockReason: 'no_setor_scope' };
     renderPage('/solicitacoes/publicacao?google=error&reason=no_setor_scope');
@@ -463,7 +472,7 @@ describe('PublicacaoSetorPage — conexão e prontidão', () => {
   });
 
   test('(e) motivo desconhecido cai na copy genérica', async () => {
-    renderPage('/solicitacoes/publicacao?google=error&reason=server_error');
+    renderPage('/solicitacoes/publicacao?google=error&reason=motivo_que_a_tela_nao_conhece');
     expect(
       await screen.findByText(
         'Não foi possível conectar sua conta Google. Tente de novo; se o erro continuar, avise o Controle.',

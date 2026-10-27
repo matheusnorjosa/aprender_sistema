@@ -73,6 +73,8 @@ import ThemeContext from '../../contexts/ThemeContext';
 import useGoogleIntegration from '../../hooks/useGoogleIntegration';
 import useGoogleGuard from '../../hooks/useGoogleGuard';
 import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard';
+import { OAuthRetornoAlert } from '../../components/google/OAuthRetornoAlert';
+import { lerOAuthRetorno, type OAuthRetorno } from '../../utils/oauthRetorno';
 import { TIMING } from '../../constants/timing';
 import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
@@ -230,7 +232,19 @@ export default function PreAgendaPage(): JSX.Element {
   // OAuth Phase 5: acesso (AcessoContext) e integração Google
   const { caps, ehSuperusuario } = useAcesso();
   const temaEscuro = useContext(ThemeContext)?.isDark === true; // o escuro tem fundo próprio (App.css)
-  const { status: googleStatus, disconnect: googleDisconnect } = useGoogleIntegration();
+  const { status: googleStatus, disconnect: googleDisconnect, fetchStatus: googleFetchStatus } = useGoogleIntegration();
+
+  // Volta do OAuth (?google=connected | ?google=error&reason=…): mostra o resultado, tira os parâmetros
+  // da URL e recarrega o status. A tela não usa o roteador, então lê e limpa a URL do navegador
+  // (mantendo o history.state do roteador).
+  const [oauthRetorno, setOauthRetorno] = useState<OAuthRetorno | null>(null);
+  useEffect(() => {
+    const retorno = lerOAuthRetorno(window.location.search);
+    if (!retorno) return;
+    setOauthRetorno(retorno);
+    window.history.replaceState(window.history.state, '', window.location.pathname);
+    void googleFetchStatus();
+  }, [googleFetchStatus]);
 
   // Section 4 Epic #459: Consolidated Google OAuth guard
   const { requireGoogleConnection, handleGoogleError } = useGoogleGuard({
@@ -847,6 +861,8 @@ export default function PreAgendaPage(): JSX.Element {
             )}
           </div>
         </Card>
+
+        {oauthRetorno && <OAuthRetornoAlert retorno={oauthRetorno} textoSucesso="Conta Google conectada." />}
 
         {/* OAuth Phase 5: Google Integration Card (Controle/Super apenas) */}
         {showGoogleCard && (

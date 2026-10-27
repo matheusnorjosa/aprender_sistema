@@ -25,6 +25,7 @@ from django.dispatch import receiver
 from apps.core.models import (
     AvailabilityBlock,
     Config,
+    Deslocamento,
     Municipio,
     Participation,
     PermissaoFuncional,
@@ -116,6 +117,19 @@ def _invalidate_cache_on_participation_change(
     usuario_id = getattr(instance, "usuario_id", None)
     if usuario_id is not None:
         invalidate_availability_cache(usuario_id=usuario_id)
+
+
+@receiver([post_save, post_delete], sender=Deslocamento)
+def _invalidate_cache_on_deslocamento_change(
+    sender: type[Deslocamento], instance: Deslocamento, **kwargs: Any
+) -> None:  # pyright: ignore[reportUnusedFunction]
+    """
+    Invalida o cache ao criar, mudar ou apagar um Deslocamento.
+
+    A grade mensal mostra "D"/"D1" a partir dele (monthly_grid_service); sem este receiver, a grade
+    ficava até 5 min (TTL) sem o deslocamento recém-registrado.
+    """
+    invalidate_availability_cache(usuario_id=getattr(instance, "usuario_id", None))
 
 
 # ================================================================

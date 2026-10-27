@@ -122,11 +122,14 @@ function apiError(status: number, data: { code?: string; detail?: string } = {})
 
 let listResponse: ReturnType<typeof pageOf>;
 let actionResult: (url: string) => Promise<unknown>;
+let deleteResult: (url: string) => Promise<unknown>;
 
 const isList = (url: unknown) => String(url).startsWith('/solicitacoes/?');
 const listCalls = () => fetchAPIMock.mock.calls.filter(([url]) => isList(url));
 const actionCalls = () =>
   fetchAPIMock.mock.calls.filter(([url]) => /^\/solicitacoes\/\d+\/[a-z-]+\/$/.test(String(url)));
+const isDelete = (url: unknown) => /^\/solicitacoes\/\d+\/$/.test(String(url));
+const deleteCalls = () => fetchAPIMock.mock.calls.filter(([url]) => isDelete(url));
 
 function LocationProbe() {
   const location = useLocation();
@@ -164,8 +167,10 @@ beforeEach(() => {
   googleHook.disconnect.mockResolvedValue({ success: true });
   listResponse = pageOf([]);
   actionResult = () => Promise.resolve({ detail: 'ok', solicitacao_id: 7 });
+  deleteResult = () => Promise.resolve(undefined);
   fetchAPIMock.mockImplementation((url: string) => {
     if (isList(url)) return Promise.resolve(listResponse);
+    if (isDelete(url)) return deleteResult(url);
     if (/^\/solicitacoes\/\d+\/[a-z-]+\/$/.test(url)) return actionResult(url);
     return Promise.reject(new Error(`URL inesperada no teste: ${url}`));
   });
@@ -680,6 +685,144 @@ describe('PublicacaoSetorPage — ações', () => {
   });
 });
 
+describe('PublicacaoSetorPage — excluir evento que está no Google (decisão do dono, 27/10)', () => {
+  const NO_GOOGLE = { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' };
+
+  test('Excluir só aparece na linha que está no Google e que o servidor diz que dá para excluir', async () => {
+    listResponse = pageOf([
+      makeSolic({ id: 7, projeto_nome: 'Pode Excluir', ...NO_GOOGLE, pode_excluir: true }),
+      makeSolic({ id: 8, projeto_nome: 'Sem Poder', ...NO_GOOGLE, pode_excluir: false }),
+      makeSolic({ id: 9, projeto_nome: 'Fora do Google', pode_excluir: true }),
+      makeSolic({ id: 10, projeto_nome: 'Erro Com Id', gcal_status: 'ERROR', external_event_id: 'asv28', pode_excluir: true }),
+      makeSolic({ id: 11, projeto_nome: 'Campo Ausente', ...NO_GOOGLE }),
+    ]);
+    renderPage();
+    await screen.findByText('Pode Excluir');
+
+    expect(screen.getByLabelText(/^Excluir: Pode Excluir, 10\/10\/2026 09:00/)).toHaveTextContent(/^Excluir$/);
+    expect(screen.getByLabelText(/^Excluir: Erro Com Id/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Excluir: Sem Poder/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Excluir: Fora do Google/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Excluir: Campo Ausente/)).not.toBeInTheDocument();
+    // "Tirar só do Google" continua ao lado: as duas saídas são diferentes.
+    expect(screen.getByLabelText(/^Tirar só do Google: Pode Excluir/)).toBeInTheDocument();
+  });
+
+  test('sem conexão com o Google, Excluir fica desabilitado como as outras ações', async () => {
+    googleHook.status = NOT_CONNECTED;
+    listResponse = pageOf([makeSolic({ ...NO_GOOGLE, pode_excluir: true })]);
+    renderPage();
+
+    expect(await screen.findByLabelText(/^Excluir: Vidas Em Rede/)).toBeDisabled();
+  });
+
+  test.each([
+    {
+      caso: 'publicado com Meet',
+      row: { ...NO_GOOGLE, meet_link: 'https://meet.google.com/abc-defg-hij' },
+      texto:
+        '10/10/2026 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e do Google Agenda, junto com o link do Meet. Não dá para desfazer.',
+    },
+    {
+      caso: 'erro (pode não estar lá)',
+      row: { gcal_status: 'ERROR' as const, external_event_id: 'asv27' },
+      texto: '10/10/2026 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e do Google Agenda, se estiver lá. Não dá para desfazer.',
+    },
+  ])('$caso: a confirmação é a de Minhas Solicitações, abre no Cancelar e Cancelar não exclui', async ({ row, texto }) => {
+    listResponse = pageOf([makeSolic({ ...row, pode_excluir: true })]);
+    renderPage();
+
+    const botao = await screen.findByLabelText(/^Excluir: Vidas Em Rede/);
+    botao.focus();
+    fireEvent.click(botao);
+
+    const dialogo = await screen.findByRole('dialog');
+    expect(within(dialogo).getAllByText('Excluir evento?').length).toBeGreaterThan(0);
+    expect(dialogo).toHaveTextContent(texto);
+    const cancelar = within(dialogo).getByRole('button', { name: 'Cancelar' });
+    await waitFor(() => expect(cancelar).toHaveFocus());
+    expect(within(dialogo).getByRole('button', { name: 'Sim, excluir' })).toBeInTheDocument();
+
+    fireEvent.click(cancelar);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(deleteCalls()).toHaveLength(0);
+    await waitFor(() => expect(botao).toHaveFocus());
+  });
+
+  test('"Sim, excluir" faz UM DELETE do evento, avisa e recarrega a lista; o foco vai para a tabela', async () => {
+    listResponse = pageOf([makeSolic({ ...NO_GOOGLE, pode_excluir: true })]);
+    deleteResult = () => {
+      listResponse = pageOf([]);
+      return Promise.resolve(undefined);
+    };
+    renderPage();
+
+    const botao = await screen.findByLabelText(/^Excluir: Vidas Em Rede/);
+    botao.focus();
+    fireEvent.click(botao);
+    const dialogo = await screen.findByRole('dialog');
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Sim, excluir' }));
+
+    await waitFor(() => expect(deleteCalls()).toHaveLength(1));
+    const [url, options] = deleteCalls()[0] ?? [];
+    expect(url).toBe('/solicitacoes/7/');
+    expect(options).toMatchObject({ method: 'DELETE' });
+    await waitFor(() => expect(listCalls()).toHaveLength(2));
+    expect(message.success).toHaveBeenCalledWith('Evento excluído do sistema e do Google Agenda.');
+    expect(actionCalls()).toHaveLength(0);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(botao).not.toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).not.toBe(document.body));
+  });
+
+  test('recusa do servidor: mostra o motivo dele e a linha fica', async () => {
+    listResponse = pageOf([makeSolic({ ...NO_GOOGLE, pode_excluir: true })]);
+    const motivo = 'Não foi possível tirar o evento do Google Agenda: nada foi excluído. Tente excluir de novo em alguns minutos.';
+    deleteResult = () => Promise.reject(apiError(400, { detail: motivo }));
+    renderPage();
+
+    await confirmAction(/^Excluir: Vidas Em Rede/, 'Excluir evento?', 'Sim, excluir');
+
+    await waitFor(() => expect(message.error).toHaveBeenCalledWith(motivo));
+    expect(message.success).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/^Excluir: Vidas Em Rede/)).toBeInTheDocument();
+    // A recusa pode chegar depois de o Google já ter sido limpo: a lista recarrega para contar a verdade.
+    await waitFor(() => expect(listCalls()).toHaveLength(2));
+  });
+
+  test('Google desconectado ao excluir: avisa e recarrega o status da conexão', async () => {
+    listResponse = pageOf([makeSolic({ ...NO_GOOGLE, pode_excluir: true })]);
+    deleteResult = () =>
+      Promise.reject(apiError(403, { code: 'google_not_connected', detail: 'Conecte sua conta Google' }));
+    renderPage();
+    const antes = googleHook.fetchStatus.mock.calls.length;
+
+    await confirmAction(/^Excluir: Vidas Em Rede/, 'Excluir evento?', 'Sim, excluir');
+
+    await waitFor(() => expect(googleHook.fetchStatus.mock.calls.length).toBeGreaterThan(antes));
+    expect(message.warning).toHaveBeenCalledWith('Sua conta Google não está conectada. Conecte-a para publicar.');
+  });
+
+  test('evento em erro: o aviso de sucesso não afirma que ele estava no Google', async () => {
+    listResponse = pageOf([makeSolic({ ...NO_GOOGLE, gcal_status: 'ERROR', external_event_id: null, pode_excluir: true })]);
+    deleteResult = () => Promise.resolve(undefined);
+    renderPage();
+
+    await confirmAction(/^Excluir: Vidas Em Rede/, 'Excluir evento?', 'Sim, excluir');
+
+    await waitFor(() =>
+      expect(message.success).toHaveBeenCalledWith('Evento excluído do sistema e do Google Agenda, se estava lá.'),
+    );
+  });
+
+  test('a explicação do topo diz a diferença entre tirar só do Google e excluir', async () => {
+    renderPage();
+    const titulo = await screen.findByText('Publicar na agenda do Google');
+    const topo = titulo.closest('header') as HTMLElement;
+    expect(topo).toHaveTextContent('Tirar só do Google deixa o evento no sistema; Excluir tira dos dois lados.');
+  });
+});
+
 describe('PublicacaoSetorPage — polling (d)', () => {
   test('sem linha PENDING não há polling', async () => {
     vi.useFakeTimers();
@@ -757,11 +900,12 @@ describe('PublicacaoSetorPage — sem rolagem horizontal', () => {
 
   test('a 360 px: só o evento e as ações, com rótulo curto; o resto na linha expandida', async () => {
     definirLarguraTela(360);
-    listResponse = pageOf([makeSolic({ gcal_status: 'PUBLISHED', external_event_id: 'asv27' })]);
-    renderPage();
+    listResponse = pageOf([makeSolic({ gcal_status: 'PUBLISHED', external_event_id: 'asv27', pode_excluir: true })]);
+    const { container } = renderPage();
     await screen.findByText('Vidas Em Rede');
 
     expect(cabecalhos()).toEqual(['Evento', 'Ações']);
+    expect(container.querySelector('.ant-table-content')?.getAttribute('style') ?? '').not.toMatch(/overflow/);
     const linha = screen.getByText('Vidas Em Rede').closest('tr') as HTMLElement;
     expect(within(linha).getByText('Sobral')).toBeInTheDocument();
     // Texto visível curto; o nome acessível continua completo e começa por ele (WCAG 2.5.3).
@@ -769,6 +913,10 @@ describe('PublicacaoSetorPage — sem rolagem horizontal', () => {
     expect(atualizar).toHaveTextContent(/^Atualizar$/);
     // "Remover" sozinho parecia apagar o evento: no celular também diz que só sai do Google.
     expect(within(linha).getByLabelText(/^Tirar só do Google: Vidas Em Rede/)).toHaveTextContent(/^Tirar só do Google$/);
+    // Excluir cabe na coluna de 116 px: o botão quebra linha em vez de alargá-la.
+    const excluir = within(linha).getByLabelText(/^Excluir: Vidas Em Rede/);
+    expect(excluir).toHaveTextContent(/^Excluir$/);
+    expect(excluir).toHaveStyle({ whiteSpace: 'normal' });
 
     fireEvent.click(within(linha).getByRole('button', { name: /^Expandir linha de Vidas Em Rede/ }));
     const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);

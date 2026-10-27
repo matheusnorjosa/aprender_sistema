@@ -16,6 +16,7 @@ from apps.core.rbac.permissions import (  # noqa: F401
     HasPerm,
     HasSectorAccess,
     IsOwnerOrPrivileged,
+    PodeExcluirSolicitacao,
     SuperuserOnly,
 )
 
@@ -24,5 +25,6 @@ __all__ = [
     "HasFunctionalPermission",
     "HasSectorAccess",
     "IsOwnerOrPrivileged",
+    "PodeExcluirSolicitacao",
     "SuperuserOnly",
 ]

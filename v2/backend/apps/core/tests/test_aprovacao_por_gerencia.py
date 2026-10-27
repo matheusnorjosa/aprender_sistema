@@ -223,9 +223,10 @@ def test_lista_da_aprovadora_tem_teto_de_queries(g1, outra_gerencia, django_asse
     client = _client(aprovadora)
 
     # Medido: 5 queries com 5 linhas (a policy soma 1 EXISTS de vínculo), mais as consultas fixas de
-    # `decisao_impedida` (PR 10: contas alteradas, ids da página, edições). Teto 11 dá folga sem esconder
-    # um N+1 (1 query por linha estouraria).
-    with django_assert_max_num_queries(11):
+    # `decisao_impedida` (PR 10: contas alteradas, ids da página, edições) e, desde 27/10, as 5 de
+    # `pode_excluir` (aprovação da página e o alcance de escrita da restrita, uma vez por request).
+    # Teto 16 dá folga sem esconder um N+1 (1 query por linha estouraria).
+    with django_assert_max_num_queries(16):
         resp = client.get("/api/solicitacoes/?flow=SUPER&status=pendente")
 
     assert resp.status_code == 200

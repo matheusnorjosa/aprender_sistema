@@ -4,6 +4,8 @@
  * A Apoio de Coordenação (policy `publish_setor_solicitacao`, NÃO `use_gcal`) conecta
  * a PRÓPRIA conta Google e publica, atualiza ou tira só do Google, no calendário oficial da
  * organização, os eventos APROVADOS do próprio setor (tirar do Google não apaga do sistema).
+ * Excluir (decisão do dono, 27/10/2026) tira dos dois lados, só na linha que está no Google e que o
+ * servidor diz que ela pode excluir (`pode_excluir`; o evento de outra pessoa só quando está no Google).
  *
  * - Lista: `GET /solicitacoes/?status=aprovado&publishable=true&date_from=<hoje em
  *   Fortaleza>&ordering=inicio`, paginada no servidor. O backend só devolve linhas que
@@ -18,6 +20,7 @@ import { Alert, Button, Card, Empty, Grid, Modal, Space, Tag, Typography, messag
 
 import {
   cancelSolicitacao,
+  deleteSolicitacao,
   listSolicitacoes,
   publishSolicitacao,
   resyncSolicitacao,
@@ -34,7 +37,13 @@ import { syncChannel } from '../../services/syncChannel';
 import type { ID, Solicitacao } from '../../types';
 import type { PublishBlockReason } from '../../types/gcal';
 import { formatFortaleza } from '../../utils/datetime';
-import { gcalRowActions, type GcalRowAction, type GcalRowTag } from '../../utils/gcalRowActions';
+import {
+  confirmacaoDeExcluirNoGoogle,
+  estaNoGoogle,
+  gcalRowActions,
+  type GcalRowAction,
+  type GcalRowTag,
+} from '../../utils/gcalRowActions';
 
 const { Title, Text } = Typography;
 
@@ -296,6 +305,46 @@ export default function PublicacaoSetorPage(): JSX.Element {
     });
   }, [modal, runAction, focarLista]);
 
+  // Excluir tira dos dois lados (mesmo DELETE e mesma confirmação de Minhas Solicitações). O 400 traz o
+  // motivo legível do servidor (Google fora, já aprovada…): ele vai inteiro para a pessoa.
+  const confirmarExclusao = useCallback((row: Solicitacao): void => {
+    const gatilho = document.activeElement;
+    void modal.confirm({
+      ...confirmacaoDeExcluirNoGoogle(row),
+      afterClose: () => {
+        if (!gatilho?.isConnected) focarLista();
+      },
+      okText: 'Sim, excluir',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancelar',
+      autoFocusButton: 'cancel',
+      onOk: async () => {
+        try {
+          await deleteSolicitacao(row.id);
+        } catch (error) {
+          const err = error as ApiErrorLike;
+          const httpStatus = err.response?.status ?? err.status;
+          const code = err.response?.data?.code;
+          // Conexão com o Google, 404, 409 e 429: o mesmo tratamento das outras ações (recarrega o status).
+          if (httpStatus === 404 || httpStatus === 409 || httpStatus === 429 || code === 'google_not_connected') {
+            handleActionError(error);
+          } else {
+            message.error(err.response?.data?.detail || `Não foi possível excluir: ${err.message ?? 'erro desconhecido'}`);
+          }
+          // A recusa pode chegar depois de o Google já ter sido limpo: recarrega para a linha dizer a verdade.
+          if (httpStatus !== 404) void load();
+          return;
+        }
+        message.success(
+          row.gcal_status === 'ERROR' && !row.external_event_id
+            ? 'Evento excluído do sistema e do Google Agenda, se estava lá.'
+            : 'Evento excluído do sistema e do Google Agenda.',
+        );
+        await load();
+      },
+    });
+  }, [modal, focarLista, handleActionError, load]);
+
   const handleConnect = (): void => {
     window.location.href = GOOGLE_CONNECT_URL;
   };
@@ -383,6 +432,7 @@ export default function PublicacaoSetorPage(): JSX.Element {
       render: (_, row) => {
         const { actions, disabled } = gcalRowActions(row, { ready });
         const evento = `${row.projeto_nome ?? 'Evento'}, ${formatFortaleza(row.inicio)}`;
+        const podeExcluir = row.pode_excluir === true && estaNoGoogle(row);
         return (
           <Space wrap size="small">
             {actions.map((action) => {
@@ -402,11 +452,23 @@ export default function PublicacaoSetorPage(): JSX.Element {
                 </Button>
               );
             })}
+            {podeExcluir && (
+              <Button
+                size="small"
+                danger
+                disabled={disabled}
+                aria-label={`Excluir: ${evento}`}
+                style={celular ? { height: 'auto', whiteSpace: 'normal' } : undefined}
+                onClick={() => confirmarExclusao(row)}
+              >
+                Excluir
+              </Button>
+            )}
           </Space>
         );
       },
     },
-  ], [ready, confirmar, celular]);
+  ], [ready, confirmar, confirmarExclusao, celular]);
 
   return (
     <section className="p-3 sm:p-6" aria-labelledby={TITLE_ID}>
@@ -419,7 +481,7 @@ export default function PublicacaoSetorPage(): JSX.Element {
             </Title>
             <Text type="secondary">
               Eventos aprovados do seu setor, a partir de hoje. Publique ou atualize cada um na agenda
-              oficial da organização, ou tire só do Google: o evento continua no sistema.
+              oficial da organização. Tirar só do Google deixa o evento no sistema; Excluir tira dos dois lados.
             </Text>
           </header>
         </Card>

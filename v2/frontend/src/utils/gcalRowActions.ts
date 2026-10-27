@@ -19,6 +19,7 @@
  * não oferece ação nenhuma: publicar criaria um segundo evento, e o backend recusa.
  */
 import type { GCalStatus, Solicitacao } from '../types';
+import { formatFortaleza } from './datetime';
 
 export type GcalRowAction = 'publicar' | 'tentar' | 'atualizar' | 'remover';
 
@@ -93,4 +94,37 @@ export function motivoNaoPublicavel(
   if (row.fim && Date.parse(row.fim) < agora) return 'evento_passado';
   if (reenvio) return row.gcal_status === 'NONE' ? 'nao_publicado' : null;
   return row.gcal_status === 'PUBLISHED' || row.gcal_status === 'PENDING' ? 'ja_publicado' : null;
+}
+
+/**
+ * Evento que o sistema pôs (ou pode ter posto) no Google: publicado, com o id de lá, ou em ERROR
+ * (a publicação que falhou pode ter criado o evento sem gravar o id). Mesmo critério do backend
+ * (`esta_no_google`): excluir um desses o tira do Google também.
+ */
+export function estaNoGoogle(row: Pick<Solicitacao, 'gcal_status' | 'external_event_id'>): boolean {
+  return row.gcal_status === 'PUBLISHED' || row.gcal_status === 'ERROR' || Boolean(row.external_event_id);
+}
+
+type EventoDaExclusao = Pick<Solicitacao, 'inicio' | 'municipio_nome' | 'projeto_nome'>;
+
+/** O evento nas confirmações de excluir: "10/05/2026 09:00 · Crato · Vidas Em Rede". */
+export function resumoDoEvento(row: EventoDaExclusao): string {
+  const quando = formatFortaleza(row.inicio, 'DD/MM/YYYY HH:mm');
+  return `${quando} · ${row.municipio_nome || 'sem município'} · ${row.projeto_nome || 'sem projeto'}`;
+}
+
+/**
+ * Confirmação de excluir evento que está no Google (`estaNoGoogle`): sai dos dois lados. A mesma em
+ * Minhas Solicitações e em Publicar na agenda. Em ERROR o evento pode não ter chegado ao Google; o
+ * Meet só é citado quando existe.
+ */
+export function confirmacaoDeExcluirNoGoogle(
+  row: EventoDaExclusao & Pick<Solicitacao, 'gcal_status' | 'meet_link'>,
+): { title: string; content: string } {
+  const doGoogle = row.gcal_status === 'ERROR' ? 'do Google Agenda, se estiver lá' : 'do Google Agenda';
+  const meet = row.meet_link ? ', junto com o link do Meet' : '';
+  return {
+    title: 'Excluir evento?',
+    content: `${resumoDoEvento(row)}. Ele sai do sistema e ${doGoogle}${meet}. Não dá para desfazer.`,
+  };
 }

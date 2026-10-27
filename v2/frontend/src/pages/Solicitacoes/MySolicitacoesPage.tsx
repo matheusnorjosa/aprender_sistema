@@ -37,7 +37,13 @@ import type { ID, Solicitacao, SolicitacaoStatus, FluxoType, GCalStatus, Paginat
 import { formadoresLabel } from '../../utils/participants';
 import { formatFortaleza } from '../../utils/datetime';
 import { TEXTO_DA_TAG } from '../../components/textoDaTag';
-import { MOTIVO_NAO_PUBLICAVEL, motivoNaoPublicavel } from '../../utils/gcalRowActions';
+import {
+  MOTIVO_NAO_PUBLICAVEL,
+  confirmacaoDeExcluirNoGoogle,
+  estaNoGoogle,
+  motivoNaoPublicavel,
+  resumoDoEvento,
+} from '../../utils/gcalRowActions';
 
 const { Title, Text } = Typography;
 
@@ -143,18 +149,6 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
   return { podeEditar, podeExcluir, motivos };
 }
 
-/**
- * Evento que o sistema pôs (ou pode ter posto) no Google: publicado, com o id de lá, ou em ERROR
- * (a publicação que falhou pode ter criado o evento sem gravar o id). Mesmo critério do backend.
- */
-function estaNoGoogle(record: Solicitacao): boolean {
-  return (
-    record.gcal_status === ('PUBLISHED' as GCalStatus) ||
-    record.gcal_status === ('ERROR' as GCalStatus) ||
-    Boolean(record.external_event_id)
-  );
-}
-
 export default function MySolicitacoesPage(): JSX.Element {
   const navigate = useNavigate();
   const [loading, setLoading] = useState<boolean>(false);
@@ -242,19 +236,11 @@ export default function MySolicitacoesPage(): JSX.Element {
 
   // Ação destrutiva: cita a solicitação e começa no Cancelar (ux-principios).
   const confirmarExclusao = useCallback((record: Solicitacao): void => {
-    const quando = formatFortaleza(record.inicio, 'DD/MM/YYYY HH:mm');
-    const evento = `${quando} · ${record.municipio_nome || 'sem município'} · ${record.projeto_nome || 'sem projeto'}`;
-    // Em ERROR o evento pode não ter chegado ao Google; o Meet só é citado quando existe.
-    const doGoogle = record.gcal_status === ('ERROR' as GCalStatus) ? 'do Google Agenda, se estiver lá' : 'do Google Agenda';
-    const meet = record.meet_link ? ', junto com o link do Meet' : '';
     let excluiu = false;
     Modal.confirm({
       ...(estaNoGoogle(record)
-        ? {
-            title: 'Excluir evento?',
-            content: `${evento}. Ele sai do sistema e ${doGoogle}${meet}. Não dá para desfazer.`,
-          }
-        : { title: 'Excluir solicitação?', content: `${evento}. Esta ação não pode ser desfeita.` }),
+        ? confirmacaoDeExcluirNoGoogle(record)
+        : { title: 'Excluir solicitação?', content: `${resumoDoEvento(record)}. Esta ação não pode ser desfeita.` }),
       okText: 'Sim, excluir',
       okType: 'danger',
       cancelText: 'Cancelar',

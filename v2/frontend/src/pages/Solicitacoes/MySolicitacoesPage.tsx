@@ -37,7 +37,7 @@ import type { ID, Solicitacao, SolicitacaoStatus, FluxoType, GCalStatus, Paginat
 import { formadoresLabel } from '../../utils/participants';
 import { formatFortaleza } from '../../utils/datetime';
 import { TEXTO_DA_TAG } from '../../components/textoDaTag';
-import { MOTIVO_NAO_PUBLICAVEL } from '../../utils/gcalRowActions';
+import { MOTIVO_NAO_PUBLICAVEL, motivoNaoPublicavel } from '../../utils/gcalRowActions';
 
 const { Title, Text } = Typography;
 
@@ -79,36 +79,80 @@ function nomeDaSolicitacao(record: Solicitacao): string {
 /**
  * O que a dona pode fazer na linha e, quando não pode, por quê (texto visível por um botão, e não
  * só no Tooltip de um botão desabilitado, que o teclado e o toque não alcançam). As regras são as
- * de sempre: editar se não estiver publicado no GCal e não estiver reprovado; excluir se não
- * estiver publicado e, no fluxo SUPER, só enquanto pendente. Evento no Google Agenda pela planilha
- * (`publicado_fora_do_sistema`) conta como publicado: mudar aqui deixaria a agenda com o dado antigo.
+ * de sempre: editar se não estiver publicado no GCal e não estiver reprovado; excluir, no fluxo
+ * SUPER, só enquanto pendente. Evento no Google Agenda pela planilha (`publicado_fora_do_sistema`)
+ * conta como publicado: mudar aqui deixaria a agenda com o dado antigo, e ele não se exclui.
+ * Evento que o sistema pôs (ou pode ter posto) no Google (`estaNoGoogle`) se exclui só por quem
+ * também pode tirá-lo de lá (`pode_tirar_do_google`): a exclusão tira dos dois lados. Em ERROR a
+ * edição continua aberta; o motivo, então, fala só da exclusão.
  */
 function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcluir: boolean; motivos: string[] } {
   const naPlanilha = record.publicado_fora_do_sistema === true;
   const isPublished = naPlanilha || record.gcal_status === ('PUBLISHED' as GCalStatus);
+  const noGoogle = estaNoGoogle(record);
+  const podeTirarDoGoogle = record.pode_tirar_do_google === true;
   const isSuper = record.fluxo === ('SUPER' as FluxoType);
+  const superForaDePendente = isSuper && record.status !== 'pendente';
   const podeEditar = !isPublished && record.status !== 'reprovado';
-  const podeExcluir = !isPublished && (!isSuper || record.status === 'pendente');
+  const podeExcluir = !naPlanilha && (!noGoogle || podeTirarDoGoogle) && !superForaDePendente;
   const motivos: string[] = [];
   if (naPlanilha) {
     // Não foi o sistema que publicou: não há publicação para cancelar aqui.
     motivos.push(
       `Este evento ${MOTIVO_NAO_PUBLICAVEL.publicado_fora_do_sistema}; mudar aqui não muda a agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle.`
     );
-  } else if (isPublished) {
+  } else if (isPublished && !podeTirarDoGoogle) {
     motivos.push(
       'Este evento já está no Google Agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle que cancele a publicação; depois disso, você consegue editar aqui.'
     );
+  } else if (isPublished) {
+    // Publicar na agenda só lista aprovado de hoje em diante e só tira do Google com o id; evento
+    // passado não volta para o Google, então tirá-lo de lá para editar não tem volta.
+    const consegueTirar =
+      record.status === 'aprovado' &&
+      Boolean(record.external_event_id) &&
+      motivoNaoPublicavel(record) !== 'evento_passado';
+    motivos.push(
+      consegueTirar
+        ? 'Este evento já está no Google Agenda: para editar, tire-o do Google antes, na tela Publicar na agenda ou na Pré-agenda; depois disso, você consegue editar aqui.'
+        : 'Este evento já está no Google Agenda e não dá para editá-lo aqui. Para mudar, fale com a administração do sistema.'
+    );
+  } else if (noGoogle && !podeTirarDoGoogle && !superForaDePendente) {
+    // ERROR: a publicação deu erro, mas o evento pode estar no Google; excluir aqui o tiraria de lá.
+    // Só a Apoio, em Publicar na agenda, tira do Google um ERROR, e só aprovado, com id e de hoje em
+    // diante (a tela lista só 'aprovado'; gcalRowActions; a Pré-agenda só cancela o publicado). Fora
+    // disso, nenhuma tela tira. A SUPER fora de pendente não chega aqui: tirar do Google não devolve
+    // a exclusão a ela, e o motivo dela (abaixo) já dá a saída.
+    const apoioConsegueTirar =
+      record.status === 'aprovado' &&
+      Boolean(record.external_event_id) &&
+      motivoNaoPublicavel(record) !== 'evento_passado';
+    const saida = apoioConsegueTirar
+      ? 'Para excluir, peça ao Apoio de Coordenação da sua gerência que tire o evento só do Google, na tela Publicar na agenda; depois disso, você consegue excluir aqui.'
+      : 'Para excluir, fale com a administração do sistema.';
+    motivos.push(`Este evento pode estar no Google Agenda, e excluir aqui também o tiraria de lá. ${saida}`);
   } else if (record.status === 'reprovado') {
     motivos.push('Solicitações reprovadas não podem ser editadas.');
   }
   // Cancelar a publicação não devolve a exclusão a uma SUPER que já saiu de pendente.
-  if (isSuper && record.status !== 'pendente') {
+  if (superForaDePendente) {
     motivos.push(
       'Solicitações do fluxo Superintendência só podem ser excluídas enquanto estão pendentes. Para tirar o evento, fale com a administração do sistema.'
     );
   }
   return { podeEditar, podeExcluir, motivos };
+}
+
+/**
+ * Evento que o sistema pôs (ou pode ter posto) no Google: publicado, com o id de lá, ou em ERROR
+ * (a publicação que falhou pode ter criado o evento sem gravar o id). Mesmo critério do backend.
+ */
+function estaNoGoogle(record: Solicitacao): boolean {
+  return (
+    record.gcal_status === ('PUBLISHED' as GCalStatus) ||
+    record.gcal_status === ('ERROR' as GCalStatus) ||
+    Boolean(record.external_event_id)
+  );
 }
 
 export default function MySolicitacoesPage(): JSX.Element {
@@ -199,10 +243,18 @@ export default function MySolicitacoesPage(): JSX.Element {
   // Ação destrutiva: cita a solicitação e começa no Cancelar (ux-principios).
   const confirmarExclusao = useCallback((record: Solicitacao): void => {
     const quando = formatFortaleza(record.inicio, 'DD/MM/YYYY HH:mm');
+    const evento = `${quando} · ${record.municipio_nome || 'sem município'} · ${record.projeto_nome || 'sem projeto'}`;
+    // Em ERROR o evento pode não ter chegado ao Google; o Meet só é citado quando existe.
+    const doGoogle = record.gcal_status === ('ERROR' as GCalStatus) ? 'do Google Agenda, se estiver lá' : 'do Google Agenda';
+    const meet = record.meet_link ? ', junto com o link do Meet' : '';
     let excluiu = false;
     Modal.confirm({
-      title: 'Excluir solicitação?',
-      content: `${quando} · ${record.municipio_nome || 'sem município'} · ${record.projeto_nome || 'sem projeto'}. Esta ação não pode ser desfeita.`,
+      ...(estaNoGoogle(record)
+        ? {
+            title: 'Excluir evento?',
+            content: `${evento}. Ele sai do sistema e ${doGoogle}${meet}. Não dá para desfazer.`,
+          }
+        : { title: 'Excluir solicitação?', content: `${evento}. Esta ação não pode ser desfeita.` }),
       okText: 'Sim, excluir',
       okType: 'danger',
       cancelText: 'Cancelar',

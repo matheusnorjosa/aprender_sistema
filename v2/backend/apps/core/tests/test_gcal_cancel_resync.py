@@ -214,6 +214,8 @@ class TestCancelHelper:
         assert solicitacao_publicada.gcal_status == Solicitacao.GCalStatus.NONE
         assert solicitacao_publicada.last_sync_action == "DELETE"
         assert solicitacao_publicada.last_sync_error is None
+        # Tirar do Google não mexe na decisão: o evento continua aprovado no sistema.
+        assert solicitacao_publicada.status == "aprovado"
 
         # Validar outcome
         assert outcome.action == "DELETE"

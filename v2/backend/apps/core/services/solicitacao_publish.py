@@ -509,3 +509,98 @@ def cancel_from_gcal(
         solicitacao_id=solicitacao.id,
         message="Cancelamento solicitado com sucesso (processando em background).",
     )
+
+
+_MSG_SINCRONIZACAO_EM_ANDAMENTO = (
+    "Não é possível excluir enquanto a sincronização com o Google Calendar está em andamento. Aguarde a conclusão."
+)
+_MSG_GOOGLE_NAO_CONFIRMOU = (
+    "O Google Agenda não confirmou a remoção do evento, e nada foi excluído: ele continua no sistema e no "
+    "Google. Tente excluir de novo em alguns minutos."
+)
+
+
+def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | None:
+    """Tira o evento do Google AGORA (síncrono), para a exclusão apagar dos dois lados.
+
+    Mesmo caminho da task de cancelamento (`task_cancel_solicitacao_from_gcal`): no modo OAuth o
+    cliente é o da conta de quem exclui; fora dele, o service account. `cancel_solicitacao` só limpa
+    os campos depois que o Google confirma (404 ou 410 = já removido) e grava `gcal_status=NONE`; o
+    `status` não muda. Quem chama já conferiu `can_publish_solicitacao`.
+
+    A linha é relida com lock: PENDING (publicação ou reenvio enfileirado) recusa sem chamar o
+    Google. ERROR sem id (publicação que falhou) usa o id determinístico do insert, porque o evento
+    pode ter sido criado lá. O AuditLog vem antes do Google: depois dele só sobra o save da linha.
+
+    Returns:
+        O `external_event_id` que estava (ou podia estar) no Google.
+
+    Raises:
+        ValidationAPIError 400 `gcal_cancel_failed` com o motivo legível. Se o Google falhou, nada
+        mudou. Se a gravação falhou depois do Google (raro), o evento pode já ter saído de lá e a
+        linha continua como antes; tentar de novo resolve (404 e 410 contam como sucesso).
+    """
+    from django.db import DatabaseError, transaction
+
+    from apps.core.services.gcal_sync_service import (  # pyright: ignore[reportPrivateUsage]
+        _event_id_for,
+        cancel_solicitacao,
+    )
+    from apps.core.tasks import (  # pyright: ignore[reportPrivateUsage]
+        _MSG_CREDENCIAL_GOOGLE,
+        _MSG_SEM_ACESSO_CALENDARIO,
+        _friendly_gcal_error,
+    )
+
+    try:
+        client = None
+        if _check_google_oauth(user) is not None:
+            from apps.core.services.gcal_client_factory import get_oauth_client_for_user
+
+            try:
+                client, _ = get_oauth_client_for_user(user)
+            except ValueError as e:
+                raise ValidationAPIError(message=_MSG_CREDENCIAL_GOOGLE, code="gcal_cancel_failed") from e
+
+        with transaction.atomic():
+            s = Solicitacao.objects.select_for_update().get(pk=solicitacao.pk)
+            if s.gcal_status == Solicitacao.GCalStatus.PENDING:
+                raise ValidationAPIError(message=_MSG_SINCRONIZACAO_EM_ANDAMENTO, code="gcal_cancel_failed")
+            if s.gcal_status == Solicitacao.GCalStatus.ERROR and not s.external_event_id:
+                s.external_event_id = _event_id_for(s)
+            external_event_id = s.external_event_id
+            AuditLog.objects.create(
+                usuario=user,
+                action=AuditLog.Action.CANCEL_GCAL,
+                model_name="Solicitacao",
+                details={
+                    "solicitacao_id": s.id,
+                    "action": "DELETE",
+                    "external_event_id": external_event_id,
+                    "origem": "exclusao",
+                },
+            )
+            cancel_solicitacao(s, client=client)
+    except ValidationAPIError:
+        raise
+    except Exception as e:
+        logger.warning(
+            "excluir_cancel_gcal_failed",
+            extra={"event": "excluir_cancel_gcal_failed", "solicitacao_id": solicitacao.pk, "error": str(e)[:500]},
+        )
+        if isinstance(e, DatabaseError):
+            mensagem = (
+                "O evento pode já ter saído do Google Agenda, mas o sistema não conseguiu gravar. "
+                "Nada foi excluído aqui: tente excluir de novo."
+            )
+        elif isinstance(e, APIError):
+            mensagem = e.message
+        elif isinstance(e, ValueError) or _friendly_gcal_error(e) == _MSG_SEM_ACESSO_CALENDARIO:
+            # Sem acesso ao calendário (403/404, ou a checagem do `cancel_solicitacao`): o texto diz o que fazer.
+            mensagem = f"Nada foi excluído. {_friendly_gcal_error(e)}"
+        else:
+            # Fora de 403/404 (5xx, rede) o texto do Google é técnico: o cru fica só no log acima.
+            mensagem = _MSG_GOOGLE_NAO_CONFIRMOU
+        raise ValidationAPIError(message=mensagem, code="gcal_cancel_failed") from e
+
+    return external_event_id

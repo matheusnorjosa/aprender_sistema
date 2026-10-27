@@ -18,7 +18,7 @@ Testes:
 1. Owner pode excluir sua solicitação SUPER pendente
 2. Usuário privilegiado pode excluir qualquer solicitação (dentro das regras)
 3. Usuário comum NÃO pode excluir solicitação de outro
-4. NÃO pode excluir solicitação publicada no GCal
+4. NÃO pode excluir solicitação publicada no GCal sem poder tirá-la do Google
 5. NÃO pode excluir solicitação SUPER aprovada ou reprovada
 6. PODE excluir solicitação NAO_SUPER aprovada ou reprovada
 7. Exclusão gera AuditLog antes de deletar
@@ -872,8 +872,15 @@ class TestSolicitacaoDelete:
         # Solicitação ainda existe
         assert Solicitacao.objects.filter(id=sol_id).exists()
 
-    def test_cannot_delete_published_solicitacao(self, api_client, usuario_owner, solicitacao_publicada):
-        """NÃO pode excluir solicitação já publicada no GCal (ambos os fluxos)."""
+    def test_cannot_delete_published_solicitacao(
+        self, api_client, usuario_owner, solicitacao_publicada, projeto_nao_super
+    ):
+        """Quem não pode tirar do Google (dono Coordenador, sem `can_publish_solicitacao`) não exclui o
+        evento publicado. Quem pode exclui dos dois lados: `test_excluir_sai_do_google.py`.
+
+        NAO_SUPER: a SUPER aprovada já para antes, na regra do fluxo SUPER."""
+        solicitacao_publicada.projeto = projeto_nao_super
+        solicitacao_publicada.save(update_fields=["projeto"])
         api_client.force_authenticate(user=usuario_owner)
         sol_id = solicitacao_publicada.id
 

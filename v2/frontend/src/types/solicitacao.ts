@@ -111,6 +111,8 @@ export interface Solicitacao {
   gcal_last_error: string | null;
   /** No Google Agenda pela planilha e não adotado (virada): o sistema não publica. */
   publicado_fora_do_sistema?: boolean;
+  /** Quem lê pode tirar este evento do Google (`can_publish_solicitacao`): Excluir tira de lá também. */
+  pode_tirar_do_google?: boolean;
   meet_link: string | null;
 }
 

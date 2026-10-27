@@ -21,6 +21,7 @@ from apps.core.serializers.usuario import UserSlimSerializer
 from apps.core.services.avaliacao_formador import formadores_avaliaveis_ids, gerencia_pergunta
 from apps.core.services.compra_elegibilidade import isento_da_regra_da_compra, par_liberado
 from apps.core.services.solicitacao_approval import DECISAO_IMPEDIDA, decisoes_impedidas
+from apps.core.services.solicitacao_scope import scope_publishable_solicitacoes
 
 
 class ParticipationNestedSerializer(serializers.ModelSerializer):
@@ -76,6 +77,9 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
     # PA-02 (PR 10): por que quem lê NÃO decide esta pendente ("propria", "conta_alterada",
     # "editada_pelo_ator"); null quando decide ou não aprova. A tela de Aprovações esconde os botões.
     decisao_impedida = serializers.SerializerMethodField()
+    # Quem lê pode tirar este evento do Google (`can_publish_solicitacao`)? Minhas Solicitações só
+    # mostra Excluir de evento no Google a quem pode as duas coisas (a exclusão tira de lá também).
+    pode_tirar_do_google = serializers.SerializerMethodField()
 
     class Meta:
         model = Solicitacao
@@ -103,6 +107,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "avaliaveis_ids",
             "projeto_pergunta_avaliar_formador",
             "decisao_impedida",
+            "pode_tirar_do_google",
             "inicio",
             "fim",
             "status",
@@ -192,15 +197,39 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         calculados: dict[int, str | None] | None = cast(Any, self.context.get("_decisao_impedida"))
         if calculados is None or obj.pk not in calculados:
             calculados = calculados or {}
-            parent: object = getattr(self, "parent", None)
-            pagina: Any = getattr(parent, "instance", None) if isinstance(parent, serializers.ListSerializer) else None
-            ids: set[int] = {int(o.pk) for o in pagina} if pagina is not None else set()
-            ids.add(obj.pk)
+            ids = self._ids_da_pagina(obj)
             impedidos: dict[int, str] = {}
             if user_has_policy(user, "access_solicitation_approvals"):
                 impedidos = decisoes_impedidas(user, Solicitacao.objects.filter(id__in=ids))
             calculados.update({sol_id: DECISAO_IMPEDIDA.get(impedidos.get(sol_id, "")) for sol_id in ids})
             self.context["_decisao_impedida"] = calculados
+        return calculados[obj.pk]
+
+    def _ids_da_pagina(self, obj: Solicitacao) -> set[int]:
+        """Ids da página que está sendo serializada (só `obj` fora de listagem)."""
+        parent: object = getattr(self, "parent", None)
+        pagina: Any = getattr(parent, "instance", None) if isinstance(parent, serializers.ListSerializer) else None
+        ids: set[int] = {int(o.pk) for o in pagina} if pagina is not None else set()
+        ids.add(obj.pk)
+        return ids
+
+    def get_pode_tirar_do_google(self, obj: Solicitacao) -> bool:
+        """`can_publish_solicitacao` de quem lê, para a página inteira numa consulta só.
+
+        Lê a mesma regra da guarda de objeto (`scope_publishable_solicitacoes`, que usa o mesmo
+        `_publish_tier`): o escopo de publicação sai uma vez por request, guardado no contexto.
+        """
+        calculados: dict[int, bool] | None = cast(Any, self.context.get("_pode_tirar_do_google"))
+        if calculados is None or obj.pk not in calculados:
+            calculados = calculados or {}
+            request: Any = self.context.get("request")
+            ids = self._ids_da_pagina(obj)
+            ids_publicaveis: Any = scope_publishable_solicitacoes(
+                Solicitacao.objects.filter(id__in=ids), getattr(request, "user", None)
+            ).values_list("id", flat=True)
+            publicaveis: set[int] = set(ids_publicaveis)
+            calculados.update({sol_id: sol_id in publicaveis for sol_id in ids})
+            self.context["_pode_tirar_do_google"] = calculados
         return calculados[obj.pk]
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:

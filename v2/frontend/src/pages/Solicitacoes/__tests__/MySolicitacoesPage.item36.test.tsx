@@ -261,3 +261,266 @@ describe('MySolicitacoesPage — item 36', { timeout: 20000 }, () => {
     expect(screen.getByText('Crato')).toBeInTheDocument();
   });
 });
+
+// Excluir um evento no Google tira dos dois lados (opção A do dono: sem poder novo). Quem vê Excluir
+// num evento no Google é quem já pode excluir E já pode tirar do Google (`pode_tirar_do_google`).
+describe('MySolicitacoesPage — Excluir sai do sistema e do Google', { timeout: 20000 }, () => {
+  beforeEach(() => {
+    listSolicitacoesMock.mockReset();
+    deleteSolicitacaoMock.mockReset();
+  });
+
+  test.each([
+    {
+      caso: 'publicado, com Meet',
+      row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'evt-1', meet_link: 'https://meet.google.com/abc-defg-hij' },
+      texto: 'Ele sai do sistema e do Google Agenda, junto com o link do Meet. Não dá para desfazer.',
+    },
+    {
+      caso: 'publicado, presencial (sem Meet)',
+      row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'evt-1', meet_link: null },
+      texto: 'Ele sai do sistema e do Google Agenda. Não dá para desfazer.',
+    },
+    {
+      caso: 'erro com o evento ainda no Google',
+      row: { gcal_status: 'ERROR' as const, external_event_id: 'evt-1' },
+      texto: 'Ele sai do sistema e do Google Agenda, se estiver lá. Não dá para desfazer.',
+    },
+    {
+      // A publicação que falhou pode ter criado o evento no Google sem gravar o id.
+      caso: 'erro sem id',
+      row: { gcal_status: 'ERROR' as const, external_event_id: null },
+      texto: 'Ele sai do sistema e do Google Agenda, se estiver lá. Não dá para desfazer.',
+    },
+  ])('$caso, para quem pode tirar do Google: Excluir aparece e avisa que sai do Google também', async ({ row, texto }) => {
+    const confirmar = vi
+      .spyOn(Modal, 'confirm')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({ id: 7, municipio_nome: 'Crato', projeto_nome: 'Vidas', status: 'aprovado', pode_tirar_do_google: true, ...row }),
+      ])
+    );
+    deleteSolicitacaoMock.mockResolvedValue(undefined);
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Excluir: 10/05/2026 · Crato' }));
+    const opcoes = confirmar.mock.calls[0]![0];
+    expect(opcoes.title).toBe('Excluir evento?');
+    expect(String(opcoes.content)).toBe(`10/05/2026 10:00 · Crato · Vidas. ${texto}`);
+    expect(opcoes).toMatchObject({ autoFocusButton: 'cancel', okText: 'Sim, excluir', cancelText: 'Cancelar' });
+    await act(async () => {
+      await opcoes.onOk?.();
+    });
+    expect(deleteSolicitacaoMock).toHaveBeenCalledWith(7);
+    confirmar.mockRestore();
+  });
+
+  test.each([
+    ['evento que já passou', { external_event_id: 'asv29' }],
+    ['publicado sem o id do Google', { inicio: '2099-05-10T13:00:00Z', fim: '2099-05-10T17:00:00Z' }],
+  ])('publicado, para quem pode tirar do Google, %s: não manda para Publicar na agenda', async (_caso, extra) => {
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 9,
+          municipio_nome: 'Crato',
+          status: 'aprovado',
+          gcal_status: 'PUBLISHED',
+          pode_tirar_do_google: true,
+          ...extra,
+        }),
+      ])
+    );
+    renderPage();
+    const botao = await screen.findByRole('button', { name: /^Por que não dá para editar: .* · Crato$/ });
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    fireEvent.click(botao);
+    const texto = String(informar.mock.calls[0]![0].content);
+    // A tela Publicar na agenda não lista evento passado nem oferece tirar do Google sem o id.
+    expect(texto).not.toContain('Publicar na agenda');
+    expect(texto).toContain('administração do sistema');
+    informar.mockRestore();
+  });
+
+  test('publicado, para quem pode tirar do Google: sem o aviso de pedir ao Apoio', async () => {
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 8,
+          municipio_nome: 'Crato',
+          status: 'aprovado',
+          gcal_status: 'PUBLISHED',
+          external_event_id: 'asv28',
+          inicio: '2099-05-10T13:00:00Z',
+          fim: '2099-05-10T17:00:00Z',
+          pode_tirar_do_google: true,
+        }),
+      ])
+    );
+    renderPage();
+    expect(await screen.findByRole('button', { name: 'Excluir: 10/05/2099 · Crato' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Por que não dá para editar nem excluir/ })).not.toBeInTheDocument();
+    // Editar continua fechado enquanto está no Google; o motivo diz o que ela mesma pode fazer.
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    fireEvent.click(screen.getByRole('button', { name: 'Por que não dá para editar: 10/05/2099 · Crato' }));
+    const texto = String(informar.mock.calls[0]![0].content);
+    expect(texto).toContain('tire-o do Google antes');
+    // Diz onde: Minhas Solicitações não tem a ação de tirar do Google.
+    expect(texto).toContain('Publicar na agenda');
+    expect(texto).not.toContain('Apoio de Coordenação');
+    informar.mockRestore();
+  });
+
+  // A saída indicada tem de existir: "Tirar só do Google" (Publicar na agenda) só aparece em ERROR com id
+  // e só lista evento de hoje em diante; nas outras, nenhuma tela tira o evento do Google.
+  test.each([
+    {
+      caso: 'com id, evento futuro',
+      external_event_id: 'evt-1',
+      fim: '2099-05-10T17:00:00Z',
+      saida: 'Para excluir, peça ao Apoio de Coordenação da sua gerência que tire o evento só do Google, na tela Publicar na agenda',
+    },
+    {
+      caso: 'com id, evento que já terminou',
+      external_event_id: 'evt-1',
+      fim: '2026-05-10T17:00:00Z',
+      saida: 'Para excluir, fale com a administração do sistema.',
+    },
+    {
+      caso: 'sem id',
+      external_event_id: null,
+      fim: '2099-05-10T17:00:00Z',
+      saida: 'Para excluir, fale com a administração do sistema.',
+    },
+  ])('erro $caso, para quem não pode tirar do Google: sem Excluir, e o motivo dá uma saída que existe', async ({ external_event_id, fim, saida }) => {
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 8,
+          municipio_nome: 'Crato',
+          status: 'aprovado',
+          gcal_status: 'ERROR',
+          external_event_id,
+          fim,
+          pode_tirar_do_google: false,
+        }),
+      ])
+    );
+    renderPage();
+    expect(await screen.findByText('Crato')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Excluir:/ })).not.toBeInTheDocument();
+    // Em ERROR a edição continua aberta: o motivo explica a exclusão, não a edição.
+    expect(screen.getByRole('button', { name: 'Editar: 10/05/2026 · Crato' })).toBeInTheDocument();
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    fireEvent.click(screen.getByRole('button', { name: 'Por que não dá para excluir: 10/05/2026 · Crato' }));
+    const texto = String(informar.mock.calls[0]![0].content);
+    expect(texto).toContain('Este evento pode estar no Google Agenda, e excluir aqui também o tiraria de lá.');
+    expect(texto).toContain(saida);
+    // O Controle não tem "tirar do Google" para evento em ERROR (a Pré-agenda só cancela o publicado).
+    expect(texto).not.toContain('Controle');
+    expect(texto).not.toContain('editar');
+    informar.mockRestore();
+  });
+
+  // Publicar na agenda só lista 'aprovado': a ERROR editada (volta a pendente, PA-04) ou reprovada não
+  // aparece lá, então o Apoio não tem onde tirá-la do Google.
+  test.each([
+    { caso: 'pendente', fluxo: 'NAO_SUPER' as const, status: 'pendente' as const },
+    { caso: 'reprovada', fluxo: 'NAO_SUPER' as const, status: 'reprovado' as const },
+    { caso: 'SUPER que voltou a pendente', fluxo: 'SUPER' as const, status: 'pendente' as const },
+  ])('erro com id, $caso, para quem não pode tirar do Google: não manda pedir ao Apoio', async ({ fluxo, status }) => {
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 8,
+          municipio_nome: 'Crato',
+          fluxo,
+          status,
+          gcal_status: 'ERROR',
+          external_event_id: 'evt-1',
+          fim: '2099-05-10T17:00:00Z',
+          pode_tirar_do_google: false,
+        }),
+      ])
+    );
+    renderPage();
+    expect(await screen.findByText('Crato')).toBeInTheDocument();
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    fireEvent.click(screen.getByRole('button', { name: /^Por que não dá para .*: 10\/05\/2026 · Crato$/ }));
+    const texto = String(informar.mock.calls[0]![0].content);
+    expect(texto).not.toContain('Publicar na agenda');
+    expect(texto).toContain('Para excluir, fale com a administração do sistema.');
+    informar.mockRestore();
+  });
+
+  test('SUPER aprovada em erro com id, para quem não pode tirar do Google: o motivo não se contradiz', async () => {
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 8,
+          municipio_nome: 'Crato',
+          fluxo: 'SUPER',
+          status: 'aprovado',
+          gcal_status: 'ERROR',
+          external_event_id: 'evt-1',
+          fim: '2099-05-10T17:00:00Z',
+          pode_tirar_do_google: false,
+        }),
+      ])
+    );
+    renderPage();
+    expect(await screen.findByText('Crato')).toBeInTheDocument();
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    fireEvent.click(screen.getByRole('button', { name: /^Por que não dá para .*: 10\/05\/2026 · Crato$/ }));
+    const texto = String(informar.mock.calls[0]![0].content);
+    // Tirar do Google não devolve a exclusão a uma SUPER fora de pendente: nada de "excluir aqui".
+    expect(texto).not.toMatch(/excluir aqui/);
+    expect(texto).toContain('Solicitações do fluxo Superintendência só podem ser excluídas enquanto estão pendentes.');
+    expect(texto).toContain('fale com a administração do sistema');
+    informar.mockRestore();
+  });
+
+  test('na planilha (não adotado): sem Excluir mesmo para quem pode tirar do Google', async () => {
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 10,
+          municipio_nome: 'Crato',
+          status: 'aprovado',
+          gcal_status: 'NONE',
+          publicado_fora_do_sistema: true,
+          pode_tirar_do_google: true,
+        }),
+      ])
+    );
+    renderPage();
+    expect(await screen.findByText('Na agenda')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Excluir:/ })).not.toBeInTheDocument();
+  });
+
+  test('fora do Google, a confirmação continua a de sempre', async () => {
+    const confirmar = vi
+      .spyOn(Modal, 'confirm')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([makeSolic({ id: 7, municipio_nome: 'Crato', projeto_nome: 'Vidas', pode_tirar_do_google: true })])
+    );
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Excluir: 10/05/2026 · Crato' }));
+    const opcoes = confirmar.mock.calls[0]![0];
+    expect(opcoes.title).toBe('Excluir solicitação?');
+    expect(String(opcoes.content)).toBe('10/05/2026 10:00 · Crato · Vidas. Esta ação não pode ser desfeita.');
+    confirmar.mockRestore();
+  });
+});

@@ -240,7 +240,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         1. Permite PATCH parcial: se apenas um dos campos vier no payload,
            usa o valor atual da instância para validar o intervalo.
         2. Bloqueia edição de solicitações já publicadas no Google Calendar
-           (gcal_status == 'PUBLISHED') para evitar drift.
+           (gcal_status == 'PUBLISHED') para evitar drift, e das que estão lá pela planilha
+           (`publicado_fora_do_sistema`, mesma regra).
         3. Bloqueia edição de solicitações reprovadas.
         4. Exige compra que libere o par município+projeto (regra única em
            `services/compra_elegibilidade`) na criação e quando o VALOR de município ou de
@@ -252,6 +253,17 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
 
         # Regra 2: Bloquear edição durante a sincronização com o GCal.
         if instance is not None:
+            # Evento no Google pela planilha (carga da virada): segue a regra do publicado pelo
+            # sistema, e mudar aqui não muda a agenda (decisão do dono, 19/10/2026).
+            if getattr(instance, "publicado_fora_do_sistema", False):
+                raise serializers.ValidationError(
+                    {
+                        "non_field_errors": [
+                            "Este evento está no Google Agenda pela planilha; mudar aqui não muda a agenda. "
+                            "Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle."
+                        ]
+                    }
+                )
             if getattr(instance, "gcal_status", None) == "PUBLISHED":
                 raise serializers.ValidationError(
                     {

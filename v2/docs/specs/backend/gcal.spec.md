@@ -1,7 +1,7 @@
 ---
 title: Integração Google Calendar + Meet
 status: canonical
-last_verified: 2026-10-26
+last_verified: 2026-10-27
 verified_at_commit: 804df36a1741d1faa53586eafade5c4c74c0659d
 sources_of_truth:
   - v2/backend/apps/core/services/gcal_client_factory.py
@@ -16,6 +16,7 @@ sources_of_truth:
   - v2/backend/apps/core/services/oauth/token_manager.py
   - v2/backend/apps/core/services/google_oauth.py
   - v2/backend/apps/core/services/solicitacao_publish.py
+  - v2/backend/apps/core/services/solicitacao_exclusao.py
   - v2/backend/apps/core/tasks.py
   - v2/backend/apps/core/views_solicitacao.py
   - v2/backend/apps/core/views_oauth.py
@@ -103,6 +104,7 @@ Ações sobre `Solicitacao` (DRF `@action`, todas `CanUseGcal | CanPublishSetorS
 - `POST /api/solicitacoes/{id}/cancel-gcal/` → enfileira `task_cancel_solicitacao_from_gcal`; deleta evento e limpa campos (202); 409 se não publicado. Só tira do Google: o `status` não muda e a solicitação continua no sistema.
 - `DELETE /api/solicitacoes/{id}/` de evento no Google (`PUBLISHED`, `ERROR` ou com `external_event_id`; `ERROR` sem id usa o id determinístico do insert, porque a publicação que falhou pode ter criado o evento) → tira do Google **síncrono** (`remover_do_google_agora`: mesma checagem OAuth e cliente da task, linha relida com lock e `PENDING` recusado, `AuditLog` `CANCEL_GCAL` antes do Google, `cancel_solicitacao`) e só então apaga (204); exige `can_publish_solicitacao`, senão 400 sem chamar o Google; falha no Google → 400 que diz que nada foi apagado (sem acesso ao calendário: o motivo e o que fazer; 5xx ou rede: tentar de novo em alguns minutos, sem o erro cru do Google, que fica no log `excluir_cancel_gcal_failed`) (falha ao gravar depois do Google → 400 que avisa que o evento pode já ter saído de lá; tentar de novo resolve). O delete relê a linha com lock e recusa (400) se uma publicação ou reenvio concorrente a pôs no Google. Regra: [`politica-aprovacao.spec.md`](../domain/politica-aprovacao.spec.md) (adendo "excluir evento que está no Google").
 - Lista e detalhe de `Solicitacao` trazem `pode_tirar_do_google` (só leitura): `can_publish_solicitacao` de quem lê, calculado para a página numa consulta (`scope_publishable_solicitacoes`).
+- E `pode_excluir` (só leitura, 27/10/2026): o `DELETE` de quem lê passaria, salvo o Google recusar. É a permissão do `destroy` (`PodeExcluirSolicitacao`: quem edita e, no evento de outra pessoa que está no Google, a Apoio da gerência, adendo de 27/10 em [`politica-aprovacao.spec.md`](../domain/politica-aprovacao.spec.md)) com as recusas que se sabem sem o Google (`motivo_que_impede_excluir`, a mesma função do `perform_destroy`). Os fatos de quem lê saem uma vez por request (`EscritaEmSolicitacao`) e a aprovação da página numa consulta (`ids_ja_aprovadas`): número de consultas fixo, sem crescer com as linhas (`test_pode_excluir_nao_cresce_em_consultas_com_a_pagina`). Publicar na agenda mostra Excluir só com ele.
 - `meet_link` é exposto nos serializers de detalhe e lista de `Solicitacao`.
 - `GET /api/solicitacoes/?publishable=true` → só as solicitações que o usuário pode publicar (global: todo o escopo; Apoio: `projeto.gerencia_id` entre as gerências onde é APOIO vigente, desde o PR 9 das permissões; sem permissão ou sem gerência de APOIO: vazio). Sem o parâmetro, a lista não muda.
 

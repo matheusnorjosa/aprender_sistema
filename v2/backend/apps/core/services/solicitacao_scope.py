@@ -227,13 +227,17 @@ class EscritaEmSolicitacao:
 
         Só quando (a) o projeto é de uma gerência onde ela é APOIO vigente (com `publish_setor_solicitacao`,
         o mesmo alcance de quem tira do Google), (b) o evento está no Google (`esta_no_google`) e (c) não
-        é `publicado_fora_do_sistema`. Pedido fora do Google (ex.: SUPER pendente esperando a gerente)
-        continua fora; editar não muda. As recusas do `perform_destroy` valem por cima.
+        é `publicado_fora_do_sistema`, e (d) está `aprovado`. Pedido fora do Google ou não aprovado (ex.: SUPER
+        pendente esperando a gerente) continua fora; editar não muda. As recusas do `perform_destroy` valem por cima.
         """
         user = self.user
         if not user or not getattr(user, "is_authenticated", False):
             return False
         if getattr(obj, "publicado_fora_do_sistema", False) or not esta_no_google(obj):
+            return False
+        # Só o aprovado: quem é global para ver e também é Apoio (a aprovadora da Superintendência)
+        # passaria só por aqui num pendente com Event ID adotado.
+        if getattr(obj, "status", None) != "aprovado":
             return False
         gerencia_id = getattr(getattr(obj, "projeto", None), "gerencia_id", None)
         return gerencia_id is not None and gerencia_id in self._gerencias_de_apoio

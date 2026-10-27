@@ -187,6 +187,9 @@ def test_apoio_nao_exclui_evento_fora_do_google_de_outra_pessoa(apoio, coordenad
     response = _delete(apoio, sol)
 
     assert response.status_code == 403
+    # A recusa fala de excluir (não da mensagem de edição) e diz quando a Apoio pode.
+    assert "excluir" in str(response.data["detail"])
+    assert "editar" not in str(response.data["detail"])
     google.delete.assert_not_called()
     assert Solicitacao.objects.filter(pk=sol.pk).exists()
 
@@ -336,3 +339,16 @@ def test_pode_excluir_nao_cresce_em_consultas_com_a_pagina(apoio, coordenadora, 
         _evento(coordenadora, projeto)
 
     assert consultas() == com_duas
+
+
+@pytest.mark.parametrize("status", ["pendente", "reprovado"])
+def test_regra_da_apoio_so_vale_para_evento_aprovado(apoio, coordenadora, projeto_super, status):
+    """Pedido de outra pessoa que não está aprovado (ex.: SUPER pendente com Event ID adotado) não é da Apoio.
+
+    A lista dela só traz as aprovadas da gerência, mas quem é global para ver (a aprovadora da
+    Superintendência que também é Apoio) passaria só por esta regra: ela tem de olhar o status.
+    """
+    from apps.core.services.solicitacao_scope import EscritaEmSolicitacao
+
+    sol = _evento(coordenadora, projeto_super, gcal_status="ERROR", external_event_id="evt-adotado-1", status=status)
+    assert EscritaEmSolicitacao(apoio).apoio_pode_excluir_do_google(sol) is False

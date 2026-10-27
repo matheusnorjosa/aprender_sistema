@@ -215,6 +215,11 @@ class PodeExcluirSolicitacao(IsOwnerOrPrivileged):  # type: ignore[misc]
     (`EscritaEmSolicitacao.apoio_pode_excluir_do_google`). As recusas do `perform_destroy` valem por cima.
     """
 
+    message = (
+        "Você só pode excluir suas próprias solicitações, as do seu escopo de gestão ou, como Apoio de "
+        "Coordenação, o evento aprovado de outra pessoa que já está no Google Agenda da sua gerência."
+    )
+
     def permite(self, user: object, obj: object, escrita: EscritaEmSolicitacao) -> bool:
         return super().permite(user, obj, escrita) or escrita.apoio_pode_excluir_do_google(obj)
 

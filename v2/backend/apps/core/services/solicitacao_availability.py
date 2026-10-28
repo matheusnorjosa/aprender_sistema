@@ -15,6 +15,7 @@ errada e o formador podia ser alocado em dois eventos simultâneos.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from django.db import connection
@@ -60,12 +61,14 @@ class GuardResult:
     blocked: participantes com conflito (vazio se ok)
     skipped_guests: e-mails de convidados externos que não puderam ser checados
     checked_usuario_ids: ids efetivamente checados (já deduplicados)
+    lote: o `lote` da checagem ({id: número na lista}); a mensagem não chama de aprovado o irmão do lote
     """
 
     ok: bool
     blocked: list[ParticipantConflicts]
     skipped_guests: list[str]
     checked_usuario_ids: list[int]
+    lote: Mapping[int, int] | None = None
 
 
 def _display_name(usuario: Usuario) -> str:
@@ -139,7 +142,9 @@ def lock_participants(usuario_ids: list[int]) -> None:
             cursor.execute("SELECT pg_advisory_xact_lock(%s, %s)", [_LOCK_NAMESPACE, usuario_id])
 
 
-def check_solicitacao_availability(solicitacao: Solicitacao, *, lock: bool = True) -> GuardResult:
+def check_solicitacao_availability(
+    solicitacao: Solicitacao, *, lock: bool = True, lote: Mapping[int, int] | None = None
+) -> GuardResult:
     """
     Checa RD-01..RD-08 para cada participante da solicitação.
 
@@ -154,7 +159,10 @@ def check_solicitacao_availability(solicitacao: Solicitacao, *, lock: bool = Tru
 
     Args:
         solicitacao: evento já gravado (precisa de pk, inicio, fim)
-        lock: trava os participantes antes de ler. False só para leitura consultiva.
+        lock: trava os participantes antes de ler. False só para leitura consultiva ou quando
+            quem chama já travou (o lote trava a união dos participantes uma vez).
+        lote: mapa COMPLETO {id gravado: número na lista} dos eventos criados juntos; ver
+            `availability_service._check_conflicts_impl`. None: checagem de sempre.
 
     Returns:
         GuardResult com ok/blocked/skipped_guests
@@ -172,6 +180,7 @@ def check_solicitacao_availability(solicitacao: Solicitacao, *, lock: bool = Tru
             fim=solicitacao.fim,
             municipio=solicitacao.municipio,
             exclude_solicitacao_id=solicitacao.pk,
+            lote=lote,
         )
         if not result.ok:
             blocked.append(
@@ -187,6 +196,7 @@ def check_solicitacao_availability(solicitacao: Solicitacao, *, lock: bool = Tru
         blocked=blocked,
         skipped_guests=skipped_guests,
         checked_usuario_ids=[u.id for u in usuarios],
+        lote=lote,
     )
 
 
@@ -213,13 +223,17 @@ _MOTIVO_GENERICO = "tem conflito de agenda"
 # O motor usa o código X também para "Intervalo inválido" (fim <= início): só a
 # sobreposição de fato pode dizer "outro evento".
 _TITULO_SOBREPOSICAO = "Sobreposição"
+# Lote (28/10): o irmão do mesmo envio pode estar pendente; "aprovado" seria falso.
+_MOTIVO_X_LOTE = "tem outro evento desta lista neste horário"
 
 
-def _motivo(conflict: Conflict) -> str:
+def _motivo(conflict: Conflict, lote: Mapping[int, int] | None = None) -> str:
     """Motivo legível de um conflito; texto genérico (com o título, se houver) fora do mapa."""
     code = str(getattr(conflict, "code", "") or "")
     titulo = str(getattr(conflict, "title", "") or "").strip()
     texto = _MOTIVO_TEXTO.get(code)
+    if code == "X" and titulo == _TITULO_SOBREPOSICAO and lote and getattr(conflict, "ref_id", None) in lote:
+        return _MOTIVO_X_LOTE
     if texto is not None and (code != "X" or titulo == _TITULO_SOBREPOSICAO):
         return texto
     return f"{_MOTIVO_GENERICO} ({titulo.lower()})" if titulo else _MOTIVO_GENERICO
@@ -229,7 +243,7 @@ def _build_message(guard: GuardResult, *, action: str = "create") -> str:
     """Mensagem de bloqueio: a ação barrada, quem está bloqueado e por quê (RD-08)."""
     partes: list[str] = []
     for p in guard.blocked:
-        motivos = list(dict.fromkeys(_motivo(c) for c in p.conflicts)) or [_MOTIVO_GENERICO]
+        motivos = list(dict.fromkeys(_motivo(c, guard.lote) for c in p.conflicts)) or [_MOTIVO_GENERICO]
         partes.append(f"{p.usuario_nome} {' e '.join(motivos)}")
     return f"Não é possível {_ACAO_TEXTO.get(action, _ACAO_GENERICA)}: {'; '.join(partes)}."
 

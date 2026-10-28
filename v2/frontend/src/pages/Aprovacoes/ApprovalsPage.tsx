@@ -760,7 +760,7 @@ export default function ApprovalsPage(): JSX.Element {
                   total,
                   showSizeChanger: true,
                   pageSizeOptions: PAGE_SIZE_OPTIONS,
-                  showTotal: (count) => `Total: ${count} solicitações`,
+                  showTotal: (count) => `Total: ${count} ${count === 1 ? 'solicitação' : 'solicitações'}`,
                   onChange: handlePageChange,
                 }}
               />

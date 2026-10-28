@@ -173,10 +173,79 @@ describe('PreAgendaPage — modo Eventos Google Calendar', () => {
 
     await waitFor(() => expect(lastEventsUrl()).toBeTruthy());
     expect(await screen.findByText('Formação Sobral')).toBeInTheDocument();
-    // "1 eventos" aparece na Tag de contagem e no total da paginação;
-    // asserta especificamente a Tag (ant-tag) de quantidade.
-    const countLabels = screen.getAllByText('1 eventos');
+    // "1 evento" (no singular) aparece na Tag de contagem e no total da paginação.
+    const countLabels = screen.getAllByText('1 evento');
     expect(countLabels.some((el) => el.closest('.ant-tag'))).toBe(true);
+    expect(countLabels.some((el) => el.closest('.ant-pagination'))).toBe(true);
+    expect(screen.queryByText('1 eventos')).toBeNull();
+  });
+
+  // Ensaio r3 (28/10/2026): servidor sem a configuração OAuth do Google. O /events/ devolvia 500 e a
+  // tela soltava o toast genérico; agora o 409 `google_calendar_not_configured` traz a mensagem, e ela
+  // fica no lugar dos eventos: um toast some em 3 s e deixava "Nenhum evento encontrado neste
+  // calendário", "0 eventos" e "Calendário: <e-mail>", como se o calendário tivesse sido lido.
+  test('servidor sem a configuração do Google: a mensagem do 409 fica no lugar dos eventos', async () => {
+    const MENSAGEM =
+      'A conexão com o Google Agenda ainda não foi configurada no sistema. Avise a administração do sistema.';
+    fetchAPIMock.mockImplementation((url: string) => {
+      if (String(url).includes('/integrations/google/events/')) {
+        return Promise.reject(Object.assign(new Error(MENSAGEM), {
+          status: 409,
+          response: { status: 409, data: { detail: MENSAGEM, code: 'google_calendar_not_configured' } },
+        }));
+      }
+      return Promise.resolve({});
+    });
+
+    render(<PreAgendaPage />);
+    fireEvent.click(await screen.findByText('Eventos Google Calendar'));
+
+    expect(await screen.findByText(MENSAGEM)).toBeInTheDocument();
+    expect(screen.queryByText('Nenhum evento encontrado neste calendário')).toBeNull();
+    expect(screen.queryByText('0 eventos')).toBeNull();
+    expect(screen.queryByText(/Calendário:/)).toBeNull();
+
+    // Com o filtro de datas, a orientação continua a mensagem do 409, não "Ajuste o filtro de datas".
+    fireEvent.click(screen.getByTestId('mock-rangepicker'));
+    await waitFor(() => expect(lastEventsUrl()).toContain('time_min'));
+    expect(await screen.findByText(MENSAGEM)).toBeInTheDocument();
+    expect(screen.queryByText(/ajuste o filtro/i)).toBeNull();
+  });
+
+  // Revisão: o "Tentar de novo" ligava o carregando, o Spin tomava o lugar da tabela e levava o botão
+  // focado; o foco caía no body e quem usa teclado voltava ao início da página.
+  test('"Tentar de novo" nos eventos do Google: o foco não cai no body, falhe ou carregue', async () => {
+    const MENSAGEM = 'Erro ao carregar eventos do Google Calendar';
+    let falhar = true;
+    fetchAPIMock.mockImplementation((url: string) => {
+      if (String(url).includes('/integrations/google/events/')) {
+        if (falhar) return Promise.reject(new Error('falhou'));
+        return Promise.resolve({ events: [sampleEvent], calendar_id: 'agenda@aprender.br', count: 1 });
+      }
+      return Promise.resolve({});
+    });
+
+    render(<PreAgendaPage />);
+    fireEvent.click(await screen.findByText('Eventos Google Calendar'));
+    expect(await screen.findByText(MENSAGEM)).toBeInTheDocument();
+
+    // Falha de novo: o aviso continua e o foco fica no botão.
+    const botao = screen.getByRole('button', { name: 'Tentar de novo' });
+    botao.focus();
+    const chamadas = fetchAPIMock.mock.calls.length;
+    fireEvent.click(botao);
+    await waitFor(() => expect(fetchAPIMock.mock.calls.length).toBeGreaterThan(chamadas));
+    await waitFor(() => expect(document.querySelector('.ant-spin-spinning')).toBeNull());
+    expect(screen.getByText(MENSAGEM)).toBeInTheDocument();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(screen.getByRole('button', { name: 'Tentar de novo' })).toHaveFocus();
+
+    // Carrega: as linhas tomam o lugar do aviso e o foco vai para a tabela.
+    falhar = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+    expect(await screen.findByText('Formação Sobral')).toBeInTheDocument();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toContainElement(screen.getByRole('table'));
   });
 
   test('vazio COM filtro de data no modo gcal mostra copy contextual, não a genérica', async () => {

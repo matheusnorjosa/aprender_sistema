@@ -521,7 +521,7 @@ export default function PublicacaoSetorPage(): JSX.Element {
               pageSize: PAGE_SIZE,
               total,
               showSizeChanger: false,
-              showTotal: (count) => `Total: ${count} eventos`,
+              showTotal: (count) => `Total: ${count} ${count === 1 ? 'evento' : 'eventos'}`,
               onChange: (nextPage) => setPage(nextPage),
             }}
             locale={{

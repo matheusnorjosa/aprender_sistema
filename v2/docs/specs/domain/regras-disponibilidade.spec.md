@@ -34,7 +34,7 @@ O calculo e a SSOT da logica de conflito, e hoje ele tem **dois consumidores com
 
 | Camada | Funcao | Cache | Efeito |
 |---|---|---|---|
-| **Consultiva** | `check_conflicts` | 300s | So informa. Telas de disponibilidade, Grade Mensal, feedback no wizard. |
+| **Consultiva** | `check_conflicts` | 300s | So informa. Telas de disponibilidade, Grade Mensal, prévia de agenda da Nova Solicitação. |
 | **Enforcement** | `check_conflicts_uncached` via `solicitacao_availability.enforce_solicitacao_availability` | nenhum | **Bloqueia** create/update/approve/batch_approve com HTTP 400 `availability_conflict` quando ha conflito `X`, `T`, `P` ou `D`. O limite diario (`M`) nao existe mais (05/10/2026). |
 
 A afirmacao "RD e apenas consultivo" era verdadeira ate o #1452 e **nao vale mais**: conflito e bloqueio duro, sem override, inclusive no fluxo `NAO_SUPER` ([`solicitacao_availability.py`](../../../backend/apps/core/services/solicitacao_availability.py)). A decisao humana da Superintendencia continua sendo o gate de *aprovacao* (PA), mas ela nao consegue mais aprovar por cima de um conflito.

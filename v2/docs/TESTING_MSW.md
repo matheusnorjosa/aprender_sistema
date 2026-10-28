@@ -92,7 +92,7 @@ server.use(
 );
 
 render(<NewSolicitacaoWizard />);
-await userEvent.click(screen.getByRole('button', { name: /criar/i }));
+await userEvent.click(screen.getByRole('button', { name: 'Criar solicitação' }));
 expect(await screen.findByText(/#42/)).toBeInTheDocument();
 ```
 

@@ -8,7 +8,7 @@ detalhe interno (nome de variável, stack). Vale também com o token vencido: a 
 mesma configuração.
 """
 
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportMissingParameterType=false, reportUnknownParameterType=false, reportOptionalMemberAccess=false, reportArgumentType=false
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportMissingParameterType=false, reportUnknownParameterType=false, reportOptionalMemberAccess=false, reportArgumentType=false, reportIndexIssue=false
 
 from __future__ import annotations
 

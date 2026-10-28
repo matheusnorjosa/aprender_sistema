@@ -8,7 +8,7 @@ menu dela. Só leitura, com a permissão de sempre da tela (`manage_admin_regist
 superusuário continua invisível para quem não é superusuário (404, P0-0). Nada muda o poder de ninguém.
 """
 
-# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportArgumentType=false
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportOperatorIssue=false
 
 from __future__ import annotations
 

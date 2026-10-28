@@ -227,6 +227,8 @@ export default function PreAgendaPage(): JSX.Element {
   // RangePicker de eventos recriava `loadData` (refetch cruzado de Solicitações).
   const [gcalDateRange, setGcalDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null]);
   const [gcalCalendarId, setGcalCalendarId] = useState<string | null>(null);
+  // A carga dos eventos falhou: o motivo fica no lugar dos eventos, não o vazio "calendário sem eventos".
+  const [gcalErro, setGcalErro] = useState<string | null>(null);
   const gcalHasDateFilter = !!(gcalDateRange[0] || gcalDateRange[1]);
 
   // OAuth Phase 5: acesso (AcessoContext) e integração Google
@@ -716,15 +718,17 @@ export default function PreAgendaPage(): JSX.Element {
       );
       setGcalEvents(data.events || []);
       setGcalCalendarId(data.calendar_id ?? null);
+      setGcalErro(null);
     } catch (error) {
+      // O motivo vai no lugar dos eventos (um toast some em 3 s e deixava o vazio "calendário sem eventos").
       const resposta = (error as { response?: { status?: number; data?: { code?: string } } }).response;
       if (resposta?.data?.code === 'google_calendar_not_configured') {
         // Servidor sem a configuração OAuth do Google: a mensagem do 409 diz o que fazer (ensaio r3).
-        message.error((error as Error).message);
+        setGcalErro((error as Error).message);
       } else if (resposta?.status === 503) {
-        message.error('O Google Calendar demorou a responder. Tente novamente em instantes.');
+        setGcalErro('O Google Calendar demorou a responder. Tente novamente em instantes.');
       } else {
-        message.error('Erro ao carregar eventos do Google Calendar');
+        setGcalErro('Erro ao carregar eventos do Google Calendar');
       }
       logger.error('Erro ao carregar eventos GCal:', error);
     } finally {
@@ -1044,14 +1048,18 @@ export default function PreAgendaPage(): JSX.Element {
                   >
                     Atualizar
                   </Button>
-                  <Tag color="blue">{gcalEvents.length} {gcalEvents.length === 1 ? 'evento' : 'eventos'}</Tag>
+                  {!gcalErro && (
+                    <Tag color="blue">{gcalEvents.length} {gcalEvents.length === 1 ? 'evento' : 'eventos'}</Tag>
+                  )}
                 </Space>
-                {/* #1295: contexto do que está sendo exibido (calendário + janela) */}
+                {/* #1295: contexto do que está sendo exibido (calendário + janela); sem carga, sem calendário lido */}
                 <Space size="middle" wrap>
-                  <Text type="secondary">
-                    <CalendarOutlined /> Calendário:{' '}
-                    <Text strong>{gcalCalendarId ?? googleStatus?.googleEmail ?? '—'}</Text>
-                  </Text>
+                  {!gcalErro && (
+                    <Text type="secondary">
+                      <CalendarOutlined /> Calendário:{' '}
+                      <Text strong>{gcalCalendarId ?? googleStatus?.googleEmail ?? '—'}</Text>
+                    </Text>
+                  )}
                   <Text type="secondary">
                     <ClockCircleOutlined /> Período:{' '}
                     <Text strong>
@@ -1072,7 +1080,7 @@ export default function PreAgendaPage(): JSX.Element {
                     <Text type="secondary">Carregando eventos do Google Calendar...</Text>
                   </div>
                 </div>
-              ) : gcalEvents.length === 0 ? (
+              ) : gcalEvents.length === 0 && !gcalErro ? (
                 gcalHasDateFilter ? (
                   // #1295: vazio COM filtro de data → orienta a ajustar a janela,
                   // em vez de sugerir que o calendário está vazio.
@@ -1098,6 +1106,8 @@ export default function PreAgendaPage(): JSX.Element {
                   rowKey="id"
                   size="small"
                   nomeDaLinha={(evento) => evento.summary || 'evento'}
+                  erro={gcalErro}
+                  onTentarDeNovo={() => { void loadGcalEvents(); }}
                   pagination={{
                     pageSize: 20,
                     showSizeChanger: true,

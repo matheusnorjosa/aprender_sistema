@@ -16,7 +16,6 @@
  * antd (isso é responsabilidade do antd).
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { message } from 'antd';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const { fetchAPIMock, getMeMock, listSolicitacoesMock, getStatusSummaryMock } = vi.hoisted(() => ({
@@ -182,11 +181,12 @@ describe('PreAgendaPage — modo Eventos Google Calendar', () => {
   });
 
   // Ensaio r3 (28/10/2026): servidor sem a configuração OAuth do Google. O /events/ devolvia 500 e a
-  // tela soltava o toast genérico; agora o 409 `google_calendar_not_configured` traz a mensagem.
-  test('servidor sem a configuração do Google: o aviso mostra a mensagem do 409', async () => {
+  // tela soltava o toast genérico; agora o 409 `google_calendar_not_configured` traz a mensagem, e ela
+  // fica no lugar dos eventos: um toast some em 3 s e deixava "Nenhum evento encontrado neste
+  // calendário", "0 eventos" e "Calendário: <e-mail>", como se o calendário tivesse sido lido.
+  test('servidor sem a configuração do Google: a mensagem do 409 fica no lugar dos eventos', async () => {
     const MENSAGEM =
       'A conexão com o Google Agenda ainda não foi configurada no sistema. Avise a administração do sistema.';
-    const erro = vi.spyOn(message, 'error').mockImplementation(vi.fn());
     fetchAPIMock.mockImplementation((url: string) => {
       if (String(url).includes('/integrations/google/events/')) {
         return Promise.reject(Object.assign(new Error(MENSAGEM), {
@@ -200,9 +200,16 @@ describe('PreAgendaPage — modo Eventos Google Calendar', () => {
     render(<PreAgendaPage />);
     fireEvent.click(await screen.findByText('Eventos Google Calendar'));
 
-    await waitFor(() => expect(erro).toHaveBeenCalledWith(MENSAGEM));
-    expect(erro).not.toHaveBeenCalledWith('Erro ao carregar eventos do Google Calendar');
-    erro.mockRestore();
+    expect(await screen.findByText(MENSAGEM)).toBeInTheDocument();
+    expect(screen.queryByText('Nenhum evento encontrado neste calendário')).toBeNull();
+    expect(screen.queryByText('0 eventos')).toBeNull();
+    expect(screen.queryByText(/Calendário:/)).toBeNull();
+
+    // Com o filtro de datas, a orientação continua a mensagem do 409, não "Ajuste o filtro de datas".
+    fireEvent.click(screen.getByTestId('mock-rangepicker'));
+    await waitFor(() => expect(lastEventsUrl()).toContain('time_min'));
+    expect(await screen.findByText(MENSAGEM)).toBeInTheDocument();
+    expect(screen.queryByText(/ajuste o filtro/i)).toBeNull();
   });
 
   test('vazio COM filtro de data no modo gcal mostra copy contextual, não a genérica', async () => {

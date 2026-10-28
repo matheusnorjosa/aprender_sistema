@@ -108,9 +108,26 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
       `Este evento ${MOTIVO_NAO_PUBLICAVEL.publicado_fora_do_sistema}; mudar aqui não muda a agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle.`
     );
   } else if (isPublished && !podeTirarDoGoogle) {
-    motivos.push(
-      'Este evento já está no Google Agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle que cancele a publicação; depois disso, você consegue editar aqui.'
-    );
+    // Mesma saída do ERROR abaixo: a Apoio, em Publicar na agenda, tira só do Google ("Tirar só do
+    // Google") ou exclui dos dois lados ("Excluir"), e só no aprovado, com id e de hoje em diante.
+    // A SUPER fora de pendente não volta a se excluir: o motivo dela (abaixo) dá a saída.
+    const apoioConsegueTirar =
+      record.status === 'aprovado' &&
+      Boolean(record.external_event_id) &&
+      motivoNaoPublicavel(record) !== 'evento_passado';
+    if (!apoioConsegueTirar) {
+      motivos.push(
+        'Este evento já está no Google Agenda e não dá para editá-lo nem excluí-lo aqui. Para mudar, fale com a administração do sistema.'
+      );
+    } else if (superForaDePendente) {
+      motivos.push(
+        'Este evento já está no Google Agenda. Para editar, peça ao Apoio de Coordenação da sua gerência que tire o evento só do Google, na tela Publicar na agenda; depois disso, você consegue editar aqui.'
+      );
+    } else {
+      motivos.push(
+        'Este evento já está no Google Agenda. Para editar ou excluir, peça ao Apoio de Coordenação da sua gerência que tire o evento só do Google, na tela Publicar na agenda; depois disso, você consegue editar e excluir aqui. Se for para apagar de vez, ela também pode excluir o evento lá, o que o tira do Google e do sistema.'
+      );
+    }
   } else if (isPublished) {
     // Publicar na agenda só lista aprovado de hoje em diante e só tira do Google com o id; evento
     // passado não volta para o Google, então tirá-lo de lá para editar não tem volta.

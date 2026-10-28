@@ -1000,7 +1000,7 @@ export default function PreAgendaPage(): JSX.Element {
                   pagination={{
                     total,
                     pageSize: 20,
-                    showTotal: (total) => `Total: ${total} eventos aprovados`,
+                    showTotal: (total) => `Total: ${total} ${total === 1 ? 'evento aprovado' : 'eventos aprovados'}`,
                   }}
                 />
               </ConfigProvider>
@@ -1041,7 +1041,7 @@ export default function PreAgendaPage(): JSX.Element {
                   >
                     Atualizar
                   </Button>
-                  <Tag color="blue">{gcalEvents.length} eventos</Tag>
+                  <Tag color="blue">{gcalEvents.length} {gcalEvents.length === 1 ? 'evento' : 'eventos'}</Tag>
                 </Space>
                 {/* #1295: contexto do que está sendo exibido (calendário + janela) */}
                 <Space size="middle" wrap>
@@ -1098,7 +1098,7 @@ export default function PreAgendaPage(): JSX.Element {
                   pagination={{
                     pageSize: 20,
                     showSizeChanger: true,
-                    showTotal: (total) => `${total} eventos`,
+                    showTotal: (total) => `${total} ${total === 1 ? 'evento' : 'eventos'}`,
                   }}
                 />
               )}

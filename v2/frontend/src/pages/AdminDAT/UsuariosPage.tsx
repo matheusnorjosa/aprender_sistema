@@ -827,7 +827,7 @@ export default function UsuariosPage(): JSX.Element {
             pagination={{
               ...pagination,
               showSizeChanger: true,
-              showTotal: (total) => `Total: ${total} usuários`,
+              showTotal: (total) => `Total: ${total} ${total === 1 ? 'usuário' : 'usuários'}`,
             }}
             onChange={handleTableChange}
           />)

@@ -173,10 +173,11 @@ describe('PreAgendaPage — modo Eventos Google Calendar', () => {
 
     await waitFor(() => expect(lastEventsUrl()).toBeTruthy());
     expect(await screen.findByText('Formação Sobral')).toBeInTheDocument();
-    // "1 eventos" aparece na Tag de contagem e no total da paginação;
-    // asserta especificamente a Tag (ant-tag) de quantidade.
-    const countLabels = screen.getAllByText('1 eventos');
+    // "1 evento" (no singular) aparece na Tag de contagem e no total da paginação.
+    const countLabels = screen.getAllByText('1 evento');
     expect(countLabels.some((el) => el.closest('.ant-tag'))).toBe(true);
+    expect(countLabels.some((el) => el.closest('.ant-pagination'))).toBe(true);
+    expect(screen.queryByText('1 eventos')).toBeNull();
   });
 
   test('vazio COM filtro de data no modo gcal mostra copy contextual, não a genérica', async () => {

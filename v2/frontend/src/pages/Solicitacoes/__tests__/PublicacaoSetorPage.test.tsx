@@ -257,6 +257,15 @@ describe('PublicacaoSetorPage — estrutura e lista', () => {
     expect(within(screen.getByText('Quixadá').closest('tr') as HTMLElement).getByText('Publicado')).toHaveStyle({ color: '#237804' });
   });
 
+  test.each([
+    [1, 'Total: 1 evento'],
+    [2, 'Total: 2 eventos'],
+  ])('o total concorda com o número (%i)', async (quantos, texto) => {
+    listResponse = pageOf(Array.from({ length: quantos }, (_, i) => makeSolic({ id: 30 + i })));
+    renderPage();
+    expect(await screen.findByText(texto)).toBeInTheDocument();
+  });
+
   test('(i) lista vazia mostra a copy do estado vazio com link para Nova Solicitação', async () => {
     renderPage();
     const empty = await screen.findByText(/Nenhum evento aprovado do seu setor a partir de hoje\./);

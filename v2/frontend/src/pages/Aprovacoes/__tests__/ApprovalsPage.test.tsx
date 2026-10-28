@@ -852,4 +852,13 @@ describe('ApprovalsPage', () => {
     expect(modalDeErro).not.toHaveBeenCalled();
     erro.mockRestore();
   }, 30000);
+
+  test.each([
+    [1, 'Total: 1 solicitação'],
+    [2, 'Total: 2 solicitações'],
+  ])('o total concorda com o número (%i)', async (quantos, texto) => {
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(quantos, quantos));
+    renderPage();
+    expect(await screen.findByText(texto)).toBeInTheDocument();
+  });
 });

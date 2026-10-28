@@ -132,3 +132,16 @@ describe('UsuariosPage — busca enquanto se digita', () => {
     expect(screen.getByRole('button', { name: 'Ver detalhes de Maria Recente' })).toBeInTheDocument();
   });
 });
+
+describe('UsuariosPage — total da lista', () => {
+  test.each([
+    [1, 'Total: 1 usuário'],
+    [2, 'Total: 2 usuários'],
+  ])('o total concorda com o número (%i)', async (quantos, texto) => {
+    vi.mocked(listUsers).mockResolvedValue(
+      pagina(Array.from({ length: quantos }, (_, i) => usuario(10 + i, 'Pessoa', `Número${i}`))),
+    );
+    renderPage();
+    expect(await screen.findByText(texto, undefined, { timeout: 15000 })).toBeInTheDocument();
+  });
+});

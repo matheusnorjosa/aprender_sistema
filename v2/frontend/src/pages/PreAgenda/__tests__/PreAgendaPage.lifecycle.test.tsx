@@ -203,6 +203,17 @@ describe('PreAgendaPage — ciclo de requisições (#1668 / M12-19)', () => {
     expect(screen.queryByText(/Total: 150\b/)).not.toBeInTheDocument();
   });
 
+  test('4b. o total concorda com o número: "Total: 1 evento aprovado"', async () => {
+    listSolicitacoesMock.mockImplementation((f: { flow: string }) =>
+      Promise.resolve(f.flow === 'SUPER' ? { results: [row(1, 'A')], count: 1 } : { results: [], count: 0 }),
+    );
+
+    render(<PreAgendaPage />);
+
+    await screen.findByText('A');
+    expect(await screen.findByText('Total: 1 evento aprovado')).toBeInTheDocument();
+  });
+
   test('5. 429: pausa o polling pelo Retry-After (ou 60 s), sem mensagem de erro', async () => {
     const erro = vi.spyOn(message, 'error');
     listSolicitacoesMock.mockResolvedValue({ results: [row(1, 'Municipio Um')], count: 1 });

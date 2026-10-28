@@ -222,7 +222,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   // #1452: conflito antecipado ou recusado no envio trava o botão; ele aponta o primeiro motivo.
   const motivoDaTrava = eventos.map((e) => travas[e.chave]).find((id): id is string => Boolean(id)) ?? null;
 
-  const handleSubmit = async (): Promise<void> => {
+  const conferirEEnviar = async (): Promise<void> => {
     setResumo(null);
     // Confere os eventos na ordem da tela; o foco vai ao primeiro problema do primeiro evento.
     const problemas: ProblemasDoEvento[] = [];
@@ -247,7 +247,6 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       return;
     }
 
-    setLoading(true);
     try {
       const payload = buildSolicitacaoPayload({
         municipioId: dados.municipio.id,
@@ -299,7 +298,20 @@ export default function NewSolicitacaoWizard(): JSX.Element {
           motivoDoCampo || detail || semResposta || 'Erro ao criar solicitação. Verifique os dados e tente novamente.'
         );
       }
+    }
+  };
+
+  // Um clique por vez: a conferência é assíncrona, e um segundo clique antes de ela (e o envio)
+  // acabar mandaria o evento de novo.
+  const enviando = useRef(false);
+  const handleSubmit = async (): Promise<void> => {
+    if (enviando.current) return;
+    enviando.current = true;
+    setLoading(true);
+    try {
+      await conferirEEnviar();
     } finally {
+      enviando.current = false;
       setLoading(false);
     }
   };

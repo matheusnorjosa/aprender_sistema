@@ -165,8 +165,10 @@ export default function DateTimeRange({
       />
     </div>
   );
+  // Na linha (cartão da Nova Solicitação) o erro não é região viva: quem anuncia é o resumo da
+  // página, uma região só. O campo continua apontando o texto (`aria-describedby`).
   const mensagemDeErro = erro ? (
-    <div id={idDoErro} role="alert">
+    <div id={idDoErro} role={emLinha ? undefined : 'alert'}>
       <Text type="danger">{erro}</Text>
     </div>
   ) : null;

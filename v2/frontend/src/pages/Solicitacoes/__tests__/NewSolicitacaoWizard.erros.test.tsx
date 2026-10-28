@@ -254,4 +254,22 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
     fireEvent.click(criar());
     await waitFor(() => expect(message.error).toHaveBeenCalledWith('Sem conexão com o servidor.'));
   });
+
+  // Autorrevisão (28/10/2026): a conferência dos campos é assíncrona; um segundo clique antes de ela
+  // acabar não pode mandar o evento duas vezes.
+  test('dois cliques seguidos em "Criar" enviam uma vez só', async () => {
+    let responder: (valor: unknown) => void = () => undefined;
+    createSolicitacaoMock.mockImplementation(() => new Promise((resolve) => { responder = resolve; }));
+    renderWizard();
+    await preencherTudo();
+    const botao = criar();
+    fireEvent.click(botao);
+    fireEvent.click(botao);
+    await waitFor(() => expect(createSolicitacaoMock).toHaveBeenCalled());
+    // Durante o envio, outro clique também não manda de novo.
+    fireEvent.click(botao);
+    responder({ id: 1 });
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/solicitacoes/minhas'));
+    expect(createSolicitacaoMock).toHaveBeenCalledTimes(1);
+  });
 });

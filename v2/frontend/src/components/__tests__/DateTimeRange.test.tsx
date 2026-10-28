@@ -165,6 +165,14 @@ describe('DateTimeRange', () => {
     expect(grade).toHaveTextContent('Fim:')
   })
 
+  test('layout em linha: o erro não é região viva (quem anuncia é o resumo da página), mas segue ligado ao campo', () => {
+    render(<DateTimeRange layout="linha" idPrefix="evento-1-" erro="Escolha a data e os horários de início e de fim do evento." />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    const erro = document.getElementById('evento-1-data-horario-erro');
+    expect(erro).toHaveTextContent('Escolha a data e os horários de início e de fim do evento.');
+    expect(screen.getByLabelText('Data:')).toHaveAttribute('aria-describedby', 'evento-1-data-horario-erro');
+  });
+
   test('idPrefix prefixa os ids dos campos e o do erro (dois cartões não repetem id)', () => {
     render(
       <>

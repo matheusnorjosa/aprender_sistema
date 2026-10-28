@@ -221,10 +221,12 @@ describe('MySolicitacoesPage — item 36', { timeout: 20000 }, () => {
     );
     // A tela não sabe se a solicitação já passou por uma aprovação (AuditLog APPROVE ou
     // `aprovada_como_super`), e o servidor recusa excluir essa, aqui e na tela do Apoio
-    // (`motivo_que_impede_excluir`): o motivo não promete a exclusão, diz quando ela não existe.
+    // (`motivo_que_impede_excluir`): o motivo não promete a exclusão e dá a saída se lá não der.
     expect(texto).not.toMatch(/consegue editar e excluir/);
-    expect(texto).toContain('Solicitação que já passou por uma aprovação não se exclui mais');
-    expect(texto).toContain('fale com a administração do sistema');
+    expect(texto).toContain('Se lá também não der para excluir, fale com a administração do sistema.');
+    // Ao lado da etiqueta "Aprovado", falar de "solicitação que já passou por uma aprovação" faz a
+    // pessoa concluir que excluir é impossível e que o conselho do Apoio não vale.
+    expect(texto).not.toMatch(/passou por uma aprovação/);
     // "Cancelar a publicação" não é o nome de nenhuma ação.
     expect(texto).not.toMatch(/cancele a publicação/);
     informar.mockRestore();

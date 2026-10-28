@@ -116,6 +116,8 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
     // Excluir não se promete: a tela não sabe se a solicitação já passou por uma aprovação
     // (AuditLog APPROVE ou `aprovada_como_super`, que a troca de fluxo do projeto deixa em
     // NAO_SUPER), e o servidor recusa excluir essa, aqui e na tela do Apoio (`motivo_que_impede_excluir`).
+    // O texto não fala em "já passou por uma aprovação": ao lado da etiqueta "Aprovado", a pessoa
+    // leria que excluir é impossível; diz só a saída se nem lá der.
     const apoioConsegueTirar =
       record.status === 'aprovado' &&
       Boolean(record.external_event_id) &&
@@ -130,7 +132,7 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
       );
     } else {
       motivos.push(
-        'Este evento já está no Google Agenda. Para editar, peça ao Apoio de Coordenação da sua gerência, na tela Publicar na agenda, ou ao Controle, na Pré-agenda, que tire o evento só do Google; depois disso, você consegue editar aqui. Para excluir, peça ao Apoio de Coordenação da sua gerência, que exclui o evento em Publicar na agenda (ele sai do Google e do sistema). Solicitação que já passou por uma aprovação não se exclui mais, nem lá nem aqui: nesse caso, fale com a administração do sistema.'
+        'Este evento já está no Google Agenda. Para editar, peça ao Apoio de Coordenação da sua gerência, na tela Publicar na agenda, ou ao Controle, na Pré-agenda, que tire o evento só do Google; depois disso, você consegue editar aqui. Para excluir, peça ao Apoio de Coordenação da sua gerência, que exclui o evento em Publicar na agenda (ele sai do Google e do sistema). Se lá também não der para excluir, fale com a administração do sistema.'
       );
     }
   } else if (isPublished) {

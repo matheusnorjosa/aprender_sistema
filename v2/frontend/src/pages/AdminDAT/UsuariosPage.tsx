@@ -100,6 +100,8 @@ function toApplyResult(result: ImportResult): ApplyResult {
 
 const { Title, Text } = Typography;
 const { Search } = Input;
+/** Quanto a busca espera a pessoa parar de digitar (o mesmo de Minhas Solicitações). */
+const ESPERA_BUSCA_MS = 350;
 
 /**
  * User record interface
@@ -326,7 +328,11 @@ interface FetchParams {
 export default function UsuariosPage(): JSX.Element {
   const [usuarios, setUsuarios] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  // O que está no campo; `searchText` é o que vai ao servidor, depois de a pessoa parar de digitar.
+  const [termoDigitado, setTermoDigitado] = useState('');
   const [searchText, setSearchText] = useState('');
+  // A última carga vence: uma resposta antiga não substitui a lista da busca atual.
+  const seqRef = useRef(0);
   const [pagination, setPagination] = useState<PaginationState>({
     current: 1,
     pageSize: PAGE_SIZES.SMALL,
@@ -434,6 +440,7 @@ export default function UsuariosPage(): JSX.Element {
    * Fetch users from API
    */
   const fetchUsuarios = async (params: FetchParams = {}): Promise<void> => {
+    const seq = ++seqRef.current;
     setLoading(true);
     try {
       const apiParams: Record<string, unknown> = {};
@@ -451,6 +458,7 @@ export default function UsuariosPage(): JSX.Element {
       apiParams['ordering'] = ordering(params.ordem ?? ordem);
 
       const data = await listUsers(apiParams);
+      if (seq !== seqRef.current) return;
 
       // DRF pagination response structure
       // Note: API returns AdminUser with Group[], component uses string[]
@@ -462,10 +470,11 @@ export default function UsuariosPage(): JSX.Element {
         total: data.count || data.results.length,
       });
     } catch (error) {
+      if (seq !== seqRef.current) return;
       message.error(`Erro ao carregar usuários: ${(error as Error).message}`);
       logger.error('Erro ao carregar usuários:', error);
     } finally {
-      setLoading(false);
+      if (seq === seqRef.current) setLoading(false);
     }
   };
 
@@ -501,6 +510,11 @@ export default function UsuariosPage(): JSX.Element {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    const espera = setTimeout(() => setSearchText(termoDigitado), ESPERA_BUSCA_MS);
+    return () => clearTimeout(espera);
+  }, [termoDigitado]);
 
   // Load users on mount and search change (reset to page 1)
   useEffect(() => {
@@ -768,10 +782,10 @@ export default function UsuariosPage(): JSX.Element {
                 aria-label="Buscar usuários por nome, e-mail ou CPF"
                 allowClear
                 style={{ width: 300, maxWidth: '100%' }}
+                value={termoDigitado}
+                onChange={(e) => setTermoDigitado(e.target.value)}
+                // Enter ou a lupa buscam na hora, sem esperar.
                 onSearch={(value) => setSearchText(value)}
-                onChange={(e) => {
-                  if (!e.target.value) setSearchText('');
-                }}
               />
               <Button icon={<ReloadOutlined />} onClick={() => fetchUsuarios()} loading={loading}>
                 Atualizar

@@ -242,6 +242,11 @@ class TestSolicitacaoRBAC:
         client = APIClient()
         superuser = UsuarioFactory(superuser=True)
         tipo_evento = TipoEventoFactory(nome="Formação")
+        # O projeto é obrigatório na criação (revisão do #2149); o responsável é da gerência dele.
+        gerencia = GerenciaFactory()
+        projeto = ProjetoFactory(nome="Projeto Superuser", gerencia=gerencia)
+        responsavel = UsuarioFactory()
+        com_papel(responsavel, "COORDENADOR", gerencia)
         client.force_authenticate(user=superuser)
 
         inicio = timezone.now() + timezone.timedelta(days=1)
@@ -251,10 +256,11 @@ class TestSolicitacaoRBAC:
         response = client.post(
             "/api/solicitacoes/",
             {
+                "projeto": projeto.id,
                 "tipo_evento": tipo_evento.id,
                 "coordenador_acompanha": False,
                 # 05/10/2026: quem cria sem a função Coordenador informa o responsável.
-                "coordenador": UsuarioFactory(groups=["Coordenador"]).id,
+                "coordenador": responsavel.id,
                 "tipo": "evento",
                 "inicio": inicio.isoformat(),
                 "fim": fim.isoformat(),

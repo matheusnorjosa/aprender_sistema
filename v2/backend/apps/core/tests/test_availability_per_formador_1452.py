@@ -77,7 +77,7 @@ def projeto_super(municipio, gerencia):
     Fluxo SUPER: fica pendente na criação (PA-04), permitindo testar a aprovação.
 
     A Compra é obrigatória: o serializer recusa solicitação para (município, projeto) sem
-    compra registrada. Os testes de criação sem formador usam `projeto=None` e não precisam dela.
+    compra registrada.
     """
     projeto = ProjetoFactory(nome="Projeto SUPER 1452", fluxo="SUPER", gerencia=gerencia)
     liberar_par(municipio, projeto)
@@ -289,7 +289,7 @@ class TestCreateChecaFormador:
         assert response.status_code == http_status.HTTP_400_BAD_REQUEST
         assert response.data["code"] == "availability_conflict"
 
-    def test_convidado_nao_e_checado(self, coordenador, municipio, tipo_evento, horario):
+    def test_convidado_nao_e_checado(self, coordenador, municipio, tipo_evento, horario, projeto):
         """
         CONVIDADO é audiência, não recurso alocado (decisão de negócio 2026-07-16).
 
@@ -304,7 +304,7 @@ class TestCreateChecaFormador:
         client.force_authenticate(user=coordenador)
         response = client.post(
             "/api/solicitacoes/",
-            _payload(municipio, tipo_evento, inicio, fim),
+            _payload(municipio, tipo_evento, inicio, fim, projeto=projeto),
             format="json",
         )
         assert response.status_code == http_status.HTTP_201_CREATED
@@ -351,7 +351,7 @@ class TestCreateChecaFormador:
         assert guard.checked_usuario_ids == [coordenador.pk]
 
     def test_convidado_externo_sem_cadastro_e_reportado_nao_ignorado(
-        self, coordenador, municipio, tipo_evento, horario
+        self, coordenador, municipio, tipo_evento, horario, projeto
     ):
         """
         Guest sem Usuario não tem agenda para checar. O que não pode é o pulo ser
@@ -368,6 +368,7 @@ class TestCreateChecaFormador:
                 tipo_evento,
                 inicio,
                 fim,
+                projeto=projeto,
                 extra_participants={"formador_emails": ["externo@fora.com"]},
             ),
             format="json",

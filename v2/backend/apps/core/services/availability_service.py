@@ -19,6 +19,7 @@ RD-08: Mensagens com formador, intervalo, tipo, detalhe
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -150,6 +151,20 @@ def _fmt_interval_local(start: datetime, end: datetime) -> str:
     return f"{s:%H:%M %d/%m}–{e:%H:%M %d/%m}"
 
 
+def _no_lote(ev: Solicitacao, lote: Mapping[int, int] | None) -> int | None:
+    """Número do evento na lista do lote, ou None se o evento não é do lote."""
+    return lote.get(ev.pk) if lote else None
+
+
+def _mais_proximos(fontes: Iterable[Solicitacao | None]) -> list[Solicitacao]:
+    """Os eventos vizinhos achados em cada fonte, sem None e sem repetir."""
+    vistos: dict[int, Solicitacao] = {}
+    for ev in fontes:
+        if ev is not None:
+            vistos.setdefault(ev.pk, ev)
+    return list(vistos.values())
+
+
 def _check_conflicts_impl(
     *,
     usuario: Usuario,
@@ -157,6 +172,7 @@ def _check_conflicts_impl(
     fim: datetime,
     municipio: Municipio | None = None,
     exclude_solicitacao_id: int | None = None,
+    lote: Mapping[int, int] | None = None,
 ) -> CheckResult:
     """
     Implementação pura da checagem RD-01..RD-08. Não usar diretamente.
@@ -180,6 +196,10 @@ def _check_conflicts_impl(
             revalidar um evento já gravado (update/aprovação), para que ele não
             conflite consigo mesmo. Precisa ser aplicado na origem (`events_qs`) e não
             filtrado depois por `ref_id`.
+        lote: {id gravado: número do evento na lista} dos eventos criados juntos (POST do lote).
+            Eles se enxergam mesmo pendentes (X e D) e a mensagem cita "o evento N desta lista".
+            Precisa ser o mapa COMPLETO do lote; o próprio evento sai por `exclude_solicitacao_id`.
+            None (padrão): só evento aprovado ocupa a agenda, como sempre.
 
     Returns:
         CheckResult com ok=True/False, a lista de conflitos e a lista de avisos
@@ -201,9 +221,16 @@ def _check_conflicts_impl(
     # CONVIDADO bloqueava indevidamente o FORMADOR. Desde 05/10/2026 quem criou também não
     # ocupa por ter criado: `ocupa_agenda_q` (formador, ou responsável que acompanha). O
     # filtro vai na ORIGEM da query (events_qs), não em Python depois.
-    events_qs = Solicitacao.objects.filter(status=Solicitacao.Status.APROVADO).filter(ocupa_agenda_q(usuario))
+    aprovados_qs = Solicitacao.objects.filter(status=Solicitacao.Status.APROVADO).filter(ocupa_agenda_q(usuario))
     if exclude_solicitacao_id is not None:
-        events_qs = events_qs.exclude(pk=exclude_solicitacao_id)
+        aprovados_qs = aprovados_qs.exclude(pk=exclude_solicitacao_id)
+    # Lote: os irmãos gravados na mesma transação ocupam a agenda mesmo pendentes (decisão do dono, 28/10).
+    events_qs = aprovados_qs
+    if lote:
+        events_qs = Solicitacao.objects.filter(Q(status=Solicitacao.Status.APROVADO) | Q(pk__in=list(lote)))
+        events_qs = events_qs.filter(ocupa_agenda_q(usuario))
+        if exclude_solicitacao_id is not None:
+            events_qs = events_qs.exclude(pk=exclude_solicitacao_id)
 
     # ================================================================
     # RD-02, RD-03: BLOQUEIOS aprovados
@@ -242,11 +269,13 @@ def _check_conflicts_impl(
 
     for ev in events:
         interval: str = _fmt_interval_local(ev.inicio, ev.fim)
+        numero = _no_lote(ev, lote)
+        quem = f"o evento {numero} desta lista" if numero else f"evento aprovado #{ev.id}"
         conflicts.append(
             Conflict(
                 "X",
                 "Sobreposição",
-                f"Conflita com evento aprovado #{ev.id} ({interval})",
+                f"Conflita com {quem} ({interval})",
                 ref_id=ev.id,
             )
         )
@@ -255,14 +284,15 @@ def _check_conflicts_impl(
     # RD-04: BUFFER de deslocamento entre municípios
     # ================================================================
     # RD-04 sempre verifica buffer. Se municipio=None, trata como cidade diferente.
-    # Evento imediatamente anterior
-    prev_ev: Solicitacao | None = events_qs.filter(fim__lte=inicio).order_by("-fim").distinct().first()
-
-    # Evento imediatamente posterior
-    next_ev: Solicitacao | None = events_qs.filter(inicio__gte=fim).order_by("inicio").distinct().first()
+    # Evento imediatamente anterior e posterior. Com lote, o vizinho mais próximo pode ser um
+    # irmão na mesma cidade: o aprovado mais próximo é conferido também, para não esconder o D
+    # que o evento já teria sem o lote.
+    fontes = [events_qs, aprovados_qs] if lote else [events_qs]
+    prev_evs = _mais_proximos(qs.filter(fim__lte=inicio).order_by("-fim").distinct().first() for qs in fontes)
+    next_evs = _mais_proximos(qs.filter(inicio__gte=fim).order_by("inicio").distinct().first() for qs in fontes)
 
     # Verificar buffer anterior
-    if prev_ev:
+    for prev_ev in prev_evs:
         # RD-04: municipio=None é tratado como cidade diferente (fix #588)
         # Se qualquer lado é None, não podemos afirmar que são na mesma cidade → requer buffer.
         municipio_id: int | None = municipio.id if municipio else None
@@ -276,18 +306,19 @@ def _check_conflicts_impl(
             mins: int = int(delta.total_seconds() // 60)
             # Buffer exato (==) deve passar, apenas < buffer conflita
             if mins < buffer_min:
+                numero = _no_lote(prev_ev, lote)
+                quem = f"o evento {numero} desta lista" if numero else f"evento #{prev_ev.id}"
                 conflicts.append(
                     Conflict(
                         "D",
                         "Buffer deslocamento insuficiente",
-                        f"Apenas {mins} min após evento #{prev_ev.id}. "
-                        f"Exige ≥ {buffer_min} min entre cidades distintas.",
+                        f"Apenas {mins} min após {quem}. Exige ≥ {buffer_min} min entre cidades distintas.",
                         ref_id=prev_ev.id,
                     )
                 )
 
     # Verificar buffer posterior
-    if next_ev:
+    for next_ev in next_evs:
         municipio_id = municipio.id if municipio else None
         next_municipio_id: int | None = next_ev.municipio_id
 
@@ -299,12 +330,13 @@ def _check_conflicts_impl(
             mins: int = int(delta.total_seconds() // 60)
             # Buffer exato (==) deve passar, apenas < buffer conflita
             if mins < buffer_min:
+                numero = _no_lote(next_ev, lote)
+                quem = f"do evento {numero} desta lista" if numero else f"de evento #{next_ev.id}"
                 conflicts.append(
                     Conflict(
                         "D",
                         "Buffer deslocamento insuficiente",
-                        f"Apenas {mins} min antes de evento #{next_ev.id}. "
-                        f"Exige ≥ {buffer_min} min entre cidades distintas.",
+                        f"Apenas {mins} min antes {quem}. Exige ≥ {buffer_min} min entre cidades distintas.",
                         ref_id=next_ev.id,
                     )
                 )
@@ -349,6 +381,7 @@ def check_conflicts_uncached(
     fim: datetime,
     municipio: Municipio | None = None,
     exclude_solicitacao_id: int | None = None,
+    lote: Mapping[int, int] | None = None,
 ) -> CheckResult:
     """
     Mesma checagem de `check_conflicts`, sempre lendo do banco.
@@ -363,6 +396,7 @@ def check_conflicts_uncached(
         fim: datetime fim do intervalo (timezone-aware UTC)
         municipio: Município opcional (necessário para checagem RD-04)
         exclude_solicitacao_id: Ignora esta solicitação (revalidar evento já gravado)
+        lote: eventos criados juntos ({id: número na lista}); ver `_check_conflicts_impl`
 
     Returns:
         CheckResult com ok=True/False e lista de conflitos
@@ -373,4 +407,5 @@ def check_conflicts_uncached(
         fim=fim,
         municipio=municipio,
         exclude_solicitacao_id=exclude_solicitacao_id,
+        lote=lote,
     )

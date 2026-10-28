@@ -307,6 +307,18 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     expect(payload.extra_participants).toEqual({ formador_ids: [99] });
   });
 
+  // Prints de 28/10/2026: o antd não foca um Radio.Group; o foco vai à primeira opção da pergunta.
+  test('"pretende avaliar" sem resposta: o foco vai à primeira opção da pergunta', async () => {
+    renderWizard();
+    await preencherEvento();
+    responder(ACOMPANHA, 'Não');
+    fireEvent.click(criar());
+    expect(await screen.findByText('Responda se você pretende avaliar o formador.', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
+    const grupo = screen.getByRole('radiogroup', { name: AVALIAR });
+    await waitFor(() => expect(within(grupo).getByLabelText('Sim')).toHaveFocus(), ESPERA_VALIDACAO);
+    expect(createSolicitacaoMock).not.toHaveBeenCalled();
+  });
+
   test('avaliar com Sim exige e envia qual formador', async () => {
     renderWizard();
     await preencherEvento();

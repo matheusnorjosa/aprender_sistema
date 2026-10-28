@@ -255,6 +255,19 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
     await waitFor(() => expect(message.error).toHaveBeenCalledWith('Sem conexão com o servidor.'));
   });
 
+  // Prints de 28/10/2026: com a pergunta Sim/Não faltando, o foco ficava no botão (o antd não foca um
+  // Radio.Group). Ele vai à primeira opção da pergunta.
+  test('"acompanha" sem resposta: o foco vai à primeira opção da pergunta', async () => {
+    renderWizard();
+    await preencherLinha1EHorario();
+    fireEvent.click(screen.getByTestId('pick-formador'));
+    fireEvent.click(criar());
+    await screen.findByText(/Corrija antes de criar a solicitação/, undefined, ESPERA_VALIDACAO);
+    const grupo = screen.getByRole('radiogroup', { name: /vai acompanhar o evento/ });
+    await waitFor(() => expect(within(grupo).getByLabelText('Sim')).toHaveFocus(), ESPERA_VALIDACAO);
+    expect(createSolicitacaoMock).not.toHaveBeenCalled();
+  });
+
   // Autorrevisão (28/10/2026): a conferência dos campos é assíncrona; um segundo clique antes de ela
   // acabar não pode mandar o evento duas vezes.
   test('dois cliques seguidos em "Criar" enviam uma vez só', async () => {

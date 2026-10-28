@@ -277,6 +277,12 @@ export default function CartaoEvento({
         // Campo escondido não recebe foco: abre "Mais detalhes" antes de focar.
         if (CAMPOS_DOS_DETALHES.has(primeiro.campo)) flushSync(() => setDetalhesAbertos(true));
         form.scrollToField(primeiro.campo, { block: 'center', focus: true });
+        // O antd não foca um Radio.Group (o id fica no <div> do grupo): o foco vai à primeira
+        // opção da pergunta Sim/Não (ou à caixa de marcar) que faltou.
+        const campo = document.getElementById(`evento-${chave}_${primeiro.campo}`);
+        if (campo && !campo.matches('input, textarea, select, button')) {
+          campo.querySelector<HTMLElement>('input[type="radio"], input[type="checkbox"]')?.focus();
+        }
       }
     }
     return problemas.flatMap((p) => p.motivos);

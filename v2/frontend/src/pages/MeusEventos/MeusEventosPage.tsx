@@ -136,7 +136,9 @@ export default function MeusEventosPage(): JSX.Element {
       dataIndex: 'meet_link',
       key: 'meet_link',
       responsive: VISIVEL_A_PARTIR.xl,
-      render: (_, record: MeEvent) => <MeetLink href={record.meet_link} />,
+      // Sem link, "—" como as outras colunas vazias (o rótulo ficava sozinho na linha expandida).
+      render: (_, record: MeEvent) =>
+        record.meet_link ? <MeetLink href={record.meet_link} /> : <Text type="secondary">—</Text>,
       width: 200,
     },
   ], []);
@@ -169,7 +171,7 @@ export default function MeusEventosPage(): JSX.Element {
                 total,
                 pageSize: PAGE_SIZE,
                 showSizeChanger: false,
-                showTotal: (totalCount) => `Total: ${totalCount} eventos`,
+                showTotal: (totalCount) => `Total: ${totalCount} ${totalCount === 1 ? 'evento' : 'eventos'}`,
               }}
               onChange={handleTableChange}
             />

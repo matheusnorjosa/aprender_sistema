@@ -9,7 +9,7 @@
  * - O rótulo é `rotulo` (nome de tela), nunca o `nome` técnico ("GERENCIA 4").
  */
 
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { CurrentUser, Gerencia } from '../../../types';
@@ -192,6 +192,25 @@ describe('FiltersBar — gerência pelo vínculo + policy', () => {
     renderBar();
 
     expect(screen.getByLabelText('Projeto')).toBeInTheDocument();
+    await waitFor(() => expect(getMeMock).toHaveBeenCalled());
+  });
+});
+
+describe('FiltersBar — setas do mês (ensaio r3, 28/10/2026)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getGerenciasMock.mockResolvedValue(ATIVAS);
+    getMyPoliciesMock.mockResolvedValue([]);
+    getMeMock.mockResolvedValue(makeMe());
+  });
+
+  test('as setas têm nome para o leitor de tela e mudam o mês', async () => {
+    const onChange = renderBar(4);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mês anterior' }));
+    expect(onChange).toHaveBeenLastCalledWith({ year: 2026, month: 8 });
+    fireEvent.click(screen.getByRole('button', { name: 'Próximo mês' }));
+    expect(onChange).toHaveBeenLastCalledWith({ year: 2026, month: 10 });
     await waitFor(() => expect(getMeMock).toHaveBeenCalled());
   });
 });

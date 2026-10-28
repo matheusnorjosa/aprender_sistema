@@ -1,7 +1,7 @@
 ---
 title: Hooks de RBAC e Guards (Frontend)
 status: canonical
-last_verified: 2026-10-19
+last_verified: 2026-10-28
 sources_of_truth:
   - v2/frontend/src/contexts/AcessoContext.ts
   - v2/frontend/src/test/lint/acessoSoPorPolicy.test.ts
@@ -84,6 +84,7 @@ Endpoints backend consumidos (contrato detalhado em `v2/docs/API_REFERENCE.md` e
   - **`aviso_senha_redefinida`** (F1, 16/10/2026): `{por, em}` ou `null`; quem redefiniu a senha e quando (`dd/mm/aaaa`). Opcional e fora do guard; o `App.tsx` guarda o valor junto com `trocaPendente` e passa para a `TrocaSenhaObrigatoriaPage` (prop `aviso`).
   - **`redefinicoes_senha`** (F1, revisão): lista `{por, em}` das redefinições por outra pessoa nos últimos 30 dias (AuditLog), da mais nova; não some com a troca de senha. Opcional e fora do guard; o `App.tsx` passa para a `TrocaSenhaObrigatoriaPage` (prop `redefinicoes`) e a `PerfilPage` lê do `user`.
 - `GET /api/me/policies/` — array ordenado de strings (subset de `PUBLIC_POLICY_KEYS`); `403` (`NOT_AUTHENTICATED`) se anonimo; superuser recebe todas. Nunca expoe codenames brutos de capability.
+- `GET /api/usuarios-admin/{id}/policies/` — o mesmo array, de OUTRA pessoa (`getUserPolicies` em `api/adminDAT.ts`), so para quem administra cadastros (`manage_admin_registries`). O form de Usuarios o traduz em itens do menu (`resumoDoMenu` em `pages/AdminDAT/usuario_form_helpers.ts`, pelos mesmos `caps` do `AppSidebar`); so mostra, nunca decide acesso (ensaio r3, 28/10/2026).
 - `GET /api/integrations/google/status/` — `{ connected, googleEmail, tokenExpiry, expiresInDays, isExpired, defaultCalendarId, publishReady, publishBlockReason, reconnectRequired }` (dominio camelCase, apos `normalizeGoogleStatus`). `publishBlockReason` e `'no_setor_scope' | 'google_not_connected' | 'google_calendar_not_configured' | null` (#1656); payload antigo sem esses campos normaliza para `publishReady=false` e `publishBlockReason=null` (acoes de publicacao desabilitadas). `reconnectRequired` (#2039) e `true` quando o sistema removeu a conexao porque o Google revogou o acesso (`invalid_grant`) e a pessoa nao reconectou; payload antigo sem o campo normaliza para `false`. O `GoogleIntegrationCard` (`components/google/GoogleIntegrationCard.tsx`) mostra, desconectado com `reconnectRequired`, um `Alert` de aviso (`role="alert"`) acima de "Conectar conta Google"; conectado, e sempre a tag "Conectado" — `isExpired`/`expiresInDays`/`tokenExpiry` descrevem o access token de 1h, renovado sozinho pelo refresh token, e nao geram mais alarme ("Expirado", "Expira em N dias", "Reconectar conta") em nenhum modo.
 - `GET /api/oauth/google/start/?return_to=<path>` — inicia o fluxo OAuth (redirect do browser, nao XHR).
 

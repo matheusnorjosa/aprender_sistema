@@ -185,4 +185,25 @@ describe('MeusEventosPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Expandir linha de 10/05/2026 · Salvador' }));
     expect(await screen.findByText('Escola Municipal X')).toBeInTheDocument();
   });
+  // Ensaio r3 (28/10/2026), a 390 px: "Total: 1 eventos" e "Reunião:" vazio.
+  test.each([
+    [1, 'Total: 1 evento'],
+    [2, 'Total: 2 eventos'],
+  ])('o total concorda com o número (%i)', async (quantos, texto) => {
+    const eventos = Array.from({ length: quantos }, (_, i) => makeEvent({ id: 80 + i }));
+    getMyEventsMock.mockResolvedValueOnce(makePage(eventos));
+    renderPage();
+    expect(await screen.findByText(texto)).toBeInTheDocument();
+  });
+
+  test('sem link, a Reunião mostra "—", como as outras colunas vazias', async () => {
+    getMyEventsMock.mockResolvedValueOnce(makePage([makeEvent({ id: 90, municipio_nome: 'Salvador', meet_link: null })]));
+    renderPage();
+    await screen.findByText('Salvador');
+    act(() => definirLarguraTela(360));
+    fireEvent.click(screen.getByRole('button', { name: 'Expandir linha de 10/05/2026 · Salvador' }));
+    const rotulo = await screen.findByText('Reunião');
+    const item = rotulo.closest('.ant-descriptions-item');
+    expect(item?.querySelector('.ant-descriptions-item-content')?.textContent).toBe('—');
+  });
 });

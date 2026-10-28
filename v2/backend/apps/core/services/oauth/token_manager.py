@@ -43,6 +43,14 @@ AUTO_REMOVED = "auto_removed"
 # ============================================================================
 
 
+class OAuthNaoConfiguradoError(ValueError):
+    """O servidor não tem `GCAL_OAUTH_CLIENT_ID`/`GCAL_OAUTH_CLIENT_SECRET`: o cliente do Google não monta.
+
+    Subclasse de `ValueError` para quem já trata `ValueError` seguir igual; a view de listar
+    calendários a separa para devolver 409 tratado em vez de 500 (ensaio r3, 28/10/2026).
+    """
+
+
 def _get_fernet_key() -> bytes:
     """
     Retorna chave Fernet dedicada para criptografia de tokens OAuth.
@@ -169,7 +177,7 @@ def refresh_access_token_safe(credential: GoogleOAuthCredential, *, force: bool 
         client_secret: str | None = os.getenv("GCAL_OAUTH_CLIENT_SECRET")
 
         if not client_id or not client_secret:
-            raise ValueError("❌ GCAL_OAUTH_CLIENT_ID e GCAL_OAUTH_CLIENT_SECRET não configuradas")
+            raise OAuthNaoConfiguradoError("❌ GCAL_OAUTH_CLIENT_ID e GCAL_OAUTH_CLIENT_SECRET não configuradas")
 
         refresh_token: str = decrypt_token(cred.refresh_token_encrypted)
 

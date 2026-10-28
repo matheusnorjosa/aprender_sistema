@@ -31,12 +31,16 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 
-from apps.core.exceptions import ServiceUnavailableError
+from apps.core.exceptions import APIError, ServiceUnavailableError
 from apps.core.models import AuditLog, GoogleOAuthCredential
 from apps.core.rbac.policies import CanPublishSetorSolicitacao, CanUseGcal, user_has_policy
 from apps.core.services.google_oauth import build_authorization_url, exchange_code_for_tokens, revoke_token
 from apps.core.services.oauth.oauth_flow import _is_safe_url as is_safe_url  # noqa: PLC2701
-from apps.core.services.oauth.token_manager import encrypt_token, usuarios_para_reconectar
+from apps.core.services.oauth.token_manager import (
+    OAuthNaoConfiguradoError,
+    encrypt_token,
+    usuarios_para_reconectar,
+)
 from apps.core.services.solicitacao_publish import oauth_publish_block_reason
 from apps.core.services.solicitacao_scope import has_publish_scope
 
@@ -652,6 +656,7 @@ def google_oauth_list_calendars(request: Request) -> Response:
     Returns:
         200 OK: Lista de calendários
         404 Not Found: Nenhuma conexão encontrada
+        409 Conflict: `google_calendar_not_configured` (servidor sem a configuração OAuth do Google)
         500 Error: Erro ao listar calendários
 
     Example:
@@ -693,6 +698,18 @@ def google_oauth_list_calendars(request: Request) -> Response:
 
     except GoogleOAuthCredential.DoesNotExist:
         return Response({"error": "Nenhuma conexão Google encontrada"}, status=status.HTTP_404_NOT_FOUND)
+    except OAuthNaoConfiguradoError:
+        # Servidor sem a configuração OAuth: era 500 (alarme falso). 409 com a mensagem que o card
+        # mostra, sem o nome da variável (ensaio r3, 28/10/2026).
+        logger.warning("⚠️ Listar calendários: configuração OAuth do Google ausente no servidor")
+        raise APIError(
+            code="google_calendar_not_configured",
+            message=(
+                "A conexão com o Google Agenda ainda não foi configurada no sistema. "
+                "Avise a administração do sistema."
+            ),
+            status_code=status.HTTP_409_CONFLICT,
+        )
     except TimeoutError:
         # socket.timeout IS TimeoutError (py3.12): 503 (Google indisponivel), nao 500.
         logger.warning("⏱️ Timeout ao listar calendários do Google Calendar")

@@ -6,6 +6,7 @@
  */
 
 import type { JSX } from 'react';
+import dayjs from 'dayjs';
 import type { ID } from '../../types';
 
 /** Person record from the monthly grid */
@@ -149,7 +150,8 @@ export default function DetailsDrawer({ open, onClose, person, day, details }: D
                     <tr key={d.id || idx} className="hover:bg-gray-50">
                       <td className="p-2 border">{d.municipio ?? ''}</td>
                       <td className="p-2 border">{d.tipo ?? ''}</td>
-                      <td className="p-2 border">{d.data ?? ''}</td>
+                      {/* O servidor já manda o dia de Fortaleza (YYYY-MM-DD): só troca o formato. */}
+                      <td className="p-2 border">{d.data ? dayjs(d.data).format('DD/MM/YYYY') : ''}</td>
                       <td className="p-2 border">{d.inicio ?? ''}</td>
                       <td className="p-2 border">{d.fim ?? ''}</td>
                     </tr>

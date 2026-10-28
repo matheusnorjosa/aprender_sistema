@@ -29,6 +29,7 @@ import {
   CalendarOutlined,
 } from '@ant-design/icons';
 import { fetchAPI } from '../../api/config';
+import { TEXTO_DA_TAG } from '../textoDaTag';
 import logger from '../../utils/logger';
 import type { GoogleIntegrationStatus } from '../../types/gcal';
 
@@ -78,6 +79,9 @@ const GoogleIntegrationCard = ({
   const [loadingCalendars, setLoadingCalendars] = useState(false);
   const [selectedCalendar, setSelectedCalendar] = useState<string | null>(null);
   const [savingCalendar, setSavingCalendar] = useState(false);
+  // Servidor sem a configuração OAuth do Google (409 `google_calendar_not_configured`): a mensagem
+  // dele fica no card, no lugar do seletor (ensaio r3, 28/10/2026).
+  const [naoConfigurado, setNaoConfigurado] = useState<string | null>(null);
   // Extrair valores de status (ou usar defaults se status for null). `status`
   // pode ser null antes do fetch inicial; a renderização real só ocorre após o
   // early return abaixo, mas os hooks precisam rodar incondicionalmente.
@@ -116,10 +120,14 @@ const GoogleIntegrationCard = ({
       setLoadingCalendars(true);
       const data = await fetchAPI<{ calendars: CalendarItem[] }>('/integrations/google/calendars/');
       setCalendars(data.calendars || []);
+      setNaoConfigurado(null);
     } catch (error) {
       logger.error('Erro ao carregar calendários:', error);
-      const httpStatus = (error as { response?: { status?: number } }).response?.status;
-      if (httpStatus === 503) {
+      const resposta = (error as { response?: { status?: number; data?: { code?: string } } }).response;
+      const httpStatus = resposta?.status;
+      if (resposta?.data?.code === 'google_calendar_not_configured') {
+        setNaoConfigurado((error as Error).message);
+      } else if (httpStatus === 503) {
         message.error('O Google Calendar demorou a responder. Tente novamente em instantes.');
       } else {
         message.error('Não foi possível carregar seus calendários');
@@ -189,15 +197,17 @@ const GoogleIntegrationCard = ({
     );
   }
 
-  // Estado: CONECTADO
-  const cardColor = '#52c41a'; // verde
+  // Estado: CONECTADO. Com o servidor sem a configuração do Google, o card fica âmbar e não diz
+  // "Conectado": ao lado do aviso de que a conexão não foi configurada, as duas frases se
+  // contradiziam (ensaio r3, 28/10/2026).
+  const cardColor = naoConfigurado ? '#faad14' : '#52c41a'; // âmbar : verde
 
   return (
     <Card
       className="mb-4"
       style={{
         borderColor: cardColor,
-        backgroundColor: '#f6ffed', // verde claro
+        backgroundColor: naoConfigurado ? '#fffbe6' : '#f6ffed', // âmbar claro : verde claro
       }}
     >
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
@@ -206,21 +216,31 @@ const GoogleIntegrationCard = ({
           <Title level={5} className="m-0">
             Integração Google Calendar
           </Title>
-          <Tag color="success" icon={<CheckCircleOutlined style={{ color: cardColor }} />}>
-            Conectado
-          </Tag>
+          {naoConfigurado ? (
+            <Tag color="gold" style={{ color: TEXTO_DA_TAG['gold'] }}>
+              Indisponível
+            </Tag>
+          ) : (
+            <Tag color="success" icon={<CheckCircleOutlined style={{ color: cardColor }} />}>
+              Conectado
+            </Tag>
+          )}
         </Space>
 
         <Space direction="vertical" size="small" style={{ width: '100%' }}>
-          <Text>
-            <strong>Conta conectada:</strong> {googleEmail}
-          </Text>
+          {!naoConfigurado && (
+            <Text>
+              <strong>Conta conectada:</strong> {googleEmail}
+            </Text>
+          )}
 
           {/* Seletor de calendário (no modo fixo, só o destino oficial) */}
           {fixedCalendar ? (
             <Text>
               <CalendarOutlined /> Os eventos são publicados no calendário oficial da organização.
             </Text>
+          ) : naoConfigurado ? (
+            <Alert type="warning" showIcon message={naoConfigurado} />
           ) : (
             <div className="mt-2">
               <Text strong className="block mb-2">

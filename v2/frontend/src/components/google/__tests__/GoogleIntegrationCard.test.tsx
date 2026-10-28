@@ -436,3 +436,36 @@ describe('GoogleIntegrationCard — fixedCalendar', () => {
     ).not.toBeInTheDocument();
   });
 });
+
+// Ensaio r3 (28/10/2026): servidor sem a configuração OAuth do Google. O /calendars/ devolvia 500 e
+// o card só soltava um toast genérico; agora o backend responde 409 `google_calendar_not_configured`
+// com a mensagem em pt-BR, e o card a mostra no lugar do seletor.
+describe('GoogleIntegrationCard — Google não configurado no servidor', () => {
+  const MENSAGEM =
+    'A conexão com o Google Agenda ainda não foi configurada no sistema. Avise a administração do sistema.';
+
+  test('mostra no card a mensagem do servidor', async () => {
+    const erro = Object.assign(new Error(MENSAGEM), {
+      status: 409,
+      response: { status: 409, data: { detail: MENSAGEM, code: 'google_calendar_not_configured' } },
+    });
+    vi.mocked(fetchAPI).mockRejectedValueOnce(erro);
+    const status: GoogleIntegrationStatus = {
+      connected: true,
+      googleEmail: 'controle@aprendereditora.com.br',
+      defaultCalendarId: null,
+      publishReady: true,
+      publishBlockReason: null,
+      reconnectRequired: false,
+    };
+
+    render(<GoogleIntegrationCard status={status} onConnect={() => {}} onDisconnect={() => {}} />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(MENSAGEM);
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    // Sem contradição na mesma tela: nada de "Conectado" junto de "não foi configurada".
+    expect(screen.queryByText('Conectado')).not.toBeInTheDocument();
+    expect(screen.queryByText('Conta conectada:')).not.toBeInTheDocument();
+    expect(screen.getByText('Indisponível')).toBeInTheDocument();
+  });
+});

@@ -107,7 +107,9 @@ class OAuthCalendarClient(CalendarClientAdapter):
         client_secret = os.getenv("GCAL_OAUTH_CLIENT_SECRET")
 
         if not client_id or not client_secret:
-            raise ValueError("❌ GCAL_OAUTH_CLIENT_ID e GCAL_OAUTH_CLIENT_SECRET não configuradas")
+            from apps.core.services.oauth.token_manager import OAuthNaoConfiguradoError
+
+            raise OAuthNaoConfiguradoError("❌ GCAL_OAUTH_CLIENT_ID e GCAL_OAUTH_CLIENT_SECRET não configuradas")
 
         # Descriptografar tokens
         access_token = _decrypt_token(credential.access_token_encrypted)

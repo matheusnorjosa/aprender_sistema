@@ -12,7 +12,7 @@ from django.contrib.auth.models import Group
 from django.db import transaction
 from django.db.models import Count, Q, QuerySet, Value
 from django.db.models.functions import Coalesce, NullIf
-from rest_framework import status, viewsets
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.filters import OrderingFilter, SearchFilter
@@ -22,6 +22,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema
 
 from apps.core.constants import RESERVED_GROUPS, SETOR_GROUPS, SETORES_PRODUTO
 from apps.core.models import (
@@ -38,7 +39,7 @@ from apps.core.models import (
 )
 from apps.core.pagination import LargePagination
 from apps.core.permissions import HasPerm, SuperuserOnly
-from apps.core.rbac.policies import CanAccessAuditLogs, can_admin_mutate_target
+from apps.core.rbac.policies import CanAccessAuditLogs, can_admin_mutate_target, resolve_public_policies
 from apps.core.serializers import (
     AuditLogSerializer,
     CompraSerializer,
@@ -472,6 +473,19 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
             {"detail": "Usuário anonimizado.", "id": usuario.pk, "anonimizado": anonimizado},
             status=status.HTTP_200_OK,
         )
+
+    @extend_schema(responses={200: serializers.ListSerializer(child=serializers.CharField())})
+    @action(detail=True, methods=["get"])
+    def policies(self, request: Request, pk: str | None = None) -> Response:
+        """
+        O que a pessoa vê no menu: as policies públicas dela, pela mesma regra de
+        `GET /api/me/policies/` (`resolve_public_policies`). Alimenta o "Resumo do perfil de
+        acesso" do form de Usuários (ensaio r3, 28/10/2026). Só leitura; a permissão é a do
+        ViewSet, e a conta de superusuário segue 404 para quem não é superusuário (P0-0).
+
+        Endpoint: GET /api/usuarios-admin/{id}/policies/
+        """
+        return Response(resolve_public_policies(self.get_object()))
 
     @action(detail=True, methods=["post"], permission_classes=[SuperuserOnly])
     def assign_groups(self, request, pk=None):

@@ -109,6 +109,7 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
         <button
           type="button"
           onClick={() => bump(-1)}
+          aria-label="Mês anterior"
           className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded border border-gray-300"
         >
           &larr;
@@ -119,6 +120,7 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
         <button
           type="button"
           onClick={() => bump(1)}
+          aria-label="Próximo mês"
           className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded border border-gray-300"
         >
           &rarr;

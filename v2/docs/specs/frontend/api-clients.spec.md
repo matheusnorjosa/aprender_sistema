@@ -1,7 +1,7 @@
 ---
 title: Clientes de API (Fetch)
 status: canonical
-last_verified: 2026-10-19
+last_verified: 2026-10-28
 sources_of_truth:
   - v2/frontend/src/api/config.ts
   - v2/frontend/src/api/auth.ts
@@ -73,6 +73,7 @@ Wrapper publico exportado por `config.ts`:
 `API_BASE` e configuravel por `VITE_API_URL` (default `/api`). Os endpoints concretos consumidos por cada cliente estao em [`v2/docs/API_REFERENCE.md`](../../API_REFERENCE.md). `initCsrfToken()` roda automaticamente no import do modulo, exceto sob Vitest.
 
 - **`getGerencias({ ativo? })`** (`availability.ts`, PR A de 2026-09-29): `{ ativo: true }` pede `/gerencias/?ativo=true` — e o que as listas de escolha usam (Grade Mensal, PreAgenda), para gerencia inativa nao aparecer. Sem filtro traz todas: a tela de Gerencias (`adminDAT.listGerencias`) precisa das inativas para reativar. O rotulo exibido e `rotulo` (`nome_exibicao` ou `nome_setor`), nunca `nome`.
+- **`getUserPolicies(id)`** (`adminDAT.ts`, ensaio r3 de 2026-10-28): `GET /usuarios-admin/{id}/policies/`, o array de policies públicas de OUTRA pessoa (a mesma regra de `/me/policies/`), para o resumo do perfil de acesso no form de Usuários; erro 403/404 sai pelo `ADMIN_ERROR_MAP` como os demais clientes de Usuários.
 
 ## Fluxos principais
 

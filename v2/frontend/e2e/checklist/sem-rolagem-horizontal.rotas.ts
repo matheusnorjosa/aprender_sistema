@@ -133,7 +133,20 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     // Reunião (< 1600) vão para a linha expandida: há linha expandida em toda largura.
     estados: [expandida(T.municipio, 'Reunião')],
   },
-  { path: '/solicitacoes/nova', perfil: 'coordenador', marco: 'Nova Solicitação' },
+  {
+    path: '/solicitacoes/nova',
+    perfil: 'coordenador',
+    marco: 'Nova Solicitação',
+    // Página única desde 28/10/2026: o cartão do evento inteiro já está na tela; "Mais detalhes"
+    // aberto mostra os campos opcionais em colunas.
+    estados: [
+      {
+        nome: 'detalhes',
+        clicar: '.ant-collapse-header:has-text("Mais detalhes")',
+        dados: { em: 'label', texto: 'Local do Evento' },
+      },
+    ],
+  },
   {
     path: '/solicitacoes/publicacao',
     perfil: 'superusuario',
@@ -357,7 +370,8 @@ export const NAO_MEDIDOS: Readonly<Record<string, string>> = {
   '/solicitacoes/disponibilidade (Grade com evento, 360 a 1024)':
     'o mês fixo não tem evento do seed, e sem evento é a Grade mais estreita: ela segue em PENDENTES a 360, ' +
     '768 e 1024 até o C4 medir com evento em data fixa (o ratchet do Vitest impede que saia por esta medição)',
-  '/solicitacoes/nova (passos 2 em diante)': 'exige preencher o formulário do wizard (C3)',
+  '/solicitacoes/nova (pergunta de avaliar e avisos de agenda)':
+    'aparecem só depois de escolher projeto, formadores e horário nos ComboBox (lookup assíncrono)',
   '/mapa-brasil (municípios do estado clicado)': 'exige clicar numa região do mapa',
   '/dat/cadastros (aba AVALIAR)': 'o seed só tem cadastro FORMAR',
   'ImportUploader depois da validação':

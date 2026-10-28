@@ -21,7 +21,9 @@ diz **o que buscar, o que evitar e como provar**.
 
 Sistema interno, usado todo dia por quem conhece o domínio (coordenação, DAT, Controle, aprovadoras). Simplicidade ×
 flexibilidade é um trade-off real: telas de operação frequente pedem **densidade** (densidade média, decisão do dono
-no C1) e poucos cliques; tarefas raras ou de quem está começando pedem guia (ex.: o wizard de solicitação).
+no C1) e poucos cliques; tarefas raras ou de quem está começando pedem guia. A Nova Solicitação
+deixou de ser wizard em 28/10/2026 (decisão do dono): é uma página só, com o evento num cartão de campos lado a
+lado e "Mais detalhes" recolhido, porque quem cria evento faz isso todo dia.
 
 ## O que buscar
 

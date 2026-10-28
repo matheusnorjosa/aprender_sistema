@@ -138,15 +138,13 @@ function renderWizard(): ReturnType<typeof renderNoRoteador>['router'] {
   return renderNoRoteador(<NewSolicitacaoWizard />, { em: '/solicitacoes/nova' }).router;
 }
 
-async function irParaParticipantes(): Promise<void> {
+/** Preenche a linha 1, o horário e os formadores do cartão (tudo na mesma página). */
+async function preencherEvento(): Promise<void> {
   await screen.findByTestId('cb-projeto');
   fireEvent.click(screen.getByTestId('cb-projeto'));
-  await waitFor(() => screen.getByTestId('cb-tipo'));
   fireEvent.click(screen.getByTestId('cb-tipo'));
   fireEvent.click(screen.getByTestId('cb-municipio'));
   fireEvent.click(screen.getByTestId('set-date'));
-  fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-  await screen.findByTestId('pick-formador');
   fireEvent.click(screen.getByTestId('pick-formador'));
 }
 
@@ -154,13 +152,14 @@ function responder(pergunta: RegExp, resposta: 'Sim' | 'Não'): void {
   fireEvent.click(within(screen.getByRole('radiogroup', { name: pergunta })).getByLabelText(resposta));
 }
 
+const criar = (): HTMLElement => screen.getByRole('button', { name: 'Criar solicitação' });
 const ACOMPANHA = /O coordenador responsável vai acompanhar o evento\?/;
 const AVALIAR = /Você pretende avaliar o formador nesse evento\?/;
 // A validação do Form do AntD é assíncrona: aqui leva 0,2–0,6 s; na CI, com a suíte inteira e a
 // cobertura, passa de 1 s (o padrão do findBy) — o aviso aparece, só demora.
 const ESPERA_VALIDACAO = { timeout: 5000 };
 
-// Percorrer o assistente com antd leva ~3 s por teste isolado; na suíte inteira passa dos 5 s padrão.
+// A página com antd leva ~3 s por teste isolado; na suíte inteira passa dos 5 s padrão.
 describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { timeout: 20000 }, () => {
   beforeEach(() => {
     if (!window.matchMedia) {
@@ -201,31 +200,31 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     getMeMock.mockResolvedValue(SEM_FUNCAO_COORDENADOR);
     projetoEscolhido = { ...projetoEscolhido, responsavel_padrao: false };
     renderWizard();
-    await irParaParticipantes();
+    await preencherEvento();
     expect(formadoresPickerProps.projetoIds.at(-1)).toBe(123);
     await waitFor(() => expect(lookupUsuariosMock).toHaveBeenCalledWith('', 'Coordenador', 123));
   });
 
   test('a lista de coordenadores acompanhantes saiu e a pergunta Sim/Não entrou', async () => {
     renderWizard();
-    await irParaParticipantes();
+    await preencherEvento();
     expect(screen.queryByText('Coordenadores Acompanhantes')).not.toBeInTheDocument();
     expect(screen.getByRole('radiogroup', { name: ACOMPANHA })).toBeInTheDocument();
   });
 
-  test('não avança sem responder se o coordenador vai acompanhar', async () => {
+  test('não envia sem responder se o coordenador vai acompanhar', async () => {
     renderWizard();
-    await irParaParticipantes();
+    await preencherEvento();
     responder(AVALIAR, 'Não');
-    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
+    fireEvent.click(criar());
     expect(await screen.findByText('Responda se o coordenador responsável vai acompanhar o evento.', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Voltar para passo anterior/i })).toBeInTheDocument();
+    expect(createSolicitacaoMock).not.toHaveBeenCalled();
     expect(screen.getByTestId('pick-formador')).toBeInTheDocument();
   });
 
   test('prévia de agenda: o responsável só entra com Sim', async () => {
     renderWizard();
-    await irParaParticipantes();
+    await preencherEvento();
     responder(ACOMPANHA, 'Não');
     await waitFor(() => expect(checkAvailabilityManyMock).toHaveBeenCalled());
     expect(checkAvailabilityManyMock.mock.calls.at(-1)?.[0].usuarios_ids).toEqual([99]);
@@ -234,26 +233,28 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     await waitFor(() => expect(checkAvailabilityManyMock.mock.calls.at(-1)?.[0].usuarios_ids).toEqual([1, 99]));
   });
 
-  test('pergunta de avaliar: aparece com formador avaliável e pede qual formador no Sim', async () => {
+  test('pergunta de avaliar: aparece com formador avaliável, fora de "Mais detalhes", e pede qual formador no Sim', async () => {
     renderWizard();
-    await irParaParticipantes();
-    expect(screen.getByRole('radiogroup', { name: AVALIAR })).toBeInTheDocument();
+    await preencherEvento();
+    const pergunta = screen.getByRole('radiogroup', { name: AVALIAR });
+    expect(pergunta.closest('.ant-collapse')).toBeNull();
     expect(screen.queryByLabelText('Qual formador você pretende avaliar?')).not.toBeInTheDocument();
     responder(AVALIAR, 'Sim');
-    expect(await screen.findByLabelText('Qual formador você pretende avaliar?')).toBeInTheDocument();
+    const qual = await screen.findByLabelText('Qual formador você pretende avaliar?');
+    expect(qual.closest('.ant-collapse')).toBeNull();
   });
 
   test('pergunta de avaliar some quando a gerência do projeto não pergunta', async () => {
     projetoEscolhido = { ...projetoEscolhido, pergunta_avaliar_formador: false };
     renderWizard();
-    await irParaParticipantes();
+    await preencherEvento();
     expect(screen.queryByRole('radiogroup', { name: AVALIAR })).not.toBeInTheDocument();
   });
 
   test('pergunta de avaliar some quando nenhum formador é avaliável (coordenador como formador)', async () => {
     formadoresEscolhidos.atual = [NAO_AVALIAVEL];
     renderWizard();
-    await irParaParticipantes();
+    await preencherEvento();
     expect(screen.queryByRole('radiogroup', { name: AVALIAR })).not.toBeInTheDocument();
   });
 
@@ -261,50 +262,44 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     getMeMock.mockResolvedValue(SEM_FUNCAO_COORDENADOR);
     projetoEscolhido = { ...projetoEscolhido, responsavel_padrao: false };
     renderWizard();
-    await irParaParticipantes();
+    await preencherEvento();
     responder(ACOMPANHA, 'Não');
     responder(AVALIAR, 'Não');
-    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
+    fireEvent.click(criar());
     expect(await screen.findByText('Escolha o coordenador responsável pelo evento.', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
+    expect(createSolicitacaoMock).not.toHaveBeenCalled();
   });
 
   test('projeto em que o backend aceita o vazio: quem cria é o responsável', async () => {
     renderWizard();
-    await irParaParticipantes();
+    await preencherEvento();
     expect(screen.getByText('Vazio: você é o coordenador responsável.')).toBeInTheDocument();
     responder(ACOMPANHA, 'Sim');
     responder(AVALIAR, 'Não');
     await waitFor(() => expect(checkAvailabilityManyMock.mock.calls.at(-1)?.[0].usuarios_ids).toEqual([1, 99]));
-    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    await screen.findByLabelText('Local do Evento');
-    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    await screen.findByText('Revise sua solicitação');
-    expect(screen.getByText('Ana Coordenadora (você)')).toBeInTheDocument();
+    fireEvent.click(criar());
+    await waitFor(() => expect(createSolicitacaoMock).toHaveBeenCalled());
+    expect(createSolicitacaoMock.mock.calls[0][0].coordenador).toBeNull();
   });
 
   test('coordenadora só de outra gerência: o texto do vazio não aparece e precisa escolher (PR 9)', async () => {
     // `me.gerencias` diz COORDENADOR, mas não na gerência do projeto: o backend recusaria o vazio.
     projetoEscolhido = { ...projetoEscolhido, responsavel_padrao: false };
     renderWizard();
-    await irParaParticipantes();
+    await preencherEvento();
     expect(screen.queryByText('Vazio: você é o coordenador responsável.')).not.toBeInTheDocument();
     responder(ACOMPANHA, 'Não');
     responder(AVALIAR, 'Não');
-    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
+    fireEvent.click(criar());
     expect(await screen.findByText('Escolha o coordenador responsável pelo evento.', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
   });
 
-  test('envia as respostas e mostra-as na confirmação', async () => {
+  test('envia as respostas', async () => {
     renderWizard();
-    await irParaParticipantes();
+    await preencherEvento();
     responder(ACOMPANHA, 'Sim');
     responder(AVALIAR, 'Não');
-    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    await screen.findByLabelText('Local do Evento');
-    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    await screen.findByText('Revise sua solicitação');
-    expect(screen.getByText('O coordenador responsável acompanha o evento')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Confirmar Solicitação/i }));
+    fireEvent.click(criar());
     await waitFor(() => expect(createSolicitacaoMock).toHaveBeenCalled());
     const payload = createSolicitacaoMock.mock.calls[0][0];
     expect(payload.coordenador_acompanha).toBe(true);
@@ -312,41 +307,47 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     expect(payload.extra_participants).toEqual({ formador_ids: [99] });
   });
 
-  // Item 38 (ensaio de 20/10/2026): a revisão mostrava o código NAO_SUPER ao lado do projeto e uma
-  // linha vazia, sem rótulo nem valor, para cada campo opcional deixado em branco.
-  test('a revisão mostra o fluxo pelo nome e não tem linha vazia para campo opcional em branco', async () => {
+  // Prints de 28/10/2026: o antd não foca um Radio.Group; o foco vai à primeira opção da pergunta.
+  test('"pretende avaliar" sem resposta: o foco vai à primeira opção da pergunta', async () => {
     renderWizard();
-    await irParaParticipantes();
+    await preencherEvento();
     responder(ACOMPANHA, 'Não');
-    responder(AVALIAR, 'Não');
-    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    await screen.findByLabelText('Local do Evento');
-    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    await screen.findByText('Revise sua solicitação');
-
-    expect(screen.queryByText('NAO_SUPER')).not.toBeInTheDocument();
-    expect(screen.getByText('Não-Superintendência')).toBeInTheDocument();
-    const linhas = Array.from(document.querySelectorAll('.ant-descriptions-row'));
-    const vazias = linhas.filter((linha) => !linha.querySelector('.ant-descriptions-item-label')?.textContent?.trim());
-    expect(vazias).toHaveLength(0);
-    for (const rotulo of ['Tipo', 'Encontro', 'Segmento', 'Observações']) {
-      expect(screen.queryByText(rotulo, { selector: '.ant-descriptions-item-label' })).not.toBeInTheDocument();
-    }
+    fireEvent.click(criar());
+    expect(await screen.findByText('Responda se você pretende avaliar o formador.', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
+    const grupo = screen.getByRole('radiogroup', { name: AVALIAR });
+    await waitFor(() => expect(within(grupo).getByLabelText('Sim')).toHaveFocus(), ESPERA_VALIDACAO);
+    expect(createSolicitacaoMock).not.toHaveBeenCalled();
   });
 
-  // Item 36: sair do assistente com algo preenchido pergunta; depois do envio com sucesso, não
+  test('avaliar com Sim exige e envia qual formador', async () => {
+    renderWizard();
+    await preencherEvento();
+    responder(ACOMPANHA, 'Não');
+    responder(AVALIAR, 'Sim');
+    fireEvent.click(criar());
+    expect(await screen.findByText('Escolha qual formador você pretende avaliar.', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
+    expect(createSolicitacaoMock).not.toHaveBeenCalled();
+  });
+
+  // Item 38 (ensaio de 20/10/2026): a tela mostrava o código NAO_SUPER. A situação do cartão diz o
+  // que acontece com o evento, em palavras.
+  test('a situação do cartão diz o fluxo em palavras, sem o código', async () => {
+    renderWizard();
+    await preencherEvento();
+    expect(screen.getByText('Aprovado na hora')).toBeInTheDocument();
+    expect(screen.queryByText('Vai para aprovação')).not.toBeInTheDocument();
+    expect(screen.queryByText(/NAO_SUPER/)).not.toBeInTheDocument();
+  });
+
+  // Item 36: sair da tela com algo preenchido pergunta; depois do envio com sucesso, não
   // (o que foi preenchido virou a solicitação).
   test('depois de enviar com sucesso, vai para Minhas Solicitações sem perguntar', async () => {
     const confirmar = vi.spyOn(Modal, 'confirm');
     const router = renderWizard();
-    await irParaParticipantes();
+    await preencherEvento();
     responder(ACOMPANHA, 'Não');
     responder(AVALIAR, 'Não');
-    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    await screen.findByLabelText('Local do Evento');
-    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    await screen.findByText('Revise sua solicitação');
-    fireEvent.click(screen.getByRole('button', { name: /Confirmar Solicitação/i }));
+    fireEvent.click(criar());
 
     await waitFor(() => expect(enderecoAtual(router)).toBe('/solicitacoes/minhas'));
     expect(confirmar).not.toHaveBeenCalled();
@@ -355,31 +356,24 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
 
   test('trocar o projeto limpa os formadores e o responsável já escolhidos (PR 9, P9-5)', async () => {
     renderWizard();
-    await irParaParticipantes();
+    await preencherEvento();
     fireEvent.click(screen.getByTestId('cb-responsavel'));
-    fireEvent.click(screen.getByRole('button', { name: /Voltar para passo anterior/i }));
 
     projetoEscolhido = { ...projetoEscolhido, id: 124, label: 'Projeto Y' };
-    fireEvent.click(await screen.findByTestId('cb-projeto'));
+    fireEvent.click(screen.getByTestId('cb-projeto'));
     fireEvent.click(screen.getByTestId('cb-municipio'));
-    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    await screen.findByTestId('pick-formador');
     expect(formadoresPickerProps.projetoIds.at(-1)).toBe(124);
 
-    // Sem formador escolhido de novo, o passo não avança.
+    // Sem formador escolhido de novo, não envia.
     responder(ACOMPANHA, 'Não');
-    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
+    fireEvent.click(criar());
     expect(await screen.findByText('Por favor selecione pelo menos um formador', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
+    expect(createSolicitacaoMock).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTestId('pick-formador'));
     responder(AVALIAR, 'Não');
-    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    await screen.findByLabelText('Local do Evento');
-    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    await screen.findByText('Revise sua solicitação');
-    expect(screen.queryByText('Carla Coordenadora')).not.toBeInTheDocument();
-    expect(screen.getByText('Ana Coordenadora (você)')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Confirmar Solicitação/i }));
+    expect(screen.getByText('Vazio: você é o coordenador responsável.')).toBeInTheDocument();
+    fireEvent.click(criar());
     await waitFor(() => expect(createSolicitacaoMock).toHaveBeenCalled());
     const payload = createSolicitacaoMock.mock.calls[0][0];
     expect(payload.projeto).toBe(124);

@@ -13,7 +13,7 @@ test.describe('Fluxo de Solicitações', () => {
     await expect(page.getByRole('main')).toBeVisible();
   });
 
-  test('2. Nova Solicitação - Wizard carrega', async ({ page }) => {
+  test('2. Nova Solicitação - Página carrega', async ({ page }) => {
     await page.goto('/solicitacoes/nova');
     await expect(page.getByRole('main')).toBeVisible();
   });

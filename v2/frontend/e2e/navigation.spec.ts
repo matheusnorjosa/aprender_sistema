@@ -37,7 +37,7 @@ test.describe('Navegação Principal', () => {
     await expect(page.getByRole('main')).toBeVisible();
   });
 
-  test('5. Nova Solicitação carrega wizard', async ({ page }) => {
+  test('5. Nova Solicitação carrega a página', async ({ page }) => {
     await page.goto('/solicitacoes/nova');
     await expect(page.getByRole('main')).toBeVisible();
   });

@@ -11,7 +11,7 @@ em três camadas de asserção:
 
 - Um arquivo por jornada: `j{NN}-{slug}.spec.ts`.
 - Tags `@critical`, `@rbac`, `@rd-XX`, `@pa-XX`, etc. em `test(...)`.
-- Seed via API (fixture `seedSolicitacao`), nunca via wizard — wizard é o
+- Seed via API (fixture `seedSolicitacao`), nunca pela tela de Nova Solicitação — ela é o
   objeto de teste em jornadas específicas (ex: J02).
 - `test.fail()` quando a jornada está bloqueada por issue conhecida. Retirar
   a marca quando a issue for resolvida.
@@ -27,7 +27,7 @@ Jornadas que dependem de aprovação têm duas variantes (J01a/J01b).
 | ---- | ---------- | ------ | -------- | ----------- |
 | J01a | SUPER happy path: coord cria → super aprova | `@critical @rf01 @pa-02 @fluxo-super` | ✅ | — |
 | J01b | NAO_SUPER happy path: coord cria → auto-aprovado | `@critical @rf01 @fluxo-nao-super` | ✅ | — |
-| J02 | Wizard de nova solicitação: estrutura, validação, RBAC | `@critical @ux @rf01` | ✅ | — |
+| J02 | Nova solicitação (página única): estrutura, validação, RBAC | `@critical @ux @rf01` | ✅ | — |
 | J03 | RD-04: deslocamento entre municípios → conflito D | `@critical @rd-04` | ✅ | — |
 | J04 | Reprovação: fluxo completo + AuditLog (PA-05) | `@critical @pa-02 @pa-05 @fluxo-super` | ✅ | — |
 | J05 | Visão individual vs setor (/solicitacoes vs /disponibilidade) | `@critical @rbac` | ✅ | — |

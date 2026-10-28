@@ -210,13 +210,21 @@ describe('MySolicitacoesPage — item 36', { timeout: 20000 }, () => {
     const texto = String(informar.mock.calls[0]![0].content);
     expect(texto).toContain('já está no Google Agenda');
     // O botão fala de editar e de excluir; o motivo também, com o nome que as ações têm hoje.
-    expect(texto).toContain('Para editar ou excluir, peça ao Apoio de Coordenação da sua gerência');
+    expect(texto).toContain('Para editar, peça ao Apoio de Coordenação da sua gerência');
     expect(texto).toContain('na tela Publicar na agenda');
     // O Controle tira do Google qualquer evento publicado ("Remover do Google", na Pré-agenda): é a
     // saída de quem não tem Apoio na gerência, ou cujo projeto não tem gerência.
     expect(texto).toContain('ou ao Controle, na Pré-agenda, que tire o evento só do Google');
-    expect(texto).toContain('você consegue editar e excluir aqui');
-    expect(texto).toContain('o Apoio também pode excluir o evento em Publicar na agenda');
+    expect(texto).toContain('você consegue editar aqui');
+    expect(texto).toContain(
+      'Para excluir, peça ao Apoio de Coordenação da sua gerência, que exclui o evento em Publicar na agenda'
+    );
+    // A tela não sabe se a solicitação já passou por uma aprovação (AuditLog APPROVE ou
+    // `aprovada_como_super`), e o servidor recusa excluir essa, aqui e na tela do Apoio
+    // (`motivo_que_impede_excluir`): o motivo não promete a exclusão, diz quando ela não existe.
+    expect(texto).not.toMatch(/consegue editar e excluir/);
+    expect(texto).toContain('Solicitação que já passou por uma aprovação não se exclui mais');
+    expect(texto).toContain('fale com a administração do sistema');
     // "Cancelar a publicação" não é o nome de nenhuma ação.
     expect(texto).not.toMatch(/cancele a publicação/);
     informar.mockRestore();

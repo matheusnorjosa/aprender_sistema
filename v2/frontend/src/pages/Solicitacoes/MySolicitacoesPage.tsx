@@ -113,6 +113,9 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
     // Apoio vigente. O Controle tira do Google qualquer publicado com id ("Remover do Google", na
     // Pré-agenda): é a saída de quem não tem Apoio na gerência, ou cujo projeto não tem gerência.
     // A SUPER fora de pendente não volta a se excluir: o motivo dela (abaixo) dá a saída.
+    // Excluir não se promete: a tela não sabe se a solicitação já passou por uma aprovação
+    // (AuditLog APPROVE ou `aprovada_como_super`, que a troca de fluxo do projeto deixa em
+    // NAO_SUPER), e o servidor recusa excluir essa, aqui e na tela do Apoio (`motivo_que_impede_excluir`).
     const apoioConsegueTirar =
       record.status === 'aprovado' &&
       Boolean(record.external_event_id) &&
@@ -127,7 +130,7 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
       );
     } else {
       motivos.push(
-        'Este evento já está no Google Agenda. Para editar ou excluir, peça ao Apoio de Coordenação da sua gerência, na tela Publicar na agenda, ou ao Controle, na Pré-agenda, que tire o evento só do Google; depois disso, você consegue editar e excluir aqui. Se for para apagar de vez, o Apoio também pode excluir o evento em Publicar na agenda, o que o tira do Google e do sistema.'
+        'Este evento já está no Google Agenda. Para editar, peça ao Apoio de Coordenação da sua gerência, na tela Publicar na agenda, ou ao Controle, na Pré-agenda, que tire o evento só do Google; depois disso, você consegue editar aqui. Para excluir, peça ao Apoio de Coordenação da sua gerência, que exclui o evento em Publicar na agenda (ele sai do Google e do sistema). Solicitação que já passou por uma aprovação não se exclui mais, nem lá nem aqui: nesse caso, fale com a administração do sistema.'
       );
     }
   } else if (isPublished) {

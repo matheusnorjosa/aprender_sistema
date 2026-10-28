@@ -6,12 +6,14 @@ Garante que todo endpoint API novo é classificado em uma de duas categorias:
 1. **Coberto pela Matriz Viva**: endpoint registrado em
    `MATRIX_ENDPOINT_COVERAGE` mapeando a um recurso de `ACCESS_MATRIX`.
 2. **Explicitamente isento**: endpoint listado em
-   `RBAC_MATRIX_EXEMPT_PREFIXES` com motivo declarado.
+   `RBAC_MATRIX_EXEMPT_PREFIXES` (prefixo) ou `RBAC_MATRIX_EXEMPT_EXACT`
+   (só o endpoint exato) com motivo declarado.
 
 Endpoint sem classificação → CI vermelho. Force o dev a:
 - Adicionar entrada em `MATRIX_ENDPOINT_COVERAGE` (e em `RESOURCES`/
   `ACCESS_MATRIX` se for recurso novo); OU
-- Adicionar prefixo a `RBAC_MATRIX_EXEMPT_PREFIXES` com motivo.
+- Adicionar prefixo a `RBAC_MATRIX_EXEMPT_PREFIXES` (ou o endpoint exato a
+  `RBAC_MATRIX_EXEMPT_EXACT`) com motivo.
 
 Não é "whitelist muda": cada exceção declara categoria + motivo.
 """
@@ -35,7 +37,8 @@ from apps.core.rbac.matrix import ACCESS_MATRIX
 
 MATRIX_ENDPOINT_COVERAGE: dict[str, list[str]] = {
     "grade_mensal": ["/api/availability/monthly/"],
-    "deslocamentos": ["/api/deslocamentos/"],
+    # alvos: mesma ViewSet e mesmo `IsAuthenticated`; o escopo (quem delega) é filtrado na action.
+    "deslocamentos": ["/api/deslocamentos/", "/api/deslocamentos/alvos/"],
     "dashboard_compras": ["/api/dat/compras-materiais/dashboard/"],
     "metrics_team_productivity": ["/api/metrics/team/productivity/"],
     "ciclos_acoes": ["/api/ciclos-acoes/"],
@@ -155,8 +158,13 @@ RBAC_MATRIX_EXEMPT_PREFIXES: dict[str, str] = {
     "/api/deslocamentos/<id>/": "Detail variant — compartilha permission da list (deslocamentos)",
     "/api/produtos/<id>/": "Detail variant — compartilha permission da list (produtos_list)",
     "/api/solicitacoes/<id>/": "Detail variant — compartilha permission da list (solicitacoes_list)",
-    # ── API root (DRF DefaultRouter root view) ───────────────────────────
-    "/api/": "API root index — DRF DefaultRouter, IsAuthenticated por design",
+}
+
+# Isenções que valem só para o endpoint exato (comparação por igualdade, não por prefixo). A raiz
+# "/api/" não pode ser prefixo: isentaria todo /api/* e a sentinela não protegeria nada (revisão do
+# #2149; foi assim que /api/deslocamentos/alvos/ entrou sem classificação no #2112).
+RBAC_MATRIX_EXEMPT_EXACT: dict[str, str] = {
+    "/api/": "Índice estático da API (`views_basic.api_root`: mensagem, versão e links) — sem dado de domínio",
 }
 
 
@@ -222,7 +230,9 @@ def _domain_endpoints() -> set[str]:
 
 
 def _is_exempt(endpoint: str) -> tuple[bool, str]:
-    """True se endpoint começa com algum prefixo isento. Retorna motivo."""
+    """True se endpoint é uma isenção exata ou começa com algum prefixo isento. Retorna motivo."""
+    if endpoint in RBAC_MATRIX_EXEMPT_EXACT:
+        return True, RBAC_MATRIX_EXEMPT_EXACT[endpoint]
     for prefix, reason in RBAC_MATRIX_EXEMPT_PREFIXES.items():
         if endpoint.startswith(prefix):
             return True, reason
@@ -235,6 +245,11 @@ def _is_covered(endpoint: str) -> tuple[bool, str]:
         if endpoint in urls:
             return True, resource
     return False, ""
+
+
+def _nao_classificados(endpoints: set[str]) -> list[str]:
+    """Os endpoints que nem a matriz cobre nem uma isenção alcança, em ordem."""
+    return [ep for ep in sorted(endpoints) if not _is_covered(ep)[0] and not _is_exempt(ep)[0]]
 
 
 # ============================================================================
@@ -265,7 +280,7 @@ def test_no_uncovered_domain_endpoints():
 
     Cada endpoint deve estar em UMA destas categorias:
     - MATRIX_ENDPOINT_COVERAGE (recurso da Matriz Viva)
-    - RBAC_MATRIX_EXEMPT_PREFIXES (isento com motivo)
+    - RBAC_MATRIX_EXEMPT_PREFIXES ou RBAC_MATRIX_EXEMPT_EXACT (isento com motivo)
 
     Quando esta falha aparece para você:
     1. O endpoint pertence à matriz? Adicione em MATRIX_ENDPOINT_COVERAGE +
@@ -274,23 +289,25 @@ def test_no_uncovered_domain_endpoints():
        RBAC_MATRIX_EXEMPT_PREFIXES com motivo claro.
     3. Não use whitelist muda — cada exceção precisa de motivo declarado.
     """
-    endpoints = _domain_endpoints()
-    unclassified: list[str] = []
-    for ep in sorted(endpoints):
-        is_covered, _ = _is_covered(ep)
-        is_exempt, _ = _is_exempt(ep)
-        if not is_covered and not is_exempt:
-            unclassified.append(ep)
+    unclassified = _nao_classificados(_domain_endpoints())
 
     assert not unclassified, (
         "RBAC_MATRIX_UNCLASSIFIED: endpoints novos não classificados:\n  - "
         + "\n  - ".join(unclassified)
         + "\n\nAdicione em MATRIX_ENDPOINT_COVERAGE (recurso da matriz) "
-        "ou em RBAC_MATRIX_EXEMPT_PREFIXES (com motivo)."
+        "ou em RBAC_MATRIX_EXEMPT_PREFIXES / RBAC_MATRIX_EXEMPT_EXACT (com motivo)."
     )
 
 
-@pytest.mark.parametrize("prefix,reason", list(RBAC_MATRIX_EXEMPT_PREFIXES.items()))
+def test_endpoint_api_novo_sem_classificacao_e_acusado():
+    """A sentinela pega o endpoint /api/ que ninguém classificou (revisão do #2149: a isenção
+    genérica "/api/" deixava passar qualquer um)."""
+    ficticio = "/api/endpoint-ficticio-sem-classificacao/"
+
+    assert _nao_classificados({ficticio}) == [ficticio]
+
+
+@pytest.mark.parametrize("prefix,reason", [*RBAC_MATRIX_EXEMPT_PREFIXES.items(), *RBAC_MATRIX_EXEMPT_EXACT.items()])
 def test_exempt_prefixes_have_non_empty_reason(prefix: str, reason: str):
     """Garante que cada exceção tem motivo declarado (não-vazio, > 10 chars)."""
     assert reason and len(reason) >= 10, (

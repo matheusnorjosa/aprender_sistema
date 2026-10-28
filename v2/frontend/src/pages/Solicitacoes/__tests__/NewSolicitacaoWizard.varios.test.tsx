@@ -259,6 +259,8 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
 
     const resumo = await screen.findByRole('alert');
     await waitFor(() => expect(resumo).toHaveTextContent('Evento 2: Por favor selecione um projeto'), ESPERA);
+    // A região viva é atômica (role=alert): o "Evento 2 adicionado" de antes não é relido com o resumo.
+    expect(resumo).not.toHaveTextContent('adicionado');
     const linhas = within(resumo).getAllByRole('button');
     expect(linhas[0]).toHaveTextContent('Evento 1: Por favor selecione um município');
     expect(linhas.filter((l) => l.textContent.startsWith('Evento 2:')).length).toBeGreaterThan(1);

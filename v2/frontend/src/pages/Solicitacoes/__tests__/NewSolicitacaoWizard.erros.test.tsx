@@ -1,8 +1,9 @@
 /**
- * Nova Solicitação — erros que a pessoa consegue corrigir (item 36, 19/10/2026).
+ * Nova Solicitação — erros que a pessoa consegue corrigir (item 36, 19/10/2026; página única, 28/10/2026).
  *
- * - Fim antes (ou igual) do início não passa do passo 1: a mensagem fica junto do horário.
- * - "Próximo" com campo faltando leva o foco ao primeiro campo com erro (não é clique mudo).
+ * - Fim antes (ou igual) do início não envia: a mensagem fica junto do horário.
+ * - "Criar solicitação" com campo faltando não envia, mostra um resumo no topo e leva o foco ao
+ *   primeiro campo com erro (não é clique mudo); se o erro está em "Mais detalhes", abre a seção.
  * - Recusa do backend por campo mostra o motivo de `errors`, não o genérico "Erro de validação.".
  * - Sem conexão, a mensagem diz isso, e não "Verifique os dados".
  */
@@ -53,6 +54,8 @@ vi.mock('../../../components/DateTimeRange', () => ({
       <button type="button" data-testid="set-date" onClick={() => onChange?.(horario.atual)}>
         set-date
       </button>
+      {/* Como o real: o campo marcado com erro leva `data-campo-horario` e `aria-invalid`. */}
+      <input data-testid="campo-horario" data-campo-horario aria-invalid={erro ? 'true' : undefined} readOnly />
       {erro ? <p data-testid="erro-horario">{erro}</p> : null}
     </div>
   ),
@@ -116,30 +119,29 @@ function renderWizard(): void {
   );
 }
 
-const proximo = (): HTMLElement => screen.getByRole('button', { name: /Ir para proximo passo/i });
+const criar = (): HTMLElement => screen.getByRole('button', { name: 'Criar solicitação' });
+// A validação do Form do AntD é assíncrona; com a suíte inteira e a cobertura na CI ela passa de 1 s.
+const ESPERA_VALIDACAO = { timeout: 5000 };
 
-async function preencherPasso1(): Promise<void> {
+async function preencherLinha1EHorario(): Promise<void> {
   await screen.findByTestId('cb-projeto');
   fireEvent.click(screen.getByTestId('cb-projeto'));
-  await waitFor(() => screen.getByTestId('cb-tipo'));
   fireEvent.click(screen.getByTestId('cb-tipo'));
   fireEvent.click(screen.getByTestId('cb-municipio'));
   fireEvent.click(screen.getByTestId('set-date'));
 }
 
-async function irParaConfirmacao(): Promise<void> {
-  await preencherPasso1();
-  fireEvent.click(proximo());
-  fireEvent.click(await screen.findByTestId('pick-formador'));
+async function preencherTudo(): Promise<void> {
+  await preencherLinha1EHorario();
+  fireEvent.click(screen.getByTestId('pick-formador'));
   fireEvent.click(within(screen.getByRole('radiogroup', { name: /vai acompanhar o evento/ })).getByLabelText('Não'));
-  await waitFor(() => expect(proximo()).not.toBeDisabled());
-  fireEvent.click(proximo());
-  await screen.findByLabelText('Local do Evento');
-  fireEvent.click(proximo());
-  await screen.findByText('Revise sua solicitação');
+  // A prévia de agenda termina antes do clique (o aviso de verificando sai da tela).
+  await waitFor(() => expect(checkAvailabilityManyMock).toHaveBeenCalled(), ESPERA_VALIDACAO);
+  await waitFor(() => expect(screen.queryByText(/Verificando disponibilidade/)).not.toBeInTheDocument(), ESPERA_VALIDACAO);
+  expect(criar()).not.toBeDisabled();
 }
 
-// Percorrer o assistente com antd leva ~3 s por teste isolado; na suíte inteira passa dos 5 s padrão.
+// A página com antd leva ~3 s por teste isolado; na suíte inteira passa dos 5 s padrão.
 describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36)', { timeout: 20000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -153,39 +155,77 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
     createSolicitacaoMock.mockResolvedValue({ id: 1 });
   });
 
-  test('fim antes do início não passa do passo 1 e a mensagem fica junto do horário', async () => {
+  test('fim antes do início não envia e a mensagem fica junto do horário', async () => {
     horario.atual = { date: '2026-08-01', start: '14:00', end: '10:00' };
     renderWizard();
-    await preencherPasso1();
-    fireEvent.click(proximo());
+    await preencherTudo();
+    fireEvent.click(criar());
     expect(await screen.findByTestId('erro-horario')).toHaveTextContent('O horário de fim precisa ser depois do início.');
-    expect(screen.queryByTestId('pick-formador')).not.toBeInTheDocument();
+    // O resumo do topo diz o mesmo e o foco vai ao horário (único problema).
+    expect(await screen.findByRole('alert')).toHaveTextContent('O horário de fim precisa ser depois do início.');
+    await waitFor(() => expect(screen.getByTestId('campo-horario')).toHaveFocus(), ESPERA_VALIDACAO);
+    expect(createSolicitacaoMock).not.toHaveBeenCalled();
   });
 
-  test('fim igual ao início também não passa', async () => {
+  test('fim igual ao início também não envia', async () => {
     horario.atual = { date: '2026-08-01', start: '10:00', end: '10:00' };
     renderWizard();
-    await preencherPasso1();
-    fireEvent.click(proximo());
+    await preencherTudo();
+    fireEvent.click(criar());
     expect(await screen.findByTestId('erro-horario')).toHaveTextContent('O horário de fim precisa ser depois do início.');
+    expect(createSolicitacaoMock).not.toHaveBeenCalled();
   });
 
   test('sem data, o erro aparece junto do horário e também nos outros campos que faltam', async () => {
     renderWizard();
     await screen.findByTestId('cb-projeto');
-    fireEvent.click(proximo());
+    fireEvent.click(criar());
     expect(await screen.findByTestId('erro-horario')).toHaveTextContent('Escolha a data e os horários de início e de fim do evento.');
-    expect(await screen.findByText('Por favor selecione um projeto', undefined, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText('Por favor selecione um projeto', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
+    expect(createSolicitacaoMock).not.toHaveBeenCalled();
   });
 
-  test('"Próximo" com campo faltando leva o foco ao primeiro campo com erro', async () => {
+  test('"Criar" com campo faltando mostra um resumo no topo e leva o foco ao primeiro campo com erro', async () => {
     renderWizard();
     await screen.findByTestId('cb-projeto');
     fireEvent.click(screen.getByTestId('set-date'));
-    fireEvent.click(proximo());
-    // A validação do Form do AntD é assíncrona; com a suíte inteira e a cobertura na CI ela passa de 1 s.
-    await screen.findByText('Por favor selecione um projeto', undefined, { timeout: 5000 });
-    await waitFor(() => expect(screen.getByTestId('cb-projeto')).toHaveFocus(), { timeout: 5000 });
+    fireEvent.click(criar());
+
+    await waitFor(() => expect(screen.getByTestId('cb-projeto')).toHaveFocus(), ESPERA_VALIDACAO);
+    // Uma só região viva: o resumo. Ele diz o evento e o que falta, na ordem dos campos.
+    const alertas = screen.getAllByRole('alert');
+    expect(alertas).toHaveLength(1);
+    const resumo = alertas[0]!;
+    expect(resumo).toHaveTextContent('Corrija antes de criar a solicitação');
+    expect(resumo).toHaveTextContent('Evento 1: Por favor selecione um projeto');
+    expect(resumo).toHaveTextContent('Responda se o coordenador responsável vai acompanhar o evento.');
+    expect(resumo.textContent.indexOf('projeto')).toBeLessThan(resumo.textContent.indexOf('formador'));
+    expect(createSolicitacaoMock).not.toHaveBeenCalled();
+  });
+
+  test('o resumo sai quando a pessoa volta a mexer no evento', async () => {
+    renderWizard();
+    await screen.findByTestId('cb-projeto');
+    fireEvent.click(criar());
+    expect(await screen.findByText(/Corrija antes de criar a solicitação/, undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('cb-projeto'));
+    await waitFor(() => expect(screen.queryByText(/Corrija antes de criar a solicitação/)).not.toBeInTheDocument());
+  });
+
+  test('erro em "Mais detalhes" (recolhido): o limite vale, a seção abre e o foco vai ao campo', async () => {
+    renderWizard();
+    await preencherTudo();
+    const detalhes = screen.getByRole('button', { name: /Mais detalhes/ });
+    expect(detalhes).toHaveAttribute('aria-expanded', 'false');
+    const encontro = screen.getByLabelText('Encontro');
+    fireEvent.change(encontro, { target: { value: 'x'.repeat(101) } });
+
+    fireEvent.click(criar());
+    expect(await screen.findByText('Máximo 100 caracteres', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
+    await waitFor(() => expect(detalhes).toHaveAttribute('aria-expanded', 'true'));
+    await waitFor(() => expect(encontro).toHaveFocus(), ESPERA_VALIDACAO);
+    expect(createSolicitacaoMock).not.toHaveBeenCalled();
   });
 
   test('recusa do backend por campo mostra o motivo, não "Erro de validação."', async () => {
@@ -199,8 +239,8 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
       },
     });
     renderWizard();
-    await irParaConfirmacao();
-    fireEvent.click(screen.getByRole('button', { name: /Confirmar Solicitação/i }));
+    await preencherTudo();
+    fireEvent.click(criar());
     await waitFor(() =>
       expect(message.error).toHaveBeenCalledWith('Não há compra que libere este projeto neste município.')
     );
@@ -210,8 +250,8 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
   test('sem conexão, a mensagem diz isso', async () => {
     createSolicitacaoMock.mockRejectedValueOnce(new TypeError('Sem conexão com o servidor.'));
     renderWizard();
-    await irParaConfirmacao();
-    fireEvent.click(screen.getByRole('button', { name: /Confirmar Solicitação/i }));
+    await preencherTudo();
+    fireEvent.click(criar());
     await waitFor(() => expect(message.error).toHaveBeenCalledWith('Sem conexão com o servidor.'));
   });
 });

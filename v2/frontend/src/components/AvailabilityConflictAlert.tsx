@@ -1,7 +1,7 @@
 /**
  * AvailabilityConflictAlert — mostra os participantes bloqueados e o motivo de cada um (#1452).
  *
- * Apresentacional puro (sem fetch). Serve três pontos: o aviso antecipado no wizard
+ * Apresentacional puro (sem fetch). Serve três pontos: o aviso antecipado na Nova Solicitação
  * (a partir de `useAvailabilityPreview`), o erro 400 do submit (`blocked_participants`
  * do backend) e, pela `ListaDeBloqueados`, o erro ao aprovar na tela de Aprovações. O texto
  * do conflito (`title`/`detail`) vem verbatim do backend — o `code` só define a cor da tag,
@@ -25,11 +25,11 @@ const COR_POR_CODIGO: Record<ConflictDetail['code'], string> = {
 };
 
 const ORIENTACAO_PADRAO =
-  'Remova o participante em conflito ou volte ao passo anterior e escolha outra data/horário.';
+  'Remova o participante em conflito ou escolha outra data ou horário.';
 
 export interface ListaDeBloqueadosProps {
   bloqueados: BlockedParticipant[];
-  /** O que a pessoa pode fazer agora. O padrão é o do wizard de criação. */
+  /** O que a pessoa pode fazer agora. O padrão é o da Nova Solicitação (tudo na mesma página). */
   orientacao?: string;
 }
 

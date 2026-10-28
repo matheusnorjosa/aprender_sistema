@@ -234,7 +234,7 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
       response: {
         status: 400,
         data: {
-          detail: '1 de 1 evento tem problema. Nada foi criado.',
+          detail: '1 de 1 eventos tem problema. Nada foi criado.',
           code: 'lote_invalido',
           errors: {
             itens: [
@@ -256,6 +256,8 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
     await waitFor(() =>
       expect(resumo).toHaveTextContent('Evento 1: Não há compra que libere este projeto neste município.'), ESPERA_VALIDACAO
     );
+    expect(resumo).toHaveTextContent('Não foi possível criar a solicitação. Nada foi criado.');
+    expect(resumo).not.toHaveTextContent('1 de 1');
     const campo = screen.getByTestId('cb-municipio').closest('.ant-form-item');
     await waitFor(() =>
       expect(campo).toHaveTextContent('Não há compra que libere este projeto neste município.'), ESPERA_VALIDACAO

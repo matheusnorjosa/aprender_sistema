@@ -152,7 +152,7 @@ const RECUSA_POR_CONFLITO = {
     status: 400,
     data: {
       code: 'lote_invalido',
-      detail: '1 de 1 evento tem problema. Nada foi criado.',
+      detail: '1 de 1 eventos tem problema. Nada foi criado.',
       errors: {
         itens: [
           {
@@ -330,6 +330,23 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     expect(screen.getByText('Não é possível criar o evento')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Criar 2 eventos' })).toBeDisabled();
     expect(createSolicitacoesEmLoteMock).toHaveBeenCalledTimes(1);
+  });
+
+  // O evento novo não estava no envio: preencher qualquer coisa nele não muda o choque do evento 1.
+  test('conflito recusado no envio: preencher um evento adicionado depois não destrava', async () => {
+    createSolicitacoesEmLoteMock.mockRejectedValueOnce(RECUSA_POR_CONFLITO);
+    renderComDispensa();
+    await preencherEventoComFormador();
+    completarResponsavel();
+    await waitFor(() => expect(criar()).not.toBeDisabled());
+    fireEvent.click(criar());
+    expect(await screen.findByText('Não é possível criar o evento')).toBeInTheDocument();
+    await waitFor(() => expect(criar()).toBeDisabled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar outro evento' }));
+    fireEvent.click(screen.getAllByTestId('cb-tipo')[1]);
+    expect(screen.getByText('Não é possível criar o evento')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Criar 2 eventos' })).toBeDisabled();
   });
 
   test('com tudo preenchido, Criar envia uma vez o evento da tela (campos opcionais intocados não apagam nada)', async () => {

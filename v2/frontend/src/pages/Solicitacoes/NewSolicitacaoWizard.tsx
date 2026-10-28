@@ -133,19 +133,21 @@ interface Resumo {
   linhas: LinhaDoResumo[];
 }
 
-/** O que o servidor recusou no envio, por chave do evento, e a agenda dos eventos enviados. */
+/** O que o servidor recusou no envio, por chave do evento, e a agenda e as chaves dos eventos enviados. */
 interface ErrosDoLote {
   agenda: string;
+  enviados: number[];
   porChave: Record<number, ErroDoEventoNoLote>;
 }
 
 /**
- * O que pesa no choque de agenda, de todos os eventos preenchidos: horário, município e quem participa.
- * O que o servidor recusou só vale enquanto isso for o do envio (o choque pode ser com outro evento).
+ * O que pesa no choque de agenda, dos eventos enviados: horário, município e quem participa.
+ * O que o servidor recusou só vale enquanto isso for o do envio (o choque pode ser com outro evento
+ * enviado); um evento que não estava no envio não pesa, e um enviado que sai conta como mudança.
  */
-function agendaDe(eventos: EventoDaPagina[], me: QuemCria | null): string {
+function agendaDe(eventos: EventoDaPagina[], enviados: number[], me: QuemCria | null): string {
   return eventos
-    .filter((e) => !estaEmBranco(e.dados))
+    .filter((e) => enviados.includes(e.chave))
     .map(({ chave, dados }) =>
       [
         chave,
@@ -164,7 +166,7 @@ function soConflitos(erros: ErrosDoLote | null): ErrosDoLote | null {
   const porChave = Object.fromEntries(
     Object.entries(erros.porChave).filter(([, item]) => item.code === 'availability_conflict'),
   ) as Record<number, ErroDoEventoNoLote>;
-  return Object.keys(porChave).length > 0 ? { agenda: erros.agenda, porChave } : null;
+  return Object.keys(porChave).length > 0 ? { ...erros, porChave } : null;
 }
 
 /** O payload de um evento conferido; null se faltar o que a conferência já exige (só estreita o tipo). */
@@ -234,8 +236,8 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   // Resumo do clique em "Criar" com problema e o anúncio de adicionar/remover: a única região viva.
   const [resumo, setResumo] = useState<Resumo | null>(null);
   const [anuncio, setAnuncio] = useState<{ texto: string; vez: number } | null>(null);
-  // O que o servidor recusou no último envio. O conflito de agenda vale enquanto a agenda de todos os
-  // eventos for a do envio (o choque pode ser com outro evento); o resto sai com qualquer mudança.
+  // O que o servidor recusou no último envio. O conflito de agenda vale enquanto a agenda dos eventos
+  // enviados for a do envio (o choque pode ser com outro evento); o resto sai com qualquer mudança.
   const [errosDoLote, setErrosDoLote] = useState<ErrosDoLote | null>(null);
   // Com o lote em voo, os eventos ficam inertes: o que mudasse agora não iria no envio que já saiu.
   const [emVoo, setEmVoo] = useState(false);
@@ -398,8 +400,11 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       porChave[evento.chave] = item;
       linhas.push(...textosDoErro(item).map((texto) => ({ chave: evento.chave, texto })));
     }
-    setErrosDoLote({ agenda: agendaDe(enviados, me), porChave });
-    setResumo({ titulo: data.detail || 'Nada foi criado.', linhas });
+    const chaves = enviados.map((e) => e.chave);
+    setErrosDoLote({ agenda: agendaDe(enviados, chaves, me), enviados: chaves, porChave });
+    // Com 1 evento, o "1 de 1 eventos" do servidor não diz nada a quem fez uma solicitação só.
+    const titulo = enviados.length === 1 ? 'Não foi possível criar a solicitação. Nada foi criado.' : data.detail;
+    setResumo({ titulo: titulo || 'Nada foi criado.', linhas });
     const primeiro = linhas[0];
     if (primeiro) cartoes.current.get(primeiro.chave)?.focarTitulo();
   };
@@ -456,7 +461,8 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   // Número visível de cada evento: a posição + 1 (muda quando um evento sai).
   const numeroDe = (chave: number): number => eventos.findIndex((e) => e.chave === chave) + 1;
   const linhasDoResumo = (resumo?.linhas ?? []).filter((l) => numeroDe(l.chave) > 0);
-  const errosValidos = errosDoLote?.agenda === agendaDe(eventos, me) ? errosDoLote.porChave : null;
+  const errosValidos =
+    errosDoLote && errosDoLote.agenda === agendaDe(eventos, errosDoLote.enviados, me) ? errosDoLote.porChave : null;
   const comProblema = new Set(linhasDoResumo.map((l) => l.chave));
   const noLimite = eventos.length >= MAX_EVENTOS;
 

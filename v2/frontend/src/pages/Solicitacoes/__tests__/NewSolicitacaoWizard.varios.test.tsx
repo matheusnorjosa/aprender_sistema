@@ -390,7 +390,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
             campo_que_a_tela_nao_tem: ['Recusado por outro motivo.'],
           },
         },
-      ], '1 de 1 evento tem problema. Nada foi criado.')
+      ], '1 de 1 eventos tem problema. Nada foi criado.')
     );
     fireEvent.click(botaoCriar());
 
@@ -517,10 +517,12 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
               { usuario_id: 99, usuario_nome: 'Bruno Formador', conflicts: [{ code: 'X', title: 'Sobreposição', detail: 'Choca 09:00-11:00' }] },
             ],
           },
-        ], '1 de 1 evento tem problema. Nada foi criado.')
+        ], '1 de 1 eventos tem problema. Nada foi criado.')
       )
     );
-    await screen.findByText('1 de 1 evento tem problema. Nada foi criado.', undefined, ESPERA);
+    // Com 1 evento, o título não fala em "1 de 1 eventos" (o texto do servidor é para a lista).
+    await screen.findByText('Não foi possível criar a solicitação. Nada foi criado.', undefined, ESPERA);
+    expect(screen.queryByText(/1 de 1/)).not.toBeInTheDocument();
     expect(screen.queryByText('Choca 09:00-11:00')).not.toBeInTheDocument();
     await waitFor(() => expect(botaoCriar()).not.toBeDisabled());
   });

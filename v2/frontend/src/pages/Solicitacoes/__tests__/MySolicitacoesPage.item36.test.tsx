@@ -211,12 +211,14 @@ describe('MySolicitacoesPage — item 36', { timeout: 20000 }, () => {
     expect(texto).toContain('já está no Google Agenda');
     // O botão fala de editar e de excluir; o motivo também, com o nome que as ações têm hoje.
     expect(texto).toContain('Para editar ou excluir, peça ao Apoio de Coordenação da sua gerência');
-    expect(texto).toContain('tire o evento só do Google, na tela Publicar na agenda');
+    expect(texto).toContain('na tela Publicar na agenda');
+    // O Controle tira do Google qualquer evento publicado ("Remover do Google", na Pré-agenda): é a
+    // saída de quem não tem Apoio na gerência, ou cujo projeto não tem gerência.
+    expect(texto).toContain('ou ao Controle, na Pré-agenda, que tire o evento só do Google');
     expect(texto).toContain('você consegue editar e excluir aqui');
-    expect(texto).toContain('excluir o evento lá');
-    // "Cancelar a publicação" não é o nome de nenhuma ação, e o Controle não tem essa tela.
+    expect(texto).toContain('o Apoio também pode excluir o evento em Publicar na agenda');
+    // "Cancelar a publicação" não é o nome de nenhuma ação.
     expect(texto).not.toMatch(/cancele a publicação/);
-    expect(texto).not.toContain('Controle');
     informar.mockRestore();
   });
 
@@ -286,6 +288,35 @@ describe('MySolicitacoesPage — item 36', { timeout: 20000 }, () => {
     expect(texto).toContain('Solicitações do fluxo Superintendência só podem ser excluídas enquanto estão pendentes.');
     // A saída real, a mesma que o backend dá ao recusar a exclusão (perform_destroy).
     expect(texto).toContain('fale com a administração do sistema');
+    informar.mockRestore();
+  });
+
+  test('SUPER aprovada, futura e com id no Google: para editar, cita o Apoio e o Controle', async () => {
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 9,
+          municipio_nome: 'Crato',
+          fluxo: 'SUPER',
+          status: 'aprovado',
+          gcal_status: 'PUBLISHED',
+          external_event_id: 'asv29',
+          inicio: '2099-05-10T13:00:00Z',
+          fim: '2099-05-10T17:00:00Z',
+        }),
+      ])
+    );
+    renderPage();
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Por que não dá para editar nem excluir: 10/05/2099 · Crato' })
+    );
+    const texto = String(informar.mock.calls[0]![0].content);
+    expect(texto).toContain('Para editar, peça ao Apoio de Coordenação da sua gerência');
+    expect(texto).toContain('ou ao Controle, na Pré-agenda, que tire o evento só do Google');
+    expect(texto).not.toMatch(/excluir aqui/);
     informar.mockRestore();
   });
 

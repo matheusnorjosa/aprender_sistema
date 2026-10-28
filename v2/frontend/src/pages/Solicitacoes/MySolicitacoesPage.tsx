@@ -108,8 +108,10 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
       `Este evento ${MOTIVO_NAO_PUBLICAVEL.publicado_fora_do_sistema}; mudar aqui não muda a agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle.`
     );
   } else if (isPublished && !podeTirarDoGoogle) {
-    // Mesma saída do ERROR abaixo: a Apoio, em Publicar na agenda, tira só do Google ("Tirar só do
-    // Google") ou exclui dos dois lados ("Excluir"), e só no aprovado, com id e de hoje em diante.
+    // A Apoio, em Publicar na agenda, tira só do Google ("Tirar só do Google") ou exclui dos dois
+    // lados ("Excluir"), e só no aprovado, com id e de hoje em diante; mas só na gerência em que é
+    // Apoio vigente. O Controle tira do Google qualquer publicado com id ("Remover do Google", na
+    // Pré-agenda): é a saída de quem não tem Apoio na gerência, ou cujo projeto não tem gerência.
     // A SUPER fora de pendente não volta a se excluir: o motivo dela (abaixo) dá a saída.
     const apoioConsegueTirar =
       record.status === 'aprovado' &&
@@ -121,11 +123,11 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
       );
     } else if (superForaDePendente) {
       motivos.push(
-        'Este evento já está no Google Agenda. Para editar, peça ao Apoio de Coordenação da sua gerência que tire o evento só do Google, na tela Publicar na agenda; depois disso, você consegue editar aqui.'
+        'Este evento já está no Google Agenda. Para editar, peça ao Apoio de Coordenação da sua gerência, na tela Publicar na agenda, ou ao Controle, na Pré-agenda, que tire o evento só do Google; depois disso, você consegue editar aqui.'
       );
     } else {
       motivos.push(
-        'Este evento já está no Google Agenda. Para editar ou excluir, peça ao Apoio de Coordenação da sua gerência que tire o evento só do Google, na tela Publicar na agenda; depois disso, você consegue editar e excluir aqui. Se for para apagar de vez, ela também pode excluir o evento lá, o que o tira do Google e do sistema.'
+        'Este evento já está no Google Agenda. Para editar ou excluir, peça ao Apoio de Coordenação da sua gerência, na tela Publicar na agenda, ou ao Controle, na Pré-agenda, que tire o evento só do Google; depois disso, você consegue editar e excluir aqui. Se for para apagar de vez, o Apoio também pode excluir o evento em Publicar na agenda, o que o tira do Google e do sistema.'
       );
     }
   } else if (isPublished) {

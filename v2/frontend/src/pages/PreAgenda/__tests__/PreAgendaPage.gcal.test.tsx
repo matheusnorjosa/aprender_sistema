@@ -212,6 +212,42 @@ describe('PreAgendaPage — modo Eventos Google Calendar', () => {
     expect(screen.queryByText(/ajuste o filtro/i)).toBeNull();
   });
 
+  // Revisão: o "Tentar de novo" ligava o carregando, o Spin tomava o lugar da tabela e levava o botão
+  // focado; o foco caía no body e quem usa teclado voltava ao início da página.
+  test('"Tentar de novo" nos eventos do Google: o foco não cai no body, falhe ou carregue', async () => {
+    const MENSAGEM = 'Erro ao carregar eventos do Google Calendar';
+    let falhar = true;
+    fetchAPIMock.mockImplementation((url: string) => {
+      if (String(url).includes('/integrations/google/events/')) {
+        if (falhar) return Promise.reject(new Error('falhou'));
+        return Promise.resolve({ events: [sampleEvent], calendar_id: 'agenda@aprender.br', count: 1 });
+      }
+      return Promise.resolve({});
+    });
+
+    render(<PreAgendaPage />);
+    fireEvent.click(await screen.findByText('Eventos Google Calendar'));
+    expect(await screen.findByText(MENSAGEM)).toBeInTheDocument();
+
+    // Falha de novo: o aviso continua e o foco fica no botão.
+    const botao = screen.getByRole('button', { name: 'Tentar de novo' });
+    botao.focus();
+    const chamadas = fetchAPIMock.mock.calls.length;
+    fireEvent.click(botao);
+    await waitFor(() => expect(fetchAPIMock.mock.calls.length).toBeGreaterThan(chamadas));
+    await waitFor(() => expect(document.querySelector('.ant-spin-spinning')).toBeNull());
+    expect(screen.getByText(MENSAGEM)).toBeInTheDocument();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(screen.getByRole('button', { name: 'Tentar de novo' })).toHaveFocus();
+
+    // Carrega: as linhas tomam o lugar do aviso e o foco vai para a tabela.
+    falhar = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+    expect(await screen.findByText('Formação Sobral')).toBeInTheDocument();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toContainElement(screen.getByRole('table'));
+  });
+
   test('vazio COM filtro de data no modo gcal mostra copy contextual, não a genérica', async () => {
     eventsResponse = { events: [], calendar_id: 'agenda@aprender.br', count: 0 };
 

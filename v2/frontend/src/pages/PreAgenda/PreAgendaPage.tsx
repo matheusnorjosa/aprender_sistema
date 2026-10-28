@@ -1073,7 +1073,9 @@ export default function PreAgendaPage(): JSX.Element {
             </Card>
 
             <Card>
-              {loadingGcalEvents ? (
+              {/* Com o aviso na tela, o "Tentar de novo" carrega dentro da tabela (`loading`): o Spin no
+                  lugar dela levaria o botão focado e o foco cairia no body. */}
+              {loadingGcalEvents && !gcalErro ? (
                 <div style={{ textAlign: 'center', padding: 40 }}>
                   <Spin size="large" />
                   <div style={{ marginTop: 16 }}>
@@ -1106,6 +1108,7 @@ export default function PreAgendaPage(): JSX.Element {
                   rowKey="id"
                   size="small"
                   nomeDaLinha={(evento) => evento.summary || 'evento'}
+                  loading={loadingGcalEvents}
                   erro={gcalErro}
                   onTentarDeNovo={() => { void loadGcalEvents(); }}
                   pagination={{

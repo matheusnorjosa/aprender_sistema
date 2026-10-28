@@ -125,10 +125,52 @@ function abrir() {
   return renderNoRoteador(<NewSolicitacaoWizard />, { em: NOVA, antes: ['/solicitacoes/minhas'] });
 }
 
-const cartao = (n: number): HTMLElement => screen.getByRole('region', { name: new RegExp(`^Evento ${n}\\b`) });
-const titulo = (n: number): HTMLElement => within(cartao(n)).getByRole('heading', { level: 3 });
-const adicionar = (): HTMLElement => screen.getByRole('button', { name: /Adicionar outro evento|Limite de 10 eventos/ });
-const botaoCriar = (): HTMLElement => screen.getByRole('button', { name: /^Criar / });
+/*
+ * Localizadores. Com o CSS do antd na página, cada `getByRole(..., { name })` custa de centenas de ms a
+ * segundos no jsdom: ele calcula o estilo de cada candidato e dos ancestrais (está visível? qual é o
+ * nome?), e o cache de estilo cai a cada mudança no DOM. Com 3 a 10 cartões, isso estourava 30 s na CI.
+ * Estes atalhos acham o MESMO elemento pela mesma fonte do nome acessível (o texto, o aria-label ou o
+ * aria-labelledby), conferem a tag do papel e que nenhum atributo o esconde. O nome acessível calculado
+ * segue conferido onde ele é o assunto do teste (toHaveAccessibleName, contagem de regiões, diálogo).
+ */
+function semEsconder<T extends HTMLElement>(el: T | null, tag: string): T {
+  expect(el?.tagName).toBe(tag);
+  expect(el!.closest('[hidden], [aria-hidden="true"]')).toBeNull();
+  return el!;
+}
+/** Botão cujo nome acessível é o próprio texto (nenhum aria-label nem aria-labelledby por cima). */
+function botaoDoTexto(texto: RegExp): HTMLElement {
+  const botao = semEsconder(screen.getByText(texto).closest('button'), 'BUTTON');
+  expect(botao).not.toHaveAttribute('aria-label');
+  expect(botao).not.toHaveAttribute('aria-labelledby');
+  return botao;
+}
+/** Texto do elemento que dá nome via aria-labelledby. */
+const rotuloDe = (el: Element): string => document.getElementById(el.getAttribute('aria-labelledby') ?? '')?.textContent ?? '';
+
+function cartao(n: number): HTMLElement {
+  const nome = new RegExp(`^Evento ${n}\\b`);
+  const achados = [...document.querySelectorAll<HTMLElement>('section[aria-labelledby]')].filter((s) => nome.test(rotuloDe(s)));
+  expect(achados).toHaveLength(1);
+  return semEsconder(achados[0]!, 'SECTION');
+}
+function titulo(n: number): HTMLElement {
+  const h3 = cartao(n).querySelectorAll<HTMLElement>('h3');
+  expect(h3).toHaveLength(1);
+  return h3[0]!;
+}
+const adicionar = (): HTMLElement => botaoDoTexto(/Adicionar outro evento|Limite de 10 eventos/);
+const botaoCriar = (): HTMLElement => botaoDoTexto(/^Criar /);
+const botaoRemover = (n: number): HTMLElement => {
+  const botao = semEsconder(within(cartao(n)).getByLabelText(`Remover evento ${n}`), 'BUTTON');
+  expect(botao).not.toHaveAttribute('aria-labelledby');
+  return botao;
+};
+/** O radiogroup "vai acompanhar o evento?" do cartão (nomeado pela pergunta, via aria-labelledby). */
+function grupoAcompanha(c: HTMLElement): HTMLElement {
+  const pergunta = within(c).getByText('O coordenador responsável vai acompanhar o evento?');
+  return semEsconder(c.querySelector<HTMLElement>(`[role="radiogroup"][aria-labelledby="${pergunta.id}"]`), 'DIV');
+}
 
 async function preencher(n: number): Promise<void> {
   const c = cartao(n);
@@ -137,7 +179,7 @@ async function preencher(n: number): Promise<void> {
   fireEvent.click(within(c).getByTestId('cb-municipio'));
   fireEvent.click(within(c).getByTestId('set-date'));
   fireEvent.click(within(c).getByTestId('pick-formador'));
-  fireEvent.click(within(within(c).getByRole('radiogroup', { name: /vai acompanhar o evento/ })).getByLabelText('Não'));
+  fireEvent.click(within(grupoAcompanha(c)).getByLabelText('Não'));
   await waitFor(() => expect(within(c).queryByText(/Verificando disponibilidade/)).not.toBeInTheDocument(), ESPERA);
 }
 
@@ -180,7 +222,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     const regioes = screen.getAllByRole('alert');
     expect(regioes).toHaveLength(1);
     expect(regioes[0]).toHaveTextContent('Evento 2 adicionado');
-    expect(within(cartao(2)).getByRole('button', { name: 'Remover evento 2' })).toHaveTextContent('Remover');
+    expect(botaoRemover(2)).toHaveTextContent('Remover');
     expect(botaoCriar()).toHaveTextContent('Criar 2 eventos');
   });
 
@@ -203,13 +245,13 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     // Preenche o 3º para ver que ele vira o "Evento 2".
     fireEvent.click(within(cartao(3)).getByTestId('cb-projeto'));
 
-    fireEvent.click(within(cartao(2)).getByRole('button', { name: 'Remover evento 2' }));
+    fireEvent.click(botaoRemover(2));
 
     expect(screen.getAllByRole('region', { name: /^Evento \d/ })).toHaveLength(2);
     await waitFor(() => expect(titulo(1)).toHaveFocus());
     expect(screen.getByRole('alert')).toHaveTextContent('Evento 2 removido');
     // O antigo 3º (com projeto) agora é o "Evento 2".
-    expect(within(cartao(2)).getByRole('button', { name: 'Remover evento 2' })).toBeInTheDocument();
+    expect(botaoRemover(2)).toBeInTheDocument();
     expect(botaoCriar()).toHaveTextContent('Criar 2 eventos');
   });
 
@@ -219,7 +261,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     fireEvent.click(adicionar());
     fireEvent.click(within(cartao(2)).getByTestId('cb-projeto'));
 
-    fireEvent.click(within(cartao(2)).getByRole('button', { name: 'Remover evento 2' }));
+    fireEvent.click(botaoRemover(2));
     // Diálogo de verdade (role=dialog, foco preso, Esc em qualquer ponto), não um balão role=tooltip:
     // pelo Tab, o foco não sai da pergunta aberta.
     const dialogo = await screen.findByRole('dialog', { name: 'Remover o evento 2?' });
@@ -230,7 +272,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     expect(cancelar).toHaveAccessibleDescription('O que você preencheu nele será perdido.');
     fireEvent.click(cancelar);
     expect(screen.getAllByRole('region', { name: /^Evento \d/ })).toHaveLength(2);
-    const remover = within(cartao(2)).getByRole('button', { name: 'Remover evento 2' });
+    const remover = botaoRemover(2);
     await waitFor(() => expect(remover).toHaveFocus());
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
@@ -242,7 +284,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     await waitFor(() => expect(remover).toHaveFocus());
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
-    fireEvent.click(within(cartao(2)).getByRole('button', { name: 'Remover evento 2' }));
+    fireEvent.click(botaoRemover(2));
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Remover' }));
     await waitFor(() => expect(screen.getAllByRole('region', { name: /^Evento \d/ })).toHaveLength(1));
     await waitFor(() => expect(titulo(1)).toHaveFocus());
@@ -258,7 +300,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     fireEvent.click(within(c1).getByTestId('cb-tipo'));
     fireEvent.click(within(c1).getByTestId('set-date'));
     fireEvent.click(within(c1).getByTestId('pick-formador'));
-    fireEvent.click(within(within(c1).getByRole('radiogroup', { name: /vai acompanhar o evento/ })).getByLabelText('Não'));
+    fireEvent.click(within(grupoAcompanha(c1)).getByLabelText('Não'));
 
     fireEvent.click(botaoCriar());
 
@@ -335,7 +377,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     fireEvent.click(adicionar());
     fireEvent.click(adicionar());
     // Remove o do meio (em branco): o antigo 3º vira o "Evento 2" e vai na posição 1 do envio.
-    fireEvent.click(within(cartao(2)).getByRole('button', { name: 'Remover evento 2' }));
+    fireEvent.click(botaoRemover(2));
     await preencher(1);
     await preencher(2);
 
@@ -519,7 +561,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     fireEvent.click(botaoCriar());
     await waitFor(() => expect(createSolicitacoesEmLoteMock).toHaveBeenCalledTimes(1), ESPERA);
 
-    fireEvent.click(screen.getByRole('button', { name: /Voltar para Minhas Solicitações/ }));
+    fireEvent.click(botaoDoTexto(/Voltar para Minhas Solicitações/));
     await waitFor(() => expect(informar).toHaveBeenCalledTimes(1));
     expect(confirmar).not.toHaveBeenCalled();
     const opcoes = informar.mock.calls[0]![0];
@@ -530,7 +572,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     expect(enderecoAtual(router)).toBe(NOVA);
 
     // Outra tentativa de sair e a resposta chega com o aviso aberto: ele fecha e vai a Minhas Solicitações.
-    fireEvent.click(screen.getByRole('button', { name: /Voltar para Minhas Solicitações/ }));
+    fireEvent.click(botaoDoTexto(/Voltar para Minhas Solicitações/));
     await waitFor(() => expect(informar).toHaveBeenCalledTimes(2));
     act(() => resolver({ eventos: [{ indice: 0, id: 5, status: 'aprovado' }] }));
     await waitFor(() => expect(enderecoAtual(router)).toBe('/solicitacoes/minhas'), ESPERA);
@@ -576,7 +618,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     expect(botaoCriar()).toBeDisabled();
 
     // Nem tirar o evento 2.
-    fireEvent.click(within(cartao(2)).getByRole('button', { name: 'Remover evento 2' }));
+    fireEvent.click(botaoRemover(2));
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Remover' }));
     await waitFor(() => expect(screen.getAllByRole('region', { name: /^Evento \d/ })).toHaveLength(1));
     expect(within(cartao(1)).getByText('Conflita com evento aprovado #5 (09:00–11:00)')).toBeInTheDocument();
@@ -617,7 +659,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     expect(botaoCriar()).toBeDisabled();
 
     // Tirar o evento 3 também não.
-    fireEvent.click(within(cartao(3)).getByRole('button', { name: 'Remover evento 3' }));
+    fireEvent.click(botaoRemover(3));
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Remover' }));
     await waitFor(() => expect(screen.getAllByRole('region', { name: /^Evento \d/ })).toHaveLength(2));
     expect(within(cartao(1)).getByText('Conflita com o evento 2 desta lista (09:00–11:00)')).toBeInTheDocument();
@@ -675,8 +717,8 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     await waitFor(() => expect(inerte(cartao(1))).toBe(true));
     expect(inerte(cartao(2))).toBe(true);
     expect(inerte(adicionar())).toBe(true);
-    expect(inerte(within(cartao(2)).getByRole('button', { name: 'Remover evento 2' }))).toBe(true);
-    expect(inerte(screen.getByRole('button', { name: /Criar 2 eventos/ }))).toBe(false);
+    expect(inerte(botaoRemover(2))).toBe(true);
+    expect(inerte(botaoDoTexto(/Criar 2 eventos/))).toBe(false);
 
     // A recusa destrava a página e leva o foco ao evento com problema.
     act(() => recusar(recusaDoLote([{ indice: 1, code: 'VALIDATION_ERROR', detail: 'x', errors: { non_field_errors: ['Recusado.'] } }])));

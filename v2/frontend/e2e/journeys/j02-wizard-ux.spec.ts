@@ -1,23 +1,22 @@
 /**
- * J02 — Wizard de nova solicitação: estrutura e navegação (UI).
+ * J02 — Nova solicitação: estrutura da página única e validação (UI).
  *
- * Primeiro spec UI-heavy da matriz. Exercita o POM `SolicitacaoWizardPage`
- * (criado na Fase 2b mas até agora não usado em spec real) e valida o
- * fluxo de navegação sem preencher o form inteiro — campos usam
- * `ComboBox` com lookup assíncrono, o que seria custoso e flaky para
- * automatizar nesta primeira jornada.
+ * Exercita o POM `SolicitacaoWizardPage` (o nome ficou do tempo do wizard). Desde 28/10/2026
+ * (decisão do dono) a tela é uma página só: o evento é um cartão com os campos lado a lado e um
+ * botão "Criar solicitação" no fim. O spec valida a estrutura sem preencher o form inteiro —
+ * campos usam `ComboBox` com lookup assíncrono, o que seria custoso e flaky para automatizar nesta
+ * jornada.
  *
- * Escopo: estrutura, navegação e gate de acesso. Preenchimento completo
- * e submit de fato ficam para uma jornada futura (J02b) após
- * estabilizarmos o padrão de interação com ComboBox.
+ * Escopo: estrutura, validação e gate de acesso. Preenchimento completo e submit de fato ficam
+ * para uma jornada futura (J02b) após estabilizarmos o padrão de interação com ComboBox.
  *
  * Três camadas:
  *
- * 1. **Canônica (estrutura)**: coord_vidas abre `/solicitacoes/nova` →
- *    shell + heading + nav de passos + botão "Próximo" visíveis; botão
- *    "Anterior" não aparece no Step 1 (condicional currentStep > 0).
- * 2. **Borda (validação)**: clicar "Próximo" com campos vazios não avança
- *    o passo — o spec valida que o indicador de passo permanece no primeiro.
+ * 1. **Canônica (estrutura)**: coord_vidas abre `/solicitacoes/nova` → shell + heading + cartão
+ *    "Evento 1" + "Mais detalhes" recolhido + botão "Criar solicitação"; nenhum passo nem
+ *    "Próximo".
+ * 2. **Borda (validação)**: clicar "Criar solicitação" com campos vazios não envia nada — a tela
+ *    fica e o resumo do que falta aparece no topo.
  * 3. **Operação (RBAC)**: formador_vidas tenta acessar `/solicitacoes/nova`
  *    → rota protegida (menu não mostra, frontend bloqueia via
  *    `RequirePolicy create_solicitation`: o papel FORMADOR não tem direito
@@ -28,47 +27,45 @@ import { test, expect } from '../fixtures';
 import { SolicitacaoWizardPage } from '../pages/SolicitacaoWizardPage';
 import { waitForRouteReady } from '../helpers/wait';
 
-test.describe('J02 — Wizard de nova solicitação: estrutura e navegação', { tag: ['@critical', '@ux', '@rf01'] }, () => {
-  test('canônica: wizard carrega com step 1 e navegação correta', async ({ authedPage }) => {
+test.describe('J02 — Nova solicitação: página única', { tag: ['@critical', '@ux', '@rf01'] }, () => {
+  test('canônica: a página carrega com o cartão do evento e sem passos', async ({ authedPage }) => {
     const page = await authedPage('coord_vidas');
-    const wizard = new SolicitacaoWizardPage(page);
-    await wizard.goto();
+    const nova = new SolicitacaoWizardPage(page);
+    await nova.goto();
 
     // Shell autenticado
-    await expect(wizard.main).toBeVisible();
+    await expect(nova.main).toBeVisible();
 
-    // Heading da página
-    await expect(page.getByRole('heading', { name: /nova solicita[cç][aã]o/i })).toBeVisible();
+    // Heading da página e o cartão do evento
+    await expect(page.getByRole('heading', { level: 2, name: /nova solicita[cç][aã]o/i })).toBeVisible();
+    await expect(nova.cartao()).toBeVisible();
+    await expect(page.getByRole('heading', { level: 3, name: 'Evento 1' })).toBeVisible();
 
-    // Navegação de passos do wizard visível
-    await expect(wizard.passosNav).toBeVisible();
+    // Os detalhes opcionais começam recolhidos
+    await expect(nova.maisDetalhes).toHaveAttribute('aria-expanded', 'false');
 
-    // Step 1: botão "Próximo" disponível, "Anterior" oculto (currentStep === 0)
-    await expect(wizard.btnProximo).toBeVisible();
-    await expect(wizard.btnAnterior).toHaveCount(0);
-
-    // "Confirmar Solicitação" só aparece no último step
-    await expect(wizard.btnConfirmar).toHaveCount(0);
+    // Um botão só para criar; nada de passos
+    await expect(nova.btnCriar).toBeVisible();
+    await expect(page.getByRole('button', { name: /pr[oó]ximo/i })).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: /passos/i })).toHaveCount(0);
   });
 
-  test('borda (validação): clicar Próximo com campos vazios não avança o passo', async ({ authedPage }) => {
+  test('borda (validação): Criar com campos vazios não envia e mostra o resumo do que falta', async ({ authedPage }) => {
     const page = await authedPage('coord_vidas');
-    const wizard = new SolicitacaoWizardPage(page);
-    await wizard.goto();
+    const nova = new SolicitacaoWizardPage(page);
+    await nova.goto();
 
-    // Captura snapshot do step atual antes do click (procura o elemento com aria-current ou active)
-    // AntD Steps marca o current via classe `.ant-steps-item-active` dentro do <nav>.
-    const activeStepBefore = await wizard.passosNav.locator('.ant-steps-item-active').innerText();
+    const envios: string[] = [];
+    page.on('request', (req) => {
+      if (req.method() === 'POST' && /\/api\/solicitacoes\/$/.test(new URL(req.url()).pathname)) envios.push(req.url());
+    });
 
-    // Tenta avançar sem preencher obrigatórios
-    await wizard.btnProximo.click();
+    await nova.btnCriar.click();
 
-    // Aguarda debounce de validação
-    await page.waitForTimeout(300);
-
-    // Step atual deve continuar o mesmo (validação bloqueou o avanço)
-    const activeStepAfter = await wizard.passosNav.locator('.ant-steps-item-active').innerText();
-    expect(activeStepAfter).toBe(activeStepBefore);
+    await expect(nova.resumoDeErros).toBeVisible();
+    await expect(nova.resumoDeErros).toContainText('Evento 1');
+    await expect(page).toHaveURL(/\/solicitacoes\/nova$/);
+    expect(envios).toHaveLength(0);
   });
 
   test('operação (RBAC): formador_vidas não acessa /solicitacoes/nova (rota bloqueada)', async ({
@@ -82,16 +79,16 @@ test.describe('J02 — Wizard de nova solicitação: estrutura e navegação', {
     // Heurísticas (qualquer uma satisfaz):
     //  (a) texto "Forbidden/403/acesso negado"
     //  (b) redirecionamento para outra rota
-    //  (c) ausência do heading "Nova Solicitação" e do botão "Próximo"
+    //  (c) ausência do heading "Nova Solicitação" e do botão "Criar solicitação"
     const hasForbiddenMessage = await page.getByText(/forbidden|403|acesso negado|permiss/i).count();
-    const hasWizardHeading = await page.getByRole('heading', { name: /nova solicita[cç][aã]o/i }).count();
-    const hasProximoButton = await page.getByRole('button', { name: 'Ir para proximo passo' }).count();
+    const hasHeading = await page.getByRole('heading', { name: /nova solicita[cç][aã]o/i }).count();
+    const hasCriarButton = await page.getByRole('button', { name: 'Criar solicitação' }).count();
     const urlChanged = !page.url().includes('/solicitacoes/nova');
 
-    const blockedByAny = hasForbiddenMessage > 0 || urlChanged || (hasWizardHeading === 0 && hasProximoButton === 0);
+    const blockedByAny = hasForbiddenMessage > 0 || urlChanged || (hasHeading === 0 && hasCriarButton === 0);
     expect(
       blockedByAny,
-      `formador não deveria acessar o wizard. url=${page.url()} forbidden=${hasForbiddenMessage} heading=${hasWizardHeading} proximo=${hasProximoButton}`
+      `formador não deveria acessar a Nova Solicitação. url=${page.url()} forbidden=${hasForbiddenMessage} heading=${hasHeading} criar=${hasCriarButton}`
     ).toBeTruthy();
   });
 });

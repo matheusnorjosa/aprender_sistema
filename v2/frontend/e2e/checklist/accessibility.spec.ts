@@ -18,6 +18,26 @@ import { mockChecklistAuthBootstrap, mockChecklistAuthenticated } from './checkl
 import { entrar, esperarAssentar, verificarTela, vigiarRede } from './sem-rolagem-horizontal.medicao';
 import { ROTAS_MEDIDAS } from './sem-rolagem-horizontal.rotas';
 
+// Já existia antes do C2 (antd 5.29 + rc-select 14.16), registrado em pages.spec.md (C2,
+// Acessibilidade): o Form.Item obrigatório passa `aria-required="true"` ao Select, e o rc-select
+// o põe no combobox (certo) e também no div raiz, que não tem role (axe: [critical]
+// aria-allowed-attr). O leitor de tela lê o do combobox. Só esse nó sai da conta; qualquer outro
+// aria-allowed-attr reprova.
+type Violacao = Awaited<ReturnType<AxeBuilder['analyze']>>['violations'][number];
+const semAriaRequiredNaRaizDoSelect = (v: Violacao): Violacao => ({
+  ...v,
+  nodes:
+    v.id === 'aria-allowed-attr'
+      ? v.nodes.filter(
+          (n) =>
+            !(
+              /^<div class="ant-select [^"]*ant-select-in-form-item/.test(n.html) &&
+              /^Fix all of the following:\s*ARIA attribute is not allowed: aria-required="true"\s*$/.test(n.failureSummary ?? '')
+            ),
+        )
+      : v.nodes,
+});
+
 test.beforeEach(async ({ page }) => {
   await mockChecklistAuthBootstrap(page);
 });
@@ -470,6 +490,7 @@ test.describe('Checklist: Acessibilidade — telas do Programa C (axe-core, back
     '/dat/admin/projetos-gerais',
     '/dat/admin/projetos', // marca de série (01/10/2026)
     '/solicitacoes/minhas', // item 36 (19/10/2026)
+    '/solicitacoes/nova', // página única (28/10/2026)
     '/solicitacoes/meus-eventos',
     '/solicitacoes/aprovacoes',
     '/solicitacoes/publicacao',
@@ -498,7 +519,12 @@ test.describe('Checklist: Acessibilidade — telas do Programa C (axe-core, back
           .exclude('.ant-spin-fullscreen')
           .exclude('.ant-spin-text')
           .analyze();
-        const critical = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
+        // Telas com Form.Item obrigatório em Select (a Nova Solicitação) caem na exceção registrada
+        // de `semAriaRequiredNaRaizDoSelect`; qualquer outra violação reprova.
+        const critical = results.violations
+          .filter((v) => v.impact === 'critical' || v.impact === 'serious')
+          .map(semAriaRequiredNaRaizDoSelect)
+          .filter((v) => v.nodes.length > 0);
         const relatorio = critical
           .map((v) => `[${v.impact}] ${v.id}: ${v.help}\n  ${v.nodes.map((n) => n.target.join(' ')).join('\n  ')}`)
           .join('\n');
@@ -519,26 +545,6 @@ test.describe('Checklist: Acessibilidade — opções que não carregaram (C2, a
   });
 
   const FALHA = { status: 500, contentType: 'application/json', body: JSON.stringify({ detail: 'Falha simulada.' }) };
-
-  // Já existia antes do C2 (antd 5.29 + rc-select 14.16), registrado em pages.spec.md (C2,
-  // Acessibilidade): o Form.Item obrigatório passa `aria-required="true"` ao Select, e o rc-select
-  // o põe no combobox (certo) e também no div raiz, que não tem role (axe: [critical]
-  // aria-allowed-attr). O leitor de tela lê o do combobox. Só esse nó sai da conta; qualquer outro
-  // aria-allowed-attr reprova.
-  type Violacao = Awaited<ReturnType<AxeBuilder['analyze']>>['violations'][number];
-  const semAriaRequiredNaRaizDoSelect = (v: Violacao): Violacao => ({
-    ...v,
-    nodes:
-      v.id === 'aria-allowed-attr'
-        ? v.nodes.filter(
-            (n) =>
-              !(
-                /^<div class="ant-select [^"]*ant-select-in-form-item/.test(n.html) &&
-                /^Fix all of the following:\s*ARIA attribute is not allowed: aria-required="true"\s*$/.test(n.failureSummary ?? '')
-              ),
-          )
-        : v.nodes,
-  });
 
   async function semViolacoesCriticas(page: Page, onde: string, escopo?: string): Promise<void> {
     const axe = new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']);

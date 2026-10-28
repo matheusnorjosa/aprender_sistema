@@ -78,6 +78,9 @@ const GoogleIntegrationCard = ({
   const [loadingCalendars, setLoadingCalendars] = useState(false);
   const [selectedCalendar, setSelectedCalendar] = useState<string | null>(null);
   const [savingCalendar, setSavingCalendar] = useState(false);
+  // Servidor sem a configuração OAuth do Google (409 `google_calendar_not_configured`): a mensagem
+  // dele fica no card, no lugar do seletor (ensaio r3, 28/10/2026).
+  const [naoConfigurado, setNaoConfigurado] = useState<string | null>(null);
   // Extrair valores de status (ou usar defaults se status for null). `status`
   // pode ser null antes do fetch inicial; a renderização real só ocorre após o
   // early return abaixo, mas os hooks precisam rodar incondicionalmente.
@@ -116,10 +119,14 @@ const GoogleIntegrationCard = ({
       setLoadingCalendars(true);
       const data = await fetchAPI<{ calendars: CalendarItem[] }>('/integrations/google/calendars/');
       setCalendars(data.calendars || []);
+      setNaoConfigurado(null);
     } catch (error) {
       logger.error('Erro ao carregar calendários:', error);
-      const httpStatus = (error as { response?: { status?: number } }).response?.status;
-      if (httpStatus === 503) {
+      const resposta = (error as { response?: { status?: number; data?: { code?: string } } }).response;
+      const httpStatus = resposta?.status;
+      if (resposta?.data?.code === 'google_calendar_not_configured') {
+        setNaoConfigurado((error as Error).message);
+      } else if (httpStatus === 503) {
         message.error('O Google Calendar demorou a responder. Tente novamente em instantes.');
       } else {
         message.error('Não foi possível carregar seus calendários');
@@ -221,6 +228,8 @@ const GoogleIntegrationCard = ({
             <Text>
               <CalendarOutlined /> Os eventos são publicados no calendário oficial da organização.
             </Text>
+          ) : naoConfigurado ? (
+            <Alert type="warning" showIcon message={naoConfigurado} />
           ) : (
             <div className="mt-2">
               <Text strong className="block mb-2">

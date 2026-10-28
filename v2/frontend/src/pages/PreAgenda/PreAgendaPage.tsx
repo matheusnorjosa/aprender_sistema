@@ -717,8 +717,11 @@ export default function PreAgendaPage(): JSX.Element {
       setGcalEvents(data.events || []);
       setGcalCalendarId(data.calendar_id ?? null);
     } catch (error) {
-      const httpStatus = (error as { response?: { status?: number } }).response?.status;
-      if (httpStatus === 503) {
+      const resposta = (error as { response?: { status?: number; data?: { code?: string } } }).response;
+      if (resposta?.data?.code === 'google_calendar_not_configured') {
+        // Servidor sem a configuração OAuth do Google: a mensagem do 409 diz o que fazer (ensaio r3).
+        message.error((error as Error).message);
+      } else if (resposta?.status === 503) {
         message.error('O Google Calendar demorou a responder. Tente novamente em instantes.');
       } else {
         message.error('Erro ao carregar eventos do Google Calendar');

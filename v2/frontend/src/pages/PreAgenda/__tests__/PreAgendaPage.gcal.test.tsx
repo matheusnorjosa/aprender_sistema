@@ -16,6 +16,7 @@
  * antd (isso é responsabilidade do antd).
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { message } from 'antd';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const { fetchAPIMock, getMeMock, listSolicitacoesMock, getStatusSummaryMock } = vi.hoisted(() => ({
@@ -178,6 +179,30 @@ describe('PreAgendaPage — modo Eventos Google Calendar', () => {
     expect(countLabels.some((el) => el.closest('.ant-tag'))).toBe(true);
     expect(countLabels.some((el) => el.closest('.ant-pagination'))).toBe(true);
     expect(screen.queryByText('1 eventos')).toBeNull();
+  });
+
+  // Ensaio r3 (28/10/2026): servidor sem a configuração OAuth do Google. O /events/ devolvia 500 e a
+  // tela soltava o toast genérico; agora o 409 `google_calendar_not_configured` traz a mensagem.
+  test('servidor sem a configuração do Google: o aviso mostra a mensagem do 409', async () => {
+    const MENSAGEM =
+      'A conexão com o Google Agenda ainda não foi configurada no sistema. Avise a administração do sistema.';
+    const erro = vi.spyOn(message, 'error').mockImplementation(vi.fn());
+    fetchAPIMock.mockImplementation((url: string) => {
+      if (String(url).includes('/integrations/google/events/')) {
+        return Promise.reject(Object.assign(new Error(MENSAGEM), {
+          status: 409,
+          response: { status: 409, data: { detail: MENSAGEM, code: 'google_calendar_not_configured' } },
+        }));
+      }
+      return Promise.resolve({});
+    });
+
+    render(<PreAgendaPage />);
+    fireEvent.click(await screen.findByText('Eventos Google Calendar'));
+
+    await waitFor(() => expect(erro).toHaveBeenCalledWith(MENSAGEM));
+    expect(erro).not.toHaveBeenCalledWith('Erro ao carregar eventos do Google Calendar');
+    erro.mockRestore();
   });
 
   test('vazio COM filtro de data no modo gcal mostra copy contextual, não a genérica', async () => {

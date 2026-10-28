@@ -36,7 +36,7 @@ vi.mock('../../../api/lookup', () => ({
   lookupMunicipiosWithFilters: lookupMunicipiosWithFiltersMock,
   lookupProjetos: lookupProjetosMock,
   lookupTiposEvento: lookupTiposEventoMock,
-  // #1666: o wizard agora busca coordenadores (ComboBox "Coordenador responsável" no Step 2).
+  // #1666: a tela busca coordenadores (ComboBox "Coordenador responsável").
   lookupUsuarios: vi.fn().mockResolvedValue([]),
 }));
 
@@ -87,11 +87,14 @@ function MockComboBox({
   useEffect(() => {
     void lookupFunction('');
   }, [lookupFunction]);
-  const testid = placeholder.includes('projeto')
-    ? 'cb-projeto'
-    : placeholder.includes('tipo')
-      ? 'cb-tipo'
-      : 'cb-municipio';
+  // Página única: os quatro ComboBox do cartão ficam na tela ao mesmo tempo.
+  const testid = placeholder.includes('respons')
+    ? 'cb-responsavel'
+    : placeholder.includes('munic')
+      ? 'cb-municipio'
+      : placeholder.includes('projeto')
+        ? 'cb-projeto'
+        : 'cb-tipo';
   return (
     <button
       type="button"
@@ -99,6 +102,7 @@ function MockComboBox({
       onClick={() => {
         if (testid === 'cb-projeto') onChange?.({ id: 123, label: 'Projeto X', fluxo: 'SUPER' });
         else if (testid === 'cb-tipo') onChange?.({ id: 789, label: 'Formação' });
+        else if (testid === 'cb-responsavel') onChange?.({ id: 7, label: 'Carla Coordenadora' });
         else onChange?.({ id: 456, label: 'Fortaleza - CE' });
       }}
     >
@@ -110,17 +114,24 @@ vi.mock('../../../components/ComboBox', () => ({ default: MockComboBox }));
 
 import NewSolicitacaoWizard from '../NewSolicitacaoWizard';
 
-async function irParaParticipantesESelecionarFormador(): Promise<void> {
+async function preencherEventoComFormador(): Promise<void> {
   await screen.findByTestId('cb-projeto');
   fireEvent.click(screen.getByTestId('cb-projeto'));
-  await waitFor(() => screen.getByTestId('cb-tipo'));
   fireEvent.click(screen.getByTestId('cb-tipo'));
   fireEvent.click(screen.getByTestId('cb-municipio'));
   fireEvent.click(screen.getByTestId('set-date'));
-  fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-  await screen.findByTestId('pick-formador');
   fireEvent.click(screen.getByTestId('pick-formador'));
 }
+
+/** O resto do que é obrigatório: o responsável e a resposta de acompanhar. */
+function completarResponsavel(): void {
+  fireEvent.click(screen.getByTestId('cb-responsavel'));
+  fireEvent.click(
+    within(screen.getByRole('radiogroup', { name: /vai acompanhar o evento/ })).getByLabelText('Não')
+  );
+}
+
+const criar = (): HTMLElement => screen.getByRole('button', { name: 'Criar solicitação' });
 
 const RESP_CONFLITO = {
   ok: false,
@@ -134,7 +145,35 @@ const RESP_CONFLITO = {
   ],
 };
 
-// Percorrer o assistente com antd leva ~3 s por teste isolado; na suíte inteira passa dos 5 s padrão.
+const RECUSA_POR_CONFLITO = {
+  response: {
+    data: {
+      code: 'availability_conflict',
+      detail: 'Não é possível criar o evento: Bruno Formador já tem evento neste horário.',
+      errors: {
+        conflicts: [],
+        skipped_guests: [],
+        blocked_participants: [
+          {
+            usuario_id: 99,
+            usuario_nome: 'Bruno Formador',
+            conflicts: [{ code: 'X', title: 'Sobreposição', detail: 'Conflita com evento aprovado #5', ref_id: 5 }],
+          },
+        ],
+      },
+    },
+  },
+};
+
+function renderComDispensa(): void {
+  renderNoRoteador(
+    <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+      <NewSolicitacaoWizard />
+    </ComAcesso>
+  );
+}
+
+// A página com antd leva ~3 s por teste isolado; na suíte inteira passa dos 5 s padrão.
 describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)', { timeout: 20000 }, () => {
   beforeEach(() => {
     if (!window.matchMedia) {
@@ -158,15 +197,12 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     lookupMunicipiosWithFiltersMock.mockResolvedValue([{ id: 456, label: 'Fortaleza - CE' }]);
     getMeMock.mockResolvedValue({ is_superuser: true, id: 1, name: 'Ana Criadora', username: 'ana' });
     checkAvailabilityManyMock.mockResolvedValue({ ok: true, results: [] });
+    createSolicitacaoMock.mockResolvedValue({ id: 1 });
   });
 
   test('selecionar formador + data dispara check-many com os formadores (quem cria não entra por criar)', async () => {
-    renderNoRoteador(
-      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-        <NewSolicitacaoWizard />
-      </ComAcesso>
-    );
-    await irParaParticipantesESelecionarFormador();
+    renderComDispensa();
+    await preencherEventoComFormador();
 
     await waitFor(() => expect(checkAvailabilityManyMock).toHaveBeenCalled());
     const arg = checkAvailabilityManyMock.mock.calls[0][0];
@@ -176,37 +212,32 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     expect(arg.inicio).toBeTruthy();
   });
 
-  test('conflito confirmado: mostra o formador e DESABILITA o Próximo', async () => {
+  test('conflito confirmado: mostra o formador e DESABILITA o Criar solicitação', async () => {
     checkAvailabilityManyMock.mockResolvedValue(RESP_CONFLITO);
-    renderNoRoteador(
-      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-        <NewSolicitacaoWizard />
-      </ComAcesso>
-    );
-    await irParaParticipantesESelecionarFormador();
+    renderComDispensa();
+    await preencherEventoComFormador();
 
     expect(await screen.findByText('Não é possível criar o evento')).toBeInTheDocument();
     expect(screen.getByText('Bruno Formador')).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /Ir para proximo passo/i })).toBeDisabled()
-    );
+    await waitFor(() => expect(criar()).toBeDisabled());
+    // O botão desabilitado aponta o motivo (o alerta do cartão).
+    expect(criar()).toHaveAttribute('aria-describedby', 'preview-conflito-1');
+    expect(document.getElementById('preview-conflito-1')).toHaveTextContent('Bruno Formador');
+    // A orientação não fala mais em passo anterior: tudo está na mesma página.
+    expect(screen.getByText('Remova o participante em conflito ou escolha outra data ou horário.')).toBeInTheDocument();
   });
 
-  test('sem conflito: nenhum alerta de bloqueio e Próximo habilitado', async () => {
+  test('sem conflito: nenhum alerta de bloqueio e Criar habilitado', async () => {
     checkAvailabilityManyMock.mockResolvedValue({ ok: true, results: [] });
-    renderNoRoteador(
-      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-        <NewSolicitacaoWizard />
-      </ComAcesso>
-    );
-    await irParaParticipantesESelecionarFormador();
+    renderComDispensa();
+    await preencherEventoComFormador();
 
     await waitFor(() => expect(checkAvailabilityManyMock).toHaveBeenCalled());
     expect(screen.queryByText('Não é possível criar o evento')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Ir para proximo passo/i })).not.toBeDisabled();
+    expect(criar()).not.toBeDisabled();
   });
 
-  test('limite diário é só aviso: mostra a informação e NÃO desabilita o Próximo', async () => {
+  test('limite diário é só aviso: mostra a informação e NÃO desabilita o Criar', async () => {
     checkAvailabilityManyMock.mockResolvedValue({
       ok: true,
       results: [
@@ -226,12 +257,8 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
         },
       ],
     });
-    renderNoRoteador(
-      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-        <NewSolicitacaoWizard />
-      </ComAcesso>
-    );
-    await irParaParticipantesESelecionarFormador();
+    renderComDispensa();
+    await preencherEventoComFormador();
 
     // A região já está na página, vazia; o texto entra nela quando a checagem responde.
     const aviso = screen.getByRole('status');
@@ -239,143 +266,74 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     expect(aviso).toHaveTextContent('Bruno Formador');
     expect(aviso).toHaveTextContent('Dia com mais de 8 horas de eventos');
     expect(screen.queryByText('Não é possível criar o evento')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Ir para proximo passo/i })).not.toBeDisabled();
+    expect(criar()).not.toBeDisabled();
   });
 
-  test('checagem falha (500): fail-open — Próximo continua habilitado', async () => {
+  test('checagem falha (500): fail-open — Criar continua habilitado', async () => {
     checkAvailabilityManyMock.mockRejectedValue(Object.assign(new Error('boom'), { status: 500 }));
-    renderNoRoteador(
-      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-        <NewSolicitacaoWizard />
-      </ComAcesso>
-    );
-    await irParaParticipantesESelecionarFormador();
+    renderComDispensa();
+    await preencherEventoComFormador();
 
     await waitFor(() => expect(checkAvailabilityManyMock).toHaveBeenCalled());
     expect(screen.queryByText('Não é possível criar o evento')).not.toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /Ir para proximo passo/i })).not.toBeDisabled()
-    );
+    await waitFor(() => expect(criar()).not.toBeDisabled());
   });
 
-  test('conflito recusado no envio: trocar o formador destrava o Confirmar e tira o alerta antigo', async () => {
-    createSolicitacaoMock.mockRejectedValueOnce({
-      response: {
-        data: {
-          code: 'availability_conflict',
-          detail: 'Não é possível criar o evento: Bruno Formador já tem evento neste horário.',
-          errors: {
-            conflicts: [],
-            skipped_guests: [],
-            blocked_participants: [
-              {
-                usuario_id: 99,
-                usuario_nome: 'Bruno Formador',
-                conflicts: [{ code: 'X', title: 'Sobreposição', detail: 'Conflita com evento aprovado #5', ref_id: 5 }],
-              },
-            ],
-          },
-        },
-      },
-    });
-    renderNoRoteador(
-      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-        <NewSolicitacaoWizard />
-      </ComAcesso>
-    );
-    await irParaParticipantesESelecionarFormador();
-    fireEvent.click(screen.getByTestId('cb-municipio')); // no passo 2, o único ComboBox é o do responsável
-    fireEvent.click(
-      within(screen.getByRole('radiogroup', { name: /vai acompanhar o evento/ })).getByLabelText('Não')
-    );
-    const proximo = () => screen.getByRole('button', { name: /Ir para proximo passo/i });
-    await waitFor(() => expect(proximo()).not.toBeDisabled());
-    fireEvent.click(proximo());
-    await screen.findByLabelText('Local do Evento');
-    fireEvent.click(proximo());
-    await screen.findByText('Revise sua solicitação');
+  test('conflito recusado no envio: trocar o formador destrava o Criar e tira o alerta antigo', async () => {
+    createSolicitacaoMock.mockRejectedValueOnce(RECUSA_POR_CONFLITO);
+    renderComDispensa();
+    await preencherEventoComFormador();
+    completarResponsavel();
 
-    const confirmar = () => screen.getByRole('button', { name: /Confirmar Solicitação/i });
-    await waitFor(() => expect(confirmar()).not.toBeDisabled());
-    fireEvent.click(confirmar());
+    await waitFor(() => expect(criar()).not.toBeDisabled());
+    fireEvent.click(criar());
     expect(await screen.findByText('Não é possível criar o evento')).toBeInTheDocument();
-    await waitFor(() => expect(confirmar()).toBeDisabled());
+    await waitFor(() => expect(criar()).toBeDisabled());
+    expect(criar()).toHaveAttribute('aria-describedby', 'submit-conflito-1');
 
-    // Segue a orientação do alerta: volta ao passo Participantes e troca o formador.
-    fireEvent.click(screen.getByRole('button', { name: /Voltar para passo anterior/i }));
-    await screen.findByLabelText('Local do Evento');
-    fireEvent.click(screen.getByRole('button', { name: /Voltar para passo anterior/i }));
-    fireEvent.click(await screen.findByTestId('pick-outro-formador'));
-    await waitFor(() => expect(proximo()).not.toBeDisabled());
-    fireEvent.click(proximo());
-    await screen.findByLabelText('Local do Evento');
-    fireEvent.click(proximo());
-    await screen.findByText('Revise sua solicitação');
-
-    await waitFor(() => expect(confirmar()).not.toBeDisabled());
+    // Segue a orientação do alerta, no mesmo cartão: troca o formador.
+    fireEvent.click(screen.getByTestId('pick-outro-formador'));
+    await waitFor(() => expect(criar()).not.toBeDisabled());
     expect(screen.queryByText('Não é possível criar o evento')).not.toBeInTheDocument();
   });
 
-  test('conflito recusado no envio: sem mudar nada, o Confirmar continua travado', async () => {
-    createSolicitacaoMock.mockRejectedValueOnce({
-      response: {
-        data: {
-          code: 'availability_conflict',
-          detail: 'Não é possível criar o evento: Bruno Formador já tem evento neste horário.',
-          errors: {
-            conflicts: [],
-            skipped_guests: [],
-            blocked_participants: [
-              { usuario_id: 99, usuario_nome: 'Bruno Formador', conflicts: [{ code: 'X', title: 'Sobreposição', detail: '', ref_id: 5 }] },
-            ],
-          },
-        },
-      },
-    });
-    renderNoRoteador(
-      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-        <NewSolicitacaoWizard />
-      </ComAcesso>
-    );
-    await irParaParticipantesESelecionarFormador();
-    fireEvent.click(screen.getByTestId('cb-municipio'));
-    fireEvent.click(
-      within(screen.getByRole('radiogroup', { name: /vai acompanhar o evento/ })).getByLabelText('Não')
-    );
-    const proximo = () => screen.getByRole('button', { name: /Ir para proximo passo/i });
-    await waitFor(() => expect(proximo()).not.toBeDisabled());
-    fireEvent.click(proximo());
-    await screen.findByLabelText('Local do Evento');
-    fireEvent.click(proximo());
-    await screen.findByText('Revise sua solicitação');
-    const confirmar = () => screen.getByRole('button', { name: /Confirmar Solicitação/i });
-    await waitFor(() => expect(confirmar()).not.toBeDisabled());
-    fireEvent.click(confirmar());
+  test('conflito recusado no envio: mudar o que não é horário, município ou pessoa não destrava', async () => {
+    createSolicitacaoMock.mockRejectedValueOnce(RECUSA_POR_CONFLITO);
+    renderComDispensa();
+    await preencherEventoComFormador();
+    completarResponsavel();
+    await waitFor(() => expect(criar()).not.toBeDisabled());
+    fireEvent.click(criar());
     expect(await screen.findByText('Não é possível criar o evento')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Voltar para passo anterior/i }));
-    await screen.findByLabelText('Local do Evento');
-    fireEvent.click(proximo());
-    await screen.findByText('Revise sua solicitação');
+    fireEvent.change(screen.getByLabelText('Local do Evento'), { target: { value: 'Escola X' } });
+    fireEvent.click(screen.getByTestId('cb-tipo'));
     expect(screen.getByText('Não é possível criar o evento')).toBeInTheDocument();
-    expect(confirmar()).toBeDisabled();
+    expect(criar()).toBeDisabled();
+    expect(createSolicitacaoMock).toHaveBeenCalledTimes(1);
   });
 
-  test('avançar do passo Participantes com as respostas chega ao passo Detalhes (guarda do P0)', async () => {
-    renderNoRoteador(
-      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-        <NewSolicitacaoWizard />
-      </ComAcesso>
-    );
-    await irParaParticipantesESelecionarFormador();
-    // Quem cria aqui não tem a função Coordenador: escolhe o responsável e responde se acompanha.
-    fireEvent.click(screen.getByTestId('cb-municipio')); // no passo 2, o único ComboBox é o do responsável
-    fireEvent.click(
-      within(screen.getByRole('radiogroup', { name: /vai acompanhar o evento/ })).getByLabelText('Não')
-    );
-    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    // Campos opcionais não tocados chegam `undefined` do validateFields; o merge não pode
-    // apagar o estado (P0). Chegar ao passo Detalhes prova o fix.
-    expect(await screen.findByLabelText('Local do Evento')).toBeInTheDocument();
+  test('com tudo preenchido, Criar envia uma vez o evento da tela (campos opcionais intocados não apagam nada)', async () => {
+    renderComDispensa();
+    await preencherEventoComFormador();
+    completarResponsavel();
+    await waitFor(() => expect(criar()).not.toBeDisabled());
+    fireEvent.click(criar());
+
+    await waitFor(() => expect(createSolicitacaoMock).toHaveBeenCalledTimes(1));
+    const payload = createSolicitacaoMock.mock.calls[0][0];
+    expect(payload).toMatchObject({
+      municipio: 456,
+      projeto: 123,
+      tipo_evento: 789,
+      coordenador: 7,
+      coordenador_acompanha: false,
+      local: '',
+      is_online: false,
+      extra_participants: { formador_ids: [99] },
+    });
+    expect(payload.inicio).toBe('2026-08-01T12:00:00Z');
+    expect(payload.fim).toBe('2026-08-01T14:00:00Z');
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/solicitacoes/minhas'));
   });
 });

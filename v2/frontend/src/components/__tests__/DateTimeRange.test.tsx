@@ -140,4 +140,52 @@ describe('DateTimeRange', () => {
     fireEvent.blur(inicio)
     await waitFor(() => expect(onChange).toHaveBeenCalledWith({ date: '2026-08-01', start: '09:00', end: null }))
   })
+
+  // ============================================================================
+  // NOVA SOLICITAÇÃO EM PÁGINA ÚNICA (28/10/2026): layout em linha e ids por cartão
+  // ============================================================================
+
+  test('sem layout, fica como na edição: sem a grade de 3 colunas e com os ids de sempre', () => {
+    const { container } = render(<DateTimeRange erro="Escolha a data." />)
+    expect(container.querySelector('.md\\:grid-cols-3')).toBeNull()
+    expect(document.getElementById('date-picker')).toBeInTheDocument()
+    expect(document.getElementById('time-start')).toBeInTheDocument()
+    expect(document.getElementById('time-end')).toBeInTheDocument()
+    expect(screen.getByRole('alert').id).toBe('data-horario-erro')
+  })
+
+  test('layout em linha: Data, Início e Fim lado a lado a partir de md, empilhados no celular', () => {
+    const { container } = render(<DateTimeRange layout="linha" />)
+    const grade = container.querySelector('.md\\:grid-cols-3')
+    expect(grade).toHaveClass('grid', 'grid-cols-1')
+    // min-w-0: o campo encolhe com a coluna e nada passa da largura da tela.
+    expect(Array.from(grade!.children).map((c) => c.classList.contains('min-w-0'))).toEqual([true, true, true])
+    expect(grade).toHaveTextContent('Data:')
+    expect(grade).toHaveTextContent('Início:')
+    expect(grade).toHaveTextContent('Fim:')
+  })
+
+  test('layout em linha: o erro não é região viva (quem anuncia é o resumo da página), mas segue ligado ao campo', () => {
+    render(<DateTimeRange layout="linha" idPrefix="evento-1-" erro="Escolha a data e os horários de início e de fim do evento." />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    const erro = document.getElementById('evento-1-data-horario-erro');
+    expect(erro).toHaveTextContent('Escolha a data e os horários de início e de fim do evento.');
+    expect(screen.getByLabelText('Data:')).toHaveAttribute('aria-describedby', 'evento-1-data-horario-erro');
+  });
+
+  test('idPrefix prefixa os ids dos campos e o do erro (dois cartões não repetem id)', () => {
+    render(
+      <>
+        <DateTimeRange idPrefix="evento-1-" value={{ date: '2026-08-01' }} erro="Escolha os horários." />
+        <DateTimeRange idPrefix="evento-2-" value={{ date: '2026-08-01' }} erro="Escolha os horários." />
+      </>
+    )
+    const ids = Array.from(document.querySelectorAll('[id]')).map((el) => el.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(document.getElementById('evento-1-date-picker')).toBeInTheDocument()
+    expect(document.getElementById('evento-2-time-end')).toBeInTheDocument()
+    const inicio = screen.getAllByLabelText('Início:')[1]!
+    expect(inicio.getAttribute('aria-describedby')).toBe('evento-2-data-horario-erro')
+    expect(document.getElementById('evento-2-data-horario-erro')).toHaveTextContent('Escolha os horários.')
+  })
 })

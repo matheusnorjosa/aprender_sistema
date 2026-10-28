@@ -31,6 +31,8 @@ describe('AvailabilityConflictAlert', () => {
     expect(screen.queryByText('X')).not.toBeInTheDocument();
     expect(screen.queryByText(/já está alocado neste horário/)).not.toBeInTheDocument();
     expect(screen.getByText(/Remova o participante em conflito/)).toBeInTheDocument();
+    // A Nova Solicitação é uma página só (28/10/2026): não há passo anterior para onde voltar.
+    expect(screen.queryByText(/passo anterior/)).not.toBeInTheDocument();
   });
 
   test('conflito sem detalhe mostra o motivo uma vez só', () => {

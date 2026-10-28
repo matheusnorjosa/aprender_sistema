@@ -404,30 +404,27 @@ is_online = models.BooleanField(
 
 **Nota**: `conferenceDataVersion=1` deve ser passado no parâmetro de query da API para criar Meet links.
 
-### UI: Checkbox no Wizard
+### UI: Checkbox na Nova Solicitação
 
-**Localização**: `v2/frontend/src/pages/Solicitacoes/NewSolicitacaoWizard.tsx` (`<Form.Item name="is_online">`)
+**Localização**: `v2/frontend/src/pages/Solicitacoes/CartaoEvento.tsx` (`<Form.Item name="is_online">`, em "Mais detalhes"; a edição tem o mesmo campo em `EditSolicitacaoPage.tsx`)
 
 ```jsx
-<Form.Item name="is_online" valuePropName="checked">
+<Form.Item
+  name="is_online"
+  valuePropName="checked"
+  extra={
+    dados.is_online
+      ? 'Link do Google Meet será gerado automaticamente após publicação do evento no calendário.'
+      : 'Evento presencial: nenhum link de reunião será gerado.'
+  }
+>
   <Checkbox
-    checked={formData.is_online}
-    onChange={(e) => setFormData({ ...formData, is_online: e.target.checked })}
+    checked={dados.is_online}
+    onChange={(e) => mudar({ is_online: e.target.checked })}
   >
     Evento online (Google Meet)
   </Checkbox>
 </Form.Item>
-
-<Alert
-  message="Modalidade do evento"
-  description={
-    formData.is_online
-      ? 'Link do Google Meet será gerado automaticamente após publicação do evento no calendário.'
-      : 'Evento presencial — nenhum link de reunião será gerado.'
-  }
-  type={formData.is_online ? 'info' : 'warning'}
-  showIcon
-/>
 ```
 
 ### Comportamento no Backend

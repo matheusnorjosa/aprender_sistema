@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Link } from 'react-router';
 import Modal from 'antd/es/modal';
@@ -34,6 +34,7 @@ vi.mock('../../../api/lookup', () => ({
   lookupMunicipiosWithFilters: lookupMunicipiosWithFiltersMock,
   lookupProjetos: lookupProjetosMock,
   lookupTiposEvento: lookupTiposEventoMock,
+  lookupUsuarios: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../../components/DateTimeRange', () => ({
@@ -89,7 +90,7 @@ vi.mock('../../../components/ComboBox', () => ({
 
 import NewSolicitacaoWizard from '../NewSolicitacaoWizard';
 
-describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', () => {
+describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', { timeout: 20000 }, () => {
   beforeEach(() => {
     if (!window.matchMedia) {
       Object.defineProperty(window, 'matchMedia', {
@@ -134,10 +135,9 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', () => {
       });
     });
 
-    expect(await screen.findByText('Sem municípios elegíveis')).toBeInTheDocument();
-    expect(
-      screen.getByText('Não há municípios com compra que libere o projeto selecionado.')
-    ).toBeInTheDocument();
+    // A situação do cartão diz o motivo da lista vazia (texto estático, sem região viva por cartão).
+    expect(await screen.findByText('Sem municípios com compra para este projeto')).toBeInTheDocument();
+    expect(screen.queryByText('Compra dispensada')).not.toBeInTheDocument();
   });
 
   // PR 7 das permissões: a dispensa da compra vem da policy create_solicitation_without_purchase
@@ -175,7 +175,8 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', () => {
       expect(lastCallArg.projeto_id).toBeUndefined();
     });
 
-    expect(screen.queryByText('Sem municípios elegíveis')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sem municípios com compra para este projeto')).not.toBeInTheDocument();
+    expect(screen.getByText('Compra dispensada')).toBeInTheDocument();
   });
 
   // Regra da compra: o projeto "em espera" (sem compra que o libere) some da lista.
@@ -217,6 +218,76 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', () => {
       expect(getMeMock).toHaveBeenCalled();
       expect(lookupProjetosMock).toHaveBeenLastCalledWith('', { com_compra: true });
     });
+  });
+});
+
+// Decisão do dono (28/10/2026): a Nova Solicitação deixa de ser um assistente de 4 passos e vira uma
+// página só, com o evento num cartão em linhas (Projeto | Tipo | Município; Data | Início | Fim;
+// Formadores | Coordenador responsável).
+describe('NewSolicitacaoWizard - página única com um cartão de evento (28/10/2026)', { timeout: 20000 }, () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    lookupProjetosMock.mockResolvedValue([]);
+    lookupTiposEventoMock.mockResolvedValue([]);
+    lookupMunicipiosWithFiltersMock.mockResolvedValue([]);
+    getMeMock.mockResolvedValue({ is_superuser: false });
+  });
+
+  test('um cartão "Evento 1" com todos os campos à vista e nenhum passo', async () => {
+    renderNoRoteador(<NewSolicitacaoWizard />);
+
+    expect(await screen.findByRole('heading', { level: 2, name: 'Nova Solicitação' })).toBeInTheDocument();
+    const cartao = screen.getByRole('region', { name: 'Evento 1' });
+    expect(screen.getByRole('heading', { level: 3, name: 'Evento 1' })).toBeInTheDocument();
+
+    for (const campo of [
+      'Busque ou selecione um projeto',
+      'Busque ou selecione um tipo de evento',
+      'Selecione um projeto para carregar municípios elegíveis',
+      'Busque o coordenador responsável',
+    ]) {
+      expect(within(cartao).getByRole('button', { name: campo })).toBeInTheDocument();
+    }
+    expect(within(cartao).getByTestId('datetime-range')).toBeInTheDocument();
+    expect(within(cartao).getByTestId('formadores-picker')).toBeInTheDocument();
+    expect(within(cartao).getByRole('radiogroup', { name: /vai acompanhar o evento/ })).toBeInTheDocument();
+    // Os detalhes opcionais ficam recolhidos, mas montados (os limites de tamanho valem recolhidos).
+    expect(within(cartao).getByRole('button', { name: /Mais detalhes/ })).toHaveAttribute('aria-expanded', 'false');
+    expect(within(cartao).getByLabelText('Observações')).toBeInTheDocument();
+
+    expect(screen.getByRole('button', { name: 'Criar solicitação' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Próximo|proximo passo|Anterior|passo anterior/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: /Passos/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Passo \d de \d/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Revise sua solicitação|Confirmar Solicitação/)).not.toBeInTheDocument();
+  });
+
+  test('as linhas do cartão são grades que empilham no celular e não passam da largura da tela', async () => {
+    renderNoRoteador(<NewSolicitacaoWizard />);
+    const projeto = await screen.findByRole('button', { name: 'Busque ou selecione um projeto' });
+
+    const linha1 = projeto.closest('.md\\:grid-cols-3');
+    expect(linha1).toHaveClass('grid', 'grid-cols-1');
+    expect(linha1).toHaveTextContent('Projeto');
+    expect(linha1).toHaveTextContent('Tipo de Evento');
+    expect(linha1).toHaveTextContent('Município');
+    expect(Array.from(linha1!.children).every((c) => c.classList.contains('min-w-0'))).toBe(true);
+
+    const linha3 = screen.getByTestId('formadores-picker').closest('.md\\:grid-cols-2');
+    expect(linha3).toHaveClass('grid', 'grid-cols-1');
+    expect(linha3).toHaveTextContent('Coordenador responsável');
+    // A pergunta obrigatória fica junto do coordenador, não escondida em "Mais detalhes".
+    expect(linha3).toHaveTextContent('O coordenador responsável vai acompanhar o evento?');
+    expect(Array.from(linha3!.children).every((c) => c.classList.contains('min-w-0'))).toBe(true);
+  });
+
+  test('a situação do cartão diz, sem região viva, que o evento SUPER vai para aprovação', async () => {
+    renderNoRoteador(<NewSolicitacaoWizard />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Busque ou selecione um projeto' }));
+
+    const situacao = await screen.findByText('Vai para aprovação');
+    expect(situacao.closest('[role="alert"], [role="status"], [aria-live]')).toBeNull();
+    expect(screen.queryByText('Aprovado na hora')).not.toBeInTheDocument();
   });
 });
 

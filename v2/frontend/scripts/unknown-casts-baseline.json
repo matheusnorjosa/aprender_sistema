@@ -17,6 +17,5 @@
   "src/pages/Disponibilidade.tsx": 1,
   "src/pages/MapaBrasil/MapaBrasilPage.tsx": 2,
   "src/pages/PreAgenda/PreAgendaPage.tsx": 1,
-  "src/pages/Solicitacoes/EditSolicitacaoPage.tsx": 4,
-  "src/pages/Solicitacoes/NewSolicitacaoWizard.tsx": 9
+  "src/pages/Solicitacoes/EditSolicitacaoPage.tsx": 4
 }

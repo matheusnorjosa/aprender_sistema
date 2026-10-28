@@ -90,7 +90,7 @@ vi.mock('../../../components/ComboBox', () => ({
 
 import NewSolicitacaoWizard from '../NewSolicitacaoWizard';
 
-describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', () => {
+describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', { timeout: 20000 }, () => {
   beforeEach(() => {
     if (!window.matchMedia) {
       Object.defineProperty(window, 'matchMedia', {

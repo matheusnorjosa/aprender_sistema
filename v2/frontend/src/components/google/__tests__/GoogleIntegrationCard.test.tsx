@@ -463,5 +463,9 @@ describe('GoogleIntegrationCard — Google não configurado no servidor', () => 
 
     expect(await screen.findByRole('alert')).toHaveTextContent(MENSAGEM);
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    // Sem contradição na mesma tela: nada de "Conectado" junto de "não foi configurada".
+    expect(screen.queryByText('Conectado')).not.toBeInTheDocument();
+    expect(screen.queryByText('Conta conectada:')).not.toBeInTheDocument();
+    expect(screen.getByText('Indisponível')).toBeInTheDocument();
   });
 });

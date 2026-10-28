@@ -162,19 +162,23 @@ function agendaDe(eventos: EventoDaPagina[], enviados: number[], me: QuemCria | 
 }
 
 /**
- * O choque é com outro evento desta lista? O servidor diz "o evento N desta lista" no motivo (X e D com um
- * irmão do lote); sem o detalhe por pessoa, conta como dependente (a recusa sai com qualquer mudança).
+ * Os eventos de que o choque depende, por chave. O servidor cita "o evento N desta lista" (N = posição no
+ * envio) em cada conflito com um irmão do lote (X e D): o choque depende dele e dos citados. Choque com o
+ * banco depende só dele. Sem o detalhe por pessoa, ou "desta lista" sem o número, depende de todos os
+ * enviados (a recusa sai com qualquer mudança).
  */
-function dependeDosOutros(item: ErroDoEventoNoLote): boolean {
+function eventosDoChoque(item: ErroDoEventoNoLote, chave: number, enviados: number[]): number[] {
   const bloqueados = item.blocked_participants;
-  if (!bloqueados) return true;
-  return (
-    item.detail.includes('desta lista') ||
-    bloqueados.some((p) => p.conflicts.some((c) => c.detail.includes('desta lista')))
-  );
+  if (!bloqueados) return enviados;
+  const detalhes = bloqueados.flatMap((p) => p.conflicts.map((c) => c.detail));
+  const citados = detalhes.flatMap((d) => [...d.matchAll(/evento (\d+) desta lista/g)].map((m) => enviados[Number(m[1]) - 1]));
+  const semNumero = detalhes.some((d) => d.includes('desta lista') && !/evento \d+ desta lista/.test(d));
+  if (semNumero || citados.some((c) => c === undefined)) return enviados;
+  if (citados.length === 0 && item.detail.includes('desta lista')) return enviados;
+  return [chave, ...(citados as number[])];
 }
 
-/** A agenda de que a recusa do evento depende: a de todos os enviados, ou só a dele se o choque é com o banco. */
+/** A agenda de que a recusa do evento depende: a dele e a dos eventos da lista com que ele choca. */
 function agendaDoErro(
   item: ErroDoEventoNoLote,
   chave: number,
@@ -182,7 +186,7 @@ function agendaDoErro(
   enviados: number[],
   me: QuemCria | null,
 ): string {
-  return agendaDe(eventos, dependeDosOutros(item) ? enviados : [chave], me);
+  return agendaDe(eventos, eventosDoChoque(item, chave, enviados), me);
 }
 
 /** Mudar outra coisa tira o que o servidor recusou, menos o conflito de agenda, que continua valendo. */

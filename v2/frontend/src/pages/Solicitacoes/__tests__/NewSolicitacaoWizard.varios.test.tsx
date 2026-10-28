@@ -583,6 +583,52 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     expect(botaoCriar()).toBeDisabled();
   });
 
+  test('conflito entre dois eventos da lista continua valendo quando um terceiro evento, fora do choque, muda', async () => {
+    abrir();
+    await screen.findByRole('region', { name: /^Evento 1/ });
+    await preencher(1);
+    fireEvent.click(adicionar());
+    await preencher(2);
+    fireEvent.click(adicionar());
+    horario.atual = { date: '2026-08-02', start: '14:00', end: '16:00' };
+    await preencher(3);
+    const bloqueado = (outro: number) => ({
+      usuario_id: 99,
+      usuario_nome: 'Bruno Formador',
+      conflicts: [{ code: 'X', title: 'Sobreposição', detail: `Conflita com o evento ${outro} desta lista (09:00–11:00)` }],
+    });
+    createSolicitacoesEmLoteMock.mockRejectedValueOnce(
+      recusaDoLote([
+        { indice: 0, code: 'availability_conflict', detail: 'Não é possível criar o evento: Bruno Formador tem outro evento desta lista neste horário.', blocked_participants: [bloqueado(2)] },
+        { indice: 1, code: 'availability_conflict', detail: 'Não é possível criar o evento: Bruno Formador tem outro evento desta lista neste horário.', blocked_participants: [bloqueado(1)] },
+      ], '2 de 3 eventos têm problema. Nada foi criado.')
+    );
+    fireEvent.click(botaoCriar());
+    await within(cartao(1)).findByText('Conflita com o evento 2 desta lista (09:00–11:00)', undefined, ESPERA);
+    await waitFor(() => expect(botaoCriar()).toBeDisabled());
+
+    // Mudar a agenda do evento 3 não mexe no choque entre o 1 e o 2.
+    horario.atual = { date: '2026-08-03', start: '14:00', end: '16:00' };
+    fireEvent.click(within(cartao(3)).getByTestId('set-date'));
+    await waitFor(() => expect(within(cartao(3)).queryByText(/Verificando disponibilidade/)).not.toBeInTheDocument(), ESPERA);
+    expect(within(cartao(1)).getByText('Conflita com o evento 2 desta lista (09:00–11:00)')).toBeInTheDocument();
+    expect(within(cartao(2)).getByText('Conflita com o evento 1 desta lista (09:00–11:00)')).toBeInTheDocument();
+    expect(cartao(1)).toHaveAccessibleName('Evento 1 com problema');
+    expect(botaoCriar()).toBeDisabled();
+
+    // Tirar o evento 3 também não.
+    fireEvent.click(within(cartao(3)).getByRole('button', { name: 'Remover evento 3' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Remover' }));
+    await waitFor(() => expect(screen.getAllByRole('region', { name: /^Evento \d/ })).toHaveLength(2));
+    expect(within(cartao(1)).getByText('Conflita com o evento 2 desta lista (09:00–11:00)')).toBeInTheDocument();
+    expect(botaoCriar()).toBeDisabled();
+
+    // Mudar o parceiro do choque (o evento 2) derruba o conflito dos dois.
+    fireEvent.click(within(cartao(2)).getByTestId('set-date'));
+    await waitFor(() => expect(within(cartao(1)).queryByText(/Conflita com o evento 2/)).not.toBeInTheDocument());
+    expect(within(cartao(2)).queryByText(/Conflita com o evento 1/)).not.toBeInTheDocument();
+  });
+
   test('com o conflito ainda valendo, mudar outra coisa mantém o evento vermelho e "com problema"', async () => {
     abrir();
     await screen.findByRole('region', { name: /^Evento 1/ });

@@ -19,7 +19,7 @@ import Modal from 'antd/es/modal';
 import { enderecoAtual, renderNoRoteador } from '../../../test/comRoteador';
 
 const {
-  createSolicitacaoMock,
+  createSolicitacoesEmLoteMock,
   getMeMock,
   checkAvailabilityManyMock,
   lookupMunicipiosWithFiltersMock,
@@ -29,7 +29,7 @@ const {
   lookupUsuariosMock,
   formadoresPickerProps,
 } = vi.hoisted(() => ({
-  createSolicitacaoMock: vi.fn(),
+  createSolicitacoesEmLoteMock: vi.fn(),
   getMeMock: vi.fn(),
   checkAvailabilityManyMock: vi.fn(),
   lookupMunicipiosWithFiltersMock: vi.fn(),
@@ -40,7 +40,7 @@ const {
   formadoresPickerProps: { projetoIds: [] as unknown[] },
 }));
 
-vi.mock('../../../api/solicitacoes', () => ({ createSolicitacao: createSolicitacaoMock }));
+vi.mock('../../../api/solicitacoes', () => ({ createSolicitacoesEmLote: createSolicitacoesEmLoteMock }));
 vi.mock('../../../api/availability', () => ({
   getMe: getMeMock,
   checkAvailabilityMany: checkAvailabilityManyMock,
@@ -191,7 +191,7 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     lookupMunicipiosWithFiltersMock.mockResolvedValue([{ id: 456, label: 'Fortaleza - CE' }]);
     getMeMock.mockResolvedValue(COORDENADORA);
     checkAvailabilityManyMock.mockResolvedValue({ ok: true, results: [] });
-    createSolicitacaoMock.mockResolvedValue({ id: 1 });
+    createSolicitacoesEmLoteMock.mockResolvedValue({ eventos: [{ indice: 0, id: 1, status: 'aprovado' }] });
     lookupUsuariosMock.mockResolvedValue([]);
     formadoresPickerProps.projetoIds.length = 0;
   });
@@ -218,7 +218,7 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     responder(AVALIAR, 'Não');
     fireEvent.click(criar());
     expect(await screen.findByText('Responda se o coordenador responsável vai acompanhar o evento.', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
-    expect(createSolicitacaoMock).not.toHaveBeenCalled();
+    expect(createSolicitacoesEmLoteMock).not.toHaveBeenCalled();
     expect(screen.getByTestId('pick-formador')).toBeInTheDocument();
   });
 
@@ -267,7 +267,7 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     responder(AVALIAR, 'Não');
     fireEvent.click(criar());
     expect(await screen.findByText('Escolha o coordenador responsável pelo evento.', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
-    expect(createSolicitacaoMock).not.toHaveBeenCalled();
+    expect(createSolicitacoesEmLoteMock).not.toHaveBeenCalled();
   });
 
   test('projeto em que o backend aceita o vazio: quem cria é o responsável', async () => {
@@ -278,8 +278,8 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     responder(AVALIAR, 'Não');
     await waitFor(() => expect(checkAvailabilityManyMock.mock.calls.at(-1)?.[0].usuarios_ids).toEqual([1, 99]));
     fireEvent.click(criar());
-    await waitFor(() => expect(createSolicitacaoMock).toHaveBeenCalled());
-    expect(createSolicitacaoMock.mock.calls[0][0].coordenador).toBeNull();
+    await waitFor(() => expect(createSolicitacoesEmLoteMock).toHaveBeenCalled());
+    expect(createSolicitacoesEmLoteMock.mock.calls[0][0][0].coordenador).toBeNull();
   });
 
   test('coordenadora só de outra gerência: o texto do vazio não aparece e precisa escolher (PR 9)', async () => {
@@ -300,8 +300,8 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     responder(ACOMPANHA, 'Sim');
     responder(AVALIAR, 'Não');
     fireEvent.click(criar());
-    await waitFor(() => expect(createSolicitacaoMock).toHaveBeenCalled());
-    const payload = createSolicitacaoMock.mock.calls[0][0];
+    await waitFor(() => expect(createSolicitacoesEmLoteMock).toHaveBeenCalled());
+    const payload = createSolicitacoesEmLoteMock.mock.calls[0][0][0];
     expect(payload.coordenador_acompanha).toBe(true);
     expect(payload.pretende_avaliar_formador).toBe(false);
     expect(payload.extra_participants).toEqual({ formador_ids: [99] });
@@ -316,7 +316,7 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     expect(await screen.findByText('Responda se você pretende avaliar o formador.', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
     const grupo = screen.getByRole('radiogroup', { name: AVALIAR });
     await waitFor(() => expect(within(grupo).getByLabelText('Sim')).toHaveFocus(), ESPERA_VALIDACAO);
-    expect(createSolicitacaoMock).not.toHaveBeenCalled();
+    expect(createSolicitacoesEmLoteMock).not.toHaveBeenCalled();
   });
 
   test('avaliar com Sim exige e envia qual formador', async () => {
@@ -326,7 +326,7 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     responder(AVALIAR, 'Sim');
     fireEvent.click(criar());
     expect(await screen.findByText('Escolha qual formador você pretende avaliar.', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
-    expect(createSolicitacaoMock).not.toHaveBeenCalled();
+    expect(createSolicitacoesEmLoteMock).not.toHaveBeenCalled();
   });
 
   // Item 38 (ensaio de 20/10/2026): a tela mostrava o código NAO_SUPER. A situação do cartão diz o
@@ -368,14 +368,14 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     responder(ACOMPANHA, 'Não');
     fireEvent.click(criar());
     expect(await screen.findByText('Por favor selecione pelo menos um formador', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
-    expect(createSolicitacaoMock).not.toHaveBeenCalled();
+    expect(createSolicitacoesEmLoteMock).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTestId('pick-formador'));
     responder(AVALIAR, 'Não');
     expect(screen.getByText('Vazio: você é o coordenador responsável.')).toBeInTheDocument();
     fireEvent.click(criar());
-    await waitFor(() => expect(createSolicitacaoMock).toHaveBeenCalled());
-    const payload = createSolicitacaoMock.mock.calls[0][0];
+    await waitFor(() => expect(createSolicitacoesEmLoteMock).toHaveBeenCalled());
+    const payload = createSolicitacoesEmLoteMock.mock.calls[0][0][0];
     expect(payload.projeto).toBe(124);
     expect(payload.coordenador).toBeNull();
     expect(payload.extra_participants).toEqual({ formador_ids: [99] });

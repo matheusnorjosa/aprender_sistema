@@ -9,13 +9,13 @@ import { enderecoAtual, renderNoRoteador } from '../../../test/comRoteador';
 import { apagarAvisoDoLogin, avisarSaidaAsOutrasAbas, guardarAvisoDoLogin, storageKeys } from '../../../utils/storage';
 
 const {
-  createSolicitacaoMock,
+  createSolicitacoesEmLoteMock,
   getMeMock,
   lookupMunicipiosWithFiltersMock,
   lookupProjetosMock,
   lookupTiposEventoMock,
 } = vi.hoisted(() => ({
-  createSolicitacaoMock: vi.fn(),
+  createSolicitacoesEmLoteMock: vi.fn(),
   getMeMock: vi.fn(),
   lookupMunicipiosWithFiltersMock: vi.fn(),
   lookupProjetosMock: vi.fn(),
@@ -23,7 +23,7 @@ const {
 }));
 
 vi.mock('../../../api/solicitacoes', () => ({
-  createSolicitacao: createSolicitacaoMock,
+  createSolicitacoesEmLote: createSolicitacoesEmLoteMock,
 }));
 
 vi.mock('../../../api/availability', () => ({

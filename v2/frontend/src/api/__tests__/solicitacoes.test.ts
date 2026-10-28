@@ -6,15 +6,16 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../test/mocks/server';
 import { apiUrl } from '../../test/mocks/handlers';
 
+const { publishMock } = vi.hoisted(() => ({ publishMock: vi.fn() }));
 vi.mock('../../services/syncChannel', () => ({
-  syncChannel: { publish: vi.fn(), subscribe: vi.fn(() => () => {}) },
+  syncChannel: { publish: publishMock, subscribe: vi.fn(() => () => {}) },
 }));
 
 import {
   approveSolicitacao,
   approveSolicitacoesBatch,
   cancelSolicitacao,
-  createSolicitacao,
+  createSolicitacoesEmLote,
   deleteSolicitacao,
   getSolicitacao,
   listSolicitacoes,
@@ -83,35 +84,57 @@ describe('solicitacoes API (MSW)', () => {
     expect(u.searchParams.get('mine')).toBe('true');
   });
 
-  test('createSolicitacao posta em /solicitacoes/ com body', async () => {
-    const payload = { id: 1, status: 'pendente' };
-    server.use(capturePost('/solicitacoes/', payload, requests));
-
-    const body = {
-      municipio: 3,
-      projeto: 4,
-      inicio: '2026-09-01T09:00:00-03:00',
-      fim: '2026-09-01T11:00:00-03:00',
+  test('createSolicitacoesEmLote posta {eventos} em /solicitacoes/lote/ e avisa as outras telas uma vez', async () => {
+    const resposta = {
+      eventos: [
+        { indice: 0, id: 11, status: 'aprovado' },
+        { indice: 1, id: 12, status: 'pendente' },
+      ],
     };
-    const response = await createSolicitacao(body);
+    server.use(capturePost('/solicitacoes/lote/', resposta, requests));
+    publishMock.mockClear();
 
-    expect(response).toEqual(payload);
+    const eventos = [
+      { municipio: 3, projeto: 4, inicio: '2026-09-01T12:00:00Z', fim: '2026-09-01T14:00:00Z' },
+      { municipio: 5, projeto: 6, inicio: '2026-09-02T12:00:00Z', fim: '2026-09-02T14:00:00Z' },
+    ];
+    const resultado = await createSolicitacoesEmLote(eventos);
+
+    expect(resultado).toEqual(resposta);
     expect(requests).toHaveLength(1);
-    expect(new URL(requests[0].url).pathname).toBe('/api/solicitacoes/');
+    expect(new URL(requests[0].url).pathname).toBe('/api/solicitacoes/lote/');
     expect(requests[0].method).toBe('POST');
-    expect(requests[0].body).toEqual(body);
+    expect(requests[0].body).toEqual({ eventos });
+    // Como o POST de 1 evento: uma vez por envio, não uma por evento.
+    expect(publishMock).toHaveBeenCalledTimes(2);
+    expect(publishMock).toHaveBeenCalledWith('solicitacoes', { action: 'created' });
+    expect(publishMock).toHaveBeenCalledWith('availability', { action: 'changed' });
   });
 
-  test('createSolicitacao propaga erro 400 com detail', async () => {
-    server.use(
-      http.post(apiUrl('/solicitacoes/'), () =>
-        HttpResponse.json({ detail: 'Município é obrigatório.' }, { status: 400 }),
-      ),
-    );
+  test('createSolicitacoesEmLote: o 400 lote_invalido chega inteiro (blocked_participants no topo do item) e nada é avisado', async () => {
+    const corpo = {
+      detail: '2 de 2 eventos têm problema. Nada foi criado.',
+      code: 'lote_invalido',
+      errors: {
+        itens: [
+          { indice: 0, code: 'VALIDATION_ERROR', detail: 'Falta município.', errors: { municipio: ['Falta município.'] } },
+          {
+            indice: 1,
+            code: 'availability_conflict',
+            detail: 'Não é possível criar o evento: Ana tem outro evento aprovado neste horário.',
+            // Formato do batch-approve: no topo do item, não dentro de `errors` (como no POST de 1 evento).
+            blocked_participants: [{ usuario_id: 9, usuario_nome: 'Ana', conflicts: [] }],
+          },
+        ],
+      },
+    };
+    server.use(http.post(apiUrl('/solicitacoes/lote/'), () => HttpResponse.json(corpo, { status: 400 })));
+    publishMock.mockClear();
 
-    await expect(createSolicitacao({ projeto: 4 })).rejects.toThrow(
-      'Município é obrigatório.',
-    );
+    const erro = await createSolicitacoesEmLote([{ projeto: 4 }, { projeto: 6 }]).catch((e: unknown) => e);
+
+    expect(erro).toMatchObject({ status: 400, response: { status: 400, data: corpo } });
+    expect(publishMock).not.toHaveBeenCalled();
   });
 
   test('approveSolicitacao usa PATCH em approve/ com motivo', async () => {

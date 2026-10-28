@@ -109,3 +109,66 @@ export function participantesDo(dados: FormDataType, me: QuemCria | null): Previ
   const vistos = new Set<ID>();
   return lista.filter((p) => (vistos.has(p.id) ? false : (vistos.add(p.id), true)));
 }
+
+/** O evento continua como nasceu (nada preenchido): "Remover" não pergunta e sair não conta ele. */
+export function estaEmBranco(dados: FormDataType): boolean {
+  return JSON.stringify(dados) === JSON.stringify(FORM_INICIAL);
+}
+
+/** Chave do erro no servidor → campo do Form do cartão, quando o nome não é o mesmo. */
+const CAMPO_DO_SERVIDOR: Record<string, string> = {
+  tipo_evento: 'tipoEvento',
+  coordenador: 'coordenadorResponsavel',
+  extra_participants: 'formadores',
+  formador_ids: 'formadores',
+  coordenador_acompanha: 'coordenadorAcompanha',
+  pretende_avaliar_formador: 'pretendeAvaliar',
+  formador_avaliado: 'formadorAvaliado',
+};
+
+/** Erro do horário: vai ao DateTimeRange (fora do Form). */
+const CHAVES_DO_HORARIO = new Set(['inicio', 'fim']);
+
+/** As mensagens de um valor de `errors` (texto, lista ou dicionário aninhado), na ordem. */
+export function mensagensDe(valor: unknown): string[] {
+  if (typeof valor === 'string') return [valor];
+  if (Array.isArray(valor)) return valor.flatMap(mensagensDe);
+  if (valor && typeof valor === 'object') return Object.values(valor).flatMap(mensagensDe);
+  return [];
+}
+
+/** O erro de um evento recusado pelo servidor, já repartido por onde a tela o mostra. */
+export interface ErrosDoServidor {
+  /** Campo do Form → mensagens. */
+  campos: Record<string, string[]>;
+  /** Mensagens do horário (`inicio`/`fim`). */
+  horario: string[];
+  /** O que não é de um campo à vista (`non_field_errors` e o que não casa): vai ao topo do cartão. */
+  topo: string[];
+}
+
+/**
+ * Reparte o `errors` de um evento do 400 do lote. `campoNaTela` diz se o campo do Form está à vista
+ * agora (a pergunta de avaliar só aparece quando se aplica); campo escondido vai para o topo.
+ */
+export function separarErrosDoServidor(
+  errors: Record<string, unknown>,
+  campoNaTela: (campo: string) => boolean,
+): ErrosDoServidor {
+  const separados: ErrosDoServidor = { campos: {}, horario: [], topo: [] };
+  for (const [chave, valor] of Object.entries(errors)) {
+    const mensagens = mensagensDe(valor);
+    if (mensagens.length === 0) continue;
+    if (CHAVES_DO_HORARIO.has(chave)) {
+      separados.horario.push(...mensagens);
+      continue;
+    }
+    const campo = CAMPO_DO_SERVIDOR[chave] ?? chave;
+    if (chave !== 'non_field_errors' && campoNaTela(campo)) {
+      separados.campos[campo] = [...(separados.campos[campo] ?? []), ...mensagens];
+    } else {
+      separados.topo.push(...mensagens);
+    }
+  }
+  return separados;
+}

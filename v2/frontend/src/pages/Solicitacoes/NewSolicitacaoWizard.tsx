@@ -108,7 +108,8 @@ const MAX_EVENTOS = 10;
 
 /**
  * Sem resposta (rede, ou 5xx do proxy): o lote pode ter sido criado e reenviar criaria de novo. Fica no
- * resumo do topo (não num toast que some) até o próximo clique ou a próxima mudança.
+ * resumo do topo (não num toast que some) até o próximo clique ou a próxima mudança, e o próximo envio
+ * pergunta antes de mandar (`confirmarReenvio`) até alguma resposta chegar.
  */
 function semResposta(quantos: number): string {
   const oQue = quantos === 1 ? 'a solicitação foi criada' : `os ${quantos} eventos foram criados`;
@@ -133,9 +134,9 @@ interface Resumo {
   linhas: LinhaDoResumo[];
 }
 
-/** O que o servidor recusou no envio, por chave do evento, e a agenda e as chaves dos eventos enviados. */
+/** O que o servidor recusou no envio, por chave do evento, a agenda de que cada recusa depende e os enviados. */
 interface ErrosDoLote {
-  agenda: string;
+  agendas: Record<number, string>;
   enviados: number[];
   porChave: Record<number, ErroDoEventoNoLote>;
 }
@@ -158,6 +159,30 @@ function agendaDe(eventos: EventoDaPagina[], enviados: number[], me: QuemCria | 
       ].join('|'),
     )
     .join(';');
+}
+
+/**
+ * O choque é com outro evento desta lista? O servidor diz "o evento N desta lista" no motivo (X e D com um
+ * irmão do lote); sem o detalhe por pessoa, conta como dependente (a recusa sai com qualquer mudança).
+ */
+function dependeDosOutros(item: ErroDoEventoNoLote): boolean {
+  const bloqueados = item.blocked_participants;
+  if (!bloqueados) return true;
+  return (
+    item.detail.includes('desta lista') ||
+    bloqueados.some((p) => p.conflicts.some((c) => c.detail.includes('desta lista')))
+  );
+}
+
+/** A agenda de que a recusa do evento depende: a de todos os enviados, ou só a dele se o choque é com o banco. */
+function agendaDoErro(
+  item: ErroDoEventoNoLote,
+  chave: number,
+  eventos: EventoDaPagina[],
+  enviados: number[],
+  me: QuemCria | null,
+): string {
+  return agendaDe(eventos, dependeDosOutros(item) ? enviados : [chave], me);
 }
 
 /** Mudar outra coisa tira o que o servidor recusou, menos o conflito de agenda, que continua valendo. */
@@ -243,19 +268,22 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   const [emVoo, setEmVoo] = useState(false);
   // Título que recebe o foco depois de o cartão entrar ou sair da tela.
   const focarDepois = useRef<number | null>(null);
+  // O último envio ficou sem resposta: o lote pode ter sido gravado; o próximo envio pergunta antes.
+  const talvezCriado = useRef(false);
+  const perguntaDeReenvio = useRef<ReturnType<typeof Modal.confirm> | null>(null);
 
   // Sair da página descarta o que foi preenchido: com algo preenchido, pergunta antes,
   // começando no Cancelar (ação destrutiva, ux-principios). Toda saída para outra página passa
   // pelo `useBlocker` do data router (App.tsx): o botão do topo, o Voltar do navegador e o do
   // Android, o menu lateral e os outros links.
-  // Um evento extra em branco não conta.
+  // Um evento extra em branco não conta. Com o lote em voo, sair não descarta nada: o aviso diz isso.
   const preenchido = eventos.some((e) => !estaEmBranco(e.dados));
   // Depois do envio com sucesso, sai sem perguntar: o que foi preenchido virou a solicitação.
   const saidaLiberada = useRef(false);
   const deveSegurar = useCallback<BlockerFunction>(
     ({ currentLocation, nextLocation }) =>
-      preenchido && !saidaLiberada.current && currentLocation.pathname !== nextLocation.pathname,
-    [preenchido],
+      (preenchido || emVoo) && !saidaLiberada.current && currentLocation.pathname !== nextLocation.pathname,
+    [preenchido, emVoo],
   );
   const bloqueio = useBlocker(deveSegurar);
   // O bloqueio da hora: outro Voltar com o aviso aberto bloqueia de novo, e "Sair" segue o último.
@@ -266,6 +294,19 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   useEffect(() => {
     bloqueioAtual.current = bloqueio;
     if (bloqueio.state !== 'blocked' || aviso.current) return;
+    if (emVoo) {
+      // O envio já saiu e não tem como cancelar: a página espera a resposta (ela fecha este aviso).
+      aviso.current = Modal.info({
+        title: 'Os eventos estão sendo criados',
+        content: 'Sair agora não cancela o envio. Espere a resposta para saber se foram criados.',
+        okText: 'Esperar a resposta',
+        onOk: () => {
+          aviso.current = null;
+          if (bloqueioAtual.current.state === 'blocked') bloqueioAtual.current.reset();
+        },
+      });
+      return;
+    }
     aviso.current = Modal.confirm({
       title: 'Sair sem criar a solicitação?',
       content: 'O que você preencheu será perdido.',
@@ -282,8 +323,20 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         if (bloqueioAtual.current.state === 'blocked') bloqueioAtual.current.reset();
       },
     });
-  }, [bloqueio]);
-  useEffect(() => () => aviso.current?.destroy(), []);
+  }, [bloqueio, emVoo]);
+  useEffect(
+    () => () => {
+      aviso.current?.destroy();
+      perguntaDeReenvio.current?.destroy();
+    },
+    [],
+  );
+  // A resposta chegou: fecha o aviso de "sendo criados" e desfaz a saída segurada.
+  const encerrarVoo = (): void => {
+    aviso.current?.destroy();
+    aviso.current = null;
+    if (bloqueioAtual.current.state === 'blocked') bloqueioAtual.current.reset();
+  };
   const sairDoAssistente = (): void => {
     void navigate('/solicitacoes/minhas');
   };
@@ -382,9 +435,11 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     logger.error('Erro ao criar os eventos:', error);
     const resposta = (error as { response?: { status?: number; data?: unknown } } | null)?.response;
     if (!resposta || (resposta.status ?? 0) >= 500) {
+      talvezCriado.current = true;
       setResumo({ titulo: semResposta(enviados.length), linhas: [] });
       return;
     }
+    talvezCriado.current = false;
     const data = resposta.data as { detail?: string; code?: string; errors?: { itens?: unknown } } | null | undefined;
     const itens = Array.isArray(data?.errors?.itens) ? (data.errors.itens as ErroDoEventoNoLote[]) : null;
     if (data?.code !== 'lote_invalido' || !itens) {
@@ -401,13 +456,34 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       linhas.push(...textosDoErro(item).map((texto) => ({ chave: evento.chave, texto })));
     }
     const chaves = enviados.map((e) => e.chave);
-    setErrosDoLote({ agenda: agendaDe(enviados, chaves, me), enviados: chaves, porChave });
+    const agendas = Object.fromEntries(
+      Object.entries(porChave).map(([chave, item]) => [chave, agendaDoErro(item, Number(chave), enviados, chaves, me)]),
+    );
+    setErrosDoLote({ agendas, enviados: chaves, porChave });
     // Com 1 evento, o "1 de 1 eventos" do servidor não diz nada a quem fez uma solicitação só.
     const titulo = enviados.length === 1 ? 'Não foi possível criar a solicitação. Nada foi criado.' : data.detail;
     setResumo({ titulo: titulo || 'Nada foi criado.', linhas });
     const primeiro = linhas[0];
     if (primeiro) cartoes.current.get(primeiro.chave)?.focarTitulo();
   };
+
+  // Depois de um envio sem resposta, mandar de novo pode duplicar o lote: pergunta, começando no Cancelar.
+  const confirmarReenvio = (quantos: number): Promise<boolean> =>
+    new Promise((resolver) => {
+      const responder = (sim: boolean): void => {
+        perguntaDeReenvio.current = null;
+        resolver(sim);
+      };
+      perguntaDeReenvio.current = Modal.confirm({
+        title: 'Enviar de novo?',
+        content: `${semResposta(quantos)} Enviar de novo pode criar em dobro.`,
+        okText: 'Enviar de novo',
+        cancelText: 'Cancelar',
+        autoFocusButton: 'cancel',
+        onOk: () => responder(true),
+        onCancel: () => responder(false),
+      });
+    });
 
   const conferirEEnviar = async (): Promise<void> => {
     setResumo(null);
@@ -430,15 +506,19 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     const enviados = eventos;
     const payloads = enviados.map((e) => payloadDo(e.dados));
     if (payloads.some((p) => p === null)) return;
+    if (talvezCriado.current && !(await confirmarReenvio(enviados.length))) return;
     setEmVoo(true);
     try {
       const criados = await createSolicitacoesEmLote(payloads.filter((p): p is SolicitacaoPayload => p !== null));
+      talvezCriado.current = false;
+      encerrarVoo();
       message.success(mensagemDeSucesso(criados.eventos.map((e) => e.status)));
       saidaLiberada.current = true;
       void navigate('/solicitacoes/minhas');
     } catch (error) {
       // Destrava antes de tratar: o foco vai ao título do evento com problema, que inerte não o recebe.
       flushSync(() => setEmVoo(false));
+      encerrarVoo();
       tratarRecusa(error, enviados);
     }
   };
@@ -461,9 +541,17 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   // Número visível de cada evento: a posição + 1 (muda quando um evento sai).
   const numeroDe = (chave: number): number => eventos.findIndex((e) => e.chave === chave) + 1;
   const linhasDoResumo = (resumo?.linhas ?? []).filter((l) => numeroDe(l.chave) > 0);
-  const errosValidos =
-    errosDoLote && errosDoLote.agenda === agendaDe(eventos, errosDoLote.enviados, me) ? errosDoLote.porChave : null;
-  const comProblema = new Set(linhasDoResumo.map((l) => l.chave));
+  // Cada recusa vale enquanto a agenda de que ela depende for a do envio.
+  const errosValidos = errosDoLote
+    ? (Object.fromEntries(
+        Object.entries(errosDoLote.porChave).filter(
+          ([chave, item]) =>
+            errosDoLote.agendas[Number(chave)] === agendaDoErro(item, Number(chave), eventos, errosDoLote.enviados, me),
+        ),
+      ) as Record<number, ErroDoEventoNoLote>)
+    : null;
+  // Com problema: o que o resumo do clique aponta e o que o servidor recusou e ainda vale (o conflito).
+  const comProblema = new Set([...linhasDoResumo.map((l) => l.chave), ...Object.keys(errosValidos ?? {}).map(Number)]);
   const noLimite = eventos.length >= MAX_EVENTOS;
 
   return (

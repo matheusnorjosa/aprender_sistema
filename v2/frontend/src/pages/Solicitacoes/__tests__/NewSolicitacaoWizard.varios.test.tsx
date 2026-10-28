@@ -467,6 +467,152 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     expect(message.error).not.toHaveBeenCalled();
   });
 
+  test('depois de um envio sem resposta, o próximo Criar pergunta antes de mandar de novo (mesmo depois de mudar um evento)', async () => {
+    const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
+    createSolicitacoesEmLoteMock.mockRejectedValueOnce(new TypeError('Sem conexão com o servidor.'));
+    abrir();
+    await screen.findByRole('region', { name: /^Evento 1/ });
+    await preencher(1);
+    fireEvent.click(adicionar());
+    await preencher(2);
+    fireEvent.click(botaoCriar());
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Não houve resposta'), ESPERA);
+
+    // Mudar um evento tira o resumo, mas não o risco: o lote pode ter sido gravado.
+    fireEvent.click(within(cartao(1)).getByTestId('cb-tipo'));
+    fireEvent.click(botaoCriar());
+    await waitFor(() => expect(confirmar).toHaveBeenCalledTimes(1), ESPERA);
+    const opcoes = confirmar.mock.calls[0]![0];
+    expect(opcoes.title).toBe('Enviar de novo?');
+    expect(opcoes.autoFocusButton).toBe('cancel');
+    expect(createSolicitacoesEmLoteMock).toHaveBeenCalledTimes(1);
+
+    // Cancelar não envia.
+    await act(async () => { opcoes.onCancel?.(); });
+    await waitFor(() => expect(botaoCriar()).toHaveTextContent('Criar 2 eventos'));
+    expect(createSolicitacoesEmLoteMock).toHaveBeenCalledTimes(1);
+
+    // Confirmar envia; com resposta, o próximo envio não pergunta mais.
+    createSolicitacoesEmLoteMock.mockRejectedValueOnce(
+      recusaDoLote([{ indice: 0, code: 'VALIDATION_ERROR', detail: 'x', errors: { non_field_errors: ['Recusado.'] } }])
+    );
+    fireEvent.click(botaoCriar());
+    await waitFor(() => expect(confirmar).toHaveBeenCalledTimes(2), ESPERA);
+    await act(async () => { confirmar.mock.calls[1]![0].onOk?.(); });
+    await waitFor(() => expect(createSolicitacoesEmLoteMock).toHaveBeenCalledTimes(2), ESPERA);
+    await within(cartao(1)).findByText('Recusado.', undefined, ESPERA);
+    fireEvent.click(botaoCriar());
+    await waitFor(() => expect(createSolicitacoesEmLoteMock).toHaveBeenCalledTimes(3), ESPERA);
+    expect(confirmar).toHaveBeenCalledTimes(2);
+    confirmar.mockRestore();
+  });
+
+  test('com o lote em voo, sair da página não descarta: o aviso diz que o envio segue e a página espera a resposta', async () => {
+    const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
+    const destruir = vi.fn();
+    const informar = vi.spyOn(Modal, 'info').mockImplementation(() => ({ destroy: destruir, update: vi.fn() }));
+    let resolver: (valor: unknown) => void = () => undefined;
+    createSolicitacoesEmLoteMock.mockImplementationOnce(() => new Promise((resolve) => { resolver = resolve; }));
+    const { router } = abrir();
+    await screen.findByRole('region', { name: /^Evento 1/ });
+    await preencher(1);
+    fireEvent.click(botaoCriar());
+    await waitFor(() => expect(createSolicitacoesEmLoteMock).toHaveBeenCalledTimes(1), ESPERA);
+
+    fireEvent.click(screen.getByRole('button', { name: /Voltar para Minhas Solicitações/ }));
+    await waitFor(() => expect(informar).toHaveBeenCalledTimes(1));
+    expect(confirmar).not.toHaveBeenCalled();
+    const opcoes = informar.mock.calls[0]![0];
+    expect(String(opcoes.title)).toMatch(/sendo criad/);
+    expect(String(opcoes.content)).toMatch(/não cancela/);
+    // Fechar o aviso fica na página; o envio segue.
+    act(() => void opcoes.onOk?.());
+    expect(enderecoAtual(router)).toBe(NOVA);
+
+    // Outra tentativa de sair e a resposta chega com o aviso aberto: ele fecha e vai a Minhas Solicitações.
+    fireEvent.click(screen.getByRole('button', { name: /Voltar para Minhas Solicitações/ }));
+    await waitFor(() => expect(informar).toHaveBeenCalledTimes(2));
+    act(() => resolver({ eventos: [{ indice: 0, id: 5, status: 'aprovado' }] }));
+    await waitFor(() => expect(enderecoAtual(router)).toBe('/solicitacoes/minhas'), ESPERA);
+    expect(destruir).toHaveBeenCalled();
+    expect(message.success).toHaveBeenCalledWith('1 evento criado');
+    expect(confirmar).not.toHaveBeenCalled();
+    confirmar.mockRestore();
+    informar.mockRestore();
+  });
+
+  test('conflito com evento aprovado (fora da lista) continua valendo quando outro evento muda ou sai', async () => {
+    abrir();
+    await screen.findByRole('region', { name: /^Evento 1/ });
+    await preencher(1);
+    fireEvent.click(adicionar());
+    horario.atual = { date: '2026-08-02', start: '14:00', end: '16:00' };
+    await preencher(2);
+    createSolicitacoesEmLoteMock.mockRejectedValueOnce(
+      recusaDoLote([
+        {
+          indice: 0,
+          code: 'availability_conflict',
+          detail: 'Não é possível criar o evento: Bruno Formador tem outro evento aprovado neste horário.',
+          blocked_participants: [
+            {
+              usuario_id: 99,
+              usuario_nome: 'Bruno Formador',
+              conflicts: [{ code: 'X', title: 'Sobreposição', detail: 'Conflita com evento aprovado #5 (09:00–11:00)', ref_id: 5 }],
+            },
+          ],
+        },
+      ], '1 de 2 eventos tem problema. Nada foi criado.')
+    );
+    fireEvent.click(botaoCriar());
+    await within(cartao(1)).findByText('Conflita com evento aprovado #5 (09:00–11:00)', undefined, ESPERA);
+    await waitFor(() => expect(botaoCriar()).toBeDisabled());
+
+    // Mudar o horário do evento 2 não mexe no choque do evento 1 com o banco.
+    horario.atual = { date: '2026-08-03', start: '14:00', end: '16:00' };
+    fireEvent.click(within(cartao(2)).getByTestId('set-date'));
+    await waitFor(() => expect(within(cartao(2)).queryByText(/Verificando disponibilidade/)).not.toBeInTheDocument(), ESPERA);
+    expect(within(cartao(1)).getByText('Conflita com evento aprovado #5 (09:00–11:00)')).toBeInTheDocument();
+    expect(botaoCriar()).toBeDisabled();
+
+    // Nem tirar o evento 2.
+    fireEvent.click(within(cartao(2)).getByRole('button', { name: 'Remover evento 2' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Remover' }));
+    await waitFor(() => expect(screen.getAllByRole('region', { name: /^Evento \d/ })).toHaveLength(1));
+    expect(within(cartao(1)).getByText('Conflita com evento aprovado #5 (09:00–11:00)')).toBeInTheDocument();
+    expect(botaoCriar()).toBeDisabled();
+  });
+
+  test('com o conflito ainda valendo, mudar outra coisa mantém o evento vermelho e "com problema"', async () => {
+    abrir();
+    await screen.findByRole('region', { name: /^Evento 1/ });
+    await preencher(1);
+    fireEvent.click(adicionar());
+    await preencher(2);
+    const bloqueado = (outro: number) => ({
+      usuario_id: 99,
+      usuario_nome: 'Bruno Formador',
+      conflicts: [{ code: 'X', title: 'Sobreposição', detail: `Conflita com o evento ${outro} desta lista (09:00–11:00)` }],
+    });
+    createSolicitacoesEmLoteMock.mockRejectedValueOnce(
+      recusaDoLote([
+        { indice: 0, code: 'availability_conflict', detail: 'Não é possível criar o evento: Bruno Formador tem outro evento desta lista neste horário.', blocked_participants: [bloqueado(2)] },
+        { indice: 1, code: 'availability_conflict', detail: 'Não é possível criar o evento: Bruno Formador tem outro evento desta lista neste horário.', blocked_participants: [bloqueado(1)] },
+      ])
+    );
+    fireEvent.click(botaoCriar());
+    await within(cartao(1)).findByText('Conflita com o evento 2 desta lista (09:00–11:00)', undefined, ESPERA);
+    expect(cartao(1)).toHaveAccessibleName('Evento 1 com problema');
+
+    // Mudar o tipo (fora da agenda) tira o resumo, mas o conflito segue e o cartão segue marcado.
+    fireEvent.click(within(cartao(1)).getByTestId('cb-tipo'));
+    await waitFor(() => expect(screen.queryByText('2 de 2 eventos têm problema. Nada foi criado.')).not.toBeInTheDocument());
+    expect(within(cartao(1)).getByText('Conflita com o evento 2 desta lista (09:00–11:00)')).toBeInTheDocument();
+    expect(cartao(1)).toHaveAccessibleName('Evento 1 com problema');
+    expect(cartao(2)).toHaveAccessibleName('Evento 2 com problema');
+    expect(botaoCriar()).toBeDisabled();
+  });
+
   test('com o envio em andamento, os eventos e o "Adicionar" ficam travados; nada se perde nem é criado à revelia', async () => {
     let recusar: (erro: unknown) => void = () => undefined;
     createSolicitacoesEmLoteMock.mockImplementationOnce(() => new Promise((_resolve, reject) => { recusar = reject; }));

@@ -511,50 +511,17 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         """
         from django.db import transaction
 
-        from .models import Participation
-        from .services.avaliacao_formador import validar_avaliacao_formador
         from .services.solicitacao_availability import enforce_solicitacao_availability
 
         projeto = serializer.validated_data.get("projeto")
-        # PR 9: o projeto tem que ser de uma gerência onde quem cria tem papel G/C/A.
-        self._assert_projeto_na_gerencia(projeto)
-        self._assert_projeto_no_alcance_da_aprovadora(projeto)
-        coordenador = self._resolver_coordenador_responsavel(serializer.validated_data.get("coordenador"), projeto)
-        initial_status = resolve_initial_status(projeto=projeto)
+        coordenador, initial_status = self._preparar_criacao(serializer)
 
         with transaction.atomic():
-            # ASQ-002: status inicial decidido em camada de serviço (não no model.save()).
-            instance = serializer.save(usuario=self.request.user, status=initial_status.status, coordenador=coordenador)
-
-            # PR15: Processar extra_participants
-            # M10-04 (#1626): valida o shape antes de materializar Participation —
-            # mata o 500 em payload malformado, limita o tamanho e normaliza e-mails.
-            extra_participants = self.request.data.get("extra_participants", {})
-            if extra_participants:
-                extra_serializer = _ExtraParticipantsSerializer(data=extra_participants)
-                extra_serializer.is_valid(raise_exception=True)
-                self._create_participants(instance, extra_serializer.validated_data)
-
-            # Convite do Google para o responsável, mesmo que não acompanhe (decisão do dono,
-            # 05/10/2026). O papel COORDENADOR não ocupa a agenda (`ENFORCED_ROLES`).
-            Participation.objects.get_or_create(solicitacao=instance, usuario=coordenador, role="COORDENADOR")
-            validar_avaliacao_formador(instance, criando=True, resposta_anterior=None)
+            instance = self._gravar_evento(
+                serializer, self.request.data.get("extra_participants", {}), coordenador, initial_status
+            )
             enforce_solicitacao_availability(instance, action="create")
-
-            # PA-04 (PR 10, decisão do dono de 16/10): quem tem o cadastro de projetos troca o fluxo, com
-            # registro. O evento que nasce aprovado porque o projeto estava NAO_SUPER fica marcado aqui; com
-            # o AuditLog da troca de fluxo (`ProjetoSerializer.update`) dá para achar o criado na janela.
-            if initial_status.status == "aprovado":
-                AuditLog.objects.create(
-                    usuario=self.request.user,
-                    action=AuditLog.Action.CREATE,
-                    model_name="Solicitacao",
-                    details={
-                        "solicitacao_id": instance.id,
-                        "projeto_id": getattr(projeto, "id", None),
-                        "auto_aprovada_por_fluxo": initial_status.fluxo,
-                    },
-                )
+            self._fechar_evento(instance, initial_status)
 
         logger.info(
             "solicitacao_initial_status_decided",
@@ -568,6 +535,64 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 "reason": initial_status.reason,
             },
         )
+
+    def _preparar_criacao(self, serializer):
+        """Antes de gravar: escopo do projeto (PR 9 e alcance da aprovadora), coordenador responsável e
+        status inicial (PA-01). Tudo levanta `serializers.ValidationError`; nada é gravado aqui.
+
+        Returns:
+            (coordenador responsável, `InitialStatusDecision`)
+        """
+        projeto = serializer.validated_data.get("projeto")
+        # PR 9: o projeto tem que ser de uma gerência onde quem cria tem papel G/C/A.
+        self._assert_projeto_na_gerencia(projeto)
+        self._assert_projeto_no_alcance_da_aprovadora(projeto)
+        coordenador = self._resolver_coordenador_responsavel(serializer.validated_data.get("coordenador"), projeto)
+        return coordenador, resolve_initial_status(projeto=projeto)
+
+    def _gravar_evento(self, serializer, extra_participants, coordenador, initial_status):
+        """Grava o evento e as Participation. Requer transação aberta (a checagem de agenda vem depois).
+
+        `extra_participants` chega por argumento: no lote cada evento traz o seu.
+        """
+        from .models import Participation
+        from .services.avaliacao_formador import validar_avaliacao_formador
+
+        # ASQ-002: status inicial decidido em camada de serviço (não no model.save()).
+        instance = serializer.save(usuario=self.request.user, status=initial_status.status, coordenador=coordenador)
+
+        # PR15: Processar extra_participants
+        # M10-04 (#1626): valida o shape antes de materializar Participation —
+        # mata o 500 em payload malformado, limita o tamanho e normaliza e-mails.
+        if extra_participants:
+            extra_serializer = _ExtraParticipantsSerializer(data=extra_participants)
+            extra_serializer.is_valid(raise_exception=True)
+            self._create_participants(instance, extra_serializer.validated_data)
+
+        # Convite do Google para o responsável, mesmo que não acompanhe (decisão do dono,
+        # 05/10/2026). O papel COORDENADOR não ocupa a agenda (`ENFORCED_ROLES`).
+        Participation.objects.get_or_create(solicitacao=instance, usuario=coordenador, role="COORDENADOR")
+        validar_avaliacao_formador(instance, criando=True, resposta_anterior=None)
+        return instance
+
+    def _fechar_evento(self, instance, initial_status):
+        """Depois da checagem de agenda: o AuditLog de quem nasce aprovado.
+
+        PA-04 (PR 10, decisão do dono de 16/10): quem tem o cadastro de projetos troca o fluxo, com
+        registro. O evento que nasce aprovado porque o projeto estava NAO_SUPER fica marcado aqui; com
+        o AuditLog da troca de fluxo (`ProjetoSerializer.update`) dá para achar o criado na janela.
+        """
+        if initial_status.status == "aprovado":
+            AuditLog.objects.create(
+                usuario=self.request.user,
+                action=AuditLog.Action.CREATE,
+                model_name="Solicitacao",
+                details={
+                    "solicitacao_id": instance.id,
+                    "projeto_id": instance.projeto_id,
+                    "auto_aprovada_por_fluxo": initial_status.fluxo,
+                },
+            )
 
     _MSG_PARTICIPANTE_FORA_DA_GERENCIA = "Você só pode adicionar formadores/coordenadores da gerência do projeto."
 

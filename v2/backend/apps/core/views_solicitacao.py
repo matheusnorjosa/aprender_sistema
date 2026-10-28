@@ -23,7 +23,13 @@ from rest_framework.response import Response
 
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema, extend_schema_view
+from drf_spectacular.utils import (
+    OpenApiExample,
+    OpenApiParameter,
+    extend_schema,
+    extend_schema_view,
+    inline_serializer,
+)
 
 from .api_schemas import (
     COMMON_ERROR_RESPONSES,
@@ -33,6 +39,7 @@ from .api_schemas import (
     SOLICITACAO_CREATE_PRESENCIAL_EXAMPLE,
     SOLICITACAO_CREATED_EXAMPLE,
 )
+from .exceptions import APIError, ValidationAPIError
 from .models import AuditLog, Solicitacao
 from .permissions import HasPerm, IsOwnerOrPrivileged, PodeExcluirSolicitacao
 from .rbac.helpers import user_e_coordenador
@@ -230,6 +237,55 @@ class _SolicitacaoOrderingFilter(OrderingFilter):
         )
 
 
+# Lote de criação (decisão do dono, 28/10): a transação segura o lock de todas as pessoas do lote
+# enquanto cada evento passa por escopo, compra e participantes. Subir aqui se o uso pedir.
+MAX_EVENTOS_LOTE = 10
+
+
+class _LoteSerializer(serializers.Serializer):
+    """Corpo do POST /solicitacoes/lote/: `eventos`, lista de 1 a `MAX_EVENTOS_LOTE` objetos.
+
+    Só o formato da lista. Cada objeto é o payload do POST de 1 evento e passa pelo
+    `SolicitacaoSerializer` um a um (nunca `many=True`: a Regra 5 lê o `initial_data` do evento).
+    `ListaComTeto`: lista acima do teto recusada antes de olhar os itens.
+    """
+
+    eventos = ListaComTeto(child=serializers.DictField(), min_length=1, max_length=MAX_EVENTOS_LOTE)
+
+
+def _mensagens(detalhe: Any) -> list[str]:
+    """As mensagens de um `ValidationError.detail` (dict, lista ou texto), achatadas em ordem."""
+    if isinstance(detalhe, dict):
+        return [m for valor in detalhe.values() for m in _mensagens(valor)]
+    if isinstance(detalhe, list):
+        return [m for valor in detalhe for m in _mensagens(valor)]
+    return [str(detalhe)]
+
+
+def _erro_do_evento(indice: int, exc: serializers.ValidationError | APIError) -> dict[str, Any]:
+    """Erro de um evento do lote, no formato dos itens do batch-approve.
+
+    `serializers.ValidationError` → `VALIDATION_ERROR` com `errors` por campo (as chaves de sempre do
+    POST de 1 evento). `APIError` → o `code` e a mensagem dele; no conflito de agenda,
+    `blocked_participants` no topo do item (como no batch-approve), senão `errors` com os detalhes.
+    """
+    if isinstance(exc, APIError):
+        item: dict[str, Any] = {"indice": indice, "code": exc.code, "detail": exc.message}
+        if exc.code == "availability_conflict":
+            item["blocked_participants"] = exc.details.get("blocked_participants", [])
+        elif exc.details:
+            item["errors"] = exc.details
+        return item
+    detalhe = exc.detail
+    erros = detalhe if isinstance(detalhe, dict) else {"non_field_errors": _mensagens(detalhe)}
+    return {
+        "indice": indice,
+        "code": "VALIDATION_ERROR",
+        "detail": "; ".join(_mensagens(detalhe)) or "Erro de validação.",
+        "errors": erros,
+    }
+
+
 class _BatchIdsSerializer(serializers.Serializer):
     """
     M11-04 (#1650): valida o TIPO do corpo das ações batch-approve/batch-reject.
@@ -380,7 +436,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         ]
         if self.action in actions_with_custom_permissions:
             return super().get_permissions()
-        if self.action == "create":
+        if self.action in ("create", "lote"):
             return [HasPerm("create_solicitation")()]
         if self.action in ["update", "partial_update"]:
             return [IsOwnerOrPrivileged()]
@@ -575,23 +631,27 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         validar_avaliacao_formador(instance, criando=True, resposta_anterior=None)
         return instance
 
-    def _fechar_evento(self, instance, initial_status):
+    def _fechar_evento(self, instance, initial_status, *, lote: bool = False):
         """Depois da checagem de agenda: o AuditLog de quem nasce aprovado.
 
         PA-04 (PR 10, decisão do dono de 16/10): quem tem o cadastro de projetos troca o fluxo, com
         registro. O evento que nasce aprovado porque o projeto estava NAO_SUPER fica marcado aqui; com
         o AuditLog da troca de fluxo (`ProjetoSerializer.update`) dá para achar o criado na janela.
+        `lote=True` (POST do lote) marca `details.lote`, como o `batch` do batch-approve.
         """
         if initial_status.status == "aprovado":
+            details = {
+                "solicitacao_id": instance.id,
+                "projeto_id": instance.projeto_id,
+                "auto_aprovada_por_fluxo": initial_status.fluxo,
+            }
+            if lote:
+                details["lote"] = True
             AuditLog.objects.create(
                 usuario=self.request.user,
                 action=AuditLog.Action.CREATE,
                 model_name="Solicitacao",
-                details={
-                    "solicitacao_id": instance.id,
-                    "projeto_id": instance.projeto_id,
-                    "auto_aprovada_por_fluxo": initial_status.fluxo,
-                },
+                details=details,
             )
 
     _MSG_PARTICIPANTE_FORA_DA_GERENCIA = "Você só pode adicionar formadores/coordenadores da gerência do projeto."
@@ -1503,4 +1563,185 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 "errors": result.errors,
             },
             status=status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        summary="Criar vários eventos de uma vez",
+        description=(
+            f"Cria de 1 a {MAX_EVENTOS_LOTE} eventos numa transação só: tudo ou nada. Cada item de "
+            "`eventos` é o mesmo payload do POST de 1 evento, com as mesmas regras por evento (escopo do "
+            "projeto, compra, perguntas obrigatórias, PA-01/PA-04 e RD-01..08). Os eventos do lote se "
+            "enxergam na checagem de agenda mesmo pendentes: a mesma pessoa em dois deles no mesmo horário "
+            "(ou sem o intervalo de deslocamento) é erro. Qualquer erro → 400 `lote_invalido`, nada é "
+            "criado e `errors.itens[]` traz `{indice, code, detail}` por evento com problema, mais "
+            "`errors` (campos) ou `blocked_participants` (conflito de agenda, no topo do item). Nada vai "
+            "ao Google Agenda (PA-03)."
+        ),
+        request=inline_serializer(
+            "SolicitacaoLoteRequest",
+            fields={"eventos": SolicitacaoSerializer(many=True)},
+        ),
+        responses={
+            201: {
+                "type": "object",
+                "properties": {
+                    "eventos": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "indice": {"type": "integer"},
+                                "id": {"type": "integer"},
+                                "status": {"type": "string", "enum": ["pendente", "aprovado"]},
+                            },
+                            "required": ["indice", "id", "status"],
+                        },
+                    }
+                },
+            },
+            400: {
+                "type": "object",
+                "properties": {
+                    "detail": {"type": "string"},
+                    "code": {"type": "string"},
+                    "errors": {
+                        "type": "object",
+                        "properties": {
+                            "itens": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "indice": {"type": "integer"},
+                                        "code": {"type": "string"},
+                                        "detail": {"type": "string"},
+                                        "errors": {"type": "object"},
+                                        "blocked_participants": {"type": "array", "items": {"type": "object"}},
+                                    },
+                                    "required": ["indice", "code", "detail"],
+                                },
+                            }
+                        },
+                    },
+                },
+            },
+            **COMMON_ERROR_RESPONSES,
+        },
+        tags=["solicitacoes"],
+    )
+    @action(detail=False, methods=["post"], url_path="lote")
+    def lote(self, request):
+        """
+        Criar vários eventos de uma vez (decisões do dono de 28/10).
+
+        POST /api/solicitacoes/lote/
+        Body: {"eventos": [<payload do POST de 1 evento>, ...]} (1 a MAX_EVENTOS_LOTE)
+
+        Response 201: {"eventos": [{"indice": 0, "id": 123, "status": "aprovado"}, ...]}
+        Response 400 (`lote_invalido`): nada criado; `errors.itens[]` por evento com problema.
+
+        Permissão: a mesma do POST de 1 evento (`create_solicitation`, em `get_permissions`), e o
+        escopo do projeto por evento (`_preparar_criacao`): ninguém ganha poder.
+        Ordem: grava cada evento (savepoint próprio; erro vira erro do evento), trava UMA vez a união
+        dos participantes em ordem crescente e checa cada evento com o mapa COMPLETO do lote, para os
+        irmãos se enxergarem mesmo pendentes. Qualquer erro levanta dentro do atomic: rollback total.
+        """
+        from django.db import transaction
+
+        from .services import solicitacao_availability as guard
+
+        entrada = _LoteSerializer(data=request.data)
+        entrada.is_valid(raise_exception=True)
+        eventos = entrada.validated_data["eventos"]
+
+        erros: dict[int, dict[str, Any]] = {}
+        gravados: list[tuple[int, Solicitacao, Any]] = []
+        with transaction.atomic():
+            for indice, item in enumerate(eventos):
+                serializer = SolicitacaoSerializer(data=item, context=self.get_serializer_context())
+                try:
+                    serializer.is_valid(raise_exception=True)
+                    coordenador, initial_status = self._preparar_criacao(serializer)
+                    # Savepoint: o evento que falha no meio não deixa linha que outro evento enxergue.
+                    with transaction.atomic():
+                        instance = self._gravar_evento(
+                            serializer, item.get("extra_participants", {}), coordenador, initial_status
+                        )
+                except (serializers.ValidationError, APIError) as exc:
+                    erros[indice] = _erro_do_evento(indice, exc)
+                    continue
+                gravados.append((indice, instance, initial_status))
+
+            mapa = {instance.pk: indice + 1 for indice, instance, _ in gravados}
+            participantes = {u.id for _, instance, _ in gravados for u in guard.collect_participants(instance)[0]}
+            guard.lock_participants(sorted(participantes))
+            for indice, instance, _ in gravados:
+                resultado = guard.check_solicitacao_availability(instance, lock=False, lote=mapa)
+                if resultado.skipped_guests:
+                    logger.warning(
+                        "availability_guest_check_skipped",
+                        extra={
+                            "event": "availability_guest_check_skipped",
+                            "action": "lote",
+                            "solicitacao_id": instance.pk,
+                            "skipped_guests": resultado.skipped_guests,
+                        },
+                    )
+                try:
+                    guard.raise_if_blocked(resultado, action="create")
+                except ValidationAPIError as exc:
+                    erros[indice] = _erro_do_evento(indice, exc)
+
+            if erros:
+                itens = [erros[i] for i in sorted(erros)]
+                logger.info(
+                    "solicitacao_lote_recusado",
+                    extra={
+                        "event": "solicitacao_lote_recusado",
+                        "user_id": request.user.id,
+                        "n": len(eventos),
+                        "indices": [i["indice"] for i in itens],
+                        "codes": [i["code"] for i in itens],
+                    },
+                )
+                verbo = "tem" if len(itens) == 1 else "têm"
+                raise ValidationAPIError(
+                    message=f"{len(itens)} de {len(eventos)} eventos {verbo} problema. Nada foi criado.",
+                    code="lote_invalido",
+                    details={"itens": itens},
+                )
+
+            for _, instance, initial_status in gravados:
+                self._fechar_evento(instance, initial_status, lote=True)
+
+        for _, instance, initial_status in gravados:
+            logger.info(
+                "solicitacao_initial_status_decided",
+                extra={
+                    "event": "solicitacao_initial_status_decided",
+                    "user_id": request.user.id,
+                    "solicitacao_id": instance.id,
+                    "projeto_id": instance.projeto_id,
+                    "projeto_fluxo": initial_status.fluxo,
+                    "initial_status": initial_status.status,
+                    "reason": initial_status.reason,
+                    "lote": True,
+                },
+            )
+        logger.info(
+            "solicitacao_lote_criado",
+            extra={
+                "event": "solicitacao_lote_criado",
+                "user_id": request.user.id,
+                "n": len(gravados),
+                "ids": [instance.id for _, instance, _ in gravados],
+            },
+        )
+        return Response(
+            {
+                "eventos": [
+                    {"indice": indice, "id": instance.id, "status": instance.status} for indice, instance, _ in gravados
+                ]
+            },
+            status=status.HTTP_201_CREATED,
         )

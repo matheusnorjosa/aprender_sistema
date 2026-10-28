@@ -60,6 +60,8 @@ _STANDARD_ACTIONS = ("create", "update", "partial_update", "destroy", "list", "r
 EXPECTED_PERMISSIONS: dict[str, tuple[str, object]] = {
     # override-path (get_permissions retorna a instância diretamente)
     "create": ("has_perm", "create_solicitation"),
+    # Lote de criação (28/10): o mesmo gate do POST de 1 evento, sem poder novo.
+    "lote": ("has_perm", "create_solicitation"),
     "update": ("class", IsOwnerOrPrivileged),
     "partial_update": ("class", IsOwnerOrPrivileged),
     "destroy": ("class", IsOwnerOrPrivileged),

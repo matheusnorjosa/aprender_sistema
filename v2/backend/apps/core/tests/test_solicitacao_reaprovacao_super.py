@@ -257,14 +257,19 @@ class TestEdicaoQueNaoRebaixa:
         assert sol.status == "aprovado"
         assert "reaprovacao" not in _ultimo_log(sol).details
 
-    def test_tirar_o_projeto_da_super_aprovada_rebaixa(self, coordenador, municipio, projeto_super, formadores):
-        """M10-02 como na main: o projeto mudou e o fluxo novo (sem projeto) não é NAO_SUPER."""
+    def test_tirar_o_projeto_da_super_aprovada_da_400(self, coordenador, municipio, projeto_super, formadores):
+        """O projeto é obrigatório na escrita (revisão do #2149): tirar o projeto não passa, e a SUPER
+        aprovada fica como estava (antes ela era rebaixada pelo M10-02 e ficava sem projeto)."""
         sol = _solicitacao(coordenador, municipio, projeto_super, [formadores[0]])
 
-        _patch(coordenador, sol, {"projeto": None})
+        resp = _client(coordenador).patch(f"/api/solicitacoes/{sol.id}/", {"projeto": None}, format="json")
 
-        assert sol.status == "pendente"
-        assert _ultimo_log(sol).details["reaprovacao"]["campos"] == ["projeto"]
+        assert resp.status_code == 400, resp.data
+        assert "projeto" in resp.data["errors"]
+        sol.refresh_from_db()
+        assert sol.status == "aprovado"
+        assert sol.projeto_id == projeto_super.pk
+        assert not AuditLog.objects.filter(action="UPDATE", details__solicitacao_id=sol.id).exists()
 
     def test_super_pendente_continua_pendente(self, coordenador, municipio, projeto_super, formadores):
         sol = _solicitacao(coordenador, municipio, projeto_super, [formadores[0]], status="pendente")

@@ -358,6 +358,32 @@ class TestRecusaPorEvento:
         assert itens[1]["code"] == "VALIDATION_ERROR"
         assert _contagens() == antes
 
+    def test_evento_sem_projeto(self, coordenador, nao_super, cidade_a, tipo_evento):
+        """Sem a chave ou com `projeto: null`: erro no campo, no índice certo, e nada é criado."""
+        sem_chave = _item(nao_super, cidade_a, tipo_evento, _utc(15), _utc(16))
+        del sem_chave["projeto"]
+        nulo = {**_item(nao_super, cidade_a, tipo_evento, _utc(17), _utc(18)), "projeto": None}
+        antes = _contagens()
+
+        response = _client(coordenador).post(
+            URL,
+            {
+                "eventos": [
+                    _item(nao_super, cidade_a, tipo_evento, _utc(12), _utc(14)),
+                    sem_chave,
+                    nulo,
+                ]
+            },
+            format="json",
+        )
+
+        itens = _itens(response)
+        assert list(itens) == [1, 2]
+        for indice in (1, 2):
+            assert itens[indice]["code"] == "VALIDATION_ERROR"
+            assert itens[indice]["errors"]["projeto"] == ["Informe o projeto do evento."]
+        assert _contagens() == antes
+
     def test_compra_faltando_recusa_e_o_isento_passa(self, coordenador, gerencia, cidade_a, tipo_evento):
         sem_compra = ProjetoFactory(nome="Projeto sem compra", gerencia=gerencia)
         payload = {"eventos": [_item(sem_compra, cidade_a, tipo_evento, _utc(12), _utc(14))]}

@@ -146,7 +146,7 @@ Cookie: sessionid=<session_id>
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
 | GET | `/api/solicitacoes/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar solicitações (paginado, queryset com escopo) | IsAuthenticated |
-| POST | `/api/solicitacoes/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar nova solicitação | `HasPerm("create_solicitation")` |
+| POST | `/api/solicitacoes/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar nova solicitação (`projeto` obrigatório: ausente ou `null` → 400 no campo; `null` no PATCH/PUT também) | `HasPerm("create_solicitation")` |
 | GET | `/api/solicitacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhes de uma solicitação | IsAuthenticated |
 | PUT | `/api/solicitacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar solicitação completa | `IsOwnerOrPrivileged` |
 | PATCH | `/api/solicitacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar parcialmente | `IsOwnerOrPrivileged` |

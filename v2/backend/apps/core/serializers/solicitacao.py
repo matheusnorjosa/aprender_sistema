@@ -156,6 +156,19 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             # PR19/RF06: Google Meet link (gerado automaticamente)
             "meet_link",
         ]
+        # Projeto obrigatório na escrita (revisão do #2149): sem ele o evento nascia pendente e pulava
+        # a regra da compra e o escopo de gerência do projeto. O FK segue `null=True` por causa do dado
+        # legado e dos importadores, que gravam pelo ORM. PATCH sem a chave não é afetado.
+        extra_kwargs = {
+            "projeto": {
+                "required": True,
+                "allow_null": False,
+                "error_messages": {
+                    "required": "Informe o projeto do evento.",
+                    "null": "Informe o projeto do evento.",
+                },
+            },
+        }
 
     def get_fluxo(self, obj: Solicitacao) -> str:
         """Retorna fluxo do projeto (SUPER ou NAO_SUPER), fallback para NAO_SUPER."""

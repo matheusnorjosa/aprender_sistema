@@ -20,16 +20,25 @@ import pytest
 from apps.core.models import Solicitacao
 from apps.core.tests.conftest import get_field_errors
 from apps.core.tests.factories import (
+    GerenciaFactory,
     MunicipioFactory,
+    ProjetoFactory,
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
     com_papel,
+    liberar_par,
 )
 
 
 @pytest.fixture
-def user_test(db):
+def gerencia_test(db):
+    """Gerência do coordenador e do projeto (PR 9: escopo pela gerência do projeto)."""
+    return GerenciaFactory(pergunta_avaliar_formador=False)
+
+
+@pytest.fixture
+def user_test(db, gerencia_test):
     """Cria um usuário de teste com grupo Coordenador (PA-06)"""
     user = UsuarioFactory(
         username="testuser",
@@ -39,7 +48,7 @@ def user_test(db):
     )
 
     # PA-06: grupo Coordenador e vínculo vigente para poder criar solicitações
-    com_papel(user, "COORDENADOR")
+    com_papel(user, "COORDENADOR", gerencia_test)
 
     return user
 
@@ -56,13 +65,22 @@ def municipio_test(db):
     return MunicipioFactory(nome="Fortaleza", uf="CE")
 
 
+@pytest.fixture
+def projeto_test(db, gerencia_test, municipio_test):
+    """Projeto SUPER com compra no município: o evento nasce pendente (PA-01). O projeto é obrigatório
+    na criação (revisão do #2149); antes estes testes criavam sem projeto, o que também dava pendente."""
+    projeto = ProjetoFactory(nome="Projeto SUPER Criacao", fluxo="SUPER", gerencia=gerencia_test)
+    liberar_par(municipio_test, projeto)
+    return projeto
+
+
 @pytest.mark.django_db
 class TestAPICreateSolicitacaoPendente:
     """
     Testes de criação de Solicitacao via API.
     """
 
-    def test_create_solicitacao_is_pendente_by_default(self, user_test, tipo_evento_test, municipio_test):
+    def test_create_solicitacao_is_pendente_by_default(self, user_test, projeto_test, tipo_evento_test, municipio_test):
         """
         Test: POST /api/solicitacoes/ com payload válido cria solicitação pendente (PA-01).
         """
@@ -75,6 +93,7 @@ class TestAPICreateSolicitacaoPendente:
 
         payload = {
             "usuario": user_test.pk,
+            "projeto": projeto_test.pk,
             "tipo_evento": tipo_evento_test.pk,
             "coordenador_acompanha": False,
             "municipio": municipio_test.pk,
@@ -103,7 +122,7 @@ class TestAPICreateSolicitacaoPendente:
         assert solicitacao.municipio == municipio_test
         assert solicitacao.observacoes == "Teste de criação via API"
 
-    def test_create_solicitacao_cannot_override_status(self, user_test, tipo_evento_test, municipio_test):
+    def test_create_solicitacao_cannot_override_status(self, user_test, projeto_test, tipo_evento_test, municipio_test):
         """
         Test: Tentar criar solicitação com status aprovado deve ser ignorado (PA-01).
         O serializer marca status como read_only.
@@ -117,6 +136,7 @@ class TestAPICreateSolicitacaoPendente:
 
         payload = {
             "usuario": user_test.pk,
+            "projeto": projeto_test.pk,
             "tipo_evento": tipo_evento_test.pk,
             "coordenador_acompanha": False,
             "municipio": municipio_test.pk,
@@ -138,7 +158,9 @@ class TestAPICreateSolicitacaoPendente:
         solicitacao = Solicitacao.objects.get(pk=response.data["id"])
         assert solicitacao.status == "pendente", "Status no DB deve ser 'pendente' (PA-01)"
 
-    def test_create_solicitacao_requires_valid_interval(self, user_test, tipo_evento_test, municipio_test):
+    def test_create_solicitacao_requires_valid_interval(
+        self, user_test, projeto_test, tipo_evento_test, municipio_test
+    ):
         """
         Test: Criar solicitação com fim <= inicio deve falhar.
         """
@@ -150,6 +172,7 @@ class TestAPICreateSolicitacaoPendente:
         # Caso 1: fim == inicio (inválido)
         payload = {
             "usuario": user_test.pk,
+            "projeto": projeto_test.pk,
             "tipo_evento": tipo_evento_test.pk,
             "coordenador_acompanha": False,
             "municipio": municipio_test.pk,
@@ -166,6 +189,7 @@ class TestAPICreateSolicitacaoPendente:
         # Caso 2: fim < inicio (inválido)
         payload2 = {
             "usuario": user_test.pk,
+            "projeto": projeto_test.pk,
             "tipo_evento": tipo_evento_test.pk,
             "coordenador_acompanha": False,
             "municipio": municipio_test.pk,
@@ -177,7 +201,7 @@ class TestAPICreateSolicitacaoPendente:
 
         assert response2.status_code == http_status.HTTP_400_BAD_REQUEST, "Criar com fim < inicio deve retornar 400"
 
-    def test_create_solicitacao_municipio_optional(self, user_test, tipo_evento_test):
+    def test_create_solicitacao_municipio_optional(self, user_test, projeto_test, tipo_evento_test):
         """
         Test: Município é opcional ao criar solicitação.
         """
@@ -190,6 +214,7 @@ class TestAPICreateSolicitacaoPendente:
 
         payload = {
             "usuario": user_test.pk,
+            "projeto": projeto_test.pk,
             "tipo_evento": tipo_evento_test.pk,
             "coordenador_acompanha": False,
             # municipio NÃO informado (opcional)
@@ -208,7 +233,9 @@ class TestAPICreateSolicitacaoPendente:
         assert solicitacao.municipio is None, "Município deve ser None quando não informado"
         assert solicitacao.status == "pendente", "Status deve ser pendente (PA-01)"
 
-    def test_create_solicitacao_external_event_id_is_readonly(self, user_test, tipo_evento_test, municipio_test):
+    def test_create_solicitacao_external_event_id_is_readonly(
+        self, user_test, projeto_test, tipo_evento_test, municipio_test
+    ):
         """
         Test: external_event_id é read-only, não pode ser definido na criação.
         """
@@ -221,6 +248,7 @@ class TestAPICreateSolicitacaoPendente:
 
         payload = {
             "usuario": user_test.pk,
+            "projeto": projeto_test.pk,
             "tipo_evento": tipo_evento_test.pk,
             "coordenador_acompanha": False,
             "municipio": municipio_test.pk,
@@ -264,7 +292,7 @@ class TestAPICreateSolicitacaoPendente:
             http_status.HTTP_403_FORBIDDEN,
         ], "Usuário não autenticado não deve poder criar solicitação"
 
-    def test_create_solicitacao_blocks_on_conflict(self, user_test, tipo_evento_test, municipio_test):
+    def test_create_solicitacao_blocks_on_conflict(self, user_test, projeto_test, tipo_evento_test, municipio_test):
         """
         Test: Criar solicitação com conflito de disponibilidade deve falhar.
         """
@@ -279,7 +307,7 @@ class TestAPICreateSolicitacaoPendente:
             usuario=user_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_test,
-            projeto=None,  # preserva o create original (projeto não era informado)
+            projeto=projeto_test,
             inicio=inicio_existente,
             fim=fim_existente,
             status="aprovado",
@@ -290,6 +318,7 @@ class TestAPICreateSolicitacaoPendente:
 
         payload = {
             "usuario": user_test.pk,
+            "projeto": projeto_test.pk,
             "tipo_evento": tipo_evento_test.pk,
             "coordenador_acompanha": True,
             "municipio": municipio_test.pk,

@@ -11,7 +11,8 @@
  * do cartão (nome `evento-<chave>`, que prefixa os ids). A página confere o cartão pelo `ref`
  * (`validar`, `focarTitulo`) e devolve a ele o que o servidor recusou no envio do lote
  * (`erroDoEnvio`): erro de campo vai ao campo, conflito de agenda ao alerta do cartão e o resto ao
- * topo do cartão. A página limpa esse erro quando qualquer evento muda.
+ * topo do cartão. A página tira esse erro quando qualquer evento muda, menos o conflito de agenda,
+ * que sai quando muda o horário, o município ou quem participa de algum evento.
  */
 
 import {
@@ -24,7 +25,6 @@ import {
   useState,
   type ChangeEvent,
   type JSX,
-  type KeyboardEvent,
   type ReactNode,
   type Ref,
 } from 'react';
@@ -37,7 +37,7 @@ import Alert from 'antd/es/alert';
 import Checkbox from 'antd/es/checkbox';
 import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 import Collapse from 'antd/es/collapse';
-import Popconfirm from 'antd/es/popconfirm';
+import Modal from 'antd/es/modal';
 import Radio from 'antd/es/radio';
 import type { RadioChangeEvent } from 'antd/es/radio';
 import Select from 'antd/es/select';
@@ -340,7 +340,7 @@ export default function CartaoEvento({
     return separados;
   }, [erroDoEnvio, submitConflito, perguntaAvaliar, pretendeAvaliar]);
 
-  // Os erros de campo do envio entram no Form; quando saem (a página limpa ao mexer em qualquer
+  // Os erros de campo do envio entram no Form; quando saem (a página os tira ao mexer em qualquer
   // evento), saem do campo, a menos que a validação da tela já tenha posto outro no lugar.
   const marcadosPeloEnvio = useRef<Record<string, string[]>>({});
   useEffect(() => {
@@ -428,53 +428,38 @@ export default function CartaoEvento({
   const idPerguntaAcompanha = `pergunta-acompanha-${chave}`;
   const idPerguntaAvaliar = `pergunta-avaliar-${chave}`;
 
-  // "Remover": evento em branco sai direto; preenchido pergunta antes, começando no Cancelar.
+  // "Remover": evento em branco sai direto; preenchido pergunta antes num diálogo de verdade
+  // (role=dialog, foco preso, Esc em qualquer ponto e o foco de volta ao "Remover" ao fechar), que
+  // abre no Cancelar. O balão do Popconfirm (role=tooltip) deixava o Tab sair com ele aberto.
+  const [modal, contextoDoModal] = Modal.useModal();
   const botaoRemover = useRef<HTMLButtonElement>(null);
-  const rotuloRemover = `Remover evento ${numero}`;
-  const idCancelarRemocao = `remover-cancelar-${chave}`;
-  const [confirmandoRemocao, setConfirmandoRemocao] = useState(false);
-  // O Popconfirm não leva o foco sozinho: ao abrir, o foco vai ao Cancelar.
-  useEffect(() => {
-    if (!confirmandoRemocao) return undefined;
-    const vez = setTimeout(() => document.getElementById(idCancelarRemocao)?.focus());
-    return () => clearTimeout(vez);
-  }, [confirmandoRemocao, idCancelarRemocao]);
-  // Fechar a pergunta (Cancelar ou Esc) devolve o foco ao "Remover". O Esc do antd só vale com o foco
-  // no botão que abriu; aqui o foco está no Cancelar, dentro da pergunta.
-  const fecharPergunta = (): void => {
-    setConfirmandoRemocao(false);
-    botaoRemover.current?.focus();
-  };
-  const escFecha = (e: KeyboardEvent<HTMLElement>): void => {
-    if (e.key === 'Escape') fecharPergunta();
+  const idAvisoRemocao = `remover-aviso-${chave}`;
+  const perguntarRemocao = (remover: (chave: number) => void): void => {
+    void modal.confirm({
+      title: `Remover o evento ${numero}?`,
+      content: <p id={idAvisoRemocao} className="mb-0">O que você preencheu nele será perdido.</p>,
+      okText: 'Remover',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancelar',
+      // O foco começa no Cancelar: o leitor de tela lê com ele o que se perde.
+      cancelButtonProps: { 'aria-describedby': idAvisoRemocao },
+      autoFocusButton: 'cancel',
+      onOk: () => remover(chave),
+      // O antd devolve o foco a quem o tinha ao abrir, que nem sempre é o botão (o clique do mouse
+      // não foca botão em todo navegador). Removido o evento, o botão sai e a página foca o anterior.
+      afterClose: () => botaoRemover.current?.focus(),
+    });
   };
   const renderRemover = (): ReactNode => {
     if (!onRemover) return null;
-    if (estaEmBranco(dados)) {
-      return (
-        <Button aria-label={rotuloRemover} onClick={() => onRemover(chave)}>
-          Remover
-        </Button>
-      );
-    }
     return (
-      <Popconfirm
-        title={`Remover o evento ${numero}?`}
-        description="O que você preencheu nele será perdido."
-        okText="Remover"
-        okButtonProps={{ danger: true, onKeyDown: escFecha }}
-        cancelText="Cancelar"
-        cancelButtonProps={{ id: idCancelarRemocao, onKeyDown: escFecha }}
-        open={confirmandoRemocao}
-        onOpenChange={setConfirmandoRemocao}
-        destroyOnHidden
-        onConfirm={() => onRemover(chave)}
-        onCancel={fecharPergunta}
+      <Button
+        ref={botaoRemover}
+        aria-label={`Remover evento ${numero}`}
+        onClick={() => (estaEmBranco(dados) ? onRemover(chave) : perguntarRemocao(onRemover))}
       >
-        <Button ref={botaoRemover} aria-label={rotuloRemover}>
-          Remover
-        </Button>
-      </Popconfirm>
+        Remover
+      </Button>
     );
   };
 
@@ -778,6 +763,7 @@ export default function CartaoEvento({
           ))}
         </p>
       )}
+      {contextoDoModal}
     </section>
   );
 }

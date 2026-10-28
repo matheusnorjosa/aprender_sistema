@@ -305,9 +305,10 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     expect(screen.queryByText('Não é possível criar o evento')).not.toBeInTheDocument();
   });
 
-  // PR 5: o erro do envio sai quando qualquer evento muda (o choque pode depender de outro evento);
-  // o servidor confere de novo no próximo envio.
-  test('conflito recusado no envio: mexer em qualquer campo tira o alerta e destrava', async () => {
+  // O conflito com evento que já está no banco continua valendo enquanto horário, município e pessoas
+  // de todos os eventos forem os do envio: mudar outro campo ou pôr um evento em branco não destrava
+  // (a prévia não o pega de novo, e o próximo clique receberia a mesma recusa).
+  test('conflito recusado no envio: mudar o que não é horário, município ou pessoa não destrava', async () => {
     createSolicitacoesEmLoteMock.mockRejectedValueOnce(RECUSA_POR_CONFLITO);
     renderComDispensa();
     await preencherEventoComFormador();
@@ -322,8 +323,12 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     await waitFor(() => expect(criar()).toBeDisabled());
 
     fireEvent.change(screen.getByLabelText('Local do Evento'), { target: { value: 'Escola X' } });
-    await waitFor(() => expect(screen.queryByText('Não é possível criar o evento')).not.toBeInTheDocument());
-    await waitFor(() => expect(criar()).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId('cb-tipo'));
+    expect(screen.getByText('Não é possível criar o evento')).toBeInTheDocument();
+    expect(criar()).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar outro evento' }));
+    expect(screen.getByText('Não é possível criar o evento')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Criar 2 eventos' })).toBeDisabled();
     expect(createSolicitacoesEmLoteMock).toHaveBeenCalledTimes(1);
   });
 

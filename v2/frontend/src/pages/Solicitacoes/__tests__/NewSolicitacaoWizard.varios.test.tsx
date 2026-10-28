@@ -213,32 +213,37 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     expect(botaoCriar()).toHaveTextContent('Criar 2 eventos');
   });
 
-  test('"Remover" num evento preenchido pergunta antes, começando no Cancelar; Cancelar mantém, Remover tira', async () => {
+  test('"Remover" num evento preenchido pergunta num diálogo, começando no Cancelar; Cancelar mantém, Remover tira', async () => {
     abrir();
     await screen.findByRole('region', { name: /^Evento 1/ });
     fireEvent.click(adicionar());
     fireEvent.click(within(cartao(2)).getByTestId('cb-projeto'));
 
     fireEvent.click(within(cartao(2)).getByRole('button', { name: 'Remover evento 2' }));
-    const cancelar = await screen.findByRole('button', { name: 'Cancelar' });
+    // Diálogo de verdade (role=dialog, foco preso, Esc em qualquer ponto), não um balão role=tooltip:
+    // pelo Tab, o foco não sai da pergunta aberta.
+    const dialogo = await screen.findByRole('dialog', { name: 'Remover o evento 2?' });
+    expect(dialogo).toHaveAttribute('aria-modal', 'true');
+    const cancelar = within(dialogo).getByRole('button', { name: 'Cancelar' });
     await waitFor(() => expect(cancelar).toHaveFocus());
-    expect(screen.getByText('Remover o evento 2?')).toBeInTheDocument();
+    // Com o foco no Cancelar, o leitor de tela lê também o que se perde.
+    expect(cancelar).toHaveAccessibleDescription('O que você preencheu nele será perdido.');
     fireEvent.click(cancelar);
     expect(screen.getAllByRole('region', { name: /^Evento \d/ })).toHaveLength(2);
     const remover = within(cartao(2)).getByRole('button', { name: 'Remover evento 2' });
     await waitFor(() => expect(remover).toHaveFocus());
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
-    // Esc com o foco no Cancelar também fecha e devolve o foco ao "Remover".
+    // Esc também fecha e devolve o foco ao "Remover".
     fireEvent.click(remover);
-    const cancelarDeNovo = await screen.findByRole('button', { name: 'Cancelar' });
+    const cancelarDeNovo = within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancelar' });
     await waitFor(() => expect(cancelarDeNovo).toHaveFocus());
-    fireEvent.keyDown(cancelarDeNovo, { key: 'Escape' });
+    fireEvent.keyDown(cancelarDeNovo, { key: 'Escape', keyCode: 27 });
     await waitFor(() => expect(remover).toHaveFocus());
-    await waitFor(() => expect(screen.queryByText('Remover o evento 2?')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
     fireEvent.click(within(cartao(2)).getByRole('button', { name: 'Remover evento 2' }));
-    const confirmar = await screen.findByRole('button', { name: 'Remover' });
-    fireEvent.click(confirmar);
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Remover' }));
     await waitFor(() => expect(screen.getAllByRole('region', { name: /^Evento \d/ })).toHaveLength(1));
     await waitFor(() => expect(titulo(1)).toHaveFocus());
   });
@@ -397,7 +402,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     expect(within(c1).getByText('Recusado por outro motivo.')).toBeInTheDocument();
   });
 
-  test('conflito no lote: os dois eventos ficam vermelhos com quem choca, o Criar trava e mexer em qualquer evento limpa', async () => {
+  test('conflito no lote: os dois eventos ficam vermelhos com quem choca, o Criar trava e mudar o horário de qualquer evento limpa', async () => {
     abrir();
     await screen.findByRole('region', { name: /^Evento 1/ });
     await preencher(1);
@@ -446,18 +451,78 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     await waitFor(() => expect(within(cartao(1)).queryByText('Recusado.')).not.toBeInTheDocument());
   });
 
-  test('sem resposta do servidor: só o aviso de rede, que manda conferir antes de enviar de novo', async () => {
+  test('sem resposta: o aviso fica no resumo do topo (não some) e manda conferir antes de enviar de novo', async () => {
     createSolicitacoesEmLoteMock.mockRejectedValueOnce(new TypeError('Sem conexão com o servidor.'));
     abrir();
     await screen.findByRole('region', { name: /^Evento 1/ });
     await preencher(1);
+    fireEvent.click(adicionar());
+    await preencher(2);
     fireEvent.click(botaoCriar());
     await waitFor(() =>
-      expect(message.error).toHaveBeenCalledWith(
-        'Não foi possível falar com o servidor. Confira em Minhas Solicitações antes de enviar de novo.'
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Não houve resposta, e não dá para saber se os 2 eventos foram criados. Confira em Minhas Solicitações antes de enviar de novo.'
       ), ESPERA
     );
-    expect(message.error).toHaveBeenCalledTimes(1);
+    expect(message.error).not.toHaveBeenCalled();
+  });
+
+  test('com o envio em andamento, os eventos e o "Adicionar" ficam travados; nada se perde nem é criado à revelia', async () => {
+    let recusar: (erro: unknown) => void = () => undefined;
+    createSolicitacoesEmLoteMock.mockImplementationOnce(() => new Promise((_resolve, reject) => { recusar = reject; }));
+    abrir();
+    await screen.findByRole('region', { name: /^Evento 1/ });
+    await preencher(1);
+    fireEvent.click(adicionar());
+    await preencher(2);
+    fireEvent.click(botaoCriar());
+    await waitFor(() => expect(createSolicitacoesEmLoteMock).toHaveBeenCalledTimes(1), ESPERA);
+
+    // O jsdom não implementa `inert` (no navegador ele barra clique, teclado e foco): confere o atributo.
+    const inerte = (el: Element): boolean => el.closest('[inert]') !== null;
+    await waitFor(() => expect(inerte(cartao(1))).toBe(true));
+    expect(inerte(cartao(2))).toBe(true);
+    expect(inerte(adicionar())).toBe(true);
+    expect(inerte(within(cartao(2)).getByRole('button', { name: 'Remover evento 2' }))).toBe(true);
+    expect(inerte(screen.getByRole('button', { name: /Criar 2 eventos/ }))).toBe(false);
+
+    // A recusa destrava a página e leva o foco ao evento com problema.
+    act(() => recusar(recusaDoLote([{ indice: 1, code: 'VALIDATION_ERROR', detail: 'x', errors: { non_field_errors: ['Recusado.'] } }])));
+    await within(cartao(2)).findByText('Recusado.', undefined, ESPERA);
+    expect(inerte(cartao(1))).toBe(false);
+    expect(inerte(adicionar())).toBe(false);
+    await waitFor(() => expect(titulo(2)).toHaveFocus());
+  });
+
+  test('resposta que chega depois de o horário mudar: o conflito do horário antigo não aparece nem trava o Criar', async () => {
+    let recusar: (erro: unknown) => void = () => undefined;
+    createSolicitacoesEmLoteMock.mockImplementationOnce(() => new Promise((_resolve, reject) => { recusar = reject; }));
+    abrir();
+    await screen.findByRole('region', { name: /^Evento 1/ });
+    await preencher(1);
+    fireEvent.click(botaoCriar());
+    await waitFor(() => expect(createSolicitacoesEmLoteMock).toHaveBeenCalledTimes(1), ESPERA);
+
+    // No navegador o cartão está inerte; aqui o clique passa e prova a segunda defesa.
+    horario.atual = { date: '2026-08-01', start: '14:00', end: '16:00' };
+    fireEvent.click(within(cartao(1)).getByTestId('set-date'));
+    act(() =>
+      recusar(
+        recusaDoLote([
+          {
+            indice: 0,
+            code: 'availability_conflict',
+            detail: 'Não é possível criar o evento: Bruno Formador tem outro evento neste horário.',
+            blocked_participants: [
+              { usuario_id: 99, usuario_nome: 'Bruno Formador', conflicts: [{ code: 'X', title: 'Sobreposição', detail: 'Choca 09:00-11:00' }] },
+            ],
+          },
+        ], '1 de 1 evento tem problema. Nada foi criado.')
+      )
+    );
+    await screen.findByText('1 de 1 evento tem problema. Nada foi criado.', undefined, ESPERA);
+    expect(screen.queryByText('Choca 09:00-11:00')).not.toBeInTheDocument();
+    await waitFor(() => expect(botaoCriar()).not.toBeDisabled());
   });
 
   test('um evento extra em branco não conta como preenchido: sair não pergunta', async () => {

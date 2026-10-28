@@ -264,16 +264,20 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
     expect(message.error).not.toHaveBeenCalled();
   });
 
-  test('sem conexão, só o aviso de rede: confira antes de enviar de novo', async () => {
+  // O aviso fica no resumo do topo (região viva), não num toast que some: é a única orientação para
+  // não criar tudo de novo (o lote não tem chave de idempotência).
+  test('sem conexão: o aviso fica no resumo do topo e manda conferir antes de enviar de novo', async () => {
     createSolicitacoesEmLoteMock.mockRejectedValueOnce(new TypeError('Sem conexão com o servidor.'));
     renderWizard();
     await preencherTudo();
     fireEvent.click(criar());
     await waitFor(() =>
-      expect(message.error).toHaveBeenCalledWith(
-        'Não foi possível falar com o servidor. Confira em Minhas Solicitações antes de enviar de novo.'
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Não houve resposta, e não dá para saber se a solicitação foi criada. Confira em Minhas Solicitações antes de enviar de novo.'
       )
     );
+    expect(screen.getByRole('alert')).not.toHaveTextContent('servidor');
+    expect(message.error).not.toHaveBeenCalled();
   });
 
   // 502/504 do proxy: o servidor pode ter criado os eventos antes de a resposta se perder.
@@ -283,10 +287,11 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
     await preencherTudo();
     fireEvent.click(criar());
     await waitFor(() =>
-      expect(message.error).toHaveBeenCalledWith(
-        'Não foi possível falar com o servidor. Confira em Minhas Solicitações antes de enviar de novo.'
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Não houve resposta, e não dá para saber se a solicitação foi criada. Confira em Minhas Solicitações antes de enviar de novo.'
       )
     );
+    expect(message.error).not.toHaveBeenCalled();
   });
 
   // Prints de 28/10/2026: com a pergunta Sim/Não faltando, o foco ficava no botão (o antd não foca um

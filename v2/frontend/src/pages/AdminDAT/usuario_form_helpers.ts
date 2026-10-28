@@ -13,6 +13,7 @@
  */
 
 import type { FormInstance } from 'antd';
+import { computeCapabilities } from '../../hooks/useCapabilities';
 import type { ID } from '../../types';
 
 export interface UsuarioFormValues {
@@ -260,4 +261,41 @@ export function errosDosCampos<Valores>(error: unknown): Parameters<FormInstance
 /** Nome de tela da pessoa; sem nome cadastrado, o e-mail (nunca o username, que é o CPF). */
 export function nomeDe(user: { first_name?: string; last_name?: string; email?: string }): string {
   return `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || 'Sem nome';
+}
+
+/**
+ * O que a pessoa vê no menu, pelas policies dela no servidor (`GET /usuarios-admin/{id}/policies/`,
+ * a mesma regra de `/me/policies/`). Os itens e a ordem são os do `AppSidebar`, com os submenus
+ * pelo nome do grupo (Controle, Dashboards, DAT, Solicitações); a Página Inicial fica de fora.
+ * Só o básico vira uma frase simples, para quem não é técnico (ensaio r3, 28/10/2026).
+ */
+export function resumoDoMenu(policies: readonly string[]): { itens: string[]; frase: string | null } {
+  const caps = computeCapabilities(policies);
+  const itens = ['Meus Eventos'];
+  if (caps.canAccessApprovals) itens.push('Aprovações');
+  if (caps.canAccessAvailabilityBlocks) itens.push('Bloqueios');
+  if (caps.canAccessControleSection) itens.push('Controle');
+  if (caps.canManageInternalActions) itens.push('Ações Internas');
+  if (caps.canAccessTravel) itens.push('Deslocamentos');
+  if (
+    caps.canViewOverviewDashboard ||
+    caps.canViewComprasDashboard ||
+    caps.canViewTeamDashboard ||
+    caps.canViewGcalDashboard ||
+    caps.canViewMapMetrics
+  ) {
+    itens.push('Dashboards');
+  }
+  if (caps.canManageAdminRegistries) itens.push('DAT');
+  if (caps.canAccessMonthlyAvailability) itens.push('Grade Mensal');
+  if (caps.canCreateSolicitation) itens.push('Solicitações');
+  if (caps.canPublishSetorSolicitacao) itens.push('Publicar na agenda');
+  const basico = itens.join('|');
+  const frase =
+    basico === 'Meus Eventos'
+      ? 'Vê só os próprios eventos.'
+      : basico === 'Meus Eventos|Bloqueios'
+        ? 'Vê os próprios eventos e registra bloqueios.'
+        : null;
+  return { itens, frase };
 }

@@ -40,7 +40,7 @@ import type { RadioChangeEvent } from 'antd/es/radio';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined, LockOutlined } from '@ant-design/icons';
 import { Link } from 'react-router';
 import { checkAuth } from '../../api/auth';
-import { listUsers, createUser, updateUser, deleteUser, resetUserPassword, listGroups, getRBACMeta, listGerencias } from '../../api/adminDAT';
+import { listUsers, getUserPolicies, createUser, updateUser, deleteUser, resetUserPassword, listGroups, getRBACMeta, listGerencias } from '../../api/adminDAT';
 import {
   buildUsuarioPayload,
   funcoesProntasParaSalvar,
@@ -50,6 +50,7 @@ import {
   mensagemDoErro,
   motivoDaLotacaoTravada,
   nomeDe,
+  resumoDoMenu,
 } from './usuario_form_helpers';
 import type { PermissaoFuncional, RBACMetaPayload, GerenciaRecord } from '../../api/adminDAT';
 import { importUsuarios } from '../../api/ops';
@@ -341,6 +342,9 @@ export default function UsuariosPage(): JSX.Element {
   const [ordem, setOrdem] = useState<Ordem>(ORDEM_PADRAO);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
+  // O que a pessoa em edição vê no menu hoje (policies dela no servidor); null = carregando.
+  const [menuDoUsuario, setMenuDoUsuario] = useState<string[] | 'erro' | null>(null);
+  const editingUserId = editingUser?.id ?? null;
   // #2071: as funções estavam carregadas quando o Editar abriu (e hidratou o form)?
   const [hidratouComFuncoes, setHidratouComFuncoes] = useState(false);
   // #1675 follow-up: redefinição de senha de OUTRO usuário (ação de admin).
@@ -510,6 +514,21 @@ export default function UsuariosPage(): JSX.Element {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    setMenuDoUsuario(null);
+    // Busca a cada abertura do modal: depois de salvar, o menu da pessoa pode ter mudado.
+    if (!modalVisible || editingUserId === null) return undefined;
+    let vale = true; // fechou ou trocou de pessoa: a resposta antiga não entra
+    Promise.resolve()
+      .then(() => getUserPolicies(editingUserId))
+      .then((policies) => { if (vale) setMenuDoUsuario(policies); })
+      .catch((error: unknown) => {
+        logger.error('Erro ao carregar o menu do usuário:', error);
+        if (vale) setMenuDoUsuario('erro');
+      });
+    return () => { vale = false; };
+  }, [modalVisible, editingUserId]);
 
   useEffect(() => {
     const espera = setTimeout(() => setSearchText(termoDigitado), ESPERA_BUSCA_MS);
@@ -1072,52 +1091,62 @@ export default function UsuariosPage(): JSX.Element {
                   <Text type="secondary">nenhuma função selecionada</Text>
                 )}
               </div>
-              <div>
-                <Text strong>Permissões efetivas: </Text>
-                {(() => {
-                  // #2071: espelha o Salvar do backend (grupos que ficam + funções + setor
-                  // da gerência só quando ela muda).
-                  const selectedGroups = gruposAposSalvar({
-                    grupos,
-                    idsAtuais: editingUser?.group_ids_display || [],
-                    funcoes: funcaoGroupsSet,
-                    funcaoIds: selectedFuncaoIds,
-                    gerencia: gerencias.find((ger) => ger.id === selectedGerenciaId),
-                    gerenciaAnterior: gerencias.find((ger) => ger.id === editingUser?.gerencia_atual?.gerencia_id),
-                  });
-                  const labels = new Set<string>();
-                  selectedGroups.forEach((group) => {
-                    (group.permissoes_funcionais || []).forEach((permissao) => labels.add(permissao.label));
-                  });
-                  // PR 11: o pacote do DAT e do Controle vem do vínculo, não de grupo; a soma acima não o vê.
-                  const avisoPacote = gerenciaDaPacote(gerencias.find((ger) => ger.id === selectedGerenciaId)) ? (
-                    <Alert
-                      type="warning"
-                      showIcon
-                      className="mt-2"
-                      message="Nesta gerência, Equipe e Gerente recebem o pacote do setor, inclusive aprovar solicitações."
-                    />
-                  ) : null;
-                  if (labels.size === 0) {
-                    return (
-                      <>
-                        <Text type="secondary">sem permissões específicas definidas</Text>
-                        {avisoPacote}
-                      </>
-                    );
-                  }
-                  return (
-                    <>
-                      <Tag color="purple">{labels.size} permissão(ões)</Tag>
-                      {Array.from(labels).sort().slice(0, 6).map((label) => (
-                        <Tag key={label} color="purple">{label}</Tag>
-                      ))}
-                      {labels.size > 6 ? <Tag>+{labels.size - 6}</Tag> : null}
-                      {avisoPacote}
-                    </>
-                  );
-                })()}
-              </div>
+              {editingUser && (
+                <div>
+                  <Text strong>O que vê no menu hoje: </Text>
+                  {(() => {
+                    if (menuDoUsuario === null) return <Text type="secondary">carregando…</Text>;
+                    if (menuDoUsuario === 'erro') {
+                      return <Text type="secondary">Não foi possível carregar agora. Feche e abra de novo para tentar.</Text>;
+                    }
+                    const { itens, frase } = resumoDoMenu(menuDoUsuario);
+                    if (frase) return <Text>{frase}</Text>;
+                    return itens.map((item) => <Tag key={item}>{item}</Tag>);
+                  })()}
+                  <div>
+                    <Text type="secondary">É o que está salvo; o que mudar aqui vale depois de salvar.</Text>
+                  </div>
+                </div>
+              )}
+              {(() => {
+                // #2071: espelha o Salvar do backend (grupos que ficam + funções + setor
+                // da gerência só quando ela muda).
+                const selectedGroups = gruposAposSalvar({
+                  grupos,
+                  idsAtuais: editingUser?.group_ids_display || [],
+                  funcoes: funcaoGroupsSet,
+                  funcaoIds: selectedFuncaoIds,
+                  gerencia: gerencias.find((ger) => ger.id === selectedGerenciaId),
+                  gerenciaAnterior: gerencias.find((ger) => ger.id === editingUser?.gerencia_atual?.gerencia_id),
+                });
+                const labels = new Set<string>();
+                selectedGroups.forEach((group) => {
+                  (group.permissoes_funcionais || []).forEach((permissao) => labels.add(permissao.label));
+                });
+                // PR 11: o pacote do DAT e do Controle vem do vínculo, não de grupo; a soma acima não o vê.
+                const avisoPacote = gerenciaDaPacote(gerencias.find((ger) => ger.id === selectedGerenciaId)) ? (
+                  <Alert
+                    type="warning"
+                    showIcon
+                    className="mt-2"
+                    message="Nesta gerência, Equipe e Gerente recebem o pacote do setor, inclusive aprovar solicitações."
+                  />
+                ) : null;
+                // Sem permissão de grupo, a linha não dizia nada ("sem permissões específicas
+                // definidas"); o que a pessoa vê fica na linha "O que vê no menu hoje".
+                if (labels.size === 0) return avisoPacote;
+                return (
+                  <div>
+                    <Text strong>Permissões efetivas: </Text>
+                    <Tag color="purple">{labels.size} permissão(ões)</Tag>
+                    {Array.from(labels).sort().slice(0, 6).map((label) => (
+                      <Tag key={label} color="purple">{label}</Tag>
+                    ))}
+                    {labels.size > 6 ? <Tag>+{labels.size - 6}</Tag> : null}
+                    {avisoPacote}
+                  </div>
+                );
+              })()}
             </Space>
           </Card>
 

@@ -1,7 +1,7 @@
 ---
 title: RBAC — Controle de Acesso
 status: canonical
-last_verified: 2026-10-27
+last_verified: 2026-10-28
 verified_at_commit: 4c64082073c84ee53e7ecaa21ae6a02873ad2a12
 sources_of_truth:
   - v2/backend/apps/core/rbac/__init__.py
@@ -94,6 +94,7 @@ Existem três conceitos ortogonais: **capability** (autorização binária por f
 - [`v2/backend/apps/core/services/rbac_permissions.py`](../../../backend/apps/core/services/rbac_permissions.py) — `capacidades_sem_cache` (fórmula única: pacote do perfil ∪ direitos do papel, mais os grupos só no modo `uniao`; ADR-020, PR 12) e `grupos_dao_poder`, `get_user_functional_permissions` (a mesma, com cache) + helpers de invalidação por usuário/grupo.
 - [`v2/backend/apps/core/services/functional_permissions_seed.py`](../../../backend/apps/core/services/functional_permissions_seed.py) — `FUNCTIONAL_PERMISSIONS_SEED`: SSOT dos codenames, labels, categorias e grupos default de cada capability.
 - [`v2/backend/apps/core/views/me.py`](../../../backend/apps/core/views/me.py) — `MePoliciesView` (`GET /api/me/policies/`) e `ChangePasswordView` (`POST /api/me/change-password/`).
+- [`v2/backend/apps/core/views/admin.py`](../../../backend/apps/core/views/admin.py) — `UsuarioAdminViewSet.policies` (`GET /api/usuarios-admin/{id}/policies/`, ensaio r3, 28/10/2026): as policies públicas da pessoa pela mesma `resolve_public_policies` do `/api/me/policies/`, para o "Resumo do perfil de acesso" do form de Usuários mostrar o que ela vê no menu. Só leitura, com a permissão do ViewSet (`manage_admin_registries`); a conta de superusuário segue 404 para quem não é superusuário (P0-0). Não muda o poder de ninguém. Teste: `tests/test_usuarios_admin_policies.py`.
 - [`v2/backend/apps/core/middleware.py`](../../../backend/apps/core/middleware.py) — `TrocaDeSenhaObrigatoriaMiddleware` e a lista fechada `ROTAS_LIBERADAS_NA_TROCA_DE_SENHA` (troca obrigatória de senha).
 - [`v2/backend/apps/core/signals.py`](../../../backend/apps/core/signals.py) — signal `m2m_changed` em `PermissaoFuncional.groups`: faz **cache-bust** dos usuários afetados. A auditoria de Grupo×Capability **não** passa mais por este signal — o buffer de módulo `_PENDING_GROUP_CAP_DELTAS` / `flush_group_capability_audit` foi removido no #1672 e o `AuditLog GROUP_CAPABILITY_CHANGED` agora é gravado no ponto de escrita — ver D17 abaixo.
 - [`v2/backend/scripts/rbac_lint.py`](../../../backend/scripts/rbac_lint.py) — lint AST (V001 a V006) que enforça a convenção em CI.

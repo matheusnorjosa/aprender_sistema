@@ -184,6 +184,11 @@ export async function listUsers(params: ListParams = {}): Promise<PaginatedRespo
   return fetchWithErrorMapping(buildUrl('/usuarios-admin/', params as QueryParams), {}, ADMIN_ERROR_MAP);
 }
 
+/** O que a pessoa vê no menu: as policies dela, pela mesma regra de `/me/policies/`. */
+export async function getUserPolicies(id: ID): Promise<string[]> {
+  return fetchWithErrorMapping<string[]>(`/usuarios-admin/${id}/policies/`, {}, ADMIN_ERROR_MAP);
+}
+
 export async function createUser(data: UserPayload): Promise<AdminUser> {
   const result = await fetchWithErrorMapping<AdminUser>(
     '/usuarios-admin/',

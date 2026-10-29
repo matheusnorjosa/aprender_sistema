@@ -1018,8 +1018,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         """P9-5 ao mover o evento para projeto de OUTRA gerência: quem fica (formadores, acompanhantes e
         o responsável) tem que ser da gerência do projeto novo. Roda sobre o estado final, dentro do
         atomic → 400 desfaz. Editar sem trocar o projeto não revalida quem já está (decisão do dono,
-        15/10), nem trocar por projeto da mesma gerência ou tirar o projeto (projeto None é isento, como
-        em `projeto_fora_da_gerencia`)."""
+        15/10), nem trocar por projeto da mesma gerência. Tirar o projeto o serializer recusa (revisão do
+        #2149); o evento legado sem projeto é isento, como em `projeto_fora_da_gerencia`."""
         from .models import Participation
 
         ficam = [

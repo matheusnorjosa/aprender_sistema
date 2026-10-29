@@ -189,10 +189,12 @@ class TestJaAprovadaNaoSeExclui:
         assert "administração" in detalhe
 
     def test_super_aprovada_que_perdeu_o_projeto_segue_travada(self, coordenador, aprovador, municipio):
+        """A API não tira mais o projeto (revisão do #2149); a linha sem projeto é a do legado (ORM)."""
         sol = _solicitacao(coordenador, municipio, _projeto(municipio, "SUPER"), "pendente")
         _aprovar(aprovador, sol, lote=False)
         resp = _client(coordenador).patch(f"/api/solicitacoes/{sol.id}/", {"projeto": None}, format="json")
-        assert resp.status_code == 200, resp.data
+        assert resp.status_code == 400, resp.data
+        Solicitacao.objects.filter(pk=sol.pk).update(projeto=None)
 
         resp = _client(coordenador).delete(f"/api/solicitacoes/{sol.id}/")
 

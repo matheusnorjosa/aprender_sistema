@@ -23,7 +23,8 @@ Sistema interno, usado todo dia por quem conhece o domínio (coordenação, DAT,
 flexibilidade é um trade-off real: telas de operação frequente pedem **densidade** (densidade média, decisão do dono
 no C1) e poucos cliques; tarefas raras ou de quem está começando pedem guia. A Nova Solicitação
 deixou de ser wizard em 28/10/2026 (decisão do dono): é uma página só, com o evento num cartão de campos lado a
-lado e "Mais detalhes" recolhido, porque quem cria evento faz isso todo dia.
+lado e "Mais detalhes" recolhido, porque quem cria evento faz isso todo dia. Na mesma página se criam até 10 eventos
+de uma vez, um cartão por evento, num envio só (tudo ou nada).
 
 ## O que buscar
 

@@ -4,17 +4,18 @@
  * - Fim antes (ou igual) do início não envia: a mensagem fica junto do horário.
  * - "Criar solicitação" com campo faltando não envia, mostra um resumo no topo e leva o foco ao
  *   primeiro campo com erro (não é clique mudo); se o erro está em "Mais detalhes", abre a seção.
- * - Recusa do backend por campo mostra o motivo de `errors`, não o genérico "Erro de validação.".
- * - Sem conexão, a mensagem diz isso, e não "Verifique os dados".
+ * - Recusa do backend por campo mostra o motivo de `errors` junto do campo e no resumo, sem toast.
+ * - Sem conexão, só o aviso de rede, que manda conferir antes de enviar de novo.
  */
 import { useEffect } from 'react';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { renderNoRoteador } from '../../../test/comRoteador';
 import message from 'antd/es/message';
+import { botaoDoTexto, cabecalhoDoTexto, grupoDaPergunta, PERGUNTA_ACOMPANHA } from './localizadores';
 
 const {
-  createSolicitacaoMock,
+  createSolicitacoesEmLoteMock,
   getMeMock,
   checkAvailabilityManyMock,
   lookupMunicipiosWithFiltersMock,
@@ -23,7 +24,7 @@ const {
   navigateMock,
   horario,
 } = vi.hoisted(() => ({
-  createSolicitacaoMock: vi.fn(),
+  createSolicitacoesEmLoteMock: vi.fn(),
   getMeMock: vi.fn(),
   checkAvailabilityManyMock: vi.fn(),
   lookupMunicipiosWithFiltersMock: vi.fn(),
@@ -37,7 +38,7 @@ vi.mock('react-router', async () => {
   const actual = await vi.importActual('react-router');
   return { ...actual, useNavigate: () => navigateMock };
 });
-vi.mock('../../../api/solicitacoes', () => ({ createSolicitacao: createSolicitacaoMock }));
+vi.mock('../../../api/solicitacoes', () => ({ createSolicitacoesEmLote: createSolicitacoesEmLoteMock }));
 vi.mock('../../../api/availability', () => ({
   getMe: getMeMock,
   checkAvailabilityMany: checkAvailabilityManyMock,
@@ -119,7 +120,7 @@ function renderWizard(): void {
   );
 }
 
-const criar = (): HTMLElement => screen.getByRole('button', { name: 'Criar solicitação' });
+const criar = (): HTMLElement => botaoDoTexto('Criar solicitação');
 // A validação do Form do AntD é assíncrona; com a suíte inteira e a cobertura na CI ela passa de 1 s.
 const ESPERA_VALIDACAO = { timeout: 5000 };
 
@@ -134,7 +135,7 @@ async function preencherLinha1EHorario(): Promise<void> {
 async function preencherTudo(): Promise<void> {
   await preencherLinha1EHorario();
   fireEvent.click(screen.getByTestId('pick-formador'));
-  fireEvent.click(within(screen.getByRole('radiogroup', { name: /vai acompanhar o evento/ })).getByLabelText('Não'));
+  fireEvent.click(within(grupoDaPergunta(PERGUNTA_ACOMPANHA)).getByLabelText('Não'));
   // A prévia de agenda termina antes do clique (o aviso de verificando sai da tela).
   await waitFor(() => expect(checkAvailabilityManyMock).toHaveBeenCalled(), ESPERA_VALIDACAO);
   await waitFor(() => expect(screen.queryByText(/Verificando disponibilidade/)).not.toBeInTheDocument(), ESPERA_VALIDACAO);
@@ -152,7 +153,7 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
     lookupMunicipiosWithFiltersMock.mockResolvedValue([]);
     getMeMock.mockResolvedValue({ id: 1, name: 'Ana Coordenadora', username: 'ana', is_superuser: false });
     checkAvailabilityManyMock.mockResolvedValue({ ok: true, results: [] });
-    createSolicitacaoMock.mockResolvedValue({ id: 1 });
+    createSolicitacoesEmLoteMock.mockResolvedValue({ eventos: [{ indice: 0, id: 1, status: 'aprovado' }] });
   });
 
   test('fim antes do início não envia e a mensagem fica junto do horário', async () => {
@@ -164,7 +165,7 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
     // O resumo do topo diz o mesmo e o foco vai ao horário (único problema).
     expect(await screen.findByRole('alert')).toHaveTextContent('O horário de fim precisa ser depois do início.');
     await waitFor(() => expect(screen.getByTestId('campo-horario')).toHaveFocus(), ESPERA_VALIDACAO);
-    expect(createSolicitacaoMock).not.toHaveBeenCalled();
+    expect(createSolicitacoesEmLoteMock).not.toHaveBeenCalled();
   });
 
   test('fim igual ao início também não envia', async () => {
@@ -173,7 +174,7 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
     await preencherTudo();
     fireEvent.click(criar());
     expect(await screen.findByTestId('erro-horario')).toHaveTextContent('O horário de fim precisa ser depois do início.');
-    expect(createSolicitacaoMock).not.toHaveBeenCalled();
+    expect(createSolicitacoesEmLoteMock).not.toHaveBeenCalled();
   });
 
   test('sem data, o erro aparece junto do horário e também nos outros campos que faltam', async () => {
@@ -182,7 +183,7 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
     fireEvent.click(criar());
     expect(await screen.findByTestId('erro-horario')).toHaveTextContent('Escolha a data e os horários de início e de fim do evento.');
     expect(await screen.findByText('Por favor selecione um projeto', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
-    expect(createSolicitacaoMock).not.toHaveBeenCalled();
+    expect(createSolicitacoesEmLoteMock).not.toHaveBeenCalled();
   });
 
   test('"Criar" com campo faltando mostra um resumo no topo e leva o foco ao primeiro campo com erro', async () => {
@@ -200,7 +201,7 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
     expect(resumo).toHaveTextContent('Evento 1: Por favor selecione um projeto');
     expect(resumo).toHaveTextContent('Responda se o coordenador responsável vai acompanhar o evento.');
     expect(resumo.textContent.indexOf('projeto')).toBeLessThan(resumo.textContent.indexOf('formador'));
-    expect(createSolicitacaoMock).not.toHaveBeenCalled();
+    expect(createSolicitacoesEmLoteMock).not.toHaveBeenCalled();
   });
 
   test('o resumo sai quando a pessoa volta a mexer no evento', async () => {
@@ -216,7 +217,7 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
   test('erro em "Mais detalhes" (recolhido): o limite vale, a seção abre e o foco vai ao campo', async () => {
     renderWizard();
     await preencherTudo();
-    const detalhes = screen.getByRole('button', { name: /Mais detalhes/ });
+    const detalhes = cabecalhoDoTexto(/Mais detalhes/);
     expect(detalhes).toHaveAttribute('aria-expanded', 'false');
     const encontro = screen.getByLabelText('Encontro');
     fireEvent.change(encontro, { target: { value: 'x'.repeat(101) } });
@@ -225,34 +226,75 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
     expect(await screen.findByText('Máximo 100 caracteres', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
     await waitFor(() => expect(detalhes).toHaveAttribute('aria-expanded', 'true'));
     await waitFor(() => expect(encontro).toHaveFocus(), ESPERA_VALIDACAO);
-    expect(createSolicitacaoMock).not.toHaveBeenCalled();
+    expect(createSolicitacoesEmLoteMock).not.toHaveBeenCalled();
   });
 
-  test('recusa do backend por campo mostra o motivo, não "Erro de validação."', async () => {
-    createSolicitacaoMock.mockRejectedValueOnce({
+  test('recusa do backend por campo mostra o motivo junto do campo e no resumo, não "Erro de validação."', async () => {
+    createSolicitacoesEmLoteMock.mockRejectedValueOnce({
+      status: 400,
       response: {
         status: 400,
         data: {
-          detail: 'Erro de validação.',
-          errors: { municipio: ['Não há compra que libere este projeto neste município.'] },
+          detail: '1 de 1 eventos tem problema. Nada foi criado.',
+          code: 'lote_invalido',
+          errors: {
+            itens: [
+              {
+                indice: 0,
+                code: 'VALIDATION_ERROR',
+                detail: 'Não há compra que libere este projeto neste município.',
+                errors: { municipio: ['Não há compra que libere este projeto neste município.'] },
+              },
+            ],
+          },
         },
       },
     });
     renderWizard();
     await preencherTudo();
     fireEvent.click(criar());
+    const resumo = await screen.findByRole('alert');
     await waitFor(() =>
-      expect(message.error).toHaveBeenCalledWith('Não há compra que libere este projeto neste município.')
+      expect(resumo).toHaveTextContent('Evento 1: Não há compra que libere este projeto neste município.'), ESPERA_VALIDACAO
     );
-    expect(message.error).not.toHaveBeenCalledWith('Erro de validação.');
+    expect(resumo).toHaveTextContent('Não foi possível criar a solicitação. Nada foi criado.');
+    expect(resumo).not.toHaveTextContent('1 de 1');
+    const campo = screen.getByTestId('cb-municipio').closest('.ant-form-item');
+    await waitFor(() =>
+      expect(campo).toHaveTextContent('Não há compra que libere este projeto neste município.'), ESPERA_VALIDACAO
+    );
+    expect(screen.queryByText('Erro de validação.')).not.toBeInTheDocument();
+    expect(message.error).not.toHaveBeenCalled();
   });
 
-  test('sem conexão, a mensagem diz isso', async () => {
-    createSolicitacaoMock.mockRejectedValueOnce(new TypeError('Sem conexão com o servidor.'));
+  // O aviso fica no resumo do topo (região viva), não num toast que some: é a única orientação para
+  // não criar tudo de novo (o lote não tem chave de idempotência).
+  test('sem conexão: o aviso fica no resumo do topo e manda conferir antes de enviar de novo', async () => {
+    createSolicitacoesEmLoteMock.mockRejectedValueOnce(new TypeError('Sem conexão com o servidor.'));
     renderWizard();
     await preencherTudo();
     fireEvent.click(criar());
-    await waitFor(() => expect(message.error).toHaveBeenCalledWith('Sem conexão com o servidor.'));
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Não houve resposta, e não dá para saber se a solicitação foi criada. Confira em Minhas Solicitações antes de enviar de novo.'
+      )
+    );
+    expect(screen.getByRole('alert')).not.toHaveTextContent('servidor');
+    expect(message.error).not.toHaveBeenCalled();
+  });
+
+  // 502/504 do proxy: o servidor pode ter criado os eventos antes de a resposta se perder.
+  test('erro 5xx também manda conferir antes de enviar de novo', async () => {
+    createSolicitacoesEmLoteMock.mockRejectedValueOnce({ status: 502, response: { status: 502, data: { detail: 'HTTP 502: Bad Gateway' } } });
+    renderWizard();
+    await preencherTudo();
+    fireEvent.click(criar());
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Não houve resposta, e não dá para saber se a solicitação foi criada. Confira em Minhas Solicitações antes de enviar de novo.'
+      )
+    );
+    expect(message.error).not.toHaveBeenCalled();
   });
 
   // Prints de 28/10/2026: com a pergunta Sim/Não faltando, o foco ficava no botão (o antd não foca um
@@ -263,26 +305,26 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
     fireEvent.click(screen.getByTestId('pick-formador'));
     fireEvent.click(criar());
     await screen.findByText(/Corrija antes de criar a solicitação/, undefined, ESPERA_VALIDACAO);
-    const grupo = screen.getByRole('radiogroup', { name: /vai acompanhar o evento/ });
+    const grupo = grupoDaPergunta(PERGUNTA_ACOMPANHA);
     await waitFor(() => expect(within(grupo).getByLabelText('Sim')).toHaveFocus(), ESPERA_VALIDACAO);
-    expect(createSolicitacaoMock).not.toHaveBeenCalled();
+    expect(createSolicitacoesEmLoteMock).not.toHaveBeenCalled();
   });
 
   // Autorrevisão (28/10/2026): a conferência dos campos é assíncrona; um segundo clique antes de ela
   // acabar não pode mandar o evento duas vezes.
   test('dois cliques seguidos em "Criar" enviam uma vez só', async () => {
     let responder: (valor: unknown) => void = () => undefined;
-    createSolicitacaoMock.mockImplementation(() => new Promise((resolve) => { responder = resolve; }));
+    createSolicitacoesEmLoteMock.mockImplementation(() => new Promise((resolve) => { responder = resolve; }));
     renderWizard();
     await preencherTudo();
     const botao = criar();
     fireEvent.click(botao);
     fireEvent.click(botao);
-    await waitFor(() => expect(createSolicitacaoMock).toHaveBeenCalled());
+    await waitFor(() => expect(createSolicitacoesEmLoteMock).toHaveBeenCalled());
     // Durante o envio, outro clique também não manda de novo.
     fireEvent.click(botao);
-    responder({ id: 1 });
+    responder({ eventos: [{ indice: 0, id: 1, status: 'aprovado' }] });
     await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/solicitacoes/minhas'));
-    expect(createSolicitacaoMock).toHaveBeenCalledTimes(1);
+    expect(createSolicitacoesEmLoteMock).toHaveBeenCalledTimes(1);
   });
 });

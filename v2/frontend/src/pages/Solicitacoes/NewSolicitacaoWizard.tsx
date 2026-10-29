@@ -1,19 +1,23 @@
 /**
- * Nova Solicitação — página única (decisão do dono, 28/10/2026).
+ * Nova Solicitação — página única, com vários eventos (decisões do dono, 28/10/2026).
  *
- * Antes era um assistente de 4 passos. Agora cada evento é um cartão (`CartaoEvento`) com os
- * campos lado a lado, e um só botão "Criar solicitação" no fim. O clique confere tudo: com campo
- * faltando, nada é enviado, o resumo do topo diz o que falta e o foco vai ao primeiro campo com
- * problema. Nesta entrega a página tem um cartão e envia pelo POST de um evento
- * (`createSolicitacao`); ela já guarda a lista `eventos` para o "+" de vários eventos.
+ * Cada evento é um cartão (`CartaoEvento`) com os campos lado a lado. A página começa com 1 evento;
+ * "+ Adicionar outro evento" acrescenta um em branco (até 10) e cada evento extra tem "Remover".
+ * Nada é comum entre os eventos. Um só botão no fim ("Criar solicitação" com 1 evento, "Criar N
+ * eventos" com mais): o clique confere todos, na ordem; com campo faltando, nada é enviado, o
+ * resumo do topo diz o que falta e o foco vai ao primeiro campo com problema. O envio é sempre o
+ * lote (`createSolicitacoesEmLote`, tudo ou nada): no 400 `lote_invalido` cada item volta ao
+ * cartão que estava naquela posição, e o choque entre os eventos quem confere é o servidor.
  */
 
 import { useState, useCallback, useEffect, useRef, JSX } from 'react';
+import { flushSync } from 'react-dom';
 import { useBlocker, useNavigate, type BlockerFunction } from 'react-router';
 // antd - direct imports for tree-shaking (Issue #424)
 import Button from 'antd/es/button';
 import Card from 'antd/es/card';
 import Alert from 'antd/es/alert';
+import PlusOutlined from '@ant-design/icons/PlusOutlined';
 import Modal from 'antd/es/modal';
 import message from 'antd/es/message';
 import Typography from 'antd/es/typography';
@@ -22,15 +26,23 @@ import ArrowLeftOutlined from '@ant-design/icons/ArrowLeftOutlined';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 
-import { createSolicitacao } from '../../api/solicitacoes';
+import { createSolicitacoesEmLote, type ErroDoEventoNoLote } from '../../api/solicitacoes';
 import { optionalText } from './optionalText';
 import { getMe } from '../../api/availability';
 import { useAcesso } from '../../contexts/AcessoContext';
 import logger from '../../utils/logger';
 import { lerAvisoDoLogin, storageKeys } from '../../utils/storage';
-import type { ID, AvailabilityConflictErrorPayload } from '../../types';
+import type { ID, SolicitacaoPayload } from '../../types';
 import CartaoEvento, { type CartaoEventoHandle } from './CartaoEvento';
-import { FORM_INICIAL, perguntaAvaliarDo, type FormDataType, type QuemCria } from './evento';
+import {
+  estaEmBranco,
+  FORM_INICIAL,
+  mensagensDe,
+  participantesDo,
+  perguntaAvaliarDo,
+  type FormDataType,
+  type QuemCria,
+} from './evento';
 
 dayjs.extend(utc);
 
@@ -91,16 +103,145 @@ export function buildSolicitacaoPayload(input: SolicitacaoWizardPayloadInput): R
 }
 
 
+/** Limite de eventos por envio (o mesmo `MAX_EVENTOS_LOTE` do servidor). */
+const MAX_EVENTOS = 10;
+
+/**
+ * Sem resposta (rede, ou 5xx do proxy): o lote pode ter sido criado e reenviar criaria de novo. Fica no
+ * resumo do topo (não num toast que some) até o próximo clique ou a próxima mudança, e o próximo envio
+ * pergunta antes de mandar (`confirmarReenvio`) até alguma resposta chegar.
+ */
+function semResposta(quantos: number): string {
+  const oQue = quantos === 1 ? 'a solicitação foi criada' : `os ${quantos} eventos foram criados`;
+  return `Não houve resposta, e não dá para saber se ${oQue}. Confira em Minhas Solicitações antes de enviar de novo.`;
+}
+
 /** Um evento da página: `chave` é estável (ids e React key); o número visível é a posição + 1. */
 interface EventoDaPagina {
   chave: number;
   dados: FormDataType;
 }
 
-/** O que falta num evento, para o resumo do topo. */
-interface ProblemasDoEvento {
-  numero: number;
-  motivos: string[];
+/** Uma linha do resumo do topo: um problema de um evento. */
+interface LinhaDoResumo {
+  chave: number;
+  texto: string;
+}
+
+/** O resumo do clique em "Criar" com problema (da conferência da tela ou do servidor). */
+interface Resumo {
+  titulo: string;
+  linhas: LinhaDoResumo[];
+}
+
+/** O que o servidor recusou no envio, por chave do evento, a agenda de que cada recusa depende e os enviados. */
+interface ErrosDoLote {
+  agendas: Record<number, string>;
+  enviados: number[];
+  porChave: Record<number, ErroDoEventoNoLote>;
+}
+
+/**
+ * O que pesa no choque de agenda, dos eventos enviados: horário, município e quem participa.
+ * O que o servidor recusou só vale enquanto isso for o do envio (o choque pode ser com outro evento
+ * enviado); um evento que não estava no envio não pesa, e um enviado que sai conta como mudança.
+ */
+function agendaDe(eventos: EventoDaPagina[], enviados: number[], me: QuemCria | null): string {
+  return eventos
+    .filter((e) => enviados.includes(e.chave))
+    .map(({ chave, dados }) =>
+      [
+        chave,
+        dados.inicio,
+        dados.fim,
+        dados.municipio?.id,
+        participantesDo(dados, me).map((p) => p.id).sort((a, b) => Number(a) - Number(b)).join(','),
+      ].join('|'),
+    )
+    .join(';');
+}
+
+/**
+ * Os eventos de que o choque depende, por chave. O servidor cita "o evento N desta lista" (N = posição no
+ * envio) em cada conflito com um irmão do lote (X e D): o choque depende dele e dos citados. Choque com o
+ * banco depende só dele. Sem o detalhe por pessoa, ou "desta lista" sem o número, depende de todos os
+ * enviados (a recusa sai com qualquer mudança).
+ */
+function eventosDoChoque(item: ErroDoEventoNoLote, chave: number, enviados: number[]): number[] {
+  const bloqueados = item.blocked_participants;
+  if (!bloqueados) return enviados;
+  const detalhes = bloqueados.flatMap((p) => p.conflicts.map((c) => c.detail));
+  const citados = detalhes.flatMap((d) => [...d.matchAll(/evento (\d+) desta lista/g)].map((m) => enviados[Number(m[1]) - 1]));
+  const semNumero = detalhes.some((d) => d.includes('desta lista') && !/evento \d+ desta lista/.test(d));
+  if (semNumero || citados.some((c) => c === undefined)) return enviados;
+  if (citados.length === 0 && item.detail.includes('desta lista')) return enviados;
+  return [chave, ...(citados as number[])];
+}
+
+/** A agenda de que a recusa do evento depende: a dele e a dos eventos da lista com que ele choca. */
+function agendaDoErro(
+  item: ErroDoEventoNoLote,
+  chave: number,
+  eventos: EventoDaPagina[],
+  enviados: number[],
+  me: QuemCria | null,
+): string {
+  return agendaDe(eventos, eventosDoChoque(item, chave, enviados), me);
+}
+
+/** Mudar outra coisa tira o que o servidor recusou, menos o conflito de agenda, que continua valendo. */
+function soConflitos(erros: ErrosDoLote | null): ErrosDoLote | null {
+  if (!erros) return null;
+  const porChave = Object.fromEntries(
+    Object.entries(erros.porChave).filter(([, item]) => item.code === 'availability_conflict'),
+  ) as Record<number, ErroDoEventoNoLote>;
+  return Object.keys(porChave).length > 0 ? { ...erros, porChave } : null;
+}
+
+/** O payload de um evento conferido; null se faltar o que a conferência já exige (só estreita o tipo). */
+function payloadDo(dados: FormDataType): SolicitacaoPayload | null {
+  if (
+    !dados.projeto || !dados.tipoEvento || !dados.municipio || !dados.inicio || !dados.fim ||
+    dados.coordenadorAcompanha === null
+  ) {
+    return null;
+  }
+  return buildSolicitacaoPayload({
+    municipioId: dados.municipio.id,
+    projetoId: dados.projeto.id,
+    tipoEventoId: dados.tipoEvento.id,
+    inicio: dados.inicio,
+    fim: dados.fim,
+    tipo: dados.tipo,
+    encontro: dados.encontro,
+    segmento: dados.segmento,
+    observacoes: dados.observacoes,
+    local: dados.local,
+    // PR19: modalidade online/presencial
+    isOnline: !!dados.is_online,
+    formadorIds: dados.formadores.map((f) => f.id),
+    // #1666: FK do coordenador responsável escolhido (null → quem cria, se coordenador).
+    coordenadorResponsavelId: dados.coordenadorResponsavel?.id ?? null,
+    coordenadorAcompanha: dados.coordenadorAcompanha,
+    avaliar: perguntaAvaliarDo(dados)
+      ? { pretende: dados.pretendeAvaliar === true, formadorAvaliadoId: dados.formadorAvaliado }
+      : null,
+  });
+}
+
+/** "2 eventos criados (1 vai para aprovação)"; no singular com 1. */
+function mensagemDeSucesso(status: string[]): string {
+  const criados = status.length === 1 ? '1 evento criado' : `${status.length} eventos criados`;
+  const pendentes = status.filter((s) => s === 'pendente').length;
+  if (pendentes === 0) return criados;
+  return `${criados} (${pendentes} ${pendentes === 1 ? 'vai' : 'vão'} para aprovação)`;
+}
+
+/** As linhas do resumo para um evento recusado pelo servidor: uma por mensagem. */
+function textosDoErro(item: ErroDoEventoNoLote): string[] {
+  if (item.code === 'availability_conflict') return [item.detail];
+  const textos = [...new Set(mensagensDe(item.errors ?? {}))];
+  return textos.length > 0 ? textos : [item.detail];
 }
 
 export default function NewSolicitacaoWizard(): JSX.Element {
@@ -115,25 +256,38 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   // COORDENADOR na gerência do projeto, PR 9). Só entra na checagem de agenda se acompanhar.
   const [me, setMe] = useState<QuemCria | null>(null);
 
-  // Os eventos da página (por ora, um).
+  // Os eventos da página: começa com 1. A chave nunca se repete (nem depois de remover).
   const [eventos, setEventos] = useState<EventoDaPagina[]>([{ chave: 1, dados: FORM_INICIAL }]);
+  const proximaChave = useRef(2);
   const cartoes = useRef(new Map<number, CartaoEventoHandle>());
   // O que trava o "Criar", por evento: o id do alerta que diz o motivo.
   const [travas, setTravas] = useState<Record<number, string>>({});
-  // Resumo do clique em "Criar" com problema: a única região viva da página.
-  const [resumo, setResumo] = useState<ProblemasDoEvento[] | null>(null);
+  // Resumo do clique em "Criar" com problema e o anúncio de adicionar/remover: a única região viva.
+  const [resumo, setResumo] = useState<Resumo | null>(null);
+  const [anuncio, setAnuncio] = useState<{ texto: string; vez: number } | null>(null);
+  // O que o servidor recusou no último envio. O conflito de agenda vale enquanto a agenda dos eventos
+  // enviados for a do envio (o choque pode ser com outro evento); o resto sai com qualquer mudança.
+  const [errosDoLote, setErrosDoLote] = useState<ErrosDoLote | null>(null);
+  // Com o lote em voo, os eventos ficam inertes: o que mudasse agora não iria no envio que já saiu.
+  const [emVoo, setEmVoo] = useState(false);
+  // Título que recebe o foco depois de o cartão entrar ou sair da tela.
+  const focarDepois = useRef<number | null>(null);
+  // O último envio ficou sem resposta: o lote pode ter sido gravado; o próximo envio pergunta antes.
+  const talvezCriado = useRef(false);
+  const perguntaDeReenvio = useRef<ReturnType<typeof Modal.confirm> | null>(null);
 
   // Sair da página descarta o que foi preenchido: com algo preenchido, pergunta antes,
   // começando no Cancelar (ação destrutiva, ux-principios). Toda saída para outra página passa
   // pelo `useBlocker` do data router (App.tsx): o botão do topo, o Voltar do navegador e o do
   // Android, o menu lateral e os outros links.
-  const preenchido = eventos.some((e) => JSON.stringify(e.dados) !== JSON.stringify(FORM_INICIAL));
+  // Um evento extra em branco não conta. Com o lote em voo, sair não descarta nada: o aviso diz isso.
+  const preenchido = eventos.some((e) => !estaEmBranco(e.dados));
   // Depois do envio com sucesso, sai sem perguntar: o que foi preenchido virou a solicitação.
   const saidaLiberada = useRef(false);
   const deveSegurar = useCallback<BlockerFunction>(
     ({ currentLocation, nextLocation }) =>
-      preenchido && !saidaLiberada.current && currentLocation.pathname !== nextLocation.pathname,
-    [preenchido],
+      (preenchido || emVoo) && !saidaLiberada.current && currentLocation.pathname !== nextLocation.pathname,
+    [preenchido, emVoo],
   );
   const bloqueio = useBlocker(deveSegurar);
   // O bloqueio da hora: outro Voltar com o aviso aberto bloqueia de novo, e "Sair" segue o último.
@@ -144,6 +298,19 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   useEffect(() => {
     bloqueioAtual.current = bloqueio;
     if (bloqueio.state !== 'blocked' || aviso.current) return;
+    if (emVoo) {
+      // O envio já saiu e não tem como cancelar: a página espera a resposta (ela fecha este aviso).
+      aviso.current = Modal.info({
+        title: 'Os eventos estão sendo criados',
+        content: 'Sair agora não cancela o envio. Espere a resposta para saber se foram criados.',
+        okText: 'Esperar a resposta',
+        onOk: () => {
+          aviso.current = null;
+          if (bloqueioAtual.current.state === 'blocked') bloqueioAtual.current.reset();
+        },
+      });
+      return;
+    }
     aviso.current = Modal.confirm({
       title: 'Sair sem criar a solicitação?',
       content: 'O que você preencheu será perdido.',
@@ -160,8 +327,20 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         if (bloqueioAtual.current.state === 'blocked') bloqueioAtual.current.reset();
       },
     });
-  }, [bloqueio]);
-  useEffect(() => () => aviso.current?.destroy(), []);
+  }, [bloqueio, emVoo]);
+  useEffect(
+    () => () => {
+      aviso.current?.destroy();
+      perguntaDeReenvio.current?.destroy();
+    },
+    [],
+  );
+  // A resposta chegou: fecha o aviso de "sendo criados" e desfaz a saída segurada.
+  const encerrarVoo = (): void => {
+    aviso.current?.destroy();
+    aviso.current = null;
+    if (bloqueioAtual.current.state === 'blocked') bloqueioAtual.current.reset();
+  };
   const sairDoAssistente = (): void => {
     void navigate('/solicitacoes/minhas');
   };
@@ -205,12 +384,44 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     };
   }, []);
 
-  // Mexer num evento tira o resumo do último clique (ele já pode não valer); os erros de cada
-  // campo continuam junto do campo.
+  // Mexer em qualquer evento tira o resumo do último clique e o que o servidor recusou, menos o
+  // conflito de agenda (ele sai quando a agenda muda); os erros de cada campo da conferência da tela
+  // continuam junto do campo.
   const mudarEvento = useCallback((chave: number, parcial: Partial<FormDataType>): void => {
     setResumo(null);
+    setErrosDoLote(soConflitos);
     setEventos((atuais) => atuais.map((e) => (e.chave === chave ? { ...e, dados: { ...e.dados, ...parcial } } : e)));
   }, []);
+
+  const anunciar = (texto: string): void => setAnuncio((atual) => ({ texto, vez: (atual?.vez ?? 0) + 1 }));
+
+  // O foco vai ao título do cartão depois de a lista mudar na tela.
+  useEffect(() => {
+    if (focarDepois.current === null) return;
+    cartoes.current.get(focarDepois.current)?.focarTitulo();
+    focarDepois.current = null;
+  }, [eventos]);
+
+  const adicionarEvento = (): void => {
+    if (eventos.length >= MAX_EVENTOS) return;
+    const chave = proximaChave.current;
+    proximaChave.current += 1;
+    setResumo(null);
+    setErrosDoLote(soConflitos);
+    setEventos([...eventos, { chave, dados: FORM_INICIAL }]);
+    focarDepois.current = chave;
+    anunciar(`Evento ${eventos.length + 1} adicionado`);
+  };
+
+  const removerEvento = (chave: number): void => {
+    const posicao = eventos.findIndex((e) => e.chave === chave);
+    if (posicao <= 0) return;
+    setResumo(null);
+    setErrosDoLote(soConflitos);
+    setEventos(eventos.filter((e) => e.chave !== chave));
+    focarDepois.current = eventos[posicao - 1]?.chave ?? null;
+    anunciar(`Evento ${posicao + 1} removido`);
+  };
 
   const marcarTrava = useCallback((chave: number, idDoMotivo: string | null): void => {
     setTravas((atuais) => {
@@ -222,82 +433,97 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   // #1452: conflito antecipado ou recusado no envio trava o botão; ele aponta o primeiro motivo.
   const motivoDaTrava = eventos.map((e) => travas[e.chave]).find((id): id is string => Boolean(id)) ?? null;
 
+  // O servidor recusou o lote (tudo ou nada): cada item volta ao evento que estava naquela posição
+  // no envio (`indice` conta do 0). Sem resposta ou 5xx: o aviso de conferir antes de reenviar.
+  const tratarRecusa = (error: unknown, enviados: EventoDaPagina[]): void => {
+    logger.error('Erro ao criar os eventos:', error);
+    const resposta = (error as { response?: { status?: number; data?: unknown } } | null)?.response;
+    if (!resposta || (resposta.status ?? 0) >= 500) {
+      talvezCriado.current = true;
+      setResumo({ titulo: semResposta(enviados.length), linhas: [] });
+      return;
+    }
+    talvezCriado.current = false;
+    const data = resposta.data as { detail?: string; code?: string; errors?: { itens?: unknown } } | null | undefined;
+    const itens = Array.isArray(data?.errors?.itens) ? (data.errors.itens as ErroDoEventoNoLote[]) : null;
+    if (data?.code !== 'lote_invalido' || !itens) {
+      // Recusa do envio inteiro (permissão, limite de envios): o motivo no resumo do topo.
+      setResumo({ titulo: data?.detail || 'Não foi possível criar. Tente de novo.', linhas: [] });
+      return;
+    }
+    const porChave: Record<number, ErroDoEventoNoLote> = {};
+    const linhas: LinhaDoResumo[] = [];
+    for (const item of itens) {
+      const evento = enviados[item.indice];
+      if (!evento) continue;
+      porChave[evento.chave] = item;
+      linhas.push(...textosDoErro(item).map((texto) => ({ chave: evento.chave, texto })));
+    }
+    const chaves = enviados.map((e) => e.chave);
+    const agendas = Object.fromEntries(
+      Object.entries(porChave).map(([chave, item]) => [chave, agendaDoErro(item, Number(chave), enviados, chaves, me)]),
+    );
+    setErrosDoLote({ agendas, enviados: chaves, porChave });
+    // Com 1 evento, o "1 de 1 eventos" do servidor não diz nada a quem fez uma solicitação só.
+    const titulo = enviados.length === 1 ? 'Não foi possível criar a solicitação. Nada foi criado.' : data.detail;
+    setResumo({ titulo: titulo || 'Nada foi criado.', linhas });
+    const primeiro = linhas[0];
+    if (primeiro) cartoes.current.get(primeiro.chave)?.focarTitulo();
+  };
+
+  // Depois de um envio sem resposta, mandar de novo pode duplicar o lote: pergunta, começando no Cancelar.
+  const confirmarReenvio = (quantos: number): Promise<boolean> =>
+    new Promise((resolver) => {
+      const responder = (sim: boolean): void => {
+        perguntaDeReenvio.current = null;
+        resolver(sim);
+      };
+      perguntaDeReenvio.current = Modal.confirm({
+        title: 'Enviar de novo?',
+        content: `${semResposta(quantos)} Enviar de novo pode criar em dobro.`,
+        okText: 'Enviar de novo',
+        cancelText: 'Cancelar',
+        autoFocusButton: 'cancel',
+        onOk: () => responder(true),
+        onCancel: () => responder(false),
+      });
+    });
+
   const conferirEEnviar = async (): Promise<void> => {
     setResumo(null);
+    setErrosDoLote(null);
+    // A região viva lê tudo o que tem (role=alert é atômica): o anúncio velho sai antes do resumo.
+    setAnuncio(null);
     // Confere os eventos na ordem da tela; o foco vai ao primeiro problema do primeiro evento.
-    const problemas: ProblemasDoEvento[] = [];
-    for (const [indice, evento] of eventos.entries()) {
-      const motivos = (await cartoes.current.get(evento.chave)?.validar({ focar: problemas.length === 0 })) ?? [];
-      if (motivos.length > 0) problemas.push({ numero: indice + 1, motivos });
+    const linhas: LinhaDoResumo[] = [];
+    for (const evento of eventos) {
+      const motivos = (await cartoes.current.get(evento.chave)?.validar({ focar: linhas.length === 0 })) ?? [];
+      linhas.push(...motivos.map((texto) => ({ chave: evento.chave, texto })));
     }
-    if (problemas.length > 0) {
-      setResumo(problemas);
+    if (linhas.length > 0) {
+      const titulo = eventos.length === 1 ? 'Corrija antes de criar a solicitação' : 'Corrija antes de criar os eventos';
+      setResumo({ titulo, linhas });
       return;
     }
 
-    // Por ora a página tem um evento e envia pelo POST de um evento.
-    const evento = eventos[0];
-    if (!evento) return;
-    const { chave, dados } = evento;
-    // A conferência acima já garante cada um destes; aqui só estreita o tipo.
-    if (
-      !dados.projeto || !dados.tipoEvento || !dados.municipio || !dados.inicio || !dados.fim ||
-      dados.coordenadorAcompanha === null
-    ) {
-      return;
-    }
-
+    // Sempre o lote, também com 1 evento: tudo ou nada.
+    const enviados = eventos;
+    const payloads = enviados.map((e) => payloadDo(e.dados));
+    if (payloads.some((p) => p === null)) return;
+    if (talvezCriado.current && !(await confirmarReenvio(enviados.length))) return;
+    setEmVoo(true);
     try {
-      const payload = buildSolicitacaoPayload({
-        municipioId: dados.municipio.id,
-        projetoId: dados.projeto.id,
-        tipoEventoId: dados.tipoEvento.id,
-        inicio: dados.inicio,
-        fim: dados.fim,
-        tipo: dados.tipo,
-        encontro: dados.encontro,
-        segmento: dados.segmento,
-        observacoes: dados.observacoes,
-        local: dados.local,
-        // PR19: modalidade online/presencial
-        isOnline: !!dados.is_online,
-        formadorIds: dados.formadores.map((f) => f.id),
-        // #1666: FK do coordenador responsável escolhido (null → quem cria, se coordenador).
-        coordenadorResponsavelId: dados.coordenadorResponsavel?.id ?? null,
-        coordenadorAcompanha: dados.coordenadorAcompanha,
-        avaliar: perguntaAvaliarDo(dados)
-          ? { pretende: dados.pretendeAvaliar === true, formadorAvaliadoId: dados.formadorAvaliado }
-          : null,
-      });
-
-      await createSolicitacao(payload);
-      message.success('Solicitação criada com sucesso!');
+      const criados = await createSolicitacoesEmLote(payloads.filter((p): p is SolicitacaoPayload => p !== null));
+      talvezCriado.current = false;
+      encerrarVoo();
+      message.success(mensagemDeSucesso(criados.eventos.map((e) => e.status)));
       saidaLiberada.current = true;
       void navigate('/solicitacoes/minhas');
     } catch (error) {
-      logger.error('Erro ao criar solicitação:', error);
-
-      // #1452: o backend recusa o double-booking com 400 `availability_conflict` e a
-      // mensagem nomeando o formador. Antes o catch engolia isso e mostrava um genérico.
-      const data = (error as { response?: { data?: unknown } })?.response?.data;
-      const payloadErro = data as Partial<AvailabilityConflictErrorPayload> | undefined;
-
-      if (payloadErro?.code === 'availability_conflict') {
-        const bloqueados = payloadErro.errors?.blocked_participants ?? [];
-        cartoes.current.get(chave)?.marcarConflitoDoEnvio(bloqueados);
-        message.error(payloadErro.detail || 'Um participante já está alocado neste horário.');
-      } else {
-        // Recusa por campo (400): o motivo vem em `errors.<campo>`; o `detail` é o genérico
-        // "Erro de validação.". Sem resposta (rede), a mensagem do próprio erro diz o que houve.
-        const motivoDoCampo = Object.values((data as { errors?: Record<string, unknown> })?.errors ?? {})
-          .flat()
-          .find((texto): texto is string => typeof texto === 'string');
-        const detail = (data as { detail?: string })?.detail;
-        const semResposta = !(error as { response?: unknown })?.response ? (error as Error)?.message : undefined;
-        message.error(
-          motivoDoCampo || detail || semResposta || 'Erro ao criar solicitação. Verifique os dados e tente novamente.'
-        );
-      }
+      // Destrava antes de tratar: o foco vai ao título do evento com problema, que inerte não o recebe.
+      flushSync(() => setEmVoo(false));
+      encerrarVoo();
+      tratarRecusa(error, enviados);
     }
   };
 
@@ -316,6 +542,22 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     }
   };
 
+  // Número visível de cada evento: a posição + 1 (muda quando um evento sai).
+  const numeroDe = (chave: number): number => eventos.findIndex((e) => e.chave === chave) + 1;
+  const linhasDoResumo = (resumo?.linhas ?? []).filter((l) => numeroDe(l.chave) > 0);
+  // Cada recusa vale enquanto a agenda de que ela depende for a do envio.
+  const errosValidos = errosDoLote
+    ? (Object.fromEntries(
+        Object.entries(errosDoLote.porChave).filter(
+          ([chave, item]) =>
+            errosDoLote.agendas[Number(chave)] === agendaDoErro(item, Number(chave), eventos, errosDoLote.enviados, me),
+        ),
+      ) as Record<number, ErroDoEventoNoLote>)
+    : null;
+  // Com problema: o que o resumo do clique aponta e o que o servidor recusou e ainda vale (o conflito).
+  const comProblema = new Set([...linhasDoResumo.map((l) => l.chave), ...Object.keys(errosValidos ?? {}).map(Number)]);
+  const noLimite = eventos.length >= MAX_EVENTOS;
+
   return (
     <section className="p-6 max-w-4xl mx-auto" aria-labelledby="nova-solicitacao-title">
       <Card>
@@ -329,46 +571,70 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         </header>
 
         {/* A única região viva da página: sempre montada (vazia sem problema), para o leitor de
-            tela anunciar o resumo quando ele entrar. */}
+            tela anunciar o resumo e o "Evento N adicionado/removido" quando eles entram. */}
         <div role="alert">
+          {anuncio && (
+            <span key={anuncio.vez} className="sr-only">
+              {anuncio.texto}
+            </span>
+          )}
           {resumo && (
             <Alert
               type="error"
               showIcon
               role="none"
               className="mt-4"
-              message="Corrija antes de criar a solicitação"
+              message={resumo.titulo}
               description={
-                <ul className="mb-0 pl-5">
-                  {resumo.flatMap((p) =>
-                    p.motivos.map((motivo, i) => (
-                      <li key={`${p.numero}-${i}`}>
-                        Evento {p.numero}: {motivo}
+                linhasDoResumo.length > 0 ? (
+                  <ul className="mb-0 pl-5">
+                    {linhasDoResumo.map((linha, i) => (
+                      <li key={`${linha.chave}-${i}`}>
+                        {/* Cada linha leva ao evento. Quebra linha: nada passa da largura da tela. */}
+                        <button
+                          type="button"
+                          className="cursor-pointer border-0 bg-transparent p-0 text-left underline break-words"
+                          onClick={() => cartoes.current.get(linha.chave)?.focarTitulo()}
+                        >
+                          Evento {numeroDe(linha.chave)}: {linha.texto}
+                        </button>
                       </li>
-                    ))
-                  )}
-                </ul>
+                    ))}
+                  </ul>
+                ) : undefined
               }
             />
           )}
         </div>
 
-        {eventos.map((evento, indice) => (
-          <CartaoEvento
-            key={evento.chave}
-            ref={(cartao: CartaoEventoHandle | null) => {
-              if (cartao) cartoes.current.set(evento.chave, cartao);
-              else cartoes.current.delete(evento.chave);
-            }}
-            chave={evento.chave}
-            numero={indice + 1}
-            dados={evento.dados}
-            onChange={mudarEvento}
-            me={me}
-            dispensaCompra={dispensaCompra}
-            onTrava={marcarTrava}
-          />
-        ))}
+        {/* Inerte com o lote em voo: no navegador, nem clique, nem teclado, nem foco entram. */}
+        <div inert={emVoo}>
+          {eventos.map((evento, indice) => (
+            <CartaoEvento
+              key={evento.chave}
+              ref={(cartao: CartaoEventoHandle | null) => {
+                if (cartao) cartoes.current.set(evento.chave, cartao);
+                else cartoes.current.delete(evento.chave);
+              }}
+              chave={evento.chave}
+              numero={indice + 1}
+              dados={evento.dados}
+              onChange={mudarEvento}
+              me={me}
+              dispensaCompra={dispensaCompra}
+              onTrava={marcarTrava}
+              erroDoEnvio={errosValidos?.[evento.chave] ?? null}
+              comProblema={comProblema.has(evento.chave)}
+              onRemover={indice > 0 ? removerEvento : undefined}
+            />
+          ))}
+
+          <div className="mt-4">
+            <Button icon={<PlusOutlined aria-hidden />} onClick={adicionarEvento} disabled={noLimite}>
+              {noLimite ? `Limite de ${MAX_EVENTOS} eventos por vez` : 'Adicionar outro evento'}
+            </Button>
+          </div>
+        </div>
 
         <footer className="mt-6 flex justify-end">
           <Button
@@ -379,7 +645,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
             disabled={motivoDaTrava !== null}
             aria-describedby={motivoDaTrava ?? undefined}
           >
-            Criar solicitação
+            {eventos.length === 1 ? 'Criar solicitação' : `Criar ${eventos.length} eventos`}
           </Button>
         </footer>
       </Card>

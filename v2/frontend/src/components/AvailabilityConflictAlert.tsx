@@ -65,11 +65,17 @@ export interface AvailabilityConflictAlertProps {
   bloqueados: BlockedParticipant[];
   /** id do bloco, para `aria-describedby` do botão desabilitado. */
   id?: string;
+  /**
+   * `false` quando outra região da tela já anuncia o conflito (o resumo do topo da Nova Solicitação,
+   * no envio de vários eventos): o bloco aparece sem `role="alert"`.
+   */
+  regiaoViva?: boolean;
 }
 
 export default function AvailabilityConflictAlert({
   bloqueados,
   id,
+  regiaoViva = true,
 }: AvailabilityConflictAlertProps): JSX.Element | null {
   if (bloqueados.length === 0) return null;
 
@@ -78,7 +84,7 @@ export default function AvailabilityConflictAlert({
       {...(id !== undefined && { id })}
       type="error"
       showIcon
-      role="alert"
+      role={regiaoViva ? 'alert' : 'none'}
       className="mb-4"
       message="Não é possível criar o evento"
       description={<ListaDeBloqueados bloqueados={bloqueados} />}

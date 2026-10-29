@@ -9,7 +9,10 @@
  *
  * Controlado: os dados vêm da página (`dados`) e cada mudança volta por `onChange`. O Form do antd é
  * do cartão (nome `evento-<chave>`, que prefixa os ids). A página confere o cartão pelo `ref`
- * (`validar`) e devolve a ele o conflito recusado no envio (`marcarConflitoDoEnvio`).
+ * (`validar`, `focarTitulo`) e devolve a ele o que o servidor recusou no envio do lote
+ * (`erroDoEnvio`): erro de campo vai ao campo, conflito de agenda ao alerta do cartão e o resto ao
+ * topo do cartão. A página tira esse erro quando qualquer evento muda, menos o conflito de agenda,
+ * que sai quando muda o horário, o município ou quem participa de algum evento.
  */
 
 import {
@@ -27,17 +30,20 @@ import {
 } from 'react';
 import { flushSync } from 'react-dom';
 // antd - direct imports for tree-shaking (Issue #424)
+import Button from 'antd/es/button';
 import Form from 'antd/es/form';
 import Input from 'antd/es/input';
 import Alert from 'antd/es/alert';
 import Checkbox from 'antd/es/checkbox';
 import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 import Collapse from 'antd/es/collapse';
+import Modal from 'antd/es/modal';
 import Radio from 'antd/es/radio';
 import type { RadioChangeEvent } from 'antd/es/radio';
 import Select from 'antd/es/select';
 import Typography from 'antd/es/typography';
 // icons - direct imports for tree-shaking (Issue #425)
+import ExclamationCircleOutlined from '@ant-design/icons/ExclamationCircleOutlined';
 import RightOutlined from '@ant-design/icons/RightOutlined';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -57,11 +63,15 @@ import FormadoresPicker from '../../components/FormadoresPicker';
 import AvailabilityConflictAlert, { AvisosDeAgenda } from '../../components/AvailabilityConflictAlert';
 import logger from '../../utils/logger';
 import type { BlockedParticipant } from '../../types';
+import type { ErroDoEventoNoLote } from '../../api/solicitacoes';
 import {
+  estaEmBranco,
   formadoresAvaliaveisDo,
   participantesDo,
   perguntaAvaliarDo,
+  separarErrosDoServidor,
   type ComboBoxValue,
+  type ErrosDoServidor,
   type FormDataType,
   type ParticipantType,
   type QuemCria,
@@ -82,7 +92,7 @@ const SIM_NAO = [
   { label: 'Não', value: false },
 ];
 
-/** Lista vazia estável (o conflito do envio volta a ela quando deixa de valer). */
+/** Lista vazia estável (sem conflito recusado no envio). */
 const SEM_BLOQUEADOS: BlockedParticipant[] = [];
 
 /** Ordem dos campos na tela: a do resumo de erros e a do foco. `horario` é o DateTimeRange (fora do Form). */
@@ -119,8 +129,8 @@ export interface CartaoEventoHandle {
    * detalhes" se ele estiver lá). Devolve os motivos na ordem da tela; vazio = pode enviar.
    */
   validar: (opcoes: { focar: boolean }) => Promise<string[]>;
-  /** #1452: conflito recusado no envio; vale enquanto horário, município e participantes forem os enviados. */
-  marcarConflitoDoEnvio: (bloqueados: BlockedParticipant[]) => void;
+  /** Leva o foco ao título do cartão ("Evento N"). */
+  focarTitulo: () => void;
 }
 
 export interface CartaoEventoProps {
@@ -136,6 +146,12 @@ export interface CartaoEventoProps {
   dispensaCompra: boolean;
   /** O que trava o "Criar": o id do alerta que diz o motivo (para o `aria-describedby`), ou null. */
   onTrava: (chave: number, idDoMotivo: string | null) => void;
+  /** O que o servidor recusou neste evento no último envio do lote (null: nada). */
+  erroDoEnvio: ErroDoEventoNoLote | null;
+  /** O evento está no resumo de problemas do topo: o cartão fica vermelho e o título diz "com problema". */
+  comProblema: boolean;
+  /** Evento extra: "Remover". O primeiro evento não tem. */
+  onRemover?: ((chave: number) => void) | undefined;
   ref?: Ref<CartaoEventoHandle>;
 }
 
@@ -147,15 +163,14 @@ export default function CartaoEvento({
   me,
   dispensaCompra,
   onTrava,
+  erroDoEnvio,
+  comProblema,
+  onRemover,
   ref,
 }: CartaoEventoProps): JSX.Element {
   const [form] = Form.useForm();
   const cartaoRef = useRef<HTMLElement>(null);
   const [municipioLookupHasResults, setMunicipioLookupHasResults] = useState<boolean | null>(null);
-  // #1452: conflito devolvido pelo backend no envio (fecha o TOCTOU / cache). Vale para a
-  // `chave` (horário, município e participantes) com que foi enviado: mudou um deles, o
-  // conflito antigo deixa de valer e o Criar volta (o backend confere de novo no envio).
-  const [conflitoDoEnvio, setConflitoDoEnvio] = useState<{ chave: string; bloqueados: BlockedParticipant[] } | null>(null);
   // Motivo de o horário não valer (faltando, ou fim antes do início), junto dos campos.
   const [erroHorario, setErroHorario] = useState<string | null>(null);
   const [detalhesAbertos, setDetalhesAbertos] = useState(false);
@@ -303,18 +318,46 @@ export default function CartaoEvento({
     }
   };
 
-  // O que o conflito do envio confere: se mudar, ele já não descreve o evento da tela.
-  const chaveDoEnvio = [
-    dados.inicio,
-    dados.fim,
-    dados.municipio?.id,
-    participantes.map((p) => p.id).sort((a, b) => Number(a) - Number(b)).join(','),
-  ].join('|');
-  const submitConflito = conflitoDoEnvio?.chave === chaveDoEnvio ? conflitoDoEnvio.bloqueados : SEM_BLOQUEADOS;
+  // #1452: conflito recusado pelo servidor no envio (fecha o TOCTOU / cache). No lote,
+  // `blocked_participants` vem no topo do item (formato do batch-approve).
+  const bloqueadosDoEnvio = erroDoEnvio?.code === 'availability_conflict' ? erroDoEnvio.blocked_participants : undefined;
+  const submitConflito: BlockedParticipant[] =
+    bloqueadosDoEnvio && bloqueadosDoEnvio.length > 0 ? bloqueadosDoEnvio : SEM_BLOQUEADOS;
 
+  // O resto do que o servidor recusou: erro de campo vai ao campo, do horário ao horário e o que não
+  // é de um campo à vista ao topo do cartão. Sem nada por campo, o `detail` do item vai ao topo.
+  const pretendeAvaliar = dados.pretendeAvaliar;
+  const errosDoEnvio = useMemo((): ErrosDoServidor | null => {
+    if (!erroDoEnvio || submitConflito.length > 0) return null;
+    const campoNaTela = (campo: string): boolean => {
+      if (campo === 'pretendeAvaliar') return perguntaAvaliar;
+      if (campo === 'formadorAvaliado') return perguntaAvaliar && pretendeAvaliar === true;
+      return campo !== 'horario' && ORDEM_DA_TELA.includes(campo);
+    };
+    const separados = separarErrosDoServidor(erroDoEnvio.errors ?? {}, campoNaTela);
+    const algum = separados.topo.length + separados.horario.length + Object.keys(separados.campos).length;
+    if (algum === 0) separados.topo.push(erroDoEnvio.detail);
+    return separados;
+  }, [erroDoEnvio, submitConflito, perguntaAvaliar, pretendeAvaliar]);
+
+  // Os erros de campo do envio entram no Form; quando saem (a página os tira ao mexer em qualquer
+  // evento), saem do campo, a menos que a validação da tela já tenha posto outro no lugar.
+  const marcadosPeloEnvio = useRef<Record<string, string[]>>({});
+  useEffect(() => {
+    const campos = errosDoEnvio?.campos ?? {};
+    const sair = Object.entries(marcadosPeloEnvio.current)
+      .filter(([nome, erros]) => !(nome in campos) && JSON.stringify(form.getFieldError(nome)) === JSON.stringify(erros))
+      .map(([nome]) => ({ name: nome, errors: [] }));
+    const entrar = Object.entries(campos).map(([nome, erros]) => ({ name: nome, errors: erros }));
+    if (sair.length + entrar.length > 0) form.setFields([...sair, ...entrar]);
+    marcadosPeloEnvio.current = campos;
+  }, [errosDoEnvio, form]);
+  const erroDoHorario = erroHorario ?? (errosDoEnvio?.horario.length ? errosDoEnvio.horario.join(' ') : null);
+
+  const idTitulo = `evento-${chave}-titulo`;
   useImperativeHandle(ref, () => ({
     validar,
-    marcarConflitoDoEnvio: (bloqueados) => setConflitoDoEnvio({ chave: chaveDoEnvio, bloqueados }),
+    focarTitulo: () => document.getElementById(idTitulo)?.focus(),
   }));
 
   const preview = useAvailabilityPreview({
@@ -382,16 +425,81 @@ export default function CartaoEvento({
     ...(dispensaCompra ? ['Compra dispensada'] : []),
   ];
 
-  const idTitulo = `evento-${chave}-titulo`;
   const idPerguntaAcompanha = `pergunta-acompanha-${chave}`;
   const idPerguntaAvaliar = `pergunta-avaliar-${chave}`;
 
+  // "Remover": evento em branco sai direto; preenchido pergunta antes num diálogo de verdade
+  // (role=dialog, foco preso, Esc em qualquer ponto e o foco de volta ao "Remover" ao fechar), que
+  // abre no Cancelar. O balão do Popconfirm (role=tooltip) deixava o Tab sair com ele aberto.
+  const [modal, contextoDoModal] = Modal.useModal();
+  const botaoRemover = useRef<HTMLButtonElement>(null);
+  const idAvisoRemocao = `remover-aviso-${chave}`;
+  const perguntarRemocao = (remover: (chave: number) => void): void => {
+    void modal.confirm({
+      title: `Remover o evento ${numero}?`,
+      content: <p id={idAvisoRemocao} className="mb-0">O que você preencheu nele será perdido.</p>,
+      okText: 'Remover',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancelar',
+      // O foco começa no Cancelar: o leitor de tela lê com ele o que se perde.
+      cancelButtonProps: { 'aria-describedby': idAvisoRemocao },
+      autoFocusButton: 'cancel',
+      onOk: () => remover(chave),
+      // O antd devolve o foco a quem o tinha ao abrir, que nem sempre é o botão (o clique do mouse
+      // não foca botão em todo navegador). Removido o evento, o botão sai e a página foca o anterior.
+      afterClose: () => botaoRemover.current?.focus(),
+    });
+  };
+  const renderRemover = (): ReactNode => {
+    if (!onRemover) return null;
+    return (
+      <Button
+        ref={botaoRemover}
+        aria-label={`Remover evento ${numero}`}
+        onClick={() => (estaEmBranco(dados) ? onRemover(chave) : perguntarRemocao(onRemover))}
+      >
+        Remover
+      </Button>
+    );
+  };
+
   return (
-    <section ref={cartaoRef} aria-labelledby={idTitulo} className="mt-6 rounded-lg border border-solid border-gray-200 p-4">
-      {/* Menor que o título da página (h2) em qualquer largura. */}
-      <Title level={3} id={idTitulo} style={{ marginTop: 0, fontSize: '1.125rem' }}>
-        Evento {numero}
-      </Title>
+    <section
+      ref={cartaoRef}
+      aria-labelledby={idTitulo}
+      className={`mt-6 rounded-lg border-solid p-4 ${comProblema ? 'border-2 border-red-600' : 'border border-gray-200'}`}
+    >
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          {/* O ícone fica fora do título: o nome do cartão é "Evento N com problema", sem o nome do ícone. */}
+          {comProblema && <ExclamationCircleOutlined aria-hidden className="text-red-700" />}
+          {/* Menor que o título da página (h2) em qualquer largura. Focável pelo código (adicionar,
+              remover, linha do resumo), fora do Tab. "com problema" escrito: a cor não é o único sinal. */}
+          <Title level={3} id={idTitulo} tabIndex={-1} style={{ marginTop: 0, marginBottom: 0, fontSize: '1.125rem' }}>
+            {comProblema ? `Evento ${numero} ` : `Evento ${numero}`}
+            {comProblema && <span className="text-base font-normal text-red-700">com problema</span>}
+          </Title>
+        </div>
+        {renderRemover()}
+      </div>
+
+      {/* O que o servidor recusou e não é de um campo à vista. Sem região viva: quem anuncia é o resumo do topo. */}
+      {errosDoEnvio && errosDoEnvio.topo.length > 0 && (
+        <Alert
+          type="error"
+          showIcon
+          role="none"
+          className="mb-4"
+          message="Este evento não pode ser criado assim"
+          description={
+            <ul className="mb-0 pl-5">
+              {errosDoEnvio.topo.map((texto) => (
+                <li key={texto}>{texto}</li>
+              ))}
+            </ul>
+          }
+        />
+      )}
 
       <Form form={form} name={`evento-${chave}`} layout="vertical" autoComplete="off">
         {/* Linha 1: Projeto | Tipo de Evento | Município */}
@@ -459,7 +567,7 @@ export default function CartaoEvento({
           <DateTimeRange
             layout="linha"
             idPrefix={`evento-${chave}-`}
-            erro={erroHorario}
+            erro={erroDoHorario}
             value={rangeValue}
             onChange={handleRangeChange}
           />
@@ -638,7 +746,10 @@ export default function CartaoEvento({
 
       {/* #1452: aviso antecipado de conflito e o conflito recusado no envio, no próprio cartão. */}
       {renderPreviewEstado()}
-      {submitConflito.length > 0 && <AvailabilityConflictAlert bloqueados={submitConflito} id={idSubmitConflito} />}
+      {/* Sem região viva: no envio, quem anuncia é o resumo do topo. */}
+      {submitConflito.length > 0 && (
+        <AvailabilityConflictAlert bloqueados={submitConflito} id={idSubmitConflito} regiaoViva={false} />
+      )}
       <AvisosDeAgenda avisos={avisosDaPrevia} />
 
       {situacao.length > 0 && (
@@ -652,6 +763,7 @@ export default function CartaoEvento({
           ))}
         </p>
       )}
+      {contextoDoModal}
     </section>
   );
 }

@@ -8,6 +8,7 @@ import { fetchAPI, buildUrl, type QueryParams } from './config';
 import { syncChannel } from '../services/syncChannel';
 import logger from '../utils/logger';
 import type {
+  BlockedParticipant,
   ID,
   PaginatedResponse,
   Solicitacao,
@@ -61,20 +62,43 @@ export async function listSolicitacoes(filters: SolicitacaoFilters = {}): Promis
   return await fetchAPI(url);
 }
 
-/**
- * Cria uma nova solicitação de evento.
- *
- * @param body - Dados da solicitação
- */
-export async function createSolicitacao(body: SolicitacaoPayload): Promise<Solicitacao> {
-  logger.debug('=== createSolicitacao ===');
-  logger.debug('Body enviado:', body);
-  logger.debug('JSON stringificado:', JSON.stringify(body));
+/** Um evento criado pelo lote: `indice` é a posição no envio (a partir de 0). */
+export interface EventoCriadoNoLote {
+  indice: number;
+  id: ID;
+  status: string;
+}
 
-  const result = await fetchAPI<Solicitacao>('/solicitacoes/', {
+/**
+ * Um evento com problema no 400 `lote_invalido` (`errors.itens[]`). `indice` conta do 0, na ordem
+ * enviada. Erro de campo vem em `errors` (as chaves do POST de 1 evento); conflito de agenda
+ * (`availability_conflict`) traz `blocked_participants` NO TOPO do item, como no batch-approve (no
+ * POST de 1 evento ele vinha dentro de `errors`).
+ */
+export interface ErroDoEventoNoLote {
+  indice: number;
+  code: string;
+  detail: string;
+  errors?: Record<string, unknown>;
+  blocked_participants?: BlockedParticipant[];
+}
+
+/**
+ * Cria vários eventos de uma vez (`POST /solicitacoes/lote/`, 1 a 10). Tudo ou nada: com qualquer
+ * evento com problema, o servidor não cria nenhum e responde 400 `lote_invalido` com
+ * `errors.itens` ({@link ErroDoEventoNoLote}). A Nova Solicitação usa só este caminho, inclusive
+ * com 1 evento.
+ *
+ * @param eventos - Payload de cada evento, o mesmo do POST de 1 evento
+ */
+export async function createSolicitacoesEmLote(
+  eventos: SolicitacaoPayload[],
+): Promise<{ eventos: EventoCriadoNoLote[] }> {
+  const result = await fetchAPI<{ eventos: EventoCriadoNoLote[] }>('/solicitacoes/lote/', {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify({ eventos }),
   });
+  // Uma vez por envio, como no POST de 1 evento.
   syncChannel.publish('solicitacoes', { action: 'created' });
   syncChannel.publish('availability', { action: 'changed' });
   return result;

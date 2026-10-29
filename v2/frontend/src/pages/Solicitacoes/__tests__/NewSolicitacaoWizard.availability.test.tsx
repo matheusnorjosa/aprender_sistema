@@ -4,9 +4,10 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { renderNoRoteador } from '../../../test/comRoteador';
 
 import { ComAcesso } from '../../../test/comAcesso';
+import { botaoDoTexto, grupoDaPergunta, PERGUNTA_ACOMPANHA } from './localizadores';
 
 const {
-  createSolicitacaoMock,
+  createSolicitacoesEmLoteMock,
   getMeMock,
   checkAvailabilityManyMock,
   lookupMunicipiosWithFiltersMock,
@@ -14,7 +15,7 @@ const {
   lookupTiposEventoMock,
   navigateMock,
 } = vi.hoisted(() => ({
-  createSolicitacaoMock: vi.fn(),
+  createSolicitacoesEmLoteMock: vi.fn(),
   getMeMock: vi.fn(),
   checkAvailabilityManyMock: vi.fn(),
   lookupMunicipiosWithFiltersMock: vi.fn(),
@@ -27,7 +28,7 @@ vi.mock('react-router', async () => {
   const actual = await vi.importActual('react-router');
   return { ...actual, useNavigate: () => navigateMock };
 });
-vi.mock('../../../api/solicitacoes', () => ({ createSolicitacao: createSolicitacaoMock }));
+vi.mock('../../../api/solicitacoes', () => ({ createSolicitacoesEmLote: createSolicitacoesEmLoteMock }));
 vi.mock('../../../api/availability', () => ({
   getMe: getMeMock,
   checkAvailabilityMany: checkAvailabilityManyMock,
@@ -123,15 +124,17 @@ async function preencherEventoComFormador(): Promise<void> {
   fireEvent.click(screen.getByTestId('pick-formador'));
 }
 
-/** O resto do que é obrigatório: o responsável e a resposta de acompanhar. */
-function completarResponsavel(): void {
+/**
+ * O resto do que é obrigatório: o responsável e a resposta de acompanhar. Espera a prévia de agenda
+ * terminar (o "Verificando" sai da tela), como quem preenche e só depois clica em Criar.
+ */
+async function completarResponsavel(): Promise<void> {
   fireEvent.click(screen.getByTestId('cb-responsavel'));
-  fireEvent.click(
-    within(screen.getByRole('radiogroup', { name: /vai acompanhar o evento/ })).getByLabelText('Não')
-  );
+  fireEvent.click(within(grupoDaPergunta(PERGUNTA_ACOMPANHA)).getByLabelText('Não'));
+  await waitFor(() => expect(screen.queryByText(/Verificando disponibilidade/)).not.toBeInTheDocument());
 }
 
-const criar = (): HTMLElement => screen.getByRole('button', { name: 'Criar solicitação' });
+const criar = (): HTMLElement => botaoDoTexto('Criar solicitação');
 
 const RESP_CONFLITO = {
   ok: false,
@@ -145,19 +148,27 @@ const RESP_CONFLITO = {
   ],
 };
 
+// O 400 do lote: `blocked_participants` no topo do item (formato do batch-approve).
 const RECUSA_POR_CONFLITO = {
+  status: 400,
   response: {
+    status: 400,
     data: {
-      code: 'availability_conflict',
-      detail: 'Não é possível criar o evento: Bruno Formador já tem evento neste horário.',
+      code: 'lote_invalido',
+      detail: '1 de 1 eventos tem problema. Nada foi criado.',
       errors: {
-        conflicts: [],
-        skipped_guests: [],
-        blocked_participants: [
+        itens: [
           {
-            usuario_id: 99,
-            usuario_nome: 'Bruno Formador',
-            conflicts: [{ code: 'X', title: 'Sobreposição', detail: 'Conflita com evento aprovado #5', ref_id: 5 }],
+            indice: 0,
+            code: 'availability_conflict',
+            detail: 'Não é possível criar o evento: Bruno Formador já tem evento neste horário.',
+            blocked_participants: [
+              {
+                usuario_id: 99,
+                usuario_nome: 'Bruno Formador',
+                conflicts: [{ code: 'X', title: 'Sobreposição', detail: 'Conflita com evento aprovado #5', ref_id: 5 }],
+              },
+            ],
           },
         ],
       },
@@ -197,7 +208,7 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     lookupMunicipiosWithFiltersMock.mockResolvedValue([{ id: 456, label: 'Fortaleza - CE' }]);
     getMeMock.mockResolvedValue({ is_superuser: true, id: 1, name: 'Ana Criadora', username: 'ana' });
     checkAvailabilityManyMock.mockResolvedValue({ ok: true, results: [] });
-    createSolicitacaoMock.mockResolvedValue({ id: 1 });
+    createSolicitacoesEmLoteMock.mockResolvedValue({ eventos: [{ indice: 0, id: 1, status: 'aprovado' }] });
   });
 
   test('selecionar formador + data dispara check-many com os formadores (quem cria não entra por criar)', async () => {
@@ -280,10 +291,10 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
   });
 
   test('conflito recusado no envio: trocar o formador destrava o Criar e tira o alerta antigo', async () => {
-    createSolicitacaoMock.mockRejectedValueOnce(RECUSA_POR_CONFLITO);
+    createSolicitacoesEmLoteMock.mockRejectedValueOnce(RECUSA_POR_CONFLITO);
     renderComDispensa();
     await preencherEventoComFormador();
-    completarResponsavel();
+    await completarResponsavel();
 
     await waitFor(() => expect(criar()).not.toBeDisabled());
     fireEvent.click(criar());
@@ -297,31 +308,59 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     expect(screen.queryByText('Não é possível criar o evento')).not.toBeInTheDocument();
   });
 
+  // O conflito com evento que já está no banco continua valendo enquanto horário, município e pessoas
+  // de todos os eventos forem os do envio: mudar outro campo ou pôr um evento em branco não destrava
+  // (a prévia não o pega de novo, e o próximo clique receberia a mesma recusa).
   test('conflito recusado no envio: mudar o que não é horário, município ou pessoa não destrava', async () => {
-    createSolicitacaoMock.mockRejectedValueOnce(RECUSA_POR_CONFLITO);
+    createSolicitacoesEmLoteMock.mockRejectedValueOnce(RECUSA_POR_CONFLITO);
     renderComDispensa();
     await preencherEventoComFormador();
-    completarResponsavel();
+    await completarResponsavel();
     await waitFor(() => expect(criar()).not.toBeDisabled());
     fireEvent.click(criar());
     expect(await screen.findByText('Não é possível criar o evento')).toBeInTheDocument();
+
+    // O resumo do topo também diz o motivo (é a região viva; o alerta do cartão não é outra).
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(screen.getByRole('alert')).toHaveTextContent('Evento 1: Não é possível criar o evento: Bruno Formador');
+    await waitFor(() => expect(criar()).toBeDisabled());
 
     fireEvent.change(screen.getByLabelText('Local do Evento'), { target: { value: 'Escola X' } });
     fireEvent.click(screen.getByTestId('cb-tipo'));
     expect(screen.getByText('Não é possível criar o evento')).toBeInTheDocument();
     expect(criar()).toBeDisabled();
-    expect(createSolicitacaoMock).toHaveBeenCalledTimes(1);
+    fireEvent.click(botaoDoTexto('Adicionar outro evento'));
+    expect(screen.getByText('Não é possível criar o evento')).toBeInTheDocument();
+    expect(botaoDoTexto('Criar 2 eventos')).toBeDisabled();
+    expect(createSolicitacoesEmLoteMock).toHaveBeenCalledTimes(1);
+  });
+
+  // O evento novo não estava no envio: preencher qualquer coisa nele não muda o choque do evento 1.
+  test('conflito recusado no envio: preencher um evento adicionado depois não destrava', async () => {
+    createSolicitacoesEmLoteMock.mockRejectedValueOnce(RECUSA_POR_CONFLITO);
+    renderComDispensa();
+    await preencherEventoComFormador();
+    await completarResponsavel();
+    await waitFor(() => expect(criar()).not.toBeDisabled());
+    fireEvent.click(criar());
+    expect(await screen.findByText('Não é possível criar o evento')).toBeInTheDocument();
+    await waitFor(() => expect(criar()).toBeDisabled());
+
+    fireEvent.click(botaoDoTexto('Adicionar outro evento'));
+    fireEvent.click(screen.getAllByTestId('cb-tipo')[1]);
+    expect(screen.getByText('Não é possível criar o evento')).toBeInTheDocument();
+    expect(botaoDoTexto('Criar 2 eventos')).toBeDisabled();
   });
 
   test('com tudo preenchido, Criar envia uma vez o evento da tela (campos opcionais intocados não apagam nada)', async () => {
     renderComDispensa();
     await preencherEventoComFormador();
-    completarResponsavel();
+    await completarResponsavel();
     await waitFor(() => expect(criar()).not.toBeDisabled());
     fireEvent.click(criar());
 
-    await waitFor(() => expect(createSolicitacaoMock).toHaveBeenCalledTimes(1));
-    const payload = createSolicitacaoMock.mock.calls[0][0];
+    await waitFor(() => expect(createSolicitacoesEmLoteMock).toHaveBeenCalledTimes(1));
+    const payload = createSolicitacoesEmLoteMock.mock.calls[0][0][0];
     expect(payload).toMatchObject({
       municipio: 456,
       projeto: 123,

@@ -12,6 +12,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { renderNoRoteador } from '../../../test/comRoteador';
 import message from 'antd/es/message';
+import { botaoDoTexto, cabecalhoDoTexto, grupoDaPergunta, PERGUNTA_ACOMPANHA } from './localizadores';
 
 const {
   createSolicitacoesEmLoteMock,
@@ -119,7 +120,7 @@ function renderWizard(): void {
   );
 }
 
-const criar = (): HTMLElement => screen.getByRole('button', { name: 'Criar solicitação' });
+const criar = (): HTMLElement => botaoDoTexto('Criar solicitação');
 // A validação do Form do AntD é assíncrona; com a suíte inteira e a cobertura na CI ela passa de 1 s.
 const ESPERA_VALIDACAO = { timeout: 5000 };
 
@@ -134,7 +135,7 @@ async function preencherLinha1EHorario(): Promise<void> {
 async function preencherTudo(): Promise<void> {
   await preencherLinha1EHorario();
   fireEvent.click(screen.getByTestId('pick-formador'));
-  fireEvent.click(within(screen.getByRole('radiogroup', { name: /vai acompanhar o evento/ })).getByLabelText('Não'));
+  fireEvent.click(within(grupoDaPergunta(PERGUNTA_ACOMPANHA)).getByLabelText('Não'));
   // A prévia de agenda termina antes do clique (o aviso de verificando sai da tela).
   await waitFor(() => expect(checkAvailabilityManyMock).toHaveBeenCalled(), ESPERA_VALIDACAO);
   await waitFor(() => expect(screen.queryByText(/Verificando disponibilidade/)).not.toBeInTheDocument(), ESPERA_VALIDACAO);
@@ -216,7 +217,7 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
   test('erro em "Mais detalhes" (recolhido): o limite vale, a seção abre e o foco vai ao campo', async () => {
     renderWizard();
     await preencherTudo();
-    const detalhes = screen.getByRole('button', { name: /Mais detalhes/ });
+    const detalhes = cabecalhoDoTexto(/Mais detalhes/);
     expect(detalhes).toHaveAttribute('aria-expanded', 'false');
     const encontro = screen.getByLabelText('Encontro');
     fireEvent.change(encontro, { target: { value: 'x'.repeat(101) } });
@@ -304,7 +305,7 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
     fireEvent.click(screen.getByTestId('pick-formador'));
     fireEvent.click(criar());
     await screen.findByText(/Corrija antes de criar a solicitação/, undefined, ESPERA_VALIDACAO);
-    const grupo = screen.getByRole('radiogroup', { name: /vai acompanhar o evento/ });
+    const grupo = grupoDaPergunta(PERGUNTA_ACOMPANHA);
     await waitFor(() => expect(within(grupo).getByLabelText('Sim')).toHaveFocus(), ESPERA_VALIDACAO);
     expect(createSolicitacoesEmLoteMock).not.toHaveBeenCalled();
   });

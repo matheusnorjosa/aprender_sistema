@@ -14,6 +14,7 @@ import message from 'antd/es/message';
 import Modal from 'antd/es/modal';
 import { enderecoAtual, renderNoRoteador } from '../../../test/comRoteador';
 import { buildSolicitacaoPayload } from '../NewSolicitacaoWizard';
+import { botaoDoTexto, botaoRemover, cartao, cartoes, dialogo, grupoDaPergunta, PERGUNTA_ACOMPANHA, titulo } from './localizadores';
 
 const {
   createSolicitacoesEmLoteMock,
@@ -125,52 +126,11 @@ function abrir() {
   return renderNoRoteador(<NewSolicitacaoWizard />, { em: NOVA, antes: ['/solicitacoes/minhas'] });
 }
 
-/*
- * Localizadores. Com o CSS do antd na página, cada `getByRole(..., { name })` custa de centenas de ms a
- * segundos no jsdom: ele calcula o estilo de cada candidato e dos ancestrais (está visível? qual é o
- * nome?), e o cache de estilo cai a cada mudança no DOM. Com 3 a 10 cartões, isso estourava 30 s na CI.
- * Estes atalhos acham o MESMO elemento pela mesma fonte do nome acessível (o texto, o aria-label ou o
- * aria-labelledby), conferem a tag do papel e que nenhum atributo o esconde. O nome acessível calculado
- * segue conferido onde ele é o assunto do teste (toHaveAccessibleName, contagem de regiões, diálogo).
- */
-function semEsconder<T extends HTMLElement>(el: T | null, tag: string): T {
-  expect(el?.tagName).toBe(tag);
-  expect(el!.closest('[hidden], [aria-hidden="true"]')).toBeNull();
-  return el!;
-}
-/** Botão cujo nome acessível é o próprio texto (nenhum aria-label nem aria-labelledby por cima). */
-function botaoDoTexto(texto: RegExp): HTMLElement {
-  const botao = semEsconder(screen.getByText(texto).closest('button'), 'BUTTON');
-  expect(botao).not.toHaveAttribute('aria-label');
-  expect(botao).not.toHaveAttribute('aria-labelledby');
-  return botao;
-}
-/** Texto do elemento que dá nome via aria-labelledby. */
-const rotuloDe = (el: Element): string => document.getElementById(el.getAttribute('aria-labelledby') ?? '')?.textContent ?? '';
-
-function cartao(n: number): HTMLElement {
-  const nome = new RegExp(`^Evento ${n}\\b`);
-  const achados = [...document.querySelectorAll<HTMLElement>('section[aria-labelledby]')].filter((s) => nome.test(rotuloDe(s)));
-  expect(achados).toHaveLength(1);
-  return semEsconder(achados[0]!, 'SECTION');
-}
-function titulo(n: number): HTMLElement {
-  const h3 = cartao(n).querySelectorAll<HTMLElement>('h3');
-  expect(h3).toHaveLength(1);
-  return h3[0]!;
-}
+// Localizadores baratos (o porquê está em ./localizadores.ts).
 const adicionar = (): HTMLElement => botaoDoTexto(/Adicionar outro evento|Limite de 10 eventos/);
 const botaoCriar = (): HTMLElement => botaoDoTexto(/^Criar /);
-const botaoRemover = (n: number): HTMLElement => {
-  const botao = semEsconder(within(cartao(n)).getByLabelText(`Remover evento ${n}`), 'BUTTON');
-  expect(botao).not.toHaveAttribute('aria-labelledby');
-  return botao;
-};
 /** O radiogroup "vai acompanhar o evento?" do cartão (nomeado pela pergunta, via aria-labelledby). */
-function grupoAcompanha(c: HTMLElement): HTMLElement {
-  const pergunta = within(c).getByText('O coordenador responsável vai acompanhar o evento?');
-  return semEsconder(c.querySelector<HTMLElement>(`[role="radiogroup"][aria-labelledby="${pergunta.id}"]`), 'DIV');
-}
+const grupoAcompanha = (c: HTMLElement): HTMLElement => grupoDaPergunta(PERGUNTA_ACOMPANHA, c);
 
 async function preencher(n: number): Promise<void> {
   const c = cartao(n);
@@ -204,7 +164,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
 
   test('começa com 1 evento, sem "Remover", e o botão diz "Criar solicitação"', async () => {
     abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     expect(screen.getAllByRole('region', { name: /^Evento \d/ })).toHaveLength(1);
     expect(screen.queryByRole('button', { name: /^Remover evento/ })).not.toBeInTheDocument();
     expect(botaoCriar()).toHaveTextContent('Criar solicitação');
@@ -212,7 +172,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
 
   test('"+ Adicionar outro evento" põe um evento em branco, leva o foco ao título dele e anuncia na região viva única', async () => {
     abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     fireEvent.click(adicionar());
 
     await waitFor(() => expect(titulo(2)).toHaveFocus());
@@ -228,7 +188,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
 
   test('limite de 10: o botão de adicionar desabilita e diz o porquê', async () => {
     abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     const botao = adicionar();
     for (let i = 0; i < 9; i += 1) fireEvent.click(botao);
     expect(document.querySelectorAll('section[aria-labelledby^="evento-"]')).toHaveLength(10);
@@ -239,7 +199,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
 
   test('"Remover" num evento em branco remove direto; o foco vai ao título do anterior e os números seguem a posição', async () => {
     abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     fireEvent.click(adicionar());
     fireEvent.click(adicionar());
     // Preenche o 3º para ver que ele vira o "Evento 2".
@@ -257,7 +217,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
 
   test('"Remover" num evento preenchido pergunta num diálogo, começando no Cancelar; Cancelar mantém, Remover tira', async () => {
     abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     fireEvent.click(adicionar());
     fireEvent.click(within(cartao(2)).getByTestId('cb-projeto'));
 
@@ -292,7 +252,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
 
   test('campo faltando em 2 eventos: nada é enviado, o resumo tem uma linha por problema e cada linha leva ao evento', async () => {
     abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     fireEvent.click(adicionar());
     // O evento 1 só sem o município; o 2 sem nada.
     const c1 = cartao(1);
@@ -328,7 +288,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
       ],
     });
     const { router } = abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     await preencher(1);
     fireEvent.click(adicionar());
     horario.atual = { date: '2026-08-02', start: '14:00', end: '16:00' };
@@ -364,7 +324,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
   test('sucesso com 1 evento: mensagem no singular, pelo mesmo lote', async () => {
     createSolicitacoesEmLoteMock.mockResolvedValue({ eventos: [{ indice: 0, id: 11, status: 'pendente' }] });
     abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     await preencher(1);
     fireEvent.click(botaoCriar());
     await waitFor(() => expect(message.success).toHaveBeenCalledWith('1 evento criado (1 vai para aprovação)'), ESPERA);
@@ -373,7 +333,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
 
   test('400 do lote volta só aos eventos certos, mesmo com um evento removido antes do envio', async () => {
     abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     fireEvent.click(adicionar());
     fireEvent.click(adicionar());
     // Remove o do meio (em branco): o antigo 3º vira o "Evento 2" e vai na posição 1 do envio.
@@ -417,7 +377,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
 
   test('mapa backend → Form: responsável, formadores, horário e o que não casa vai para o topo do evento', async () => {
     abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     await preencher(1);
     createSolicitacoesEmLoteMock.mockRejectedValueOnce(
       recusaDoLote([
@@ -446,7 +406,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
 
   test('conflito no lote: os dois eventos ficam vermelhos com quem choca, o Criar trava e mudar o horário de qualquer evento limpa', async () => {
     abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     await preencher(1);
     fireEvent.click(adicionar());
     await preencher(2);
@@ -482,7 +442,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
 
   test('adicionar um evento também limpa os erros do lote', async () => {
     abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     await preencher(1);
     createSolicitacoesEmLoteMock.mockRejectedValueOnce(
       recusaDoLote([{ indice: 0, code: 'VALIDATION_ERROR', detail: 'x', errors: { non_field_errors: ['Recusado.'] } }])
@@ -496,7 +456,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
   test('sem resposta: o aviso fica no resumo do topo (não some) e manda conferir antes de enviar de novo', async () => {
     createSolicitacoesEmLoteMock.mockRejectedValueOnce(new TypeError('Sem conexão com o servidor.'));
     abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     await preencher(1);
     fireEvent.click(adicionar());
     await preencher(2);
@@ -513,7 +473,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
     createSolicitacoesEmLoteMock.mockRejectedValueOnce(new TypeError('Sem conexão com o servidor.'));
     abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     await preencher(1);
     fireEvent.click(adicionar());
     await preencher(2);
@@ -556,7 +516,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     let resolver: (valor: unknown) => void = () => undefined;
     createSolicitacoesEmLoteMock.mockImplementationOnce(() => new Promise((resolve) => { resolver = resolve; }));
     const { router } = abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     await preencher(1);
     fireEvent.click(botaoCriar());
     await waitFor(() => expect(createSolicitacoesEmLoteMock).toHaveBeenCalledTimes(1), ESPERA);
@@ -585,7 +545,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
 
   test('conflito com evento aprovado (fora da lista) continua valendo quando outro evento muda ou sai', async () => {
     abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     await preencher(1);
     fireEvent.click(adicionar());
     horario.atual = { date: '2026-08-02', start: '14:00', end: '16:00' };
@@ -619,15 +579,15 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
 
     // Nem tirar o evento 2.
     fireEvent.click(botaoRemover(2));
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Remover' }));
-    await waitFor(() => expect(screen.getAllByRole('region', { name: /^Evento \d/ })).toHaveLength(1));
+    fireEvent.click(botaoDoTexto('Remover', await waitFor(dialogo)));
+    await waitFor(() => expect(cartoes()).toHaveLength(1));
     expect(within(cartao(1)).getByText('Conflita com evento aprovado #5 (09:00–11:00)')).toBeInTheDocument();
     expect(botaoCriar()).toBeDisabled();
   });
 
   test('conflito entre dois eventos da lista continua valendo quando um terceiro evento, fora do choque, muda', async () => {
     abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     await preencher(1);
     fireEvent.click(adicionar());
     await preencher(2);
@@ -660,8 +620,8 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
 
     // Tirar o evento 3 também não.
     fireEvent.click(botaoRemover(3));
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Remover' }));
-    await waitFor(() => expect(screen.getAllByRole('region', { name: /^Evento \d/ })).toHaveLength(2));
+    fireEvent.click(botaoDoTexto('Remover', await waitFor(dialogo)));
+    await waitFor(() => expect(cartoes()).toHaveLength(2));
     expect(within(cartao(1)).getByText('Conflita com o evento 2 desta lista (09:00–11:00)')).toBeInTheDocument();
     expect(botaoCriar()).toBeDisabled();
 
@@ -673,7 +633,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
 
   test('com o conflito ainda valendo, mudar outra coisa mantém o evento vermelho e "com problema"', async () => {
     abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     await preencher(1);
     fireEvent.click(adicionar());
     await preencher(2);
@@ -705,7 +665,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     let recusar: (erro: unknown) => void = () => undefined;
     createSolicitacoesEmLoteMock.mockImplementationOnce(() => new Promise((_resolve, reject) => { recusar = reject; }));
     abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     await preencher(1);
     fireEvent.click(adicionar());
     await preencher(2);
@@ -732,7 +692,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     let recusar: (erro: unknown) => void = () => undefined;
     createSolicitacoesEmLoteMock.mockImplementationOnce(() => new Promise((_resolve, reject) => { recusar = reject; }));
     abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     await preencher(1);
     fireEvent.click(botaoCriar());
     await waitFor(() => expect(createSolicitacoesEmLoteMock).toHaveBeenCalledTimes(1), ESPERA);
@@ -764,7 +724,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
   test('um evento extra em branco não conta como preenchido: sair não pergunta', async () => {
     const confirmar = vi.spyOn(Modal, 'confirm');
     const { router } = abrir();
-    await screen.findByRole('region', { name: /^Evento 1/ });
+    await waitFor(() => cartao(1));
     fireEvent.click(adicionar());
     act(() => {
       void router.navigate('/solicitacoes/minhas');

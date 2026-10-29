@@ -7,6 +7,7 @@ import Modal from 'antd/es/modal';
 import { ComAcesso } from '../../../test/comAcesso';
 import { enderecoAtual, renderNoRoteador } from '../../../test/comRoteador';
 import { apagarAvisoDoLogin, avisarSaidaAsOutrasAbas, guardarAvisoDoLogin, storageKeys } from '../../../utils/storage';
+import { botaoDoTexto } from './localizadores';
 
 const {
   createSolicitacoesEmLoteMock,
@@ -120,12 +121,10 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', { timeo
       <NewSolicitacaoWizard />
     );
 
-    const municipioDisabledButton = await screen.findByRole('button', {
-      name: 'Selecione um projeto para carregar municípios elegíveis',
-    });
+    const municipioDisabledButton = await waitFor(() => botaoDoTexto('Selecione um projeto para carregar municípios elegíveis'));
     expect(municipioDisabledButton).toBeDisabled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Busque ou selecione um projeto' }));
+    fireEvent.click(botaoDoTexto('Busque ou selecione um projeto'));
 
     await waitFor(() => {
       expect(lookupMunicipiosWithFiltersMock).toHaveBeenCalledWith({
@@ -151,9 +150,7 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', { timeo
       </ComAcesso>
     );
 
-    const municipioButton = await screen.findByRole('button', {
-      name: 'Busque ou selecione um município',
-    });
+    const municipioButton = await waitFor(() => botaoDoTexto('Busque ou selecione um município'));
     expect(municipioButton).not.toBeDisabled();
 
     await waitFor(() => {
@@ -165,7 +162,7 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', { timeo
     expect(firstCallArg.com_compra).toBeUndefined();
     expect(firstCallArg.projeto_id).toBeUndefined();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Busque ou selecione um projeto' }));
+    fireEvent.click(botaoDoTexto('Busque ou selecione um projeto'));
 
     await waitFor(() => {
       const lastCallArg =
@@ -199,7 +196,7 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', { timeo
       </ComAcesso>
     );
 
-    await screen.findByRole('button', { name: 'Busque ou selecione um município' });
+    await waitFor(() => botaoDoTexto('Busque ou selecione um município'));
     await waitFor(() => {
       expect(lookupProjetosMock).toHaveBeenLastCalledWith('', {});
     });
@@ -264,7 +261,7 @@ describe('NewSolicitacaoWizard - página única com um cartão de evento (28/10/
 
   test('as linhas do cartão são grades que empilham no celular e não passam da largura da tela', async () => {
     renderNoRoteador(<NewSolicitacaoWizard />);
-    const projeto = await screen.findByRole('button', { name: 'Busque ou selecione um projeto' });
+    const projeto = await waitFor(() => botaoDoTexto('Busque ou selecione um projeto'));
 
     const linha1 = projeto.closest('.md\\:grid-cols-3');
     expect(linha1).toHaveClass('grid', 'grid-cols-1');
@@ -283,7 +280,7 @@ describe('NewSolicitacaoWizard - página única com um cartão de evento (28/10/
 
   test('a situação do cartão diz, sem região viva, que o evento SUPER vai para aprovação', async () => {
     renderNoRoteador(<NewSolicitacaoWizard />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Busque ou selecione um projeto' }));
+    fireEvent.click(await waitFor(() => botaoDoTexto('Busque ou selecione um projeto')));
 
     const situacao = await screen.findByText('Vai para aprovação');
     expect(situacao.closest('[role="alert"], [role="status"], [aria-live]')).toBeNull();
@@ -309,9 +306,9 @@ describe('NewSolicitacaoWizard - sair do assistente (item 36)', { timeout: 20000
     </>,
     { em: NOVA, antes },
   );
-  const sair = () => screen.getByRole('button', { name: /Voltar para Minhas Solicitações/i });
+  const sair = () => botaoDoTexto(/Voltar para Minhas Solicitações/i);
   const preencher = async (): Promise<void> => {
-    fireEvent.click(await screen.findByRole('button', { name: 'Busque ou selecione um projeto' }));
+    fireEvent.click(await waitFor(() => botaoDoTexto('Busque ou selecione um projeto')));
   };
   const voltarDoNavegador = async (router: ReturnType<typeof abrir>['router'], passos = 1): Promise<void> => {
     await act(async () => {
@@ -330,7 +327,7 @@ describe('NewSolicitacaoWizard - sair do assistente (item 36)', { timeout: 20000
   test('sem nada preenchido, o botão do topo sai direto para Minhas Solicitações', async () => {
     const confirmar = espiarAviso();
     const { router } = abrir();
-    await screen.findByRole('button', { name: 'Busque ou selecione um projeto' });
+    await waitFor(() => botaoDoTexto('Busque ou selecione um projeto'));
     fireEvent.click(sair());
     await waitFor(() => expect(enderecoAtual(router)).toBe('/solicitacoes/minhas'));
     expect(confirmar).not.toHaveBeenCalled();
@@ -369,7 +366,7 @@ describe('NewSolicitacaoWizard - sair do assistente (item 36)', { timeout: 20000
 
     responder(confirmar, 'onCancel');
     expect(enderecoAtual(router)).toBe(NOVA);
-    expect(screen.getByRole('button', { name: 'Busque ou selecione um município' })).toBeInTheDocument();
+    expect(botaoDoTexto('Busque ou selecione um município')).toBeInTheDocument();
 
     fireEvent.click(sair());
     await waitFor(() => expect(confirmar).toHaveBeenCalledTimes(2));
@@ -425,7 +422,7 @@ describe('NewSolicitacaoWizard - sair do assistente (item 36)', { timeout: 20000
     const confirmar = espiarAviso();
     const { router } = abrir();
     await preencher();
-    fireEvent.click(screen.getByRole('button', { name: 'Limpar projeto' }));
+    fireEvent.click(botaoDoTexto('Limpar projeto'));
 
     await voltarDoNavegador(router);
     await waitFor(() => expect(enderecoAtual(router)).toBe('/home'));
@@ -464,7 +461,7 @@ describe('NewSolicitacaoWizard - sair do assistente (item 36)', { timeout: 20000
     // No app, o monitor de sessão grava o horário comum às abas ao montar.
     localStorage.setItem(storageKeys.sessaoUltimaResposta, String(Date.now()));
     const { unmount } = abrir();
-    await screen.findByRole('button', { name: 'Busque ou selecione um projeto' });
+    await waitFor(() => botaoDoTexto('Busque ou selecione um projeto'));
     const vazio = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(vazio);
     expect(vazio.defaultPrevented).toBe(false);

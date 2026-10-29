@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import Modal from 'antd/es/modal';
 
 import { enderecoAtual, renderNoRoteador } from '../../../test/comRoteador';
+import { botaoDoTexto, grupoDaPergunta } from './localizadores';
 
 const {
   createSolicitacoesEmLoteMock,
@@ -149,10 +150,10 @@ async function preencherEvento(): Promise<void> {
 }
 
 function responder(pergunta: RegExp, resposta: 'Sim' | 'Não'): void {
-  fireEvent.click(within(screen.getByRole('radiogroup', { name: pergunta })).getByLabelText(resposta));
+  fireEvent.click(within(grupoDaPergunta(pergunta)).getByLabelText(resposta));
 }
 
-const criar = (): HTMLElement => screen.getByRole('button', { name: 'Criar solicitação' });
+const criar = (): HTMLElement => botaoDoTexto('Criar solicitação');
 const ACOMPANHA = /O coordenador responsável vai acompanhar o evento\?/;
 const AVALIAR = /Você pretende avaliar o formador nesse evento\?/;
 // A validação do Form do AntD é assíncrona: aqui leva 0,2–0,6 s; na CI, com a suíte inteira e a
@@ -314,7 +315,7 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     responder(ACOMPANHA, 'Não');
     fireEvent.click(criar());
     expect(await screen.findByText('Responda se você pretende avaliar o formador.', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
-    const grupo = screen.getByRole('radiogroup', { name: AVALIAR });
+    const grupo = grupoDaPergunta(AVALIAR);
     await waitFor(() => expect(within(grupo).getByLabelText('Sim')).toHaveFocus(), ESPERA_VALIDACAO);
     expect(createSolicitacoesEmLoteMock).not.toHaveBeenCalled();
   });

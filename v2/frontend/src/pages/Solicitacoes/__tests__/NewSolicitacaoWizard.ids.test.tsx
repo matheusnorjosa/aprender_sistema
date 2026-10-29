@@ -8,6 +8,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { renderNoRoteador } from '../../../test/comRoteador';
+import { botaoDoTexto, cartao } from './localizadores';
 
 vi.mock('../../../api/solicitacoes', () => ({ createSolicitacoesEmLote: vi.fn() }));
 vi.mock('../../../api/availability', () => ({
@@ -47,15 +48,15 @@ describe('NewSolicitacaoWizard — ids com vários eventos', { timeout: 30000 },
 
   test('com 3 eventos, e com os erros de todos à vista, nenhum id nem nome de radio se repete', async () => {
     renderNoRoteador(<NewSolicitacaoWizard />);
-    await screen.findByRole('region', { name: /^Evento 1/ });
-    const adicionar = screen.getByRole('button', { name: /Adicionar outro evento/ });
+    await waitFor(() => cartao(1));
+    const adicionar = botaoDoTexto(/Adicionar outro evento/);
     fireEvent.click(adicionar);
     fireEvent.click(adicionar);
     expect(document.querySelectorAll('section[aria-labelledby^="evento-"]')).toHaveLength(3);
     expect(idsRepetidos()).toEqual([]);
 
     // Os erros (inclusive o do horário, que tem id próprio) aparecem nos 3 de uma vez.
-    fireEvent.click(screen.getByRole('button', { name: 'Criar 3 eventos' }));
+    fireEvent.click(botaoDoTexto('Criar 3 eventos'));
     await waitFor(
       () => expect(screen.getAllByText('Escolha a data e os horários de início e de fim do evento.')).toHaveLength(3),
       { timeout: 5000 },

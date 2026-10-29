@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { renderNoRoteador } from '../../../test/comRoteador';
 
 import { ComAcesso } from '../../../test/comAcesso';
+import { botaoDoTexto, grupoDaPergunta, PERGUNTA_ACOMPANHA } from './localizadores';
 
 const {
   createSolicitacoesEmLoteMock,
@@ -123,15 +124,17 @@ async function preencherEventoComFormador(): Promise<void> {
   fireEvent.click(screen.getByTestId('pick-formador'));
 }
 
-/** O resto do que é obrigatório: o responsável e a resposta de acompanhar. */
-function completarResponsavel(): void {
+/**
+ * O resto do que é obrigatório: o responsável e a resposta de acompanhar. Espera a prévia de agenda
+ * terminar (o "Verificando" sai da tela), como quem preenche e só depois clica em Criar.
+ */
+async function completarResponsavel(): Promise<void> {
   fireEvent.click(screen.getByTestId('cb-responsavel'));
-  fireEvent.click(
-    within(screen.getByRole('radiogroup', { name: /vai acompanhar o evento/ })).getByLabelText('Não')
-  );
+  fireEvent.click(within(grupoDaPergunta(PERGUNTA_ACOMPANHA)).getByLabelText('Não'));
+  await waitFor(() => expect(screen.queryByText(/Verificando disponibilidade/)).not.toBeInTheDocument());
 }
 
-const criar = (): HTMLElement => screen.getByRole('button', { name: 'Criar solicitação' });
+const criar = (): HTMLElement => botaoDoTexto('Criar solicitação');
 
 const RESP_CONFLITO = {
   ok: false,
@@ -291,7 +294,7 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     createSolicitacoesEmLoteMock.mockRejectedValueOnce(RECUSA_POR_CONFLITO);
     renderComDispensa();
     await preencherEventoComFormador();
-    completarResponsavel();
+    await completarResponsavel();
 
     await waitFor(() => expect(criar()).not.toBeDisabled());
     fireEvent.click(criar());
@@ -312,7 +315,7 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     createSolicitacoesEmLoteMock.mockRejectedValueOnce(RECUSA_POR_CONFLITO);
     renderComDispensa();
     await preencherEventoComFormador();
-    completarResponsavel();
+    await completarResponsavel();
     await waitFor(() => expect(criar()).not.toBeDisabled());
     fireEvent.click(criar());
     expect(await screen.findByText('Não é possível criar o evento')).toBeInTheDocument();
@@ -326,9 +329,9 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     fireEvent.click(screen.getByTestId('cb-tipo'));
     expect(screen.getByText('Não é possível criar o evento')).toBeInTheDocument();
     expect(criar()).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Adicionar outro evento' }));
+    fireEvent.click(botaoDoTexto('Adicionar outro evento'));
     expect(screen.getByText('Não é possível criar o evento')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Criar 2 eventos' })).toBeDisabled();
+    expect(botaoDoTexto('Criar 2 eventos')).toBeDisabled();
     expect(createSolicitacoesEmLoteMock).toHaveBeenCalledTimes(1);
   });
 
@@ -337,22 +340,22 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     createSolicitacoesEmLoteMock.mockRejectedValueOnce(RECUSA_POR_CONFLITO);
     renderComDispensa();
     await preencherEventoComFormador();
-    completarResponsavel();
+    await completarResponsavel();
     await waitFor(() => expect(criar()).not.toBeDisabled());
     fireEvent.click(criar());
     expect(await screen.findByText('Não é possível criar o evento')).toBeInTheDocument();
     await waitFor(() => expect(criar()).toBeDisabled());
 
-    fireEvent.click(screen.getByRole('button', { name: 'Adicionar outro evento' }));
+    fireEvent.click(botaoDoTexto('Adicionar outro evento'));
     fireEvent.click(screen.getAllByTestId('cb-tipo')[1]);
     expect(screen.getByText('Não é possível criar o evento')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Criar 2 eventos' })).toBeDisabled();
+    expect(botaoDoTexto('Criar 2 eventos')).toBeDisabled();
   });
 
   test('com tudo preenchido, Criar envia uma vez o evento da tela (campos opcionais intocados não apagam nada)', async () => {
     renderComDispensa();
     await preencherEventoComFormador();
-    completarResponsavel();
+    await completarResponsavel();
     await waitFor(() => expect(criar()).not.toBeDisabled());
     fireEvent.click(criar());
 

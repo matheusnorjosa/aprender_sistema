@@ -20,6 +20,7 @@ Nada de dado pessoal no AuditLog, no log ou no `resumo`: só s<id>, u<id>, event
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
@@ -43,7 +44,7 @@ from .sync import desvincular_do_google
 
 logger = logging.getLogger(__name__)
 
-# Mais que isto de cancelamentos numa rodada: nenhum é aplicado (freio de massa). Mudar exige PR.
+# Mais que isto de cancelamentos numa rodada do `copiar`: ela para inteira (freio de massa). Mudar exige PR.
 FREIO_CANCELAMENTOS = 5
 MAX_ADIADOS = 200
 MAX_TENTATIVAS_ADIADO = 5
@@ -55,7 +56,6 @@ ORIGEM = "gcal_copia"
 
 COPIAR_HORARIO = "copiar_horario"
 CANCELADO = "cancelado"
-FREIO = "freio"
 ECO = "eco"
 SEM_VINCULO = "sem_vinculo"
 ID_DUPLICADO = "id_duplicado"
@@ -159,8 +159,9 @@ class _Resumo:
         self.futuro = 0
         self.passado = 0
         self.falhas: list[dict[str, str]] = []
-        self.freio = 0
-        self.freio_ids: list[str] = []
+        self.cancelamentos: list[str] = []
+        self.digest = ""
+        self.freio = False
         self.leitura_completa = False
         self.lidos = 0
 
@@ -201,10 +202,16 @@ class _Resumo:
             "futuro": futuro,
             "passado": passado,
             "falhas": falhas[-MAX_FALHAS:],
+            # A lista inteira, sem corte: é dela o digest que o `liberar_freio` precisa repetir.
+            "cancelamentos": list(self.cancelamentos),
+            "digest": self.digest,
             "freio": self.freio,
-            # A lista inteira, sem corte: é ela que o `liberar_freio` compara (só no `copiar`).
-            "freio_ids": list(self.freio_ids),
         }
+
+
+def _digest(event_ids: Sequence[str]) -> str:
+    """Impressão digital da lista ordenada de event ids: o dono só libera a lista que viu."""
+    return hashlib.sha256(" ".join(event_ids).encode()).hexdigest()[:12]
 
 
 def _erro_curto(e: BaseException) -> str:
@@ -320,7 +327,7 @@ def _reprovar(s: Solicitacao, event_id: str) -> None:
 
 
 def _aplicar_item(
-    pk: int, event_id: str, evento: JsonDict, agora: datetime, operador_id: int, freio: bool, lido_em: datetime
+    pk: int, event_id: str, evento: JsonDict, agora: datetime, operador_id: int, lido_em: datetime
 ) -> Decisao:
     """Grava um item na própria transação, com a linha travada e a decisão refeita sob a trava."""
     with transaction.atomic():
@@ -336,8 +343,6 @@ def _aplicar_item(
         d = decidir(evento, linhas, agora)
         if d.motivo == COPIAR_HORARIO:
             _copiar_horario(s, d, event_id, operador_id)
-        elif d.motivo == CANCELADO and freio:
-            d = Decisao(FREIO, s)
         elif d.motivo == CANCELADO:
             _reprovar(s, event_id)
         return d
@@ -350,7 +355,7 @@ def sincronizar(
     escrever: bool,
     agora: datetime | None = None,
     operador_id: int | None = None,
-    liberar_freio: bool = False,
+    liberar_freio: str | None = None,
 ) -> Resultado:
     """
     Uma rodada da cópia.
@@ -360,8 +365,10 @@ def sincronizar(
     - `escrever=True` + `copiar`: grava o horário e o cancelamento, item a item.
 
     `operador_id` (padrão `cursor.operador_id`) é quem faz o PATCH da descrição depois.
-    `liberar_freio` é a saída manual do dono: aplica os cancelamentos segurados só se a lista desta
-    rodada for igual à guardada em `resumo.freio_ids` (a que ele viu).
+    Freio de massa (só no `copiar` com escrita): mais de FREIO_CANCELAMENTOS cancelamentos de evento
+    aprovado e futuro e a rodada para inteira antes de aplicar qualquer coisa: nada no sistema, token
+    e adiados intactos, `ativo=False` e o `resumo` com a lista e o digest. `liberar_freio` é o digest
+    que o dono viu: igual ao desta rodada, aplica tudo; diferente, para do mesmo jeito.
     """
     agora = agora or timezone.now()
     pino = str(getattr(settings, "GCAL_OAUTH_CALENDAR_ID", "") or "")
@@ -372,7 +379,7 @@ def sincronizar(
     if aplicar and operador_id is None:
         return Resultado("ERROR", erro="modo copiar sem operador")
     if not escrever:
-        return _rodada(cursor, client, pino, agora, escrever=False, aplicar=False, operador_id=0, liberar_freio=False)
+        return _rodada(cursor, client, pino, agora, escrever=False, aplicar=False, operador_id=0, liberar_freio=None)
     with _trava_da_copia() as livre:
         if not livre:
             logger.info("gcal_copia: outra rodada em execução; pulada")
@@ -404,7 +411,7 @@ def _rodada(
     escrever: bool,
     aplicar: bool,
     operador_id: int,
-    liberar_freio: bool,
+    liberar_freio: str | None,
 ) -> Resultado:
     resumo = _Resumo(cursor.modo, agora)
     token_lido = cursor.sync_token
@@ -414,7 +421,6 @@ def _rodada(
         if isinstance(a, dict) and a.get("event_id")
     }
     adiados: dict[str, int] = {}
-    freio = lista_mudou = False
     lido_em = timezone.now()
     try:
         # 1) Adiados da rodada anterior: o syncToken não os traz de novo, então relê um a um.
@@ -439,45 +445,34 @@ def _rodada(
 
         linhas = _linhas_por_event_id(list(eventos))
         decisoes = {eid: decidir(ev, linhas.get(eid, []), agora) for eid, ev in eventos.items()}
-        # Freio de massa. Mais de FREIO_CANCELAMENTOS cancelamentos: nenhum é aplicado. No `copiar` ele
-        # fica puxado com a lista exata (event ids) em `resumo.freio_ids` e segue puxado enquanto houver
-        # cancelamento. O dono solta com `liberar_freio`, que só vale se a lista desta rodada for IGUAL à
-        # guardada; um id a mais ou a menos e nada é aplicado: a lista nova fica guardada para ele ver.
-        # O dry-run lê o mesmo cursor, então dá o mesmo veredito do --apply. O `observar` só avisa.
-        # Cancelado no Google com a linha PENDING também conta: está só esperando nos adiados, e sem
-        # ele o freio cairia sem o dono liberar.
-        atuais = sorted(
+        # Freio de massa: cancelado no Google com linha aprovada e futura, qualquer que seja o
+        # gcal_status ou a trava da linha (o PENDING de agora é o PUBLISHED da próxima rodada).
+        resumo.cancelamentos = sorted(
             eid
-            for eid, d in decisoes.items()
-            if d.motivo == CANCELADO or (d.motivo == PENDENTE_GCAL and eventos[eid].get("status") == "cancelled")
+            for eid, ev in eventos.items()
+            if ev.get("status") == "cancelled"
+            and any(s.status == Solicitacao.Status.APROVADO and s.inicio >= agora for s in linhas.get(eid, []))
         )
-        copiar = cursor.modo == GCalCopiaCursor.Modo.COPIAR
-        guardados = cursor.resumo.get("freio_ids") if copiar and isinstance(cursor.resumo, dict) else None
-        puxado = bool(guardados)
-        liberado = liberar_freio and puxado and set(atuais) == {str(x) for x in guardados or []}
-        freio = bool(atuais) and not liberado and (puxado or len(atuais) > FREIO_CANCELAMENTOS)
-        lista_mudou = freio and liberar_freio and puxado
-        if freio:
-            resumo.freio = len(atuais)
-            if copiar:
-                resumo.freio_ids = atuais
+        resumo.digest = _digest(resumo.cancelamentos)
+        if liberar_freio is None:
+            resumo.freio = len(resumo.cancelamentos) > FREIO_CANCELAMENTOS
+        else:
+            resumo.freio = liberar_freio != resumo.digest
+        parar = aplicar and resumo.freio
 
         for event_id, d in decisoes.items():
+            if parar:
+                resumo.conta(d)  # só conta: a rodada para logo abaixo, sem aplicar nada
+                continue
             if aplicar and d.motivo in (COPIAR_HORARIO, CANCELADO) and d.solicitacao is not None:
                 try:
-                    d = _aplicar_item(d.solicitacao.pk, event_id, eventos[event_id], agora, operador_id, freio, lido_em)
+                    d = _aplicar_item(d.solicitacao.pk, event_id, eventos[event_id], agora, operador_id, lido_em)
                 except _ERROS_DE_DOMINIO as e:
                     resumo.falha(event_id, type(e).__name__)
                     continue
-            elif d.motivo == CANCELADO and freio:
-                d = Decisao(FREIO, d.solicitacao)
             resumo.conta(d)
-            transitorio = d.motivo in _TRANSITORIOS
-            # Segurado pelo freio e vindo dos adiados: o token segurado não o traz de novo, então fica
-            # nos adiados sem gastar tentativa (o freio pode durar mais que MAX_TENTATIVAS_ADIADO rodadas).
-            segurado = copiar and d.motivo == FREIO and event_id in tentativas
-            if transitorio or segurado:
-                n = tentativas.get(event_id, 0) + (1 if transitorio else 0)
+            if d.motivo in _TRANSITORIOS:
+                n = tentativas.get(event_id, 0) + 1
                 if n >= MAX_TENTATIVAS_ADIADO:
                     resumo.falha(event_id, f"adiado_{MAX_TENTATIVAS_ADIADO}x")
                 elif len(adiados) >= MAX_ADIADOS:
@@ -491,43 +486,50 @@ def _rodada(
             GCalCopiaCursor.objects.filter(pk=cursor.pk).update(ultimo_erro=erro, updated_at=timezone.now())
         return Resultado("ERROR", resumo.como_dict(), erro)
 
+    if parar:
+        return _parar_no_freio(cursor, resumo)
+
     anterior = cursor.resumo if cursor.modo == GCalCopiaCursor.Modo.OBSERVAR else None
     if not (isinstance(anterior, dict) and anterior.get("modo") == GCalCopiaCursor.Modo.OBSERVAR):
         anterior = None
     dados = resumo.como_dict(anterior)
-    ultimo_erro = ""
-    if lista_mudou:
-        ultimo_erro = "freio: lista mudou"
-    elif freio:
-        ultimo_erro = f"freio: {resumo.freio} cancelamentos"
     logger.info(
-        "gcal_copia: modo=%s lidos=%s contagens=%s falhas=%s freio=%s",
+        "gcal_copia: modo=%s lidos=%s contagens=%s falhas=%s cancelamentos=%s freio=%s",
         cursor.modo,
         resumo.lidos,
         resumo.contagens,
         len(resumo.falhas),
+        len(resumo.cancelamentos),
         resumo.freio,
     )
     if not escrever:
-        return Resultado("OK", dados, ultimo_erro, token_novo)
+        return Resultado("OK", dados, "", token_novo)
 
     campos: dict[str, Any] = {
         "resumo": dados,
         "adiados": [{"event_id": eid, "tentativas": n} for eid, n in adiados.items()],
         "ultimo_sucesso_em": timezone.now(),
-        "ultimo_erro": ultimo_erro,
+        "ultimo_erro": "",
+        "sync_token": token_novo,
         "updated_at": timezone.now(),
     }
-    # Com o freio no `copiar`, o token NÃO avança: os cancelamentos voltam na próxima rodada até o
-    # dono liberar (`liberar_freio`). O horário copiado nesta rodada volta como eco, sem efeito. No
-    # `observar` nada é aplicado: o token avança e o freio fica só como aviso.
-    if not (freio and aplicar):
-        campos["sync_token"] = token_novo
     # Compare-and-set: só grava se ninguém trocou o token nem o modo durante a rodada (`trocar_modo`).
     if not GCalCopiaCursor.objects.filter(pk=cursor.pk, sync_token=token_lido, modo=cursor.modo).update(**campos):
         logger.warning("gcal_copia: o token mudou durante a rodada; resultado descartado")
         return Resultado("ERROR", dados, "o token mudou durante a rodada", token_novo)
-    return Resultado("OK", dados, ultimo_erro, token_novo)
+    return Resultado("OK", dados, "", token_novo)
+
+
+def _parar_no_freio(cursor: GCalCopiaCursor, resumo: _Resumo) -> Resultado:
+    """A rodada parou antes de aplicar: só o cursor muda (desligado, erro e resumo). Token e adiados
+    ficam, então a próxima rodada relê a mesma lista."""
+    erro = f"freio: {len(resumo.cancelamentos)} cancelamentos ({resumo.digest})"
+    logger.warning("gcal_copia: %s; rodada parada sem aplicar nada e cópia desligada", erro)
+    dados = resumo.como_dict()
+    GCalCopiaCursor.objects.filter(pk=cursor.pk).update(
+        ativo=False, ultimo_erro=erro, resumo=dados, updated_at=timezone.now()
+    )
+    return Resultado("ERROR", dados, erro)
 
 
 def trocar_modo(cursor: GCalCopiaCursor, modo: str) -> None:

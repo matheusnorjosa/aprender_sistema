@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from datetime import timedelta
 from datetime import timezone as dt_timezone
 from io import StringIO
@@ -130,10 +131,10 @@ def test_pino_vazio_ou_primary_e_erro(fake, settings):
 
 def test_liberar_freio_exige_apply(fake):
     with pytest.raises(CommandError, match="--apply"):
-        _rodar("--liberar-freio", "--operador", str(UsuarioFactory().pk))
+        _rodar("--liberar-freio", "abc123abc123", "--operador", str(UsuarioFactory().pk))
 
 
-def test_freio_mostra_a_lista_no_dry_run_e_libera_so_ela(fake):
+def test_freio_mostra_a_lista_e_o_digest_e_libera_so_com_ele(fake):
     inicio = (timezone.now() + timedelta(days=3)).replace(minute=0, second=0, microsecond=0)
     eids = [f"c{i}" for i in range(6)]
     for eid in eids:
@@ -146,17 +147,22 @@ def test_freio_mostra_a_lista_no_dry_run_e_libera_so_ela(fake):
         )
         fim = inicio + timedelta(hours=2)
         fake.insert(PINO, eid, {"start": {"dateTime": inicio.isoformat()}, "end": {"dateTime": fim.isoformat()}})
-    GCalCopiaCursor.objects.create(calendar_id=PINO, modo="copiar", operador=UsuarioFactory())
+    GCalCopiaCursor.objects.create(calendar_id=PINO, modo="copiar", ativo=True, operador=UsuarioFactory())
     _rodar("--apply")  # linha de base
     for eid in eids:
         fake.delete(PINO, eid)
+    digest = hashlib.sha256(" ".join(eids).encode()).hexdigest()[:12]
 
-    _rodar("--apply")  # puxa o freio
     previa = _rodar()
 
-    assert "erro=freio: 6 cancelamentos" in previa
-    assert f"freio_ids: 6 [{' '.join(eids)}]" in previa
+    assert f"freio: 6 cancelamentos, digest {digest} [{' '.join(eids)}]" in previa
+    assert "freio=sim" in previa
+    with pytest.raises(CommandError, match=rf"freio: 6 cancelamentos \({digest}\)"):
+        _rodar("--apply")
+    with pytest.raises(CommandError, match="freio"):
+        _rodar("--apply", "--liberar-freio", "0" * 12)
     assert not AuditLog.objects.filter(action="REJECT").exists()
+    assert GCalCopiaCursor.objects.get(calendar_id=PINO).ativo is False
 
-    _rodar("--apply", "--liberar-freio")
+    _rodar("--apply", "--liberar-freio", digest)  # a cópia desligada ainda roda à mão
     assert AuditLog.objects.filter(action="REJECT").count() == 6

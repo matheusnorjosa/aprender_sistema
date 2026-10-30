@@ -5,6 +5,7 @@ Uso:
     python manage.py gcal_copia                 # dry-run: lê e decide, não grava nada
     python manage.py gcal_copia --apply         # grava (no modo do cursor: observar ou copiar)
     python manage.py gcal_copia --operador 7    # outra conta Google faz a leitura
+    python manage.py gcal_copia --apply --liberar-freio <digest>   # aplica a lista que o freio parou
 
 A agenda é sempre `GCAL_OAUTH_CALENDAR_ID` (vazio ou 'primary' é erro). A saída só traz
 contagens por motivo, futuro/passado e s<id>: nada de título, nome ou e-mail.
@@ -36,16 +37,17 @@ class Command(BaseCommand):
         parser.add_argument("--operador", type=int, default=None, help="Id do usuário cuja conta Google lê")
         parser.add_argument(
             "--liberar-freio",
-            action="store_true",
+            default=None,
+            metavar="DIGEST",
             help=(
-                "Aplica os cancelamentos que o freio de massa segurou, só se a lista for a mesma da "
-                "rodada anterior (freio_ids); se mudou, nada é aplicado e a lista nova fica (só com --apply)"
+                "Digest da lista de cancelamentos que o freio de massa parou (sai no dry-run e no erro). "
+                "Igual ao da rodada: aplica tudo; diferente: a rodada para de novo (só com --apply)"
             ),
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
         aplicar: bool = options["apply"]
-        if options["liberar_freio"] and not aplicar:
+        if options["liberar_freio"] is not None and not aplicar:
             raise CommandError("--liberar-freio só vale com --apply")
         pino = str(getattr(settings, "GCAL_OAUTH_CALENDAR_ID", "") or "")
         if not pino or pino == "primary":
@@ -85,12 +87,15 @@ class Command(BaseCommand):
         out.write(
             f"lidos={resumo.get('lidos', 0)} leitura_completa={resumo.get('leitura_completa')} "
             f"futuro={resumo.get('futuro', 0)} passado={resumo.get('passado', 0)} "
-            f"falhas={len(resumo.get('falhas', []))} freio={resumo.get('freio', 0)}"
+            f"falhas={len(resumo.get('falhas', []))} freio={'sim' if resumo.get('freio') else 'não'}"
         )
-        freio_ids = resumo.get("freio_ids", [])
-        if freio_ids:
-            # A lista inteira que o --liberar-freio vai comparar: é esta que o dono confere.
-            out.write(f"freio_ids: {len(freio_ids)} [{' '.join(freio_ids)}]")
+        cancelamentos = resumo.get("cancelamentos", [])
+        if cancelamentos:
+            # A lista inteira e o digest que o --liberar-freio precisa repetir: é isto que o dono confere.
+            out.write(
+                f"freio: {len(cancelamentos)} cancelamentos, digest {resumo.get('digest')} "
+                f"[{' '.join(cancelamentos)}]"
+            )
         for motivo, n in sorted(resumo.get("contagens", {}).items()):
             ids = resumo.get("ids", {}).get(motivo, [])
             out.write(f"  {motivo}: {n}" + (f" [{' '.join(ids)}]" if ids else ""))

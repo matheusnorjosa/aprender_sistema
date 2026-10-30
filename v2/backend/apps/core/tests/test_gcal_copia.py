@@ -11,6 +11,7 @@ registro não sobe até a raiz onde o caplog escuta (mesmo padrão de test_gcal_
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -563,10 +564,10 @@ def test_timeline_mostra_a_copia(agora, fake, enfileirados):
 
 # --- freio de massa ---
 #
-# Regra: no `copiar`, mais de FREIO_CANCELAMENTOS cancelamentos numa rodada puxa o freio: nenhum é
-# aplicado, o token fica e a lista exata (event ids) vai para `resumo.freio_ids`. Puxado, segue puxado
-# enquanto houver cancelamento. `liberar_freio` só aplica se a lista da rodada for IGUAL à guardada;
-# se mudou um id que seja, nada é aplicado e a lista nova fica guardada para o dono ver.
+# Regra (sem estado guardado): no `copiar`, se a rodada traz mais de FREIO_CANCELAMENTOS cancelamentos
+# de evento aprovado e futuro, ela PARA inteira: nada é gravado no sistema, o token e os adiados ficam,
+# a cópia desliga (`ativo=False`) e o `resumo` mostra a lista e o digest. O dono libera passando o
+# digest daquela lista exata; digest de outra lista para a rodada do mesmo jeito.
 
 
 def _cancelamentos(agora, fake, n: int) -> tuple[GCalCopiaCursor, list[Solicitacao]]:
@@ -587,120 +588,101 @@ def _ids(n: int, prefixo: str = "c") -> list[str]:
     return sorted(f"{prefixo}{i}" for i in range(n))
 
 
-def _puxar(cursor: GCalCopiaCursor, fake: FakeCalendarClient, agora: datetime) -> str | None:
-    """Uma rodada que puxa o freio; devolve o token segurado."""
-    r = sincronizar(cursor, fake, escrever=True, agora=agora)
-    assert r.status == "OK" and r.resumo["freio_ids"], r.erro
+def _digest(ids: list[str]) -> str:
+    return hashlib.sha256(" ".join(ids).encode()).hexdigest()[:12]
+
+
+def _foto_do_sistema() -> tuple[list[tuple[Any, ...]], int]:
+    linhas = list(
+        Solicitacao.objects.order_by("pk").values_list(
+            "pk", "status", "inicio", "fim", "external_event_id", "gcal_status", "updated_at"
+        )
+    )
+    return linhas, AuditLog.objects.count()
+
+
+def _assert_parou(
+    r, cursor: GCalCopiaCursor, ids: list[str], token: str | None, adiados: list[dict[str, Any]], foto
+) -> None:
+    """A rodada parou no freio: erro, nada gravado no sistema, token e adiados intactos, cópia desligada."""
+    digest = _digest(ids)
+    assert r.status == "ERROR"
+    assert r.erro == f"freio: {len(ids)} cancelamentos ({digest})"
+    assert r.resumo["cancelamentos"] == ids and r.resumo["digest"] == digest and r.resumo["freio"] is True
+    assert _foto_do_sistema() == foto, "nada no sistema: nem cancelamento, nem horário, nem AuditLog"
     cursor.refresh_from_db()
-    return cursor.sync_token
+    assert cursor.ativo is False
+    assert cursor.sync_token == token and cursor.adiados == adiados
+    assert cursor.ultimo_erro == r.erro and cursor.resumo == r.resumo, "o resumo é trocado pelo desta rodada"
 
 
 @pytest.mark.django_db
-def test_freio_mais_de_5_cancelamentos_nao_aplica_nenhum_e_guarda_a_lista(agora, fake, enfileirados):
-    cursor, linhas = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS + 1)
-    token_antes = cursor.sync_token
+def test_freio_mais_de_5_cancelamentos_para_a_rodada_sem_gravar_nada(agora, fake, enfileirados):
+    cursor, _ = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS + 1)
+    adiados = [{"event_id": "outro", "tentativas": 2}]
+    GCalCopiaCursor.objects.filter(pk=cursor.pk).update(adiados=adiados)
+    cursor.refresh_from_db()
+    token = cursor.sync_token
+    foto = _foto_do_sistema()
 
     r = sincronizar(cursor, fake, escrever=True, agora=agora)
 
-    assert r.status == "OK"
-    assert r.resumo["contagens"] == {"freio": 6, "copiar_horario": 1}
-    assert r.resumo["freio"] == 6 and r.resumo["freio_ids"] == _ids(6)
-    assert all(Solicitacao.objects.get(pk=s.pk).status == "aprovado" for s in linhas[:-1])
-    assert not AuditLog.objects.filter(action="REJECT").exists()
-    assert Solicitacao.objects.get(pk=linhas[-1].pk).inicio == _hora(agora, 8), "horário segue sendo copiado"
-    cursor.refresh_from_db()
-    assert cursor.ultimo_erro == "freio: 6 cancelamentos"
-    assert cursor.resumo["freio_ids"] == _ids(6)
-    assert cursor.sync_token == token_antes, "a linha de base fica para a próxima rodada"
+    _assert_parou(r, cursor, _ids(6), token, adiados, foto)
+    assert r.resumo["contagens"] == {"cancelado": 6, "copiar_horario": 1}
+    assert enfileirados == []
 
     r2 = sincronizar(cursor, fake, escrever=True, agora=agora)
-    assert r2.resumo["contagens"] == {"freio": 6, "eco": 1}, "os cancelamentos voltam na rodada seguinte"
+    _assert_parou(r2, cursor, _ids(6), token, adiados, foto)
 
 
 @pytest.mark.django_db
-def test_freio_segue_puxado_quando_a_lista_encolhe_sem_o_dono_liberar(agora, fake, enfileirados):
-    """Um dos 6 começa e vira passado: os 5 que sobram continuam segurados, com a lista nova."""
-    linhas = [_publicada(agora, eid=f"c{i}") for i in range(copia.FREIO_CANCELAMENTOS)]
-    linhas.append(_publicada(agora, eid="logo", inicio=agora + timedelta(hours=1)))
-    for s in linhas:
+def test_liberar_com_o_digest_da_lista_aplica_tudo(agora, fake, enfileirados):
+    cursor, linhas = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS + 1)
+    token = cursor.sync_token
+    parada = sincronizar(cursor, fake, escrever=True, agora=agora)
+    assert parada.status == "ERROR"
+
+    r = sincronizar(cursor, fake, escrever=True, agora=agora, liberar_freio=parada.resumo["digest"])
+
+    assert r.status == "OK" and r.erro == ""
+    assert r.resumo["contagens"] == {"cancelado": 6, "copiar_horario": 1}
+    assert r.resumo["cancelamentos"] == _ids(6) and r.resumo["freio"] is False
+    assert AuditLog.objects.filter(action="REJECT").count() == 6
+    assert all(Solicitacao.objects.get(pk=s.pk).status == "reprovado" for s in linhas[:-1])
+    assert Solicitacao.objects.get(pk=linhas[-1].pk).inicio == _hora(agora, 8)
+    cursor.refresh_from_db()
+    assert cursor.sync_token != token and cursor.ultimo_erro == ""
+    assert cursor.ativo is False, "religar a cópia é com o dono"
+
+
+@pytest.mark.django_db
+def test_liberar_com_digest_de_lista_com_um_a_mais_para_a_rodada(agora, fake, enfileirados):
+    linhas = [_publicada(agora, eid=f"c{i}") for i in range(copia.FREIO_CANCELAMENTOS + 1)]
+    extra = _publicada(agora, eid="d0")
+    for s in (*linhas, extra):
         _no_google(fake, s)
     cursor = _cursor()
     _linha_de_base(cursor, fake, agora)
     for s in linhas:
         fake.delete(PINO, s.external_event_id)
-    token_segurado = _puxar(cursor, fake, agora)
-
-    r = sincronizar(cursor, fake, escrever=True, agora=agora + timedelta(hours=2))
-
-    assert r.resumo["contagens"] == {"freio": 5, "passado": 1}
-    assert not AuditLog.objects.filter(action="REJECT").exists()
-    cursor.refresh_from_db()
-    assert cursor.resumo["freio_ids"] == _ids(5)
-    assert cursor.sync_token == token_segurado and cursor.ultimo_erro == "freio: 5 cancelamentos"
-
-
-@pytest.mark.django_db
-def test_dry_run_mostra_o_freio_puxado_igual_ao_apply_sem_gravar(agora, fake, enfileirados):
-    cursor, _ = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS + 1)
-    _puxar(cursor, fake, agora)
-    gravado = GCalCopiaCursor.objects.get(pk=cursor.pk)
-
-    previa = sincronizar(cursor, fake, escrever=False, agora=agora)
-
-    depois = GCalCopiaCursor.objects.get(pk=cursor.pk)
-    assert (depois.resumo, depois.sync_token, depois.ultimo_erro, depois.updated_at) == (
-        gravado.resumo,
-        gravado.sync_token,
-        gravado.ultimo_erro,
-        gravado.updated_at,
-    ), "o dry-run não grava nada"
-    r = sincronizar(cursor, fake, escrever=True, agora=agora)
-    assert previa.status == r.status == "OK"
-    assert previa.resumo == r.resumo and previa.resumo["freio_ids"] == _ids(6)
-    assert previa.erro == r.erro == "freio: 6 cancelamentos"
-
-
-@pytest.mark.django_db
-def test_liberar_com_a_mesma_lista_aplica_e_solta_o_freio(agora, fake, enfileirados):
-    cursor, linhas = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS + 1)
-    token_segurado = _puxar(cursor, fake, agora)
-
-    r = sincronizar(cursor, fake, escrever=True, agora=agora, liberar_freio=True)
-
-    assert r.resumo["contagens"] == {"cancelado": 6, "eco": 1}
-    assert r.resumo["freio"] == 0 and r.resumo["freio_ids"] == []
-    assert AuditLog.objects.filter(action="REJECT").count() == 6
-    assert all(Solicitacao.objects.get(pk=s.pk).status == "reprovado" for s in linhas[:-1])
-    cursor.refresh_from_db()
-    assert cursor.ultimo_erro == "" and cursor.resumo["freio_ids"] == []
-    assert cursor.sync_token != token_segurado
-
-
-@pytest.mark.django_db
-def test_liberar_com_um_id_a_mais_nao_aplica_nenhum_e_guarda_a_lista_nova(agora, fake, enfileirados):
-    cursor, _ = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS + 1)
-    extra = _publicada(agora, eid="d0")
-    _no_google(fake, extra)
-    token_segurado = _puxar(cursor, fake, agora)  # segura os 6; o d0 entra na leitura como eco
+    parada = sincronizar(cursor, fake, escrever=True, agora=agora)
+    assert parada.resumo["cancelamentos"] == _ids(6)
     fake.delete(PINO, "d0")
-
-    r = sincronizar(cursor, fake, escrever=True, agora=agora, liberar_freio=True)
-
-    assert r.resumo["contagens"] == {"freio": 7, "eco": 1}
-    assert r.resumo["freio_ids"] == sorted([*_ids(6), "d0"])
-    assert not AuditLog.objects.filter(action="REJECT").exists()
     cursor.refresh_from_db()
-    assert cursor.resumo["freio_ids"] == sorted([*_ids(6), "d0"])
-    assert cursor.sync_token == token_segurado and cursor.ultimo_erro == "freio: lista mudou"
+    token, foto = cursor.sync_token, _foto_do_sistema()
 
-    r2 = sincronizar(cursor, fake, escrever=True, agora=agora, liberar_freio=True)
-    assert r2.resumo["contagens"]["cancelado"] == 7, "a lista nova, vista pelo dono, é liberada"
+    r = sincronizar(cursor, fake, escrever=True, agora=agora, liberar_freio=parada.resumo["digest"])
+
+    _assert_parou(r, cursor, sorted([*_ids(6), "d0"]), token, [], foto)
+
+    r2 = sincronizar(cursor, fake, escrever=True, agora=agora, liberar_freio=r.resumo["digest"])
+    assert r2.status == "OK" and r2.resumo["contagens"] == {"cancelado": 7}
     assert AuditLog.objects.filter(action="REJECT").count() == 7
 
 
 @pytest.mark.django_db
-def test_liberar_com_um_id_a_menos_nao_aplica_nenhum_e_guarda_a_lista_nova(agora, fake, enfileirados):
-    """Um dos 6 segurados vira passado: a lista encolheu, então a liberação não aplica os 5."""
+def test_liberar_com_digest_de_lista_com_um_a_menos_para_a_rodada(agora, fake, enfileirados):
+    """Um dos 6 começa e vira passado: sobram 5 (abaixo do limite), mas o digest não é o deles."""
     linhas = [_publicada(agora, eid=f"c{i}") for i in range(copia.FREIO_CANCELAMENTOS)]
     linhas.append(_publicada(agora, eid="logo", inicio=agora + timedelta(hours=1)))
     for s in linhas:
@@ -709,172 +691,94 @@ def test_liberar_com_um_id_a_menos_nao_aplica_nenhum_e_guarda_a_lista_nova(agora
     _linha_de_base(cursor, fake, agora)
     for s in linhas:
         fake.delete(PINO, s.external_event_id)
-    token_segurado = _puxar(cursor, fake, agora)
+    parada = sincronizar(cursor, fake, escrever=True, agora=agora)
+    assert parada.resumo["cancelamentos"] == sorted([*_ids(5), "logo"])
+    cursor.refresh_from_db()
+    token, foto = cursor.sync_token, _foto_do_sistema()
     depois = agora + timedelta(hours=2)
 
-    r = sincronizar(cursor, fake, escrever=True, agora=depois, liberar_freio=True)
+    r = sincronizar(cursor, fake, escrever=True, agora=depois, liberar_freio=parada.resumo["digest"])
 
-    assert r.resumo["contagens"] == {"freio": 5, "passado": 1}
-    assert not AuditLog.objects.filter(action="REJECT").exists()
-    cursor.refresh_from_db()
-    assert cursor.resumo["freio_ids"] == _ids(5)
-    assert cursor.sync_token == token_segurado and cursor.ultimo_erro == "freio: lista mudou"
+    _assert_parou(r, cursor, _ids(5), token, [], foto)
 
-    r2 = sincronizar(cursor, fake, escrever=True, agora=depois, liberar_freio=True)
-    assert r2.resumo["contagens"] == {"cancelado": 5, "passado": 1}
+    r2 = sincronizar(cursor, fake, escrever=True, agora=depois, liberar_freio=r.resumo["digest"])
+    assert r2.status == "OK" and r2.resumo["contagens"] == {"cancelado": 5, "passado": 1}
     assert AuditLog.objects.filter(action="REJECT").count() == 5
 
 
 @pytest.mark.django_db
-def test_liberar_com_a_mesma_contagem_e_outra_lista_nao_aplica(agora, fake, enfileirados):
-    """6 segurados; 1 vira passado e entra 1 cancelamento novo: a contagem é a mesma, a lista não."""
-    linhas = [_publicada(agora, eid=f"c{i}") for i in range(copia.FREIO_CANCELAMENTOS)]
-    linhas.append(_publicada(agora, eid="logo", inicio=agora + timedelta(hours=1)))
-    novo = _publicada(agora, eid="novo")
-    for s in (*linhas, novo):
-        _no_google(fake, s)
-    cursor = _cursor()
-    _linha_de_base(cursor, fake, agora)
-    for s in linhas:
-        fake.delete(PINO, s.external_event_id)
-    token_segurado = _puxar(cursor, fake, agora)
-    fake.delete(PINO, novo.external_event_id)
-
-    r = sincronizar(cursor, fake, escrever=True, agora=agora + timedelta(hours=2), liberar_freio=True)
-
-    assert r.resumo["contagens"] == {"freio": 6, "passado": 1}
-    assert r.resumo["freio_ids"] == sorted([*_ids(5), "novo"])
-    assert not AuditLog.objects.filter(action="REJECT").exists()
-    assert all(Solicitacao.objects.get(pk=s.pk).status == "aprovado" for s in (*linhas, novo))
-    cursor.refresh_from_db()
-    assert cursor.sync_token == token_segurado and cursor.ultimo_erro == "freio: lista mudou"
-
-
-@pytest.mark.django_db
-def test_liberar_sem_freio_puxado_antes_nao_solta(agora, fake, enfileirados):
-    """Sem lista guardada, o dono não viu nada: o freio puxa como sempre."""
-    cursor, _ = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS + 1)
-
-    r = sincronizar(cursor, fake, escrever=True, agora=agora, liberar_freio=True)
-
-    assert r.resumo["freio_ids"] == _ids(6)
-    assert not AuditLog.objects.filter(action="REJECT").exists()
-    cursor.refresh_from_db()
-    assert cursor.ultimo_erro == "freio: 6 cancelamentos"
-
-
-@pytest.mark.django_db
-def test_freio_no_observar_avisa_avanca_o_token_e_nao_puxa(agora, fake, enfileirados):
-    cursor, linhas = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS + 1)
-    trocar_modo(cursor, "observar")
-    token_antes = cursor.sync_token
+def test_5_cancelamentos_aplicam_normalmente(agora, fake, enfileirados):
+    cursor, _ = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS)
 
     r = sincronizar(cursor, fake, escrever=True, agora=agora)
 
-    assert r.resumo["contagens"] == {"freio": 6, "copiar_horario": 1}
+    assert r.status == "OK" and r.erro == ""
+    assert r.resumo["contagens"] == {"cancelado": 5, "copiar_horario": 1}
+    assert r.resumo["cancelamentos"] == _ids(5) and r.resumo["freio"] is False
+    assert AuditLog.objects.filter(action="REJECT").count() == 5
     cursor.refresh_from_db()
-    assert cursor.ultimo_erro == "freio: 6 cancelamentos", "o freio segue como aviso"
-    assert cursor.sync_token != token_antes, "no observar nada é aplicado: o token avança"
-    assert cursor.resumo["freio_ids"] == [], "o observar não guarda lista"
+    assert cursor.ativo is True
 
-    sincronizar(cursor, fake, escrever=True, agora=agora)
-    cursor.refresh_from_db()
-    assert cursor.resumo["contagens"] == {"freio": 6, "copiar_horario": 1}, "a mesma mudança não conta 2x"
-    assert cursor.resumo["futuro"] == 7
+
+@pytest.mark.django_db
+def test_cancelamento_com_linha_pending_ou_error_conta_no_freio(agora, fake, enfileirados):
+    cursor, linhas = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS + 1)
+    Solicitacao.objects.filter(pk=linhas[0].pk).update(gcal_status=Solicitacao.GCalStatus.PENDING)
+    Solicitacao.objects.filter(pk=linhas[1].pk).update(gcal_status=Solicitacao.GCalStatus.ERROR)
+    token, foto = cursor.sync_token, _foto_do_sistema()
+
+    r = sincronizar(cursor, fake, escrever=True, agora=agora)
+
+    _assert_parou(r, cursor, _ids(6), token, [], foto)
+    assert r.resumo["contagens"] == {"pendente_gcal": 1, "erro_gcal": 1, "cancelado": 4, "copiar_horario": 1}
+
+
+@pytest.mark.django_db
+def test_dry_run_mostra_a_mesma_lista_e_digest_do_apply_sem_gravar(agora, fake, enfileirados):
+    cursor, _ = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS + 1)
+    gravado = GCalCopiaCursor.objects.get(pk=cursor.pk)
+    foto = _foto_do_sistema()
+
+    previa = sincronizar(cursor, fake, escrever=False, agora=agora)
+
+    assert previa.status == "OK", "o dry-run não para"
+    assert previa.resumo["freio"] is True and previa.resumo["contagens"] == {"cancelado": 6, "copiar_horario": 1}
+    assert _foto_do_sistema() == foto
+    depois = GCalCopiaCursor.objects.get(pk=cursor.pk)
+    campos = ("resumo", "sync_token", "adiados", "ativo", "ultimo_erro", "updated_at")
+    assert [getattr(depois, c) for c in campos] == [getattr(gravado, c) for c in campos], "não grava nada"
+
+    r = sincronizar(cursor, fake, escrever=True, agora=agora)
+    assert r.status == "ERROR"
+    assert previa.resumo["cancelamentos"] == r.resumo["cancelamentos"] == _ids(6)
+    assert previa.resumo["digest"] == r.resumo["digest"] == _digest(_ids(6))
+
+
+@pytest.mark.django_db
+def test_observar_nunca_para_e_mostra_a_lista(agora, fake, enfileirados):
+    cursor, linhas = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS + 1)
+    trocar_modo(cursor, "observar")
+    token = cursor.sync_token
+
+    r = sincronizar(cursor, fake, escrever=True, agora=agora)
+
+    assert r.status == "OK" and r.erro == ""
+    assert r.resumo["freio"] is True and r.resumo["cancelamentos"] == _ids(6)
+    assert r.resumo["digest"] == _digest(_ids(6))
     assert all(Solicitacao.objects.get(pk=s.pk).status == "aprovado" for s in linhas)
+    assert not AuditLog.objects.filter(action="REJECT").exists()
+    cursor.refresh_from_db()
+    assert cursor.ativo is True and cursor.ultimo_erro == ""
+    assert cursor.sync_token != token, "no observar nada é aplicado: o token avança"
+    assert cursor.resumo["cancelamentos"] == _ids(6)
 
-    # Passa a copiar sem zerar o token: um cancelamento só não pode ficar preso num freio do observar.
+    # Passa a copiar sem zerar o token: um cancelamento só passa direto.
     GCalCopiaCursor.objects.filter(pk=cursor.pk).update(modo="copiar")
     cursor.refresh_from_db()
     fake.delete(PINO, "movida")
     r3 = sincronizar(cursor, fake, escrever=True, agora=agora)
     assert r3.resumo["contagens"] == {"cancelado": 1}
     assert Solicitacao.objects.get(pk=linhas[-1].pk).status == "reprovado"
-
-
-@pytest.mark.django_db
-def test_cancelamento_vindo_dos_adiados_segurado_pelo_freio_nao_se_perde(agora, fake, enfileirados):
-    """x cancela com a linha PENDING (adiado, o token avança); depois o freio o segura com mais 6.
-
-    O token segurado já não traz x: só os adiados o trazem. Ele fica lá, sem gastar tentativa, e a
-    1ª liberação da lista que o dono viu aplica os 7.
-    """
-    x = _publicada(agora, eid="x")
-    linhas = [_publicada(agora, eid=f"c{i}") for i in range(copia.FREIO_CANCELAMENTOS + 1)]
-    for s in (x, *linhas):
-        _no_google(fake, s)
-    cursor = _cursor()
-    _linha_de_base(cursor, fake, agora)
-
-    # k: x cancela com a linha PENDING; vira adiado e o token avança.
-    Solicitacao.objects.filter(pk=x.pk).update(gcal_status=Solicitacao.GCalStatus.PENDING)
-    fake.delete(PINO, "x")
-    token_k = cursor.sync_token
-    r = sincronizar(cursor, fake, escrever=True, agora=agora)
-    assert r.resumo["contagens"] == {"pendente_gcal": 1} and r.resumo["freio_ids"] == []
-    cursor.refresh_from_db()
-    assert cursor.adiados == [{"event_id": "x", "tentativas": 1}] and cursor.sync_token != token_k
-
-    # k+1: x publicada de novo; c0..c5 cancelam. O freio segura os 7, x incluído.
-    Solicitacao.objects.filter(pk=x.pk).update(gcal_status=Solicitacao.GCalStatus.PUBLISHED)
-    for s in linhas:
-        fake.delete(PINO, s.external_event_id)
-    sete = sorted([*_ids(6), "x"])
-    r = sincronizar(cursor, fake, escrever=True, agora=agora)
-    assert r.resumo["contagens"] == {"freio": 7} and r.resumo["freio_ids"] == sete
-    cursor.refresh_from_db()
-    assert cursor.adiados == [{"event_id": "x", "tentativas": 1}], "segurado: fica, sem gastar tentativa"
-    assert not AuditLog.objects.filter(action="REJECT").exists()
-
-    # k+2: o dono libera a mesma lista de 7: aplica os 7, x incluído.
-    r = sincronizar(cursor, fake, escrever=True, agora=agora, liberar_freio=True)
-    assert r.erro == "", "a 1ª liberação não pode dar 'lista mudou'"
-    assert r.resumo["contagens"] == {"cancelado": 7}
-    assert AuditLog.objects.filter(action="REJECT").count() == 7
-    assert Solicitacao.objects.get(pk=x.pk).status == "reprovado"
-    cursor.refresh_from_db()
-    assert cursor.adiados == [] and cursor.ultimo_erro == "" and cursor.resumo["freio_ids"] == []
-
-
-@pytest.mark.django_db
-def test_freio_segue_puxado_com_os_segurados_pendentes_no_sistema(agora, fake, enfileirados):
-    """Os 6 segurados ficam PENDING numa rodada: seguem contando como cancelamento segurado.
-
-    Sem isso o freio caía (nenhum CANCELADO na rodada) e os 5 que voltam a PUBLISHED passavam sem
-    o dono liberar.
-    """
-    cursor, linhas = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS + 1)
-    token_segurado = _puxar(cursor, fake, agora)
-    canceladas = [s.pk for s in linhas[:-1]]
-
-    Solicitacao.objects.filter(pk__in=canceladas).update(gcal_status=Solicitacao.GCalStatus.PENDING)
-    r = sincronizar(cursor, fake, escrever=True, agora=agora)
-    assert r.resumo["freio_ids"] == _ids(6)
-    cursor.refresh_from_db()
-    assert cursor.sync_token == token_segurado and cursor.resumo["freio_ids"] == _ids(6)
-
-    Solicitacao.objects.filter(pk__in=canceladas[:5]).update(gcal_status=Solicitacao.GCalStatus.PUBLISHED)
-    r = sincronizar(cursor, fake, escrever=True, agora=agora)
-    assert r.resumo["freio_ids"] == _ids(6)
-    assert not AuditLog.objects.filter(action="REJECT").exists()
-
-    Solicitacao.objects.filter(pk=canceladas[5]).update(gcal_status=Solicitacao.GCalStatus.PUBLISHED)
-    r = sincronizar(cursor, fake, escrever=True, agora=agora)
-    assert r.resumo["contagens"] == {"freio": 6, "eco": 1}
-    assert not AuditLog.objects.filter(action="REJECT").exists()
-    assert all(Solicitacao.objects.get(pk=pk).status == "aprovado" for pk in canceladas)
-    cursor.refresh_from_db()
-    assert cursor.resumo["freio_ids"] == _ids(6) and cursor.sync_token == token_segurado
-
-
-@pytest.mark.django_db
-def test_5_cancelamentos_passam_pelo_freio(agora, fake, enfileirados):
-    cursor, _ = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS)
-
-    r = sincronizar(cursor, fake, escrever=True, agora=agora)
-
-    assert r.resumo["contagens"]["cancelado"] == 5 and r.resumo["freio_ids"] == []
-    assert AuditLog.objects.filter(action="REJECT").count() == 5
 
 
 # --- erros ---

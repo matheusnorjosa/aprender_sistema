@@ -559,6 +559,21 @@ def task_cancel_solicitacao_from_gcal(
         }
 
 
+@shared_task(name="apps.core.tasks.task_gcal_copia_descricao", ignore_result=True)
+def task_gcal_copia_descricao(solicitation_id: int, operator_user_id: int) -> str:
+    """Cópia Google → Sistema: PATCH só da descrição depois de copiar o horário (sem convite por e-mail).
+
+    Falha não marca ERROR: a linha segue PUBLISHED com o hash antigo, e o próximo Reapply manda tudo.
+    """
+    from apps.core.services.gcal.copia import atualizar_descricao_no_google
+
+    try:
+        return atualizar_descricao_no_google(solicitation_id, operator_user_id)
+    except Exception as e:
+        logger.warning("gcal_copia: PATCH da descrição de s%s falhou (%s)", solicitation_id, type(e).__name__)
+        return "erro"
+
+
 @shared_task(name="apps.core.tasks.processar_notificacoes_acoes_diarias")
 def processar_notificacoes_acoes_diarias(reference_date_iso: str | None = None) -> dict[str, Any]:
     """

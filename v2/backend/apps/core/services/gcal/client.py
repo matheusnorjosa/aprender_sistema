@@ -61,6 +61,14 @@ class CalendarClientAdapter:
         """
         raise NotImplementedError
 
+    def patch_descricao(self, calendar_id: CalendarId, event_id: EventId, descricao: str) -> JsonDict:
+        """
+        Troca só a descrição do evento, sem avisar os convidados (cópia Google → Sistema).
+
+        Não manda início nem fim: o horário veio do Google e ele pode ter mudado de novo.
+        """
+        raise NotImplementedError
+
     def delete(self, calendar_id: CalendarId, event_id: EventId) -> None:
         """
         Deleta evento.

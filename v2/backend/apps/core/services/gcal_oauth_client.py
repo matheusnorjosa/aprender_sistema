@@ -341,6 +341,25 @@ class OAuthCalendarClient(CalendarClientAdapter):
 
         return self._retry_with_backoff(_update)
 
+    def patch_descricao(self, calendar_id: CalendarId, event_id: EventId, descricao: str) -> JsonDict:
+        """
+        PATCH só da descrição, com `sendUpdates='none'` qualquer que seja o GCAL_SEND_UPDATES.
+
+        Usado depois da cópia Google → Sistema para acertar a linha "📅 Data" da descrição. Não manda
+        início, fim, convidados nem conferenceData: o horário veio do Google, e mandá-lo de volta
+        desfaria uma edição mais nova feita lá; convite atualizado por e-mail seria ruído.
+        """
+        calendar_id = self._resolve_calendar_id(calendar_id)
+
+        def _patch():
+            return (
+                self.service.events()
+                .patch(calendarId=calendar_id, eventId=event_id, body={"description": descricao}, sendUpdates="none")
+                .execute()
+            )
+
+        return self._retry_with_backoff(_patch)
+
     def delete(self, calendar_id: str, event_id: str) -> None:
         """
         Deleta evento.

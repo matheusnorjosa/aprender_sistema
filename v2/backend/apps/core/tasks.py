@@ -580,7 +580,10 @@ def copiar_mudancas_do_google() -> str:
 
     As guardas vêm antes de montar o cliente, porque montar o cliente renova o token do operador.
     Nunca libera o freio de massa: isso é só do dono, pelo `gcal_copia --apply --liberar-freio`.
-    Uma linha de log por rodada, só com status e contagens. Devolve OK | SKIPPED | ERROR.
+    Escreve uma linha por rodada (`copiar_mudancas_do_google: status=...`), além da linha
+    `gcal_copia:` do serviço; as duas só com status e contagens. No `observar` o `resumo` soma as
+    rodadas, então o nível e as contagens do log vêm de `falhas_rodada` e `contagens_rodada`.
+    Devolve OK | SKIPPED | ERROR.
     """
     from django.conf import settings
     from django.utils import timezone
@@ -627,7 +630,7 @@ def copiar_mudancas_do_google() -> str:
         logger.error("%s: status=ERROR passou do tempo (soft_time_limit)", nome)
         return "ERROR"
 
-    falhas = len(r.resumo.get("falhas", []))
+    falhas = int(r.resumo.get("falhas_rodada", 0))
     choques = (
         AuditLog.objects.filter(
             action=AuditLog.Action.GCAL_COPIA_GOOGLE, created_at__gte=inicio, details__campo="horario"
@@ -650,7 +653,7 @@ def copiar_mudancas_do_google() -> str:
         r.status,
         cursor.modo,
         r.resumo.get("lidos", 0),
-        r.resumo.get("contagens", {}),
+        r.resumo.get("contagens_rodada", {}),
         falhas,
         choques,
         len(r.resumo.get("cancelamentos", [])),

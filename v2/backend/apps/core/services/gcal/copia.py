@@ -2,7 +2,8 @@
 AS v2 — Cópia Google → Sistema
 
 Lê o que mudou na agenda da organização (syncToken) e traz para o sistema o horário novo e o
-cancelamento de evento aprovado e publicado. Desligada: só o comando `gcal_copia` chama.
+cancelamento de evento aprovado e publicado. Chamada pelo comando `gcal_copia` e pela task
+`copiar_mudancas_do_google` (beat); liga e desliga pelo `GCalCopiaCursor.ativo`.
 
 Regras (decisões do dono de 29/10):
 - casa só por `Solicitacao.external_event_id == evento["id"]`; id em mais de uma linha não casa;
@@ -179,7 +180,9 @@ class _Resumo:
         self.falhas.append({"event_id": event_id, "motivo": motivo})
 
     def como_dict(self, anterior: dict[str, Any] | None = None) -> dict[str, Any]:
-        """O resumo da rodada; no `observar` ele soma ao da rodada anterior do mesmo modo."""
+        """O resumo da rodada; no `observar` ele soma ao da rodada anterior do mesmo modo.
+
+        `falhas_rodada` e `contagens_rodada` são sempre só desta rodada (o log da task usa esses)."""
         contagens = dict(self.contagens)
         ids = {m: set(v) for m, v in self.ids.items()}
         futuro, passado, falhas, rodadas = self.futuro, self.passado, list(self.falhas), 1
@@ -203,6 +206,8 @@ class _Resumo:
             "futuro": futuro,
             "passado": passado,
             "falhas": falhas[-MAX_FALHAS:],
+            "falhas_rodada": len(self.falhas),
+            "contagens_rodada": dict(self.contagens),
             # A lista inteira, sem corte: é dela o digest que o `liberar_freio` precisa repetir.
             "cancelamentos": list(self.cancelamentos),
             "digest": self.digest,

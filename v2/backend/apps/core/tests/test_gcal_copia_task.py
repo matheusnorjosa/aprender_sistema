@@ -273,7 +273,7 @@ def test_falhas_ou_choque_viram_warning(fabrica, monkeypatch):
     monkeypatch.setattr(
         copia,
         "sincronizar",
-        lambda *a, **kw: copia.Resultado("OK", {"falhas": [{"event_id": "e", "motivo": "IntegrityError"}]}),
+        lambda *a, **kw: copia.Resultado("OK", {"falhas_rodada": 1}),
     )
 
     with _logs() as registros:
@@ -281,6 +281,24 @@ def test_falhas_ou_choque_viram_warning(fabrica, monkeypatch):
     assert [r.levelno for r in registros if r.getMessage().startswith("copiar_mudancas_do_google:")] == [
         logging.WARNING
     ]
+
+
+def test_observar_nivel_e_contagens_sao_da_rodada_nao_do_acumulado(fabrica, fake):
+    """No observar o `resumo` soma as rodadas; o nível e as contagens do log são só da rodada."""
+    _no_google(fake, _publicada("evt1"))
+    # Adiado que sumiu do Google: vira falha na 1ª rodada e não volta na 2ª.
+    _cursor(modo="observar", adiados=[{"event_id": "sumiu", "tentativas": 1}])
+
+    with _logs() as registros:
+        assert tasks.copiar_mudancas_do_google() == "OK"
+        assert tasks.copiar_mudancas_do_google() == "OK"
+
+    linhas = [r for r in registros if r.getMessage().startswith("copiar_mudancas_do_google:")]
+    assert [r.levelno for r in linhas] == [logging.WARNING, logging.INFO]
+    assert "falhas=1" in linhas[0].getMessage() and "falhas=0" in linhas[1].getMessage()
+    assert "contagens={}" in linhas[1].getMessage(), "a 2ª rodada não leu nada de novo"
+    cursor = GCalCopiaCursor.objects.get()
+    assert cursor.resumo["rodadas"] == 2 and len(cursor.resumo["falhas"]) == 1
 
 
 def test_choque_registrado_na_rodada_vira_warning(fabrica, monkeypatch):

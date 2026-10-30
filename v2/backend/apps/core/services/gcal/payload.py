@@ -186,10 +186,14 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
     # Seção 6: Equipe (Formadores + Coordenador)
     equipe_parts = []
 
-    # Formadores (via ManyToMany)
-    formadores = s.formadores.all()
-    if formadores.exists():
-        formadores_names = [str(f) for f in formadores]  # nome ou "Usuario #id", nunca o login (CPF)
+    # Formadores (via Participation, a mesma fonte dos attendees; a M2M `formadores` ninguém grava, M10-06).
+    # Só quem tem conta: o convidado só por e-mail já vai nos attendees e o e-mail não entra no texto.
+    formadores = {
+        p.usuario_id: p.usuario
+        for p in s.participations.filter(role="FORMADOR", usuario__isnull=False).select_related("usuario")
+    }
+    if formadores:
+        formadores_names = sorted(str(f) for f in formadores.values())  # nome ou "Usuario #id", nunca o login (CPF)
         equipe_parts.append(f"Formador(es): {', '.join(formadores_names)}")
 
     # Coordenador

@@ -628,12 +628,49 @@ def test_freio_segue_puxado_quando_a_contagem_cai_sem_o_dono_liberar(agora, fake
 @pytest.mark.django_db
 def test_freio_liberado_pelo_dono_aplica(agora, fake, enfileirados):
     cursor, _ = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS + 1)
+    r1 = sincronizar(cursor, fake, escrever=True, agora=agora)
+    assert r1.resumo["freio"] == 6
+    cursor.refresh_from_db()
 
     r = sincronizar(cursor, fake, escrever=True, agora=agora, liberar_freio=True)
 
     assert r.resumo["contagens"]["cancelado"] == 6
+    assert AuditLog.objects.filter(action="REJECT").count() == 6
     cursor.refresh_from_db()
     assert cursor.ultimo_erro == ""
+
+
+@pytest.mark.django_db
+def test_liberar_sem_rodada_segurada_nao_solta_o_freio(agora, fake, enfileirados):
+    """Sem rodada segurada antes, o dono não viu a contagem: o freio segura como sempre."""
+    cursor, _ = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS + 1)
+
+    r = sincronizar(cursor, fake, escrever=True, agora=agora, liberar_freio=True)
+
+    assert r.resumo["freio"] == 6
+    assert not AuditLog.objects.filter(action="REJECT").exists()
+
+
+@pytest.mark.django_db
+def test_liberar_nao_cobre_cancelamentos_que_chegaram_depois(agora, fake, enfileirados):
+    """6 segurados, mais 20 cancelados no Google: a liberação dos 6 não aplica os 26."""
+    cursor, _ = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS + 1)
+    mais = [_publicada(agora, eid=f"d{i}") for i in range(20)]
+    for s in mais:
+        _no_google(fake, s)
+    sincronizar(cursor, fake, escrever=True, agora=agora)  # segura os 6; os 20 novos entram na base
+    cursor.refresh_from_db()
+    assert cursor.resumo["freio"] == 6
+    token_segurado = cursor.sync_token
+    for s in mais:
+        fake.delete(PINO, s.external_event_id)
+
+    r = sincronizar(cursor, fake, escrever=True, agora=agora, liberar_freio=True)
+
+    assert r.resumo["freio"] == 26
+    assert not AuditLog.objects.filter(action="REJECT").exists()
+    cursor.refresh_from_db()
+    assert cursor.sync_token == token_segurado and cursor.ultimo_erro == "freio: 26 cancelamentos"
 
 
 @pytest.mark.django_db

@@ -444,7 +444,11 @@ def _rodada(
             and cursor.resumo.get("modo") == GCalCopiaCursor.Modo.COPIAR
             and int(cursor.resumo.get("freio", 0)) > 0
         )
-        freio = (cancelamentos > FREIO_CANCELAMENTOS or (segurado and cancelamentos > 0)) and not liberar_freio
+        # A liberação do dono só cobre o que ele viu segurado: se chegaram mais, a rodada segue segurada
+        # com a contagem nova e ele libera de novo depois de vê-la.
+        segurado_n = int(cursor.resumo.get("freio", 0)) if segurado else 0
+        liberado = liberar_freio and 0 < cancelamentos <= segurado_n
+        freio = (cancelamentos > FREIO_CANCELAMENTOS or (segurado and cancelamentos > 0)) and not liberado
         if freio:
             resumo.freio = cancelamentos
 

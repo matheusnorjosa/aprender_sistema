@@ -19,6 +19,7 @@ Estrutura:
     ├── config.py            # Config
     ├── auditoria.py         # AuditLog
     ├── integracao.py        # GoogleOAuthCredential
+    ├── gcal_copia.py        # GCalCopiaCursor
     ├── dat_registro.py      # DATRegistro
     ├── dat_coordenador.py   # DATCoordenador, DATArea
     ├── dat_acao.py          # DATAcao
@@ -58,6 +59,7 @@ from apps.core.models.dat_compra import DATCompra
 from apps.core.models.dat_coordenador import DATArea, DATCoordenador
 from apps.core.models.dat_registro import DATRegistro
 from apps.core.models.formacao import Formacao
+from apps.core.models.gcal_copia import GCalCopiaCursor
 from apps.core.models.group_classificacao import GroupClassificacao
 from apps.core.models.import_job import ImportJob
 from apps.core.models.integracao import GoogleOAuthCredential
@@ -122,6 +124,7 @@ __all__ = [
     "AuditLog",
     # Integracao
     "GoogleOAuthCredential",
+    "GCalCopiaCursor",
     # Imports (ASQ-005)
     "ImportJob",
     # Acoes/Notificacoes Internas

@@ -201,9 +201,10 @@ class TestAPICreateSolicitacaoPendente:
 
         assert response2.status_code == http_status.HTTP_400_BAD_REQUEST, "Criar com fim < inicio deve retornar 400"
 
-    def test_create_solicitacao_municipio_optional(self, user_test, projeto_test, tipo_evento_test):
+    def test_create_solicitacao_municipio_obrigatorio(self, user_test, projeto_test, tipo_evento_test):
         """
-        Test: Município é opcional ao criar solicitação.
+        Test: Município é obrigatório ao criar solicitação (sem ele a regra da compra pulava).
+        Casos completos em `test_solicitacao_municipio_obrigatorio.py`.
         """
         client = APIClient()
         client.force_authenticate(user=user_test)
@@ -217,21 +218,20 @@ class TestAPICreateSolicitacaoPendente:
             "projeto": projeto_test.pk,
             "tipo_evento": tipo_evento_test.pk,
             "coordenador_acompanha": False,
-            # municipio NÃO informado (opcional)
+            # municipio NÃO informado
             "inicio": inicio.isoformat(),
             "fim": fim.isoformat(),
             "observacoes": "Evento online sem município específico",
         }
+        antes = Solicitacao.objects.count()
 
         response = client.post("/api/solicitacoes/", payload, format="json")
 
         assert (
-            response.status_code == http_status.HTTP_201_CREATED
-        ), f"Criar sem município deve funcionar (esperado 201, obtido {response.status_code})"
-
-        solicitacao = Solicitacao.objects.get(pk=response.data["id"])
-        assert solicitacao.municipio is None, "Município deve ser None quando não informado"
-        assert solicitacao.status == "pendente", "Status deve ser pendente (PA-01)"
+            response.status_code == http_status.HTTP_400_BAD_REQUEST
+        ), f"Criar sem município deve falhar (esperado 400, obtido {response.status_code})"
+        assert get_field_errors(response)["municipio"] == ["Informe o município do evento."]
+        assert Solicitacao.objects.count() == antes, "Nada deve ser criado"
 
     def test_create_solicitacao_external_event_id_is_readonly(
         self, user_test, projeto_test, tipo_evento_test, municipio_test

@@ -159,6 +159,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         # Projeto obrigatório na escrita (revisão do #2149): sem ele o evento nascia pendente e pulava
         # a regra da compra e o escopo de gerência do projeto. O FK segue `null=True` por causa do dado
         # legado e dos importadores, que gravam pelo ORM. PATCH sem a chave não é afetado.
+        # Município idem, para todos (isentos inclusive): sem ele a Regra 4 não tinha par para conferir.
         extra_kwargs = {
             "projeto": {
                 "required": True,
@@ -166,6 +167,14 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
                 "error_messages": {
                     "required": "Informe o projeto do evento.",
                     "null": "Informe o projeto do evento.",
+                },
+            },
+            "municipio": {
+                "required": True,
+                "allow_null": False,
+                "error_messages": {
+                    "required": "Informe o município do evento.",
+                    "null": "Informe o município do evento.",
                 },
             },
         }
@@ -297,7 +306,9 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         3. Bloqueia edição de solicitações reprovadas.
         4. Exige compra que libere o par município+projeto (regra única em
            `services/compra_elegibilidade`) na criação e quando o VALOR de município ou de
-           projeto muda na edição. Isentos: superuser e a capacidade de isenção.
+           projeto muda na edição. Isentos: superuser e a capacidade de isenção. Para quem não é
+           isento, município vazio não pula a regra: o campo é obrigatório na escrita (Meta) e o
+           evento antigo sem município não troca de projeto sem informar o município.
         5. Na criação, `coordenador_acompanha` é obrigatório (decisão do dono, 05/10/2026):
            o padrão do model (False) esconderia a falta da resposta. Null o campo já recusa.
         """
@@ -368,7 +379,11 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
                 or getattr(municipio, "pk", None) != instance.municipio_id
                 or getattr(projeto, "pk", None) != instance.projeto_id
             )
-            if reatribui_par and municipio is not None and projeto is not None:
+            if reatribui_par and projeto is not None:
+                # Evento antigo sem município (gravado pelo ORM) num PATCH que só troca o projeto:
+                # sem o par não há o que conferir, então não pula a regra.
+                if municipio is None:
+                    raise serializers.ValidationError({"municipio": "Informe o município do evento."})
                 if not par_liberado(municipio.pk, projeto):
                     raise serializers.ValidationError(
                         {

@@ -574,7 +574,15 @@ def cancel_solicitacao(
         if not _ja_saiu_do_google(e):
             raise
 
-    # Limpar campos
+    desvincular_do_google(s)
+
+    return SyncOutcome(
+        action="DELETE", solicitation_id=s.id, external_event_id=None, summary=f"Solicitação #{s.id} (cancelada)"
+    )
+
+
+def desvincular_do_google(s: Solicitacao) -> None:
+    """Limpa o vínculo da linha com o Google depois que o evento saiu de lá (cancel e cópia Google → Sistema)."""
     s.external_event_id = None
     s.meet_link = None
     s.gcal_payload_hash = None
@@ -592,8 +600,4 @@ def cancel_solicitacao(
             "last_sync_action",
             "last_sync_error",
         ]
-    )
-
-    return SyncOutcome(
-        action="DELETE", solicitation_id=s.id, external_event_id=None, summary=f"Solicitação #{s.id} (cancelada)"
     )

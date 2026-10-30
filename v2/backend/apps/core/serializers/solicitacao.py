@@ -521,6 +521,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
         - GOOGLE_CONNECT
         - GOOGLE_DISCONNECT
         - GOOGLE_REFRESH_TOKEN
+        - GCAL_COPIA_GOOGLE (horário ou cancelamento copiado do Google)
 
         Ordenado por created_at desc (mais recentes primeiro).
         Limite: 20 registros.
@@ -536,6 +537,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
             "GOOGLE_CONNECT",
             "GOOGLE_DISCONNECT",
             "GOOGLE_REFRESH_TOKEN",
+            "GCAL_COPIA_GOOGLE",
         ]
 
         # Buscar logs relacionados ao evento (via details.solicitacao_id ou model_name)

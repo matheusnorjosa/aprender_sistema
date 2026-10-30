@@ -99,17 +99,17 @@ class FakeCalendarClient(CalendarClientAdapter):
 
     def update(self, calendar_id: CalendarId, event_id: EventId, payload: JsonDict) -> JsonDict:
         """
-        Atualiza evento no store.
+        Atualiza evento no store com a semântica do PATCH do Google: o que não vem no payload fica.
 
         Args:
             calendar_id: ID do calendário
             event_id: ID do evento
-            payload: Novos dados do evento
+            payload: Campos a trocar
 
         Returns:
             dict com evento atualizado (inclui "hangoutLink" se conferenceData presente)
         """
-        event: JsonDict = {"id": event_id, **payload}
+        event: JsonDict = {**self._store.get(self._key(calendar_id, event_id), {}), **payload, "id": event_id}
 
         # RF06/PR19: Gerar hangoutLink fake se conferenceData presente
         if payload.get("conferenceData"):
@@ -122,6 +122,10 @@ class FakeCalendarClient(CalendarClientAdapter):
         self._store[self._key(calendar_id, event_id)] = event
         self._registrar_mudanca(calendar_id, event_id)
         return event
+
+    def patch_descricao(self, calendar_id: CalendarId, event_id: EventId, descricao: str) -> JsonDict:
+        """PATCH só da descrição (mesma semântica do `update`)."""
+        return self.update(calendar_id, event_id, {"description": descricao})
 
     def delete(self, calendar_id: CalendarId, event_id: EventId) -> None:
         """

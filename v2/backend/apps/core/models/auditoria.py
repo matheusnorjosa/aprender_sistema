@@ -61,6 +61,8 @@ class AuditLog(models.Model):
         CELERY_GCAL_SYNC = "CELERY_GCAL_SYNC", "Sync GCal via Celery"
         GCAL_RETRY_SUCCESS = "GCAL_RETRY_SUCCESS", "Retry GCal bem-sucedido"
         GCAL_ENCRYPTION_KEY_ROTATION = "GCAL_ENCRYPTION_KEY_ROTATION", "Rotacao chave GCal"
+        # Copia Google -> Sistema (horario ou cancelamento feito na agenda); usuario=None
+        GCAL_COPIA_GOOGLE = "GCAL_COPIA_GOOGLE", "Copia do Google para o sistema"
 
         # OAuth Google
         GOOGLE_CONNECT = "GOOGLE_CONNECT", "Conectar Google"

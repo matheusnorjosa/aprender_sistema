@@ -110,8 +110,13 @@ def test_apply_em_copiar_usa_o_operador_do_cursor(movida, monkeypatch):
 
     monkeypatch.setattr(tasks.task_gcal_copia_descricao, "delay", lambda *a: None)
     operador = UsuarioFactory()
-    GCalCopiaCursor.objects.create(calendar_id=PINO, modo="copiar", operador=operador)
+    cursor = GCalCopiaCursor.objects.create(calendar_id=PINO, modo="copiar", operador=operador)
 
+    with pytest.raises(CommandError, match="cópia desligada"):
+        _rodar("--apply")
+    assert Solicitacao.objects.get(pk=movida.pk).inicio == movida.inicio
+
+    GCalCopiaCursor.objects.filter(pk=cursor.pk).update(ativo=True)
     _rodar("--apply")
 
     assert Solicitacao.objects.get(pk=movida.pk).inicio == movida.inicio + timedelta(days=1)

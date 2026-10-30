@@ -632,7 +632,27 @@ def test_freio_mais_de_5_cancelamentos_para_a_rodada_sem_gravar_nada(agora, fake
     assert enfileirados == []
 
     r2 = sincronizar(cursor, fake, escrever=True, agora=agora)
-    _assert_parou(r2, cursor, _ids(6), token, adiados, foto)
+    assert (r2.status, r2.erro) == ("ERROR", copia.ERRO_DESLIGADA)
+    assert _foto_do_sistema() == foto
+    cursor.refresh_from_db()
+    assert cursor.sync_token == token and cursor.adiados == adiados
+
+
+@pytest.mark.django_db
+def test_desligada_pelo_freio_nao_aplica_a_lista_que_encolheu_sozinha(agora, fake, enfileirados):
+    """Um dos 6 começa e vira passado: sem o digest, os 5 restantes não passam pelo freio."""
+    cursor, linhas = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS + 1)
+    Solicitacao.objects.filter(pk=linhas[0].pk).update(
+        inicio=agora + timedelta(hours=1), fim=agora + timedelta(hours=2)
+    )
+    assert sincronizar(cursor, fake, escrever=True, agora=agora).status == "ERROR"
+    foto = _foto_do_sistema()
+
+    r = sincronizar(cursor, fake, escrever=True, agora=agora + timedelta(hours=3))
+
+    assert (r.status, r.erro) == ("ERROR", copia.ERRO_DESLIGADA)
+    assert _foto_do_sistema() == foto
+    assert AuditLog.objects.filter(action="REJECT").count() == 0
 
 
 @pytest.mark.django_db

@@ -46,6 +46,7 @@ logger = logging.getLogger(__name__)
 
 # Mais que isto de cancelamentos numa rodada do `copiar`: ela para inteira (freio de massa). Mudar exige PR.
 FREIO_CANCELAMENTOS = 5
+ERRO_DESLIGADA = "cópia desligada; para aplicar, libere com --liberar-freio <digest>"
 MAX_ADIADOS = 200
 MAX_TENTATIVAS_ADIADO = 5
 MAX_IDS_POR_MOTIVO = 200
@@ -369,6 +370,7 @@ def sincronizar(
     aprovado e futuro e a rodada para inteira antes de aplicar qualquer coisa: nada no sistema, token
     e adiados intactos, `ativo=False` e o `resumo` com a lista e o digest. `liberar_freio` é o digest
     que o dono viu: igual ao desta rodada, aplica tudo; diferente, para do mesmo jeito.
+    Com `ativo=False`, o `copiar` com escrita só roda com `liberar_freio` (ERRO_DESLIGADA sem ele).
     """
     agora = agora or timezone.now()
     pino = str(getattr(settings, "GCAL_OAUTH_CALENDAR_ID", "") or "")
@@ -390,6 +392,10 @@ def sincronizar(
         aplicar = cursor.modo == GCalCopiaCursor.Modo.COPIAR
         if aplicar and operador_id is None:
             return Resultado("ERROR", erro="modo copiar sem operador")
+        # Desligada (pelo freio ou pelo dono), a cópia só aplica com o digest da lista que o dono viu:
+        # sem isso, a lista que encolhe sozinha (evento que começou, exclusão desfeita) passaria do freio.
+        if aplicar and not cursor.ativo and liberar_freio is None:
+            return Resultado("ERROR", erro=ERRO_DESLIGADA)
         return _rodada(
             cursor,
             client,

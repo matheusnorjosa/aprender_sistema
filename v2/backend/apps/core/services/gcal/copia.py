@@ -373,6 +373,12 @@ def sincronizar(
         if not livre:
             logger.info("gcal_copia: outra rodada em execução; pulada")
             return Resultado("SKIPPED", erro="cópia já em execução")
+        # O modo e o token valem como estão sob a trava: a ordem de parar (`observar`) não se perde.
+        cursor.refresh_from_db()
+        operador_id = operador_id or cursor.operador_id
+        aplicar = cursor.modo == GCalCopiaCursor.Modo.COPIAR
+        if aplicar and operador_id is None:
+            return Resultado("ERROR", erro="modo copiar sem operador")
         return _rodada(
             cursor,
             client,
@@ -430,7 +436,15 @@ def _rodada(
         linhas = _linhas_por_event_id(list(eventos))
         decisoes = {eid: decidir(ev, linhas.get(eid, []), agora) for eid, ev in eventos.items()}
         cancelamentos = sum(1 for d in decisoes.values() if d.motivo == CANCELADO)
-        freio = cancelamentos > FREIO_CANCELAMENTOS and not liberar_freio
+        # O freio do `copiar` fica puxado: se a rodada anterior segurou o token, segue segurando até o
+        # dono liberar ou não sobrar cancelamento (a contagem cai quando um vira passado ou volta).
+        segurado = (
+            aplicar
+            and isinstance(cursor.resumo, dict)
+            and cursor.resumo.get("modo") == GCalCopiaCursor.Modo.COPIAR
+            and int(cursor.resumo.get("freio", 0)) > 0
+        )
+        freio = (cancelamentos > FREIO_CANCELAMENTOS or (segurado and cancelamentos > 0)) and not liberar_freio
         if freio:
             resumo.freio = cancelamentos
 

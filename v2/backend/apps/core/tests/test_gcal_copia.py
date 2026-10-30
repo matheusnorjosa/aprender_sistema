@@ -249,19 +249,20 @@ def test_decidir_copiar_horario_em_utc(agora):
 
 
 @pytest.mark.django_db
-def test_eco_nao_grava_nada_e_mantem_updated_at(agora, fake, enfileirados):
+def test_eco_nao_grava_nada_e_mantem_updated_at(agora, fake, enfileirados, django_capture_on_commit_callbacks):
     s = _publicada(agora)
     _no_google(fake, s)
     antes = Solicitacao.objects.get(pk=s.pk).updated_at
     cursor = _cursor()
 
-    r = sincronizar(cursor, fake, escrever=True, agora=agora)
+    with django_capture_on_commit_callbacks(execute=True) as callbacks:
+        r = sincronizar(cursor, fake, escrever=True, agora=agora)
 
     assert r.status == "OK"
     assert r.resumo["contagens"] == {"eco": 1}
     assert Solicitacao.objects.get(pk=s.pk).updated_at == antes
     assert not AuditLog.objects.filter(action="GCAL_COPIA_GOOGLE").exists()
-    assert enfileirados == []
+    assert callbacks == [] and enfileirados == []
 
 
 @pytest.mark.django_db
@@ -497,14 +498,17 @@ def test_rollback_do_item_nao_enfileira_e_desfaz_a_escrita(
 
 
 @pytest.mark.django_db
-def test_cancelado_no_google_vira_reprovado_sem_autoridade_e_sai_do_google(agora, fake, enfileirados):
+def test_cancelado_no_google_vira_reprovado_sem_autoridade_e_sai_do_google(
+    agora, fake, enfileirados, django_capture_on_commit_callbacks
+):
     s = _publicada(agora, gcal_payload_hash="a" * 40, meet_link="https://meet.google.com/x")
     _no_google(fake, s)
     cursor = _cursor()
     _linha_de_base(cursor, fake, agora)
     fake.delete(PINO, "evt1")
 
-    r = sincronizar(cursor, fake, escrever=True, agora=agora)
+    with django_capture_on_commit_callbacks(execute=True) as callbacks:
+        r = sincronizar(cursor, fake, escrever=True, agora=agora)
 
     assert r.resumo["contagens"] == {"cancelado": 1}
     s.refresh_from_db()
@@ -524,7 +528,7 @@ def test_cancelado_no_google_vira_reprovado_sem_autoridade_e_sai_do_google(agora
     linha_do_tempo = AuditLog.objects.get(action="GCAL_COPIA_GOOGLE")
     assert linha_do_tempo.details["campo"] == "status"
     assert linha_do_tempo.details["depois"] == {"status": "reprovado"}
-    assert enfileirados == []
+    assert callbacks == [] and enfileirados == []
 
 
 @pytest.mark.django_db
@@ -593,6 +597,32 @@ def test_freio_mais_de_5_cancelamentos_nao_aplica_nenhum_e_segura_o_token(agora,
 
     r2 = sincronizar(cursor, fake, escrever=True, agora=agora)
     assert r2.resumo["contagens"] == {"freio": 6, "eco": 1}, "os cancelamentos voltam na rodada seguinte"
+
+
+@pytest.mark.django_db
+def test_freio_segue_puxado_quando_a_contagem_cai_sem_o_dono_liberar(agora, fake, enfileirados):
+    """Um dos 6 começa e vira passado: os 5 que sobram continuam segurados até o `--liberar-freio`."""
+    linhas = [_publicada(agora, eid=f"c{i}") for i in range(copia.FREIO_CANCELAMENTOS)]
+    linhas.append(_publicada(agora, eid="logo", inicio=agora + timedelta(hours=1)))
+    for s in linhas:
+        _no_google(fake, s)
+    cursor = _cursor()
+    _linha_de_base(cursor, fake, agora)
+    for s in linhas:
+        fake.delete(PINO, s.external_event_id)
+    r1 = sincronizar(cursor, fake, escrever=True, agora=agora)
+    assert r1.resumo["contagens"] == {"freio": 6}
+    cursor.refresh_from_db()
+    token_segurado = cursor.sync_token
+
+    r2 = sincronizar(cursor, fake, escrever=True, agora=agora + timedelta(hours=2))
+
+    assert r2.status == "OK"
+    assert r2.resumo["contagens"] == {"freio": 5, "passado": 1}
+    assert not AuditLog.objects.filter(action="REJECT").exists()
+    assert all(Solicitacao.objects.get(pk=s.pk).status == "aprovado" for s in linhas)
+    cursor.refresh_from_db()
+    assert cursor.sync_token == token_segurado and cursor.ultimo_erro == "freio: 5 cancelamentos"
 
 
 @pytest.mark.django_db
@@ -821,6 +851,26 @@ def test_troca_de_modo_no_meio_da_rodada_sem_token_descarta_o_resultado(agora, f
 
 
 @pytest.mark.django_db
+def test_volta_ao_observar_antes_da_trava_nao_aplica(agora, fake, enfileirados):
+    """O cursor foi carregado em `copiar`, mas o dono mandou parar antes de a rodada pegar a trava."""
+    s = _publicada(agora)
+    _no_google(fake, s)
+    cursor = _cursor()
+    _linha_de_base(cursor, fake, agora)
+    velho = GCalCopiaCursor.objects.get(pk=cursor.pk)
+    trocar_modo(cursor, "observar")
+    novo = _hora(agora, 6)
+    _mover_no_google(fake, "evt1", novo, novo + timedelta(hours=1))
+
+    r = sincronizar(velho, fake, escrever=True, agora=agora)
+
+    assert r.status == "OK", r.erro
+    assert r.resumo["modo"] == "observar"
+    assert Solicitacao.objects.get(pk=s.pk).inicio == s.inicio
+    assert not AuditLog.objects.filter(action="GCAL_COPIA_GOOGLE").exists()
+
+
+@pytest.mark.django_db
 def test_linha_republicada_depois_da_leitura_vira_adiado(agora, fake, enfileirados):
     """Lápide lida e a linha republicada antes da trava: o item lido já não vale."""
     s = _publicada(agora)
@@ -850,7 +900,9 @@ def test_linha_republicada_depois_da_leitura_vira_adiado(agora, fake, enfileirad
 
 
 @pytest.mark.django_db
-def test_observar_nao_escreve_no_sistema_avanca_token_e_junta_o_resumo(agora, fake, enfileirados):
+def test_observar_nao_escreve_no_sistema_avanca_token_e_junta_o_resumo(
+    agora, fake, enfileirados, django_capture_on_commit_callbacks
+):
     a = _publicada(agora, eid="a")
     b = _publicada(agora, eid="b")
     for s in (a, b):
@@ -862,16 +914,17 @@ def test_observar_nao_escreve_no_sistema_avanca_token_e_junta_o_resumo(agora, fa
     fake.delete(PINO, "b")
     token_antes = cursor.sync_token
 
-    sincronizar(cursor, fake, escrever=True, agora=agora)
-    cursor.refresh_from_db()
-    _mover_no_google(fake, "a", novo + timedelta(hours=1), novo + timedelta(hours=2))
-    sincronizar(cursor, fake, escrever=True, agora=agora)
+    with django_capture_on_commit_callbacks(execute=True) as callbacks:
+        sincronizar(cursor, fake, escrever=True, agora=agora)
+        cursor.refresh_from_db()
+        _mover_no_google(fake, "a", novo + timedelta(hours=1), novo + timedelta(hours=2))
+        sincronizar(cursor, fake, escrever=True, agora=agora)
 
     for s in (a, b):
         atual = Solicitacao.objects.get(pk=s.pk)
         assert (atual.inicio, atual.status, atual.external_event_id) == (s.inicio, "aprovado", s.external_event_id)
     assert not AuditLog.objects.filter(action__in=["GCAL_COPIA_GOOGLE", "REJECT"]).exists()
-    assert enfileirados == []
+    assert callbacks == [] and enfileirados == []
     cursor.refresh_from_db()
     assert cursor.sync_token != token_antes
     assert cursor.resumo["modo"] == "observar" and cursor.resumo["rodadas"] == 3

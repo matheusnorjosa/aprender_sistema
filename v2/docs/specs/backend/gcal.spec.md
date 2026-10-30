@@ -1,7 +1,7 @@
 ---
 title: Integração Google Calendar + Meet
 status: canonical
-last_verified: 2026-10-28
+last_verified: 2026-10-30
 verified_at_commit: 804df36a1741d1faa53586eafade5c4c74c0659d
 sources_of_truth:
   - v2/backend/apps/core/services/gcal_client_factory.py
@@ -12,6 +12,7 @@ sources_of_truth:
   - v2/backend/apps/core/services/gcal/sync.py
   - v2/backend/apps/core/services/gcal/payload.py
   - v2/backend/apps/core/services/gcal/client.py
+  - v2/backend/apps/core/services/gcal/copia.py
   - v2/backend/apps/core/services/oauth/oauth_flow.py
   - v2/backend/apps/core/services/oauth/token_manager.py
   - v2/backend/apps/core/services/google_oauth.py
@@ -25,9 +26,11 @@ sources_of_truth:
   - v2/backend/apps/core/urls.py
   - v2/backend/apps/core/models/integracao.py
   - v2/backend/apps/core/models/auditoria.py
+  - v2/backend/apps/core/models/gcal_copia.py
   - v2/backend/apps/core/rbac/policies.py
   - v2/backend/apps/core/management/commands/preagenda_to_gcal.py
   - v2/backend/apps/core/management/commands/rotate_gcal_encryption_key.py
+  - v2/backend/apps/core/management/commands/gcal_copia.py
 owner: backend
 supersedes:
   - v2/docs/GUIDE_GCAL.md
@@ -57,7 +60,7 @@ O módulo isola o acesso à Google Calendar API atrás de um adaptador único (`
   - [`gcal_fake_client.py`](../../../backend/apps/core/services/gcal_fake_client.py) — fake in-memory.
 - Sincronização (pacote modular): [`gcal/sync.py`](../../../backend/apps/core/services/gcal/sync.py) (`apply_one_solicitacao`, `upsert_one`, `resync_solicitacao`, `cancel_solicitacao`) e [`gcal/payload.py`](../../../backend/apps/core/services/gcal/payload.py) (`build_event_payload`, `build_preview_for_solicitacao`). O módulo legado [`gcal_sync_service.py`](../../../backend/apps/core/services/gcal_sync_service.py) é apenas um *re-export facade* para o pacote `gcal/`.
 - Camada de serviço dos endpoints: [`solicitacao_publish.py`](../../../backend/apps/core/services/solicitacao_publish.py) (`publish_to_gcal`, `preview_gcal`, `resync_to_gcal`, `cancel_from_gcal`, `_check_google_oauth`).
-- Tasks Celery: [`tasks.py`](../../../backend/apps/core/tasks.py) — `task_publish_solicitacao_to_gcal`, `task_cancel_solicitacao_from_gcal`, `preview_then_apply_gcal` (beat).
+- Tasks Celery: [`tasks.py`](../../../backend/apps/core/tasks.py) — `task_publish_solicitacao_to_gcal`, `task_cancel_solicitacao_from_gcal`, `preview_then_apply_gcal` (beat), `copiar_mudancas_do_google` (beat) e `task_gcal_copia_descricao` (cópia Google → sistema, seção própria abaixo).
 - OAuth 2.0 (fluxo + tokens): [`oauth/oauth_flow.py`](../../../backend/apps/core/services/oauth/oauth_flow.py) e [`oauth/token_manager.py`](../../../backend/apps/core/services/oauth/token_manager.py), re-exportados por [`google_oauth.py`](../../../backend/apps/core/services/google_oauth.py). Modelo: [`models/integracao.py`](../../../backend/apps/core/models/integracao.py) (`GoogleOAuthCredential`).
 - Endpoints: [`views_solicitacao.py`](../../../backend/apps/core/views_solicitacao.py) (ações GCal) e [`views_oauth.py`](../../../backend/apps/core/views_oauth.py) (fluxo OAuth) — roteados em [`urls.py`](../../../backend/apps/core/urls.py).
 
@@ -121,10 +124,72 @@ Comandos de gestão:
 
 - `python manage.py preagenda_to_gcal [--dry-run] [--client=fake|google] [--ids …] [--since/--until …]` — sync em lote da Pré-agenda (substitui a referência stale a `sync_calendar` no guia).
 - `python manage.py rotate_gcal_encryption_key --old-key … --new-key …` — rotação zero-downtime da chave Fernet.
+- `python manage.py gcal_copia [--apply] [--operador <id>] [--apply --liberar-freio <digest>]` — cópia Google → sistema, dry-run por padrão (seção «Cópia Google → sistema» abaixo).
 
 Beat automático: `preview_then_apply_gcal`, chave `gcal-sync-every-5-minutes`, `schedule=300.0`. **Não fica em `config/celery.py`** e sim em [`config/settings.py`](../../../backend/config/settings.py), atrás de `FEATURE_AUTO_APPLY_ENABLED` (default `"0"` → `CELERY_BEAT_SCHEDULE = {}`). O merge com o schedule fixo do `celery.py` acontece em `app.conf.update(CELERY_BEAT_SCHEDULE=…)`. **Desabilitado por default.**
 
 Beat sempre ativo: `probe_google_credentials`, chave `daily-google-credentials-probe`, `crontab(hour=5, minute=0)`, no schedule fixo de [`config/celery.py`](../../../backend/config/celery.py) — não depende de `FEATURE_AUTO_APPLY_ENABLED` (#2039).
+
+Beat sempre registrado: `copiar_mudancas_do_google`, chave `gcal-copia-google`, `schedule=600.0`, `expires=540`, em [`config/settings.py`](../../../backend/config/settings.py) — não depende de `FEATURE_AUTO_APPLY_ENABLED`; quem liga é `GCalCopiaCursor.ativo` (desligada, devolve `SKIPPED` sem montar o cliente).
+
+## Cópia Google → sistema (copia sozinho)
+
+Decisões do dono de 29 e 30/10/2026; plano v3 de 30/10 (plano_copia_google_v3_2026-10-30, na pasta liberacao/relatorios do dono, fora do repo). Código: [`gcal/copia.py`](../../../backend/apps/core/services/gcal/copia.py) (`decidir`, `sincronizar`, `trocar_modo`, `atualizar_descricao_no_google`), o comando [`gcal_copia`](../../../backend/apps/core/management/commands/gcal_copia.py), o cursor [`GCalCopiaCursor`](../../../backend/apps/core/models/gcal_copia.py) e a task `copiar_mudancas_do_google` em [`tasks.py`](../../../backend/apps/core/tasks.py). Está **construída e desligada** (D1): o cursor nasce `ativo=False` e só liga na virada.
+
+**O que copia.** Só da agenda `GCAL_OAUTH_CALENDAR_ID` (vazio ou `primary` é erro) e só de linha `aprovado` + `gcal_status=PUBLISHED` que casa por `Solicitacao.external_event_id == id do evento` (id em mais de uma linha não casa: `id_duplicado`). Duas coisas:
+
+- **data e horário** (`inicio`/`fim`) mudados no Google, só no futuro: `s.inicio >= agora` **e** o início novo também `>= agora` (um `agora` por rodada). Depois de copiar, um PATCH **só da descrição** (`task_gcal_copia_descricao`, `sendUpdates=none`, sem tocar início e fim nem mandar convite) acerta a linha "📅 Data" no Google. O hash só é recalculado se não era nulo; a linha adotada segue com hash nulo. Se o PATCH falha, fica o hash antigo e o próximo Reapply manda tudo.
+- **cancelamento** no Google de evento futuro (só `s.inicio >= agora`, porque a lápide do Google traz só id e status): vira `reprovado` (D2) e o vínculo com o Google é limpo, sem chamar o Google.
+
+**O que ignora** (conta no `resumo` por motivo, com os s<id>): título, convidados, local, descrição e qualquer outro campo; linha que não está `aprovado` (`nao_aprovada`), `PENDING` (`pendente_gcal`, adiada), `ERROR` (`erro_gcal`: pode ter edição do sistema que ainda não chegou ao Google, e o Google não vence aqui), não publicada; evento recorrente ou de dia inteiro, sem horário, fim antes do início, eco (mesmo horário), `passado`, `movido_para_passado` e evento em andamento (perda aceita). Linha `publicado_fora_do_sistema` sem adoção não tem id e não casa (`sem_vinculo`).
+
+**Decisões do dono.**
+
+- **D1**: construir agora e ligar só na virada.
+- **D2**: cancelado no Google vira `reprovado`, motivo `cancelado_no_google`. Grava `AuditLog` `REJECT` no formato da carga da virada (`usuario=None`, `details.origem="gcal_copia"`, `motivo`, `status_anterior`, `event_id_antigo`) **sem `autoridade`**, porque não é decisão humana; a exceção está registrada na [política de aprovação](../domain/politica-aprovacao.spec.md). Grava também `GCAL_COPIA_GOOGLE` (`campo="status"`), para a linha do tempo. Não existe "reabrir": um falso positivo se desfaz por data-fix, com o OK do dono. O freio de massa e o modo `observar` existem para isso não acontecer.
+- **D3**: choque de horário copia mesmo assim. Depois de copiar roda `check_solicitacao_availability(lock=True)`, e o `GCAL_COPIA_GOOGLE` (`campo="horario"`, `antes`, `depois`) leva `choque=[{"usuario_id", "codigo"}]`, só ids e códigos. O aviso na tela fica para um PR à parte; por ora ele aparece na linha do tempo do evento.
+- **D4**: SUPER aprovada com data mudada no Google continua `aprovado` (o adendo da reaprovação da PA-04 não vale para a cópia). O `GCAL_COPIA_GOOGLE` leva `aprovada_como_super` e `mudou_material_sem_reaprovacao`.
+- **D7**: antes de ligar, o dono revisa no Google quem tem "Fazer alterações nos eventos" na agenda (em 30/10: 12 pessoas e 5 grupos). O Google não diz quem fez a edição; com a cópia ligada, qualquer editor da agenda muda data e cancela evento aprovado no sistema. É um poder novo.
+
+**Modos** (`GCalCopiaCursor.modo`):
+
+- `observar` (padrão): lê com o token, decide e só grava o cursor (token, adiados e o `resumo`, somado ao das rodadas anteriores do `observar`, com os s<id> juntados por conjunto). Não mexe em evento.
+- `copiar`: grava horário e cancelamento item a item, cada um na própria transação, com a linha travada (`select_for_update(skip_locked=True)`) e a decisão refeita sob a trava. Trocar para `copiar` (`trocar_modo`) **zera o token**: a 1ª rodada é uma leitura completa decidida por valor contra o sistema e pega toda edição feita na semana de observação.
+
+**Freio de massa.** No `copiar` com escrita, mais de **5** (`FREIO_CANCELAMENTOS`; mudar exige PR) cancelamentos de evento aprovado e futuro numa rodada param a rodada **inteira** antes de aplicar qualquer coisa: nada muda no sistema, token e adiados ficam, o cursor vai para `ativo=False`, `ultimo_erro="freio: N cancelamentos (<digest>)"`, e o `resumo` traz a lista inteira de event ids e o digest (sha256 da lista ordenada, 12 caracteres). Só o dono destrava, com o digest da lista exata que viu: `gcal_copia --apply --liberar-freio <digest>`. Digest diferente (a lista mudou) para de novo. Com a cópia desligada, o `copiar` com escrita só roda com `--liberar-freio`. A task nunca libera o freio.
+
+**Erros e adiados.** Erro de domínio (`IntegrityError`, `DoesNotExist`, `ValidationError`) vai para `resumo.falhas` e a rodada segue. Erro de infraestrutura (banco, `HttpError` que não seja 410, token) aborta a rodada com o token intacto e grava `ultimo_erro` só com o tipo e o status HTTP. 410 (`SyncTokenExpirado`) faz leitura completa na mesma rodada. Linha `PENDING`, trava ocupada ou linha que sumiu vai para `cursor.adiados` (só event ids, teto 200) e é relida com `events.get` na rodada seguinte; depois de 5 tentativas vira falha.
+
+**Cursor** (`GCalCopiaCursor`): `calendar_id` (único: o pino), `sync_token`, `ativo` (padrão False), `modo` (padrão `observar`), `operador` (a conta cuja credencial Google lê e faz o PATCH), `adiados`, `resumo` (contagens e s<id> por motivo, futuro/passado, falhas, cancelamentos, digest, freio), `ultimo_sucesso_em`, `ultimo_erro`. Ligar, desligar e trocar o modo é feito no banco, sem redeploy: a task relê a linha a cada execução. Nada de dado pessoal no cursor, no AuditLog nem no log: só s<id>, u<id>, event ids, datas e códigos. O `AuditLog` `GOOGLE_REFRESH_TOKEN` do refresh continua com o e-mail, como em todo refresh (fora deste escopo).
+
+**Trava.** `pg_try_advisory_lock` de sessão com a mesma chave no comando e na task, solta no `finally` (se o processo morre, a conexão leva a trava). Rodada que não pega a trava sai `SKIPPED`.
+
+**Comando** `python manage.py gcal_copia`: dry-run por padrão (lê e decide; não grava nada, nem o cursor); `--apply` grava no modo do cursor e, se o cursor não existe, cria desligado e em `observar`; `--operador <id>` escolhe a conta que lê; `--apply --liberar-freio <digest>` aplica a lista que o freio parou. A saída só traz contagens, futuro/passado, s<id> e, no freio, a lista de event ids com o digest. Montar o cliente pode renovar o token do operador (grava a credencial e um `GOOGLE_REFRESH_TOKEN`; no `invalid_grant` a credencial é apagada), como no uso normal. Nunca há revoke.
+
+**Task e beat.** `copiar_mudancas_do_google` (`ignore_result=True`, `soft_time_limit=1500`, abaixo do `CELERY_TASK_TIME_LIMIT` de 1800), no beat `gcal-copia-google` de [`config/settings.py`](../../../backend/config/settings.py): a cada 600 s, `expires=540`, **sempre registrado** (quem liga é o cursor). Guardas, nesta ordem, antes de montar o cliente (montar renova o token):
+
+1. sem cursor do pino ou com `ativo=False` → `SKIPPED`, só log DEBUG (com o pino vazio ou `primary`, vale qualquer cursor ligado, para a cópia ligada não parar em silêncio);
+2. pino vazio ou `primary` → ERROR;
+3. operador nulo → ERROR;
+4. operador sem `GoogleOAuthCredential` → ERROR, só com o u<id>.
+
+Depois monta o cliente OAuth do operador como o comando (`get_oauth_client_for_user`) e roda `sincronizar(cursor, client, escrever=True)`. Uma linha de log por rodada, só com status e contagens: INFO no OK; WARNING com falhas, choque ou freio; ERROR no erro. O freio devolve ERROR e desliga o cursor, então a execução seguinte já é `SKIPPED`. Falha ao montar o cliente e estouro do `soft_time_limit` → ERROR, só com o tipo do erro. Devolve `OK`, `SKIPPED` ou `ERROR`.
+
+**Ordem da virada** (plano v3, item 9; cada passo leva o OK do dono):
+
+1. planilha só consulta;
+2. o sheets.banco desliga o gatilho planilha→Google, com prova;
+3. backup com menos de 24 h;
+4. export do dia;
+5. carga da virada (dry-run, OK e `--apply`; [`imports.spec.md`](imports.spec.md));
+6. A5;
+7. `gcal_adocao` (dry-run, OK e `--apply`);
+8. `gcal_copia` (dry-run) mostrado ao dono;
+9. o dono revisa quem edita a agenda (D7);
+10. cursor com `ativo=True`, `modo=observar` e sem token;
+11. depois de uma semana, `modo=copiar`.
+
+**Casos aceitos.** Evento movido no Google para outra agenda aparece como cancelado e, pela D2, vira reprovado. Evento restaurado da lixeira do Google depois da D2 não casa (o id foi limpo) e fica reprovado.
 
 ## Fluxos principais
 
@@ -155,6 +220,7 @@ Beat sempre ativo: `probe_google_credentials`, chave `daily-google-credentials-p
 - [`test_gcal_republicar_e_dryrun_oauth.py`](../../../backend/apps/core/tests/test_gcal_republicar_e_dryrun_oauth.py) — publicar → remover → publicar de novo termina `confirmed` (Google falso com soft-delete e `patch` parcial), também com o `get` falhando (409 → `patch`, removido ou editado; sem mudança = `SKIP`, sem `patch`); dry-run OAuth monta o cliente com a credencial do operador (não a de outro usuário), confere o calendário da organização, dá erro sem acesso (como a publicação real), não trava a linha, não escreve e não mexe na `Solicitacao`, nem em erro (sem operador, operador inexistente, sem credencial, rede no refresh, sem calendário).
 - [`test_google_oauth.py`](../../../backend/apps/core/tests/test_google_oauth.py), [`test_pr_security_oauth_hardening.py`](../../../backend/apps/core/tests/test_pr_security_oauth_hardening.py), [`test_pr_security_oauth_authorize_url.py`](../../../backend/apps/core/tests/test_pr_security_oauth_authorize_url.py) — encrypt/decrypt/rotation, open-redirect, rate limit, HTTPS, validação de domínio/state.
 - [`test_google_reconnect_alert.py`](../../../backend/apps/core/tests/test_google_reconnect_alert.py) — `invalid_grant` apaga e audita de verdade (M12-10), job diário (ok / revogada / rede / 5xx), beat, `reconnect_required` (nunca conectou, desconectou manual, removida pelo sistema, reconectou) e `google_reconnect` no resumo de alertas (+ 403 sem `use_gcal`).
+- [`test_gcal_copia.py`](../../../backend/apps/core/tests/test_gcal_copia.py), [`test_gcal_copia_command.py`](../../../backend/apps/core/tests/test_gcal_copia_command.py), [`test_gcal_copia_cursor.py`](../../../backend/apps/core/tests/test_gcal_copia_cursor.py) e [`test_gcal_copia_task.py`](../../../backend/apps/core/tests/test_gcal_copia_task.py) — cópia Google → sistema: `decidir`, modos, freio e `--liberar-freio`, adiados, erros, D2/D3/D4, PATCH da descrição, comando e as guardas da task (nenhuma monta o cliente); a sentinela do beat em [`test_celery_beat_registration.py`](../../../backend/apps/core/tests/test_celery_beat_registration.py).
 - [`test_gcal_google_client.py`](../../../backend/apps/core/tests/test_gcal_google_client.py), [`test_gcal_sync_dryrun.py`](../../../backend/apps/core/tests/test_gcal_sync_dryrun.py), [`test_gcal_hash_drift.py`](../../../backend/apps/core/tests/test_gcal_hash_drift.py), [`test_gcal_endpoints.py`](../../../backend/apps/core/tests/test_gcal_endpoints.py).
 
 ## Pontos de atenção / dívidas conhecidas

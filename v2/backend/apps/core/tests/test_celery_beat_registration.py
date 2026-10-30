@@ -80,3 +80,11 @@ def test_beat_agenda_o_backup_diario() -> None:
     # Dead-man diario: foi a ausencia deste agendamento que deixou o backup morrer
     # 10 dias em silencio (2026-08). Se alguem remover a entrada, o alarme some.
     assert "backup.check_backup_freshness" in dados["agendadas"]
+
+
+def test_beat_agenda_a_copia_do_google() -> None:
+    """A copia do Google roda pelo beat a cada 10 min (desligada pelo cursor, nao pelo agendamento).
+    Sem a entrada, ligar o cursor no banco nao faria nada, em silencio."""
+    dados = _sondar()
+    assert "apps.core.tasks.copiar_mudancas_do_google" in dados["agendadas"]
+    assert "apps.core.tasks.copiar_mudancas_do_google" in dados["registradas"]

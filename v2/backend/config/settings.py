@@ -703,6 +703,13 @@ CELERY_BEAT_SCHEDULE: dict[str, dict[str, object]] = {
         "task": "apps.core.tasks.purge_old_audit_logs",
         "schedule": crontab(hour=4, minute=0, day_of_week=0),
     },
+    # Cópia Google → Sistema: SEMPRE registrada; quem liga é `GCalCopiaCursor.ativo` (desligada,
+    # a task devolve SKIPPED sem montar o cliente). Expira antes da próxima para não empilhar.
+    "gcal-copia-google": {
+        "task": "apps.core.tasks.copiar_mudancas_do_google",
+        "schedule": 600.0,  # 10 minutos (em segundos)
+        "options": {"expires": 540.0},
+    },
 }
 # Governança Fase 3: o gcal-sync só é registrado quando FEATURE_AUTO_APPLY_ENABLED=True.
 if FEATURE_AUTO_APPLY_ENABLED:

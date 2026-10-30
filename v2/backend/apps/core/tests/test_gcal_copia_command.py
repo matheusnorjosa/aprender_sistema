@@ -131,3 +131,32 @@ def test_pino_vazio_ou_primary_e_erro(fake, settings):
 def test_liberar_freio_exige_apply(fake):
     with pytest.raises(CommandError, match="--apply"):
         _rodar("--liberar-freio", "--operador", str(UsuarioFactory().pk))
+
+
+def test_freio_mostra_a_lista_no_dry_run_e_libera_so_ela(fake):
+    inicio = (timezone.now() + timedelta(days=3)).replace(minute=0, second=0, microsecond=0)
+    eids = [f"c{i}" for i in range(6)]
+    for eid in eids:
+        SolicitacaoFactory(
+            status="aprovado",
+            gcal_status="PUBLISHED",
+            external_event_id=eid,
+            inicio=inicio,
+            fim=inicio + timedelta(hours=2),
+        )
+        fim = inicio + timedelta(hours=2)
+        fake.insert(PINO, eid, {"start": {"dateTime": inicio.isoformat()}, "end": {"dateTime": fim.isoformat()}})
+    GCalCopiaCursor.objects.create(calendar_id=PINO, modo="copiar", operador=UsuarioFactory())
+    _rodar("--apply")  # linha de base
+    for eid in eids:
+        fake.delete(PINO, eid)
+
+    _rodar("--apply")  # puxa o freio
+    previa = _rodar()
+
+    assert "erro=freio: 6 cancelamentos" in previa
+    assert f"freio_ids: 6 [{' '.join(eids)}]" in previa
+    assert not AuditLog.objects.filter(action="REJECT").exists()
+
+    _rodar("--apply", "--liberar-freio")
+    assert AuditLog.objects.filter(action="REJECT").count() == 6

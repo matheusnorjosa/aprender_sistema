@@ -160,6 +160,7 @@ class _Resumo:
         self.passado = 0
         self.falhas: list[dict[str, str]] = []
         self.freio = 0
+        self.freio_ids: list[str] = []
         self.leitura_completa = False
         self.lidos = 0
 
@@ -201,6 +202,8 @@ class _Resumo:
             "passado": passado,
             "falhas": falhas[-MAX_FALHAS:],
             "freio": self.freio,
+            # A lista inteira, sem corte: é ela que o `liberar_freio` compara (só no `copiar`).
+            "freio_ids": list(self.freio_ids),
         }
 
 
@@ -357,7 +360,8 @@ def sincronizar(
     - `escrever=True` + `copiar`: grava o horário e o cancelamento, item a item.
 
     `operador_id` (padrão `cursor.operador_id`) é quem faz o PATCH da descrição depois.
-    `liberar_freio` é a saída manual do dono para uma rodada que o freio de massa segurou.
+    `liberar_freio` é a saída manual do dono: aplica os cancelamentos segurados só se a lista desta
+    rodada for igual à guardada em `resumo.freio_ids` (a que ele viu).
     """
     agora = agora or timezone.now()
     pino = str(getattr(settings, "GCAL_OAUTH_CALENDAR_ID", "") or "")
@@ -410,7 +414,7 @@ def _rodada(
         if isinstance(a, dict) and a.get("event_id")
     }
     adiados: dict[str, int] = {}
-    freio = False
+    freio = lista_mudou = False
     lido_em = timezone.now()
     try:
         # 1) Adiados da rodada anterior: o syncToken não os traz de novo, então relê um a um.
@@ -435,27 +439,22 @@ def _rodada(
 
         linhas = _linhas_por_event_id(list(eventos))
         decisoes = {eid: decidir(ev, linhas.get(eid, []), agora) for eid, ev in eventos.items()}
-        cancelamentos = sum(1 for d in decisoes.values() if d.motivo == CANCELADO)
-        # O freio do `copiar` fica puxado: se a rodada anterior segurou o token, segue segurando até o
-        # dono liberar ou não sobrar cancelamento (a contagem cai quando um vira passado ou volta).
-        # Vale também no dry-run do `copiar`, para a prévia dar o mesmo veredito do --apply.
-        segurado = (
-            cursor.modo == GCalCopiaCursor.Modo.COPIAR
-            and isinstance(cursor.resumo, dict)
-            and cursor.resumo.get("modo") == GCalCopiaCursor.Modo.COPIAR
-            and int(cursor.resumo.get("freio", 0)) > 0
-        )
-        # A liberação do dono só cobre os s<id> que ele viu segurados: se entrou algum outro, a rodada
-        # segue segurada com a lista nova e ele libera de novo depois de vê-la. Lista cortada em
-        # MAX_IDS_POR_MOTIVO: o que ficou de fora não está em `vistos` e o freio segue puxado.
-        vistos = set(cursor.resumo.get("ids", {}).get(FREIO, [])) if segurado else set()
-        atuais = {
-            f"s{d.solicitacao.pk}" for d in decisoes.values() if d.motivo == CANCELADO and d.solicitacao is not None
-        }
-        liberado = liberar_freio and bool(atuais) and atuais <= vistos
-        freio = (cancelamentos > FREIO_CANCELAMENTOS or (segurado and cancelamentos > 0)) and not liberado
+        # Freio de massa. Mais de FREIO_CANCELAMENTOS cancelamentos: nenhum é aplicado. No `copiar` ele
+        # fica puxado com a lista exata (event ids) em `resumo.freio_ids` e segue puxado enquanto houver
+        # cancelamento. O dono solta com `liberar_freio`, que só vale se a lista desta rodada for IGUAL à
+        # guardada; um id a mais ou a menos e nada é aplicado: a lista nova fica guardada para ele ver.
+        # O dry-run lê o mesmo cursor, então dá o mesmo veredito do --apply. O `observar` só avisa.
+        atuais = sorted(eid for eid, d in decisoes.items() if d.motivo == CANCELADO)
+        copiar = cursor.modo == GCalCopiaCursor.Modo.COPIAR
+        guardados = cursor.resumo.get("freio_ids") if copiar and isinstance(cursor.resumo, dict) else None
+        puxado = bool(guardados)
+        liberado = liberar_freio and puxado and set(atuais) == {str(x) for x in guardados or []}
+        freio = bool(atuais) and not liberado and (puxado or len(atuais) > FREIO_CANCELAMENTOS)
+        lista_mudou = freio and liberar_freio and puxado
         if freio:
-            resumo.freio = cancelamentos
+            resumo.freio = len(atuais)
+            if copiar:
+                resumo.freio_ids = atuais
 
         for event_id, d in decisoes.items():
             if aplicar and d.motivo in (COPIAR_HORARIO, CANCELADO) and d.solicitacao is not None:
@@ -486,7 +485,11 @@ def _rodada(
     if not (isinstance(anterior, dict) and anterior.get("modo") == GCalCopiaCursor.Modo.OBSERVAR):
         anterior = None
     dados = resumo.como_dict(anterior)
-    ultimo_erro = f"freio: {resumo.freio} cancelamentos" if freio else ""
+    ultimo_erro = ""
+    if lista_mudou:
+        ultimo_erro = "freio: lista mudou"
+    elif freio:
+        ultimo_erro = f"freio: {resumo.freio} cancelamentos"
     logger.info(
         "gcal_copia: modo=%s lidos=%s contagens=%s falhas=%s freio=%s",
         cursor.modo,

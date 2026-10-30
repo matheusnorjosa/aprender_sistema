@@ -37,7 +37,10 @@ class Command(BaseCommand):
         parser.add_argument(
             "--liberar-freio",
             action="store_true",
-            help="Aplica os cancelamentos de uma rodada que o freio de massa segurou (só com --apply)",
+            help=(
+                "Aplica os cancelamentos que o freio de massa segurou, só se a lista for a mesma da "
+                "rodada anterior (freio_ids); se mudou, nada é aplicado e a lista nova fica (só com --apply)"
+            ),
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
@@ -84,6 +87,10 @@ class Command(BaseCommand):
             f"futuro={resumo.get('futuro', 0)} passado={resumo.get('passado', 0)} "
             f"falhas={len(resumo.get('falhas', []))} freio={resumo.get('freio', 0)}"
         )
+        freio_ids = resumo.get("freio_ids", [])
+        if freio_ids:
+            # A lista inteira que o --liberar-freio vai comparar: é esta que o dono confere.
+            out.write(f"freio_ids: {len(freio_ids)} [{' '.join(freio_ids)}]")
         for motivo, n in sorted(resumo.get("contagens", {}).items()):
             ids = resumo.get("ids", {}).get(motivo, [])
             out.write(f"  {motivo}: {n}" + (f" [{' '.join(ids)}]" if ids else ""))

@@ -226,7 +226,8 @@ def _trava_da_copia() -> Iterator[bool]:
     """`pg_try_advisory_lock` de sessão; solta no `finally`. Se o processo morre, a conexão leva a trava."""
     with connection.cursor() as c:
         c.execute("SELECT pg_try_advisory_lock(%s, %s)", list(_TRAVA_COPIA))
-        livre = bool(c.fetchone()[0])
+        linha = c.fetchone()
+        livre = bool(linha and linha[0])
     try:
         yield livre
     finally:
@@ -234,7 +235,8 @@ def _trava_da_copia() -> Iterator[bool]:
             try:
                 with connection.cursor() as c:
                     c.execute("SELECT pg_advisory_unlock(%s, %s)", list(_TRAVA_COPIA))
-                    if not c.fetchone()[0]:
+                    solta = c.fetchone()
+                    if not (solta and solta[0]):
                         logger.warning("gcal_copia: a trava já não estava com esta sessão")
             except DatabaseError:
                 logger.warning("gcal_copia: não deu para soltar a trava (conexão caiu; sai com ela)")

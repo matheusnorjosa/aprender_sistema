@@ -337,7 +337,9 @@ def test_choque_de_horario_copia_e_grava_so_ids_e_codigos(agora, fake, enfileira
 @pytest.mark.django_db
 def test_hash_nulo_fica_nulo_e_nao_nulo_so_muda_depois_do_patch(agora, fake, enfileirados):
     adotada = _publicada(agora, eid="adotada", gcal_payload_hash=None)
-    publicada = _publicada(agora, eid="publicada", gcal_payload_hash="a" * 40)
+    publicada = _publicada(agora, eid="publicada")
+    em_dia = compute_payload_hash(publicada)  # em dia com o Google antes da cópia
+    Solicitacao.objects.filter(pk=publicada.pk).update(gcal_payload_hash=em_dia)
     for s in (adotada, publicada):
         _no_google(fake, s)
     cursor = _cursor()
@@ -351,7 +353,7 @@ def test_hash_nulo_fica_nulo_e_nao_nulo_so_muda_depois_do_patch(agora, fake, enf
     adotada.refresh_from_db()
     publicada.refresh_from_db()
     assert adotada.gcal_payload_hash is None
-    assert publicada.gcal_payload_hash == "a" * 40, "a cópia não recalcula o hash"
+    assert publicada.gcal_payload_hash == em_dia, "a cópia não recalcula o hash"
 
     for s in (adotada, publicada):
         assert copia.atualizar_descricao_no_google(s.pk, cursor.operador_id, client=fake) == "ok"
@@ -364,6 +366,63 @@ def test_hash_nulo_fica_nulo_e_nao_nulo_so_muda_depois_do_patch(agora, fake, enf
     assert "📅 Data:" in evento["description"] and "antiga" not in evento["description"]
     assert evento["summary"] == TITULO_SECRETO, "o PATCH só troca a descrição"
     assert datetime.fromisoformat(evento["start"]["dateTime"]) == novo
+
+
+@pytest.mark.django_db
+def test_hash_ja_divergente_vira_nulo_na_copia_e_o_patch_nao_o_recalcula(agora, fake, enfileirados):
+    """Título ou convidados já fora de dia: o PATCH só da descrição não os acerta; o Reapply manda tudo."""
+    s = _publicada(agora, gcal_payload_hash="a" * 40)
+    _no_google(fake, s)
+    cursor = _cursor()
+    _linha_de_base(cursor, fake, agora)
+    novo = _hora(agora, 7)
+    _mover_no_google(fake, s.external_event_id, novo, novo + timedelta(hours=1))
+
+    sincronizar(cursor, fake, escrever=True, agora=agora)
+    s.refresh_from_db()
+    assert s.inicio == novo and s.gcal_payload_hash is None
+
+    assert copia.atualizar_descricao_no_google(s.pk, cursor.operador_id, client=fake) == "ok"
+    s.refresh_from_db()
+    assert s.gcal_payload_hash is None
+
+
+@pytest.mark.django_db
+def test_patch_da_descricao_com_refresh_morto_apaga_a_credencial_fora_da_transacao(agora, settings):
+    """invalid_grant no refresh: a credencial sai e o GOOGLE_DISCONNECT fica, mesmo com o ValueError."""
+    from unittest.mock import Mock, patch
+
+    import requests
+
+    from apps.core.models import GoogleOAuthCredential
+    from apps.core.services.oauth import token_manager
+    from apps.core.services.oauth.token_manager import encrypt_token
+
+    settings.GCAL_CLIENT = "google"
+    settings.GCAL_AUTH_MODE = "oauth"
+    s = _publicada(agora)
+    operador = UsuarioFactory()
+    GoogleOAuthCredential.objects.create(
+        user=operador,
+        google_email="operador@example.invalid",
+        access_token_encrypted=encrypt_token("velho"),
+        refresh_token_encrypted=encrypt_token("revogado"),
+        token_expiry=timezone.now() - timedelta(hours=2),
+        scope="https://www.googleapis.com/auth/calendar",
+    )
+    resposta = Mock(status_code=400)
+    resposta.json.return_value = {"error": "invalid_grant"}
+
+    with (
+        patch.dict("os.environ", {"GCAL_OAUTH_CLIENT_ID": "id", "GCAL_OAUTH_CLIENT_SECRET": "segredo"}),
+        patch.object(token_manager.requests, "post") as post,
+    ):
+        post.return_value.raise_for_status.side_effect = requests.exceptions.HTTPError(response=resposta)
+        with pytest.raises(ValueError):
+            copia.atualizar_descricao_no_google(s.pk, operador.pk)
+
+    assert not GoogleOAuthCredential.objects.filter(user=operador).exists()
+    assert AuditLog.objects.filter(action="GOOGLE_DISCONNECT", usuario=operador).exists()
 
 
 @pytest.mark.django_db
@@ -548,6 +607,26 @@ def test_freio_liberado_pelo_dono_aplica(agora, fake, enfileirados):
 
 
 @pytest.mark.django_db
+def test_freio_no_observar_avisa_mas_avanca_o_token(agora, fake, enfileirados):
+    cursor, linhas = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS + 1)
+    trocar_modo(cursor, "observar")
+    token_antes = cursor.sync_token
+
+    r = sincronizar(cursor, fake, escrever=True, agora=agora)
+
+    assert r.resumo["contagens"] == {"freio": 6, "copiar_horario": 1}
+    cursor.refresh_from_db()
+    assert cursor.ultimo_erro == "freio: 6 cancelamentos", "o freio segue como aviso"
+    assert cursor.sync_token != token_antes, "no observar nada é aplicado: o token avança"
+
+    sincronizar(cursor, fake, escrever=True, agora=agora)
+    cursor.refresh_from_db()
+    assert cursor.resumo["contagens"] == {"freio": 6, "copiar_horario": 1}, "a mesma mudança não conta 2x"
+    assert cursor.resumo["futuro"] == 7
+    assert all(Solicitacao.objects.get(pk=s.pk).status == "aprovado" for s in linhas)
+
+
+@pytest.mark.django_db
 def test_5_cancelamentos_passam_pelo_freio(agora, fake, enfileirados):
     cursor, _ = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS)
 
@@ -721,6 +800,50 @@ def test_token_so_avanca_se_ninguem_mexeu_nele(agora, fake):
     assert r.status == "ERROR"
     cursor.refresh_from_db()
     assert cursor.sync_token == "mexido-por-outro"
+
+
+@pytest.mark.django_db
+def test_troca_de_modo_no_meio_da_rodada_sem_token_descarta_o_resultado(agora, fake):
+    """Sem token, `trocar_modo(copiar)` grava nulo de novo: só o token não pegaria a troca."""
+    cursor = _cursor(modo="observar")
+    original = fake.list_changes
+
+    def _troca_no_meio(cal, token):
+        trocar_modo(GCalCopiaCursor.objects.get(pk=cursor.pk), "copiar")
+        return original(cal, token)
+
+    fake.list_changes = _troca_no_meio
+    r = sincronizar(cursor, fake, escrever=True, agora=agora)
+
+    assert r.status == "ERROR"
+    cursor.refresh_from_db()
+    assert cursor.modo == "copiar" and cursor.sync_token is None, "a 1ª rodada do copiar relê tudo"
+
+
+@pytest.mark.django_db
+def test_linha_republicada_depois_da_leitura_vira_adiado(agora, fake, enfileirados):
+    """Lápide lida e a linha republicada antes da trava: o item lido já não vale."""
+    s = _publicada(agora)
+    _no_google(fake, s)
+    cursor = _cursor()
+    _linha_de_base(cursor, fake, agora)
+    fake.delete(PINO, "evt1")
+    original = fake.list_changes
+
+    def _republica_no_meio(cal, token):
+        lido = original(cal, token)
+        Solicitacao.objects.get(pk=s.pk).mark_gcal(status=Solicitacao.GCalStatus.PUBLISHED)
+        return lido
+
+    fake.list_changes = _republica_no_meio
+    r = sincronizar(cursor, fake, escrever=True, agora=agora)
+
+    assert r.resumo["contagens"] == {"pendente_gcal": 1}
+    atual = Solicitacao.objects.get(pk=s.pk)
+    assert (atual.status, atual.external_event_id) == ("aprovado", "evt1")
+    assert not AuditLog.objects.filter(action="REJECT").exists()
+    cursor.refresh_from_db()
+    assert cursor.adiados == [{"event_id": "evt1", "tentativas": 1}]
 
 
 # --- observar e trocar_modo ---

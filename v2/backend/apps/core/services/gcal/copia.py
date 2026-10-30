@@ -245,8 +245,12 @@ def _linhas_por_event_id(event_ids: Sequence[str]) -> dict[str, list[Solicitacao
 def _copiar_horario(s: Solicitacao, d: Decisao, event_id: str, operador_id: int) -> None:
     assert d.inicio is not None and d.fim is not None
     antes = {"inicio": s.inicio.isoformat(), "fim": s.fim.isoformat()}
+    # Já fora de dia com o Google (título, convidados, local): o PATCH só da descrição não acerta
+    # isso, então o hash vira nulo e o próximo Reapply manda tudo.
+    if s.gcal_payload_hash is not None and s.gcal_payload_hash != compute_payload_hash(s):
+        s.gcal_payload_hash = None
     s.inicio, s.fim = d.inicio, d.fim
-    s.save(update_fields=["inicio", "fim", "updated_at"])
+    s.save(update_fields=["inicio", "fim", "gcal_payload_hash", "updated_at"])
     # D3: copia mesmo com choque; só ids e códigos (nada de nome, título ou e-mail de convidado).
     guarda = check_solicitacao_availability(s, lock=True)
     choque = sorted({(p.usuario_id, c.code) for p in guarda.blocked for c in p.conflicts})
@@ -312,12 +316,17 @@ def _reprovar(s: Solicitacao, event_id: str) -> None:
     desvincular_do_google(s)
 
 
-def _aplicar_item(pk: int, event_id: str, evento: JsonDict, agora: datetime, operador_id: int, freio: bool) -> Decisao:
+def _aplicar_item(
+    pk: int, event_id: str, evento: JsonDict, agora: datetime, operador_id: int, freio: bool, lido_em: datetime
+) -> Decisao:
     """Grava um item na própria transação, com a linha travada e a decisão refeita sob a trava."""
     with transaction.atomic():
         s = _travar_linha(pk)
         if s is None:
             return Decisao(TRAVA_OCUPADA)
+        if s.gcal_last_sync_at and s.gcal_last_sync_at >= lido_em:
+            # O sistema publicou a linha depois da leitura: o item lido já não vale. Relê na próxima.
+            return Decisao(PENDENTE_GCAL, s)
         linhas = [s] if s.external_event_id == event_id else []
         if linhas:
             linhas += list(Solicitacao.objects.filter(external_event_id=event_id).exclude(pk=s.pk))
@@ -396,6 +405,7 @@ def _rodada(
     }
     adiados: dict[str, int] = {}
     freio = False
+    lido_em = timezone.now()
     try:
         # 1) Adiados da rodada anterior: o syncToken não os traz de novo, então relê um a um.
         eventos: dict[str, JsonDict] = {}
@@ -427,7 +437,7 @@ def _rodada(
         for event_id, d in decisoes.items():
             if aplicar and d.motivo in (COPIAR_HORARIO, CANCELADO) and d.solicitacao is not None:
                 try:
-                    d = _aplicar_item(d.solicitacao.pk, event_id, eventos[event_id], agora, operador_id, freio)
+                    d = _aplicar_item(d.solicitacao.pk, event_id, eventos[event_id], agora, operador_id, freio, lido_em)
                 except _ERROS_DE_DOMINIO as e:
                     resumo.falha(event_id, type(e).__name__)
                     continue
@@ -472,12 +482,13 @@ def _rodada(
         "ultimo_erro": ultimo_erro,
         "updated_at": timezone.now(),
     }
-    # Com o freio, o token NÃO avança: os cancelamentos voltam na próxima rodada até o dono liberar
-    # (`liberar_freio`). O horário copiado nesta rodada volta como eco, sem efeito.
-    if not freio:
+    # Com o freio no `copiar`, o token NÃO avança: os cancelamentos voltam na próxima rodada até o
+    # dono liberar (`liberar_freio`). O horário copiado nesta rodada volta como eco, sem efeito. No
+    # `observar` nada é aplicado: o token avança e o freio fica só como aviso.
+    if not (freio and aplicar):
         campos["sync_token"] = token_novo
-    # Compare-and-set: só grava se ninguém trocou o token durante a rodada (p.ex. `trocar_modo`).
-    if not GCalCopiaCursor.objects.filter(pk=cursor.pk, sync_token=token_lido).update(**campos):
+    # Compare-and-set: só grava se ninguém trocou o token nem o modo durante a rodada (`trocar_modo`).
+    if not GCalCopiaCursor.objects.filter(pk=cursor.pk, sync_token=token_lido, modo=cursor.modo).update(**campos):
         logger.warning("gcal_copia: o token mudou durante a rodada; resultado descartado")
         return Resultado("ERROR", dados, "o token mudou durante a rodada", token_novo)
     return Resultado("OK", dados, ultimo_erro, token_novo)
@@ -504,22 +515,24 @@ def atualizar_descricao_no_google(
     nulo (D5). Se o PATCH falha, o hash antigo fica e o próximo Reapply manda tudo.
     """
     calendario = str(getattr(settings, "GCAL_OAUTH_CALENDAR_ID", "") or "")
+    if not calendario or calendario == "primary":
+        return "pulado"
+    if client is None:
+        # Fora da transação, como no `excluir`: o refresh do token grava (e, no invalid_grant, apaga a
+        # credencial e registra o GOOGLE_DISCONNECT) e isso não pode voltar no rollback daqui.
+        from apps.core.models import Usuario
+        from apps.core.services.gcal_client_factory import get_oauth_client_for_user
+
+        client, _ = get_oauth_client_for_user(Usuario.objects.get(pk=operador_id))
     with transaction.atomic():
         s = Solicitacao.objects.select_for_update().filter(pk=solicitacao_id).first()
         if (
-            not calendario
-            or calendario == "primary"
-            or s is None
+            s is None
             or s.status != Solicitacao.Status.APROVADO
             or s.gcal_status != Solicitacao.GCalStatus.PUBLISHED
             or not s.external_event_id
         ):
             return "pulado"
-        if client is None:
-            from apps.core.models import Usuario
-            from apps.core.services.gcal_client_factory import get_oauth_client_for_user
-
-            client, _ = get_oauth_client_for_user(Usuario.objects.get(pk=operador_id))
         client.patch_descricao(calendario, s.external_event_id, build_event_payload(s)["description"])
         if s.gcal_payload_hash is not None:
             s.gcal_payload_hash = compute_payload_hash(s)

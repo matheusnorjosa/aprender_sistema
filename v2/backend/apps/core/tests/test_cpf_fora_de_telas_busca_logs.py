@@ -640,7 +640,7 @@ def test_descricao_do_evento_no_google_nao_leva_cpf_de_quem_nao_tem_nome():
     coordenador = _conta(groups=["Coordenador"])
     formador = _conta(groups=["Formador"])
     s = SolicitacaoFactory(status="aprovado", coordenador=coordenador)
-    s.formadores.add(formador)
+    Participation.objects.create(solicitacao=s, usuario=formador, role=Participation.Role.FORMADOR)
 
     descricao = build_event_payload(s)["description"]
 

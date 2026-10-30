@@ -11,6 +11,10 @@ from __future__ import annotations
 from apps.core.types import CalendarId, EventId, JsonDict
 
 
+class SyncTokenExpirado(Exception):
+    """O Google recusou o syncToken (HTTP 410): quem chama descarta o token e refaz a leitura completa."""
+
+
 class CalendarClientAdapter:
     """
     Interface para clientes de Calendar.
@@ -64,6 +68,18 @@ class CalendarClientAdapter:
         Args:
             calendar_id: ID do calendário
             event_id: ID do evento
+        """
+        raise NotImplementedError
+
+    def list_changes(self, calendar_id: CalendarId, sync_token: str | None) -> tuple[list[JsonDict], str]:
+        """
+        Lê o que mudou no calendário desde `sync_token` (None = leitura completa).
+
+        Returns:
+            (itens crus do Google, incluindo cancelados; nextSyncToken da última página)
+
+        Raises:
+            SyncTokenExpirado: o Google recusou o token (410)
         """
         raise NotImplementedError
 

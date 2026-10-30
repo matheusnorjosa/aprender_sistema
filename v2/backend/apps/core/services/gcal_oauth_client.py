@@ -24,6 +24,7 @@ from google_auth_httplib2 import AuthorizedHttp
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+from apps.core.services.gcal.client import SyncTokenExpirado
 from apps.core.services.gcal_sync_service import CalendarClientAdapter
 from apps.core.types import CalendarId, EventId, JsonDict
 
@@ -31,6 +32,9 @@ if TYPE_CHECKING:
     from apps.core.models import GoogleOAuthCredential
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+# Só o que a cópia Google → Sistema precisa: nada de título, descrição ou convidados (LGPD).
+CAMPOS_LIST_CHANGES = "items(id,status,start,end,updated,recurringEventId,recurrence),nextPageToken,nextSyncToken"
 
 
 def resolve_publish_calendar_id(credential: Any) -> str:
@@ -95,11 +99,11 @@ class OAuthCalendarClient(CalendarClientAdapter):
 
         # Refresh token se expirado (thread-safe com select_for_update)
         if credential.is_expired():
-            logger.info(f"🔄 Access token expired for {credential.google_email}, refreshing...")
+            logger.info(f"🔄 Access token expired for u{credential.user_id}, refreshing...")
             credential = refresh_access_token_safe(credential)
         else:
             logger.debug(
-                f"✅ Access token still valid for {credential.google_email}, " f"expires at {credential.token_expiry}"
+                f"✅ Access token still valid for u{credential.user_id}, " f"expires at {credential.token_expiry}"
             )
 
         # Obter client_id e client_secret do env
@@ -135,9 +139,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
         # Armazenar referência ao credential para logging
         self.credential = credential
 
-        logger.info(
-            f"✅ OAuthCalendarClient initialized for {credential.google_email} " f"(user_id={credential.user_id})"
-        )
+        logger.info(f"✅ OAuthCalendarClient initialized for u{credential.user_id}")
 
     def get_default_calendar_id(self) -> str:
         """
@@ -226,7 +228,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
                         logger.warning(
                             f"Request failed with {status}, retrying in {wait_time}s "
                             f"(attempt {attempt + 1}/{max_retries}) "
-                            f"[user: {self.credential.google_email}]"
+                            f"[user: u{self.credential.user_id}]"
                         )
                         time.sleep(wait_time)
                         continue
@@ -364,7 +366,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
         except HttpError as e:
             if e.resp.status == 404:
                 # Evento já não existe → idempotente
-                logger.debug(f"Event {event_id} already deleted (404) " f"[user: {self.credential.google_email}]")
+                logger.debug(f"Event {event_id} already deleted (404) " f"[user: u{self.credential.user_id}]")
                 return
             raise
 
@@ -448,6 +450,50 @@ class OAuthCalendarClient(CalendarClientAdapter):
 
         return self._retry_with_backoff(_list_events, max_retries=settings.GCAL_REQUEST_MAX_RETRIES)
 
+    def list_changes(self, calendar_id: CalendarId, sync_token: str | None) -> tuple[list[JsonDict], str]:
+        """
+        Lê o que mudou no calendário desde `sync_token` (None = leitura completa), com cancelados.
+
+        Sem `singleEvents`, `orderBy`, `timeMin` ou `updatedMin`: o Google não os aceita junto do
+        `syncToken`. Cada página passa pelo retry de 429/5xx; o 410 não entra em retry.
+
+        Returns:
+            (itens crus de todas as páginas, nextSyncToken da última página)
+
+        Raises:
+            SyncTokenExpirado: o Google recusou o token (410)
+            RuntimeError: a última página veio sem nextSyncToken
+        """
+        calendar_id = self._resolve_calendar_id(calendar_id)
+        itens: list[JsonDict] = []
+        page_token: str | None = None
+        while True:
+            params: dict[str, Any] = {
+                "calendarId": calendar_id,
+                "showDeleted": True,
+                "maxResults": 2500,
+                "fields": CAMPOS_LIST_CHANGES,
+            }
+            if sync_token:
+                params["syncToken"] = sync_token
+            if page_token:
+                params["pageToken"] = page_token
+            try:
+                pagina = self._retry_with_backoff(self.service.events().list(**params).execute)
+            except HttpError as e:
+                if e.resp.status == 410:
+                    raise SyncTokenExpirado("syncToken recusado pelo Google (410)") from e
+                raise
+            itens.extend(pagina.get("items", []))
+            page_token = pagina.get("nextPageToken")
+            if not page_token:
+                break
+
+        next_sync_token = pagina.get("nextSyncToken")
+        if not next_sync_token:
+            raise RuntimeError("Google não devolveu nextSyncToken na última página")
+        return itens, next_sync_token
+
     def health_check(self) -> JsonDict:
         """
         Verifica saúde da integração com Google Calendar API.
@@ -468,7 +514,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
                 "details": f"Successfully connected to Google Calendar API. {len(calendars)} calendars found.",
             }
         except Exception as e:
-            logger.error(f"Google Calendar OAuth health check failed for " f"{self.credential.google_email}: {e}")
+            logger.error(f"Google Calendar OAuth health check failed for " f"u{self.credential.user_id}: {e}")
             return {
                 "status": "unhealthy",
                 "client_type": "oauth",

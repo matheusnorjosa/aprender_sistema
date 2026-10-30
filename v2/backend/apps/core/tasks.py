@@ -574,6 +574,95 @@ def task_gcal_copia_descricao(solicitation_id: int, operator_user_id: int) -> st
         return "erro"
 
 
+@shared_task(name="apps.core.tasks.copiar_mudancas_do_google", ignore_result=True, soft_time_limit=1500)
+def copiar_mudancas_do_google() -> str:
+    """Cópia Google → Sistema pelo beat (a cada 10 min). Liga e desliga pelo `GCalCopiaCursor.ativo`.
+
+    As guardas vêm antes de montar o cliente, porque montar o cliente renova o token do operador.
+    Nunca libera o freio de massa: isso é só do dono, pelo `gcal_copia --apply --liberar-freio`.
+    Escreve uma linha por rodada (`copiar_mudancas_do_google: status=...`), além da linha
+    `gcal_copia:` do serviço; as duas só com status e contagens. No `observar` o `resumo` soma as
+    rodadas, então o nível e as contagens do log vêm de `falhas_rodada` e `contagens_rodada`.
+    Devolve OK | SKIPPED | ERROR.
+    """
+    from django.conf import settings
+    from django.utils import timezone
+
+    from celery.exceptions import SoftTimeLimitExceeded
+
+    from apps.core.models import AuditLog, GCalCopiaCursor, GoogleOAuthCredential
+    from apps.core.services import gcal_client_factory
+    from apps.core.services.gcal import copia
+
+    nome = "copiar_mudancas_do_google"
+    pino = str(getattr(settings, "GCAL_OAUTH_CALENDAR_ID", "") or "")
+    pino_ok = bool(pino) and pino != "primary"
+    # Pino quebrado: vale qualquer cursor ligado, para a cópia ligada não parar em silêncio.
+    cursores = GCalCopiaCursor.objects.select_related("operador")
+    cursor = cursores.filter(calendar_id=pino).first() if pino_ok else cursores.filter(ativo=True).first()
+    if cursor is None or not cursor.ativo:
+        logger.debug("%s: desligada", nome)
+        return "SKIPPED"
+    if not pino_ok:
+        logger.error("%s: status=ERROR GCAL_OAUTH_CALENDAR_ID vazio ou 'primary' com a cópia ligada", nome)
+        return "ERROR"
+    if cursor.operador is None:
+        logger.error("%s: status=ERROR cursor ligado sem operador", nome)
+        return "ERROR"
+    if not GoogleOAuthCredential.objects.filter(user_id=cursor.operador_id).exists():
+        logger.error("%s: status=ERROR u%s sem credencial Google", nome, cursor.operador_id)
+        return "ERROR"
+
+    inicio = timezone.now()
+    try:
+        try:
+            client, _ = gcal_client_factory.get_oauth_client_for_user(cursor.operador)
+        except SoftTimeLimitExceeded:
+            raise
+        except Exception as e:
+            # Só o tipo: a mensagem do Google ou do refresh pode trazer e-mail.
+            logger.error(
+                "%s: status=ERROR sem cliente Google para u%s (%s)", nome, cursor.operador_id, type(e).__name__
+            )
+            return "ERROR"
+        r = copia.sincronizar(cursor, client, escrever=True)
+    except SoftTimeLimitExceeded:
+        logger.error("%s: status=ERROR passou do tempo (soft_time_limit)", nome)
+        return "ERROR"
+
+    falhas = int(r.resumo.get("falhas_rodada", 0))
+    choques = (
+        AuditLog.objects.filter(
+            action=AuditLog.Action.GCAL_COPIA_GOOGLE, created_at__gte=inicio, details__campo="horario"
+        )
+        .exclude(details__choque=[])
+        .count()
+    )
+    freio = bool(r.resumo.get("freio"))
+    if r.status == "ERROR":
+        nivel = logging.ERROR
+    elif falhas or choques or freio:
+        nivel = logging.WARNING
+    else:
+        nivel = logging.INFO
+    # `r.erro` não traz dado pessoal: é texto fixo ou o tipo do erro (ver copia._erro_curto).
+    logger.log(
+        nivel,
+        "%s: status=%s modo=%s lidos=%s contagens=%s falhas=%s choques=%s cancelamentos=%s freio=%s erro=%s",
+        nome,
+        r.status,
+        cursor.modo,
+        r.resumo.get("lidos", 0),
+        r.resumo.get("contagens_rodada", {}),
+        falhas,
+        choques,
+        len(r.resumo.get("cancelamentos", [])),
+        freio,
+        r.erro or "-",
+    )
+    return r.status
+
+
 @shared_task(name="apps.core.tasks.processar_notificacoes_acoes_diarias")
 def processar_notificacoes_acoes_diarias(reference_date_iso: str | None = None) -> dict[str, Any]:
     """

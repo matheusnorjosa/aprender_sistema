@@ -793,6 +793,81 @@ def test_freio_no_observar_avisa_avanca_o_token_e_nao_puxa(agora, fake, enfileir
 
 
 @pytest.mark.django_db
+def test_cancelamento_vindo_dos_adiados_segurado_pelo_freio_nao_se_perde(agora, fake, enfileirados):
+    """x cancela com a linha PENDING (adiado, o token avança); depois o freio o segura com mais 6.
+
+    O token segurado já não traz x: só os adiados o trazem. Ele fica lá, sem gastar tentativa, e a
+    1ª liberação da lista que o dono viu aplica os 7.
+    """
+    x = _publicada(agora, eid="x")
+    linhas = [_publicada(agora, eid=f"c{i}") for i in range(copia.FREIO_CANCELAMENTOS + 1)]
+    for s in (x, *linhas):
+        _no_google(fake, s)
+    cursor = _cursor()
+    _linha_de_base(cursor, fake, agora)
+
+    # k: x cancela com a linha PENDING; vira adiado e o token avança.
+    Solicitacao.objects.filter(pk=x.pk).update(gcal_status=Solicitacao.GCalStatus.PENDING)
+    fake.delete(PINO, "x")
+    token_k = cursor.sync_token
+    r = sincronizar(cursor, fake, escrever=True, agora=agora)
+    assert r.resumo["contagens"] == {"pendente_gcal": 1} and r.resumo["freio_ids"] == []
+    cursor.refresh_from_db()
+    assert cursor.adiados == [{"event_id": "x", "tentativas": 1}] and cursor.sync_token != token_k
+
+    # k+1: x publicada de novo; c0..c5 cancelam. O freio segura os 7, x incluído.
+    Solicitacao.objects.filter(pk=x.pk).update(gcal_status=Solicitacao.GCalStatus.PUBLISHED)
+    for s in linhas:
+        fake.delete(PINO, s.external_event_id)
+    sete = sorted([*_ids(6), "x"])
+    r = sincronizar(cursor, fake, escrever=True, agora=agora)
+    assert r.resumo["contagens"] == {"freio": 7} and r.resumo["freio_ids"] == sete
+    cursor.refresh_from_db()
+    assert cursor.adiados == [{"event_id": "x", "tentativas": 1}], "segurado: fica, sem gastar tentativa"
+    assert not AuditLog.objects.filter(action="REJECT").exists()
+
+    # k+2: o dono libera a mesma lista de 7: aplica os 7, x incluído.
+    r = sincronizar(cursor, fake, escrever=True, agora=agora, liberar_freio=True)
+    assert r.erro == "", "a 1ª liberação não pode dar 'lista mudou'"
+    assert r.resumo["contagens"] == {"cancelado": 7}
+    assert AuditLog.objects.filter(action="REJECT").count() == 7
+    assert Solicitacao.objects.get(pk=x.pk).status == "reprovado"
+    cursor.refresh_from_db()
+    assert cursor.adiados == [] and cursor.ultimo_erro == "" and cursor.resumo["freio_ids"] == []
+
+
+@pytest.mark.django_db
+def test_freio_segue_puxado_com_os_segurados_pendentes_no_sistema(agora, fake, enfileirados):
+    """Os 6 segurados ficam PENDING numa rodada: seguem contando como cancelamento segurado.
+
+    Sem isso o freio caía (nenhum CANCELADO na rodada) e os 5 que voltam a PUBLISHED passavam sem
+    o dono liberar.
+    """
+    cursor, linhas = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS + 1)
+    token_segurado = _puxar(cursor, fake, agora)
+    canceladas = [s.pk for s in linhas[:-1]]
+
+    Solicitacao.objects.filter(pk__in=canceladas).update(gcal_status=Solicitacao.GCalStatus.PENDING)
+    r = sincronizar(cursor, fake, escrever=True, agora=agora)
+    assert r.resumo["freio_ids"] == _ids(6)
+    cursor.refresh_from_db()
+    assert cursor.sync_token == token_segurado and cursor.resumo["freio_ids"] == _ids(6)
+
+    Solicitacao.objects.filter(pk__in=canceladas[:5]).update(gcal_status=Solicitacao.GCalStatus.PUBLISHED)
+    r = sincronizar(cursor, fake, escrever=True, agora=agora)
+    assert r.resumo["freio_ids"] == _ids(6)
+    assert not AuditLog.objects.filter(action="REJECT").exists()
+
+    Solicitacao.objects.filter(pk=canceladas[5]).update(gcal_status=Solicitacao.GCalStatus.PUBLISHED)
+    r = sincronizar(cursor, fake, escrever=True, agora=agora)
+    assert r.resumo["contagens"] == {"freio": 6, "eco": 1}
+    assert not AuditLog.objects.filter(action="REJECT").exists()
+    assert all(Solicitacao.objects.get(pk=pk).status == "aprovado" for pk in canceladas)
+    cursor.refresh_from_db()
+    assert cursor.resumo["freio_ids"] == _ids(6) and cursor.sync_token == token_segurado
+
+
+@pytest.mark.django_db
 def test_5_cancelamentos_passam_pelo_freio(agora, fake, enfileirados):
     cursor, _ = _cancelamentos(agora, fake, copia.FREIO_CANCELAMENTOS)
 

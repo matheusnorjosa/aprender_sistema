@@ -444,7 +444,13 @@ def _rodada(
         # cancelamento. O dono solta com `liberar_freio`, que só vale se a lista desta rodada for IGUAL à
         # guardada; um id a mais ou a menos e nada é aplicado: a lista nova fica guardada para ele ver.
         # O dry-run lê o mesmo cursor, então dá o mesmo veredito do --apply. O `observar` só avisa.
-        atuais = sorted(eid for eid, d in decisoes.items() if d.motivo == CANCELADO)
+        # Cancelado no Google com a linha PENDING também conta: está só esperando nos adiados, e sem
+        # ele o freio cairia sem o dono liberar.
+        atuais = sorted(
+            eid
+            for eid, d in decisoes.items()
+            if d.motivo == CANCELADO or (d.motivo == PENDENTE_GCAL and eventos[eid].get("status") == "cancelled")
+        )
         copiar = cursor.modo == GCalCopiaCursor.Modo.COPIAR
         guardados = cursor.resumo.get("freio_ids") if copiar and isinstance(cursor.resumo, dict) else None
         puxado = bool(guardados)
@@ -466,8 +472,12 @@ def _rodada(
             elif d.motivo == CANCELADO and freio:
                 d = Decisao(FREIO, d.solicitacao)
             resumo.conta(d)
-            if d.motivo in _TRANSITORIOS:
-                n = tentativas.get(event_id, 0) + 1
+            transitorio = d.motivo in _TRANSITORIOS
+            # Segurado pelo freio e vindo dos adiados: o token segurado não o traz de novo, então fica
+            # nos adiados sem gastar tentativa (o freio pode durar mais que MAX_TENTATIVAS_ADIADO rodadas).
+            segurado = copiar and d.motivo == FREIO and event_id in tentativas
+            if transitorio or segurado:
+                n = tentativas.get(event_id, 0) + (1 if transitorio else 0)
                 if n >= MAX_TENTATIVAS_ADIADO:
                     resumo.falha(event_id, f"adiado_{MAX_TENTATIVAS_ADIADO}x")
                 elif len(adiados) >= MAX_ADIADOS:

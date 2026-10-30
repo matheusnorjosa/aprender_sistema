@@ -438,16 +438,21 @@ def _rodada(
         cancelamentos = sum(1 for d in decisoes.values() if d.motivo == CANCELADO)
         # O freio do `copiar` fica puxado: se a rodada anterior segurou o token, segue segurando até o
         # dono liberar ou não sobrar cancelamento (a contagem cai quando um vira passado ou volta).
+        # Vale também no dry-run do `copiar`, para a prévia dar o mesmo veredito do --apply.
         segurado = (
-            aplicar
+            cursor.modo == GCalCopiaCursor.Modo.COPIAR
             and isinstance(cursor.resumo, dict)
             and cursor.resumo.get("modo") == GCalCopiaCursor.Modo.COPIAR
             and int(cursor.resumo.get("freio", 0)) > 0
         )
-        # A liberação do dono só cobre o que ele viu segurado: se chegaram mais, a rodada segue segurada
-        # com a contagem nova e ele libera de novo depois de vê-la.
-        segurado_n = int(cursor.resumo.get("freio", 0)) if segurado else 0
-        liberado = liberar_freio and 0 < cancelamentos <= segurado_n
+        # A liberação do dono só cobre os s<id> que ele viu segurados: se entrou algum outro, a rodada
+        # segue segurada com a lista nova e ele libera de novo depois de vê-la. Lista cortada em
+        # MAX_IDS_POR_MOTIVO: o que ficou de fora não está em `vistos` e o freio segue puxado.
+        vistos = set(cursor.resumo.get("ids", {}).get(FREIO, [])) if segurado else set()
+        atuais = {
+            f"s{d.solicitacao.pk}" for d in decisoes.values() if d.motivo == CANCELADO and d.solicitacao is not None
+        }
+        liberado = liberar_freio and bool(atuais) and atuais <= vistos
         freio = (cancelamentos > FREIO_CANCELAMENTOS or (segurado and cancelamentos > 0)) and not liberado
         if freio:
             resumo.freio = cancelamentos

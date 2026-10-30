@@ -615,6 +615,10 @@ def test_freio_segue_puxado_quando_a_contagem_cai_sem_o_dono_liberar(agora, fake
     cursor.refresh_from_db()
     token_segurado = cursor.sync_token
 
+    previa = sincronizar(cursor, fake, escrever=False, agora=agora + timedelta(hours=2))
+    assert previa.resumo["contagens"] == {"freio": 5, "passado": 1}, "o dry-run vê o freio puxado"
+    assert previa.resumo["freio"] == 5
+
     r2 = sincronizar(cursor, fake, escrever=True, agora=agora + timedelta(hours=2))
 
     assert r2.status == "OK"
@@ -671,6 +675,34 @@ def test_liberar_nao_cobre_cancelamentos_que_chegaram_depois(agora, fake, enfile
     assert not AuditLog.objects.filter(action="REJECT").exists()
     cursor.refresh_from_db()
     assert cursor.sync_token == token_segurado and cursor.ultimo_erro == "freio: 26 cancelamentos"
+
+
+@pytest.mark.django_db
+def test_liberar_nao_cobre_cancelamento_novo_quando_um_segurado_sai(agora, fake, enfileirados):
+    """6 segurados; 1 vira passado e entra 1 cancelamento novo: a contagem é a mesma, a lista não."""
+    linhas = [_publicada(agora, eid=f"c{i}") for i in range(copia.FREIO_CANCELAMENTOS)]
+    linhas.append(_publicada(agora, eid="logo", inicio=agora + timedelta(hours=1)))
+    novo = _publicada(agora, eid="novo")
+    for s in (*linhas, novo):
+        _no_google(fake, s)
+    cursor = _cursor()
+    _linha_de_base(cursor, fake, agora)
+    for s in linhas:
+        fake.delete(PINO, s.external_event_id)
+    r1 = sincronizar(cursor, fake, escrever=True, agora=agora)
+    assert r1.resumo["contagens"] == {"freio": 6}
+    cursor.refresh_from_db()
+    token_segurado = cursor.sync_token
+    fake.delete(PINO, novo.external_event_id)
+
+    r = sincronizar(cursor, fake, escrever=True, agora=agora + timedelta(hours=2), liberar_freio=True)
+
+    assert r.resumo["contagens"] == {"freio": 6, "passado": 1}
+    assert f"s{novo.pk}" in r.resumo["ids"]["freio"]
+    assert not AuditLog.objects.filter(action="REJECT").exists()
+    assert all(Solicitacao.objects.get(pk=s.pk).status == "aprovado" for s in (*linhas, novo))
+    cursor.refresh_from_db()
+    assert cursor.sync_token == token_segurado and cursor.ultimo_erro == "freio: 6 cancelamentos"
 
 
 @pytest.mark.django_db

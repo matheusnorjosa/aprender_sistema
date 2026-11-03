@@ -173,7 +173,19 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', { timeo
     });
 
     expect(screen.queryByText('Sem municípios com compra para este projeto')).not.toBeInTheDocument();
-    expect(screen.getByText('Compra dispensada')).toBeInTheDocument();
+    // Decisão do dono (03/11): "Compra dispensada" não serve a quem cria o evento e saiu da tela.
+    expect(screen.queryByText('Compra dispensada')).not.toBeInTheDocument();
+  });
+
+  test('textos que o dono tirou (03/11) não aparecem no cartão', async () => {
+    renderNoRoteador(<NewSolicitacaoWizard />);
+    await waitFor(() => botaoDoTexto('Busque ou selecione um projeto'));
+    expect(screen.queryByText('Coordenador que vai atuar no evento entra na lista de formadores.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Se Sim, a agenda do coordenador responsável é conferida como a dos formadores.'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Mais detalhes')).toBeInTheDocument();
+    expect(screen.queryByText('Mais detalhes (opcional)')).not.toBeInTheDocument();
   });
 
   // Regra da compra: o projeto "em espera" (sem compra que o libere) some da lista.

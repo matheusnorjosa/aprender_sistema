@@ -263,10 +263,11 @@ describe('NewSolicitacaoWizard - página única com um cartão de evento (28/10/
     renderNoRoteador(<NewSolicitacaoWizard />);
     const projeto = await waitFor(() => botaoDoTexto('Busque ou selecione um projeto'));
 
-    const linha1 = projeto.closest('.md\\:grid-cols-3');
-    expect(linha1).toHaveClass('grid', 'grid-cols-1');
+    const linha1 = projeto.closest('.xl\\:grid-cols-4');
+    expect(linha1).toHaveClass('grid', 'grid-cols-1', 'md:grid-cols-2');
     expect(linha1).toHaveTextContent('Projeto');
     expect(linha1).toHaveTextContent('Tipo de Evento');
+    expect(linha1).toHaveTextContent('Nº da formação');
     expect(linha1).toHaveTextContent('Município');
     expect(Array.from(linha1!.children).every((c) => c.classList.contains('min-w-0'))).toBe(true);
 

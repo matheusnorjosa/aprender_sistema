@@ -26,6 +26,7 @@ from functools import reduce
 from operator import or_
 from typing import Any
 
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.core.models import AvailabilityBlock, Deslocamento, EquipeGerencia, Participation, Solicitacao, Usuario
@@ -52,8 +53,9 @@ def build_monthly_grid(
         year: Ano (YYYY)
         month: Mês (1..12)
         role: "FORMADOR" ou "COORDENADOR". Na aba COORDENADOR o dia marca os eventos que
-            ocupam a agenda pela regra do motor de conflito (`ocupa_agenda_q`): formador, ou
-            responsável que acompanha (decisão do dono, 05/10/2026)
+            ocupam a agenda pela regra do motor de conflito (`ocupa_agenda_q`): formador,
+            coordenador além do responsável (03/11/2026), ou responsável que acompanha (decisão do
+            dono, 05/10/2026)
         gerencia_id: ID da gerência para filtrar. Quando especificado, filtra
             participações e eventos apenas dessa gerência. Quando None, mantém
             comportamento legado (apenas fluxo SUPER).
@@ -108,8 +110,11 @@ def build_monthly_grid(
 
         user_ids = list(set(equipe_qs.values_list("usuario_id", flat=True)))
     else:
-        # Fallback para comportamento anterior (via Participation, apenas fluxo SUPER)
-        participations_qs = Participation.objects.filter(role=role)
+        # Fallback para comportamento anterior (via Participation, apenas fluxo SUPER). Na aba
+        # Coordenadores entra também o coordenador além do responsável (COORD_ACOMPANHA, 03/11/2026).
+        participations_qs = Participation.objects.filter(
+            role__in=(role, Participation.Role.COORD_ACOMPANHA) if role == "COORDENADOR" else (role,)
+        )
         participations_qs = participations_qs.filter(solicitacao__projeto__fluxo="SUPER")
 
         if q and q.strip():
@@ -141,10 +146,14 @@ def build_monthly_grid(
             reduce(or_, (ocupa_agenda_q(uid) for uid in user_ids))
         )
     else:
-        events_q = Solicitacao.objects.filter(
-            status="aprovado",
-            participations__role=role,
-            participations__usuario_id__in=user_ids,
+        # Formadores: o dia marca o que ocupa a agenda, como a CH (`horas_formacao`): o papel
+        # (`ENFORCED_ROLES`: formador e coordenador além do responsável, 03/11/2026) ou ser o
+        # responsável que acompanha (sem a FK, quem criou). A lista de pessoas da aba não muda. É o
+        # `ocupa_agenda_q` em lote (um `IN` em vez de um OR por pessoa).
+        responsavel_da_lista = Q(coordenador_id__in=user_ids) | Q(coordenador__isnull=True, usuario_id__in=user_ids)
+        events_q = Solicitacao.objects.filter(status="aprovado").filter(
+            Q(participations__role__in=ENFORCED_ROLES, participations__usuario_id__in=user_ids)
+            | (Q(coordenador_acompanha=True) & responsavel_da_lista)
         )
     events_q = events_q.filter(
         # Interseção com o mês: evento.inicio < month_end AND evento.fim > month_start
@@ -170,28 +179,27 @@ def build_monthly_grid(
     # inflando CH, contagem de eventos (código "2" em vez de "E") e detalhes.
     # As colunas do SELECT (Solicitacao + municipio/tipo_evento via select_related)
     # são determinísticas por evento, então o DISTINCT colapsa só as cópias. (#1630)
-    events_q = events_q.select_related("municipio", "tipo_evento").distinct()
-    if role == "COORDENADOR":
-        events_q = events_q.select_related("coordenador", "usuario")
+    events_q = events_q.select_related("municipio", "tipo_evento", "coordenador", "usuario").distinct()
     events = list(events_q)
 
     # Batch fetch participants for every event in one query. Returns a flat
     # list of (solicitacao_id, usuario_id) tuples, indexed below.
     event_ids = [e.id for e in events]
-    event_to_users: dict[int, list[int]] = defaultdict(list)
+    # set: a mesma pessoa em dois papéis ocupantes do mesmo evento conta um evento só.
+    event_to_users: dict[int, set[int]] = defaultdict(set)
     if event_ids:
         for sol_id, uid in Participation.objects.filter(
             solicitacao_id__in=event_ids,
-            role__in=ENFORCED_ROLES if role == "COORDENADOR" else (role,),
+            role__in=ENFORCED_ROLES,
             usuario_id__in=user_ids,
         ).values_list("solicitacao_id", "usuario_id"):
-            event_to_users[sol_id].append(uid)
-    if role == "COORDENADOR":
-        ids = set(user_ids)
-        for event in events:
-            ocupante = coordenador_ocupante(event)
-            if ocupante is not None and ocupante.pk in ids and ocupante.pk not in event_to_users[event.id]:
-                event_to_users[event.id].append(ocupante.pk)
+            event_to_users[sol_id].add(uid)
+    # O responsável que acompanha (nas duas abas, para quem está na lista dela).
+    ids = set(user_ids)
+    for event in events:
+        ocupante = coordenador_ocupante(event)
+        if ocupante is not None and ocupante.pk in ids:
+            event_to_users[event.id].add(ocupante.pk)
 
     # 3. Bloqueios aprovados
     blocks = list(

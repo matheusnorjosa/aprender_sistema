@@ -37,7 +37,7 @@ export type TipoEventoCode = 'FORMACAO' | 'ACOMPANHAMENTO' | 'REUNIAO' | 'OUTRO'
 /**
  * Participant role in an event
  */
-export type ParticipantRole = 'FORMADOR' | 'COORDENADOR' | 'PARTICIPANTE' | 'CONVIDADO';
+export type ParticipantRole = 'FORMADOR' | 'COORDENADOR' | 'COORD_ACOMPANHA' | 'PARTICIPANTE' | 'CONVIDADO';
 
 /**
  * Participation nested representation
@@ -92,7 +92,7 @@ export interface Solicitacao {
    * `propria`: pediu; `conta_alterada`: alterou a conta de quem pediu nos 30 dias;
    * `conta_alterada_pelo_autor`: quem pediu alterou a conta de quem lê nos 30 dias;
    * `contas_alteradas_pela_mesma_pessoa`: a mesma pessoa alterou a conta de quem lê e a de quem pediu;
-   * `editada_pelo_ator`: mudou data, horário, município, projeto ou formadores.
+   * `editada_pelo_ator`: mudou data, horário, município, projeto, formadores ou coordenadores.
    */
   decisao_impedida?: DecisaoImpedida | null;
   inicio: ISODateTime;

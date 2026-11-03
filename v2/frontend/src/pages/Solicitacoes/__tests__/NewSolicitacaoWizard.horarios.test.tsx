@@ -28,12 +28,14 @@ const {
   horario,
   formadores,
   projeto,
+  coordenadoresDoMock,
 } = vi.hoisted(() => ({
   createSolicitacoesEmLoteMock: vi.fn(),
   checkAvailabilityManyMock: vi.fn(),
   horario: { atual: { date: '2026-08-01', start: '09:00', end: '11:00' } },
   formadores: { atual: [{ id: 99, label: 'Bruno Formador', avaliavel: false }] },
   projeto: { atual: {} },
+  coordenadoresDoMock: { atual: [{ id: 7, label: 'Carla Coordenadora' }] as Array<{ id: number; label: string }> },
 }));
 
 vi.mock('../../../api/solicitacoes', () => ({ createSolicitacoesEmLote: createSolicitacoesEmLoteMock }));
@@ -71,6 +73,29 @@ vi.mock('../../../components/FormadoresPicker', () => ({
   ),
 }));
 
+// A caixa "Coordenador(es)" (03/11/2026): escolhe a Carla, que é a 1ª e por isso a responsável.
+vi.mock('../../../components/CoordenadoresPicker', () => ({
+  default: ({
+    onChange,
+    id,
+    'aria-invalid': invalido,
+  }: {
+    onChange?: (v: unknown) => void;
+    id?: string;
+    'aria-invalid'?: boolean | 'true' | 'false';
+  }) => (
+    <button
+      type="button"
+      id={id}
+      aria-invalid={invalido}
+      data-testid="cb-responsavel"
+      onClick={() => onChange?.(coordenadoresDoMock.atual)}
+    >
+      cb-responsavel
+    </button>
+  ),
+}));
+
 function MockComboBox({
   placeholder = '',
   lookupFunction,
@@ -87,13 +112,11 @@ function MockComboBox({
   useEffect(() => {
     void lookupFunction('');
   }, [lookupFunction]);
-  const testid = placeholder.includes('respons')
-    ? 'cb-responsavel'
-    : placeholder.includes('munic')
-      ? 'cb-municipio'
-      : placeholder.includes('projeto')
-        ? 'cb-projeto'
-        : 'cb-tipo';
+  const testid = placeholder.includes('munic')
+    ? 'cb-municipio'
+    : placeholder.includes('projeto')
+      ? 'cb-projeto'
+      : 'cb-tipo';
   return (
     <button
       type="button"
@@ -103,7 +126,6 @@ function MockComboBox({
       onClick={() => {
         if (testid === 'cb-projeto') onChange?.(projeto.atual);
         else if (testid === 'cb-tipo') onChange?.({ id: 789, label: 'Formação' });
-        else if (testid === 'cb-responsavel') onChange?.({ id: 7, label: 'Carla Coordenadora' });
         else onChange?.({ id: 456, label: 'Fortaleza - CE' });
       }}
     >
@@ -153,6 +175,7 @@ describe('NewSolicitacaoWizard — "+ horário" (03/11/2026)', { timeout: 30000 
     horario.atual = { date: '2026-08-01', start: '09:00', end: '11:00' };
     formadores.atual = [{ id: 99, label: 'Bruno Formador', avaliavel: false }];
     projeto.atual = PROJETO_1;
+    coordenadoresDoMock.atual = [{ id: 7, label: 'Carla Coordenadora' }];
     checkAvailabilityManyMock.mockResolvedValue({ ok: true, results: [] });
     createSolicitacoesEmLoteMock.mockResolvedValue({
       eventos: [
@@ -232,13 +255,16 @@ describe('NewSolicitacaoWizard — "+ horário" (03/11/2026)', { timeout: 30000 
     fireEvent.click(maisHorario(1));
     horario.atual = { date: '2026-08-01', start: '14:00', end: '16:00' };
     formadores.atual = [{ id: 98, label: 'Dora Formadora', avaliavel: false }];
+    // Dois coordenadores só no Horário 2: a Carla (responsável) e a Dora (03/11/2026).
+    coordenadoresDoMock.atual = [{ id: 7, label: 'Carla Coordenadora' }, { id: 8, label: 'Dora Coordenadora' }];
     const h2 = blocoDoHorario(cartao(1), 2);
     fireEvent.click(within(h2).getByTestId('cb-responsavel'));
     await preencherHorario(h2, 'Sim');
 
-    // A agenda do Horário 2 confere só as pessoas dele (a formadora e a coordenadora que acompanha).
+    // A agenda do Horário 2 confere só as pessoas dele (a formadora, a responsável que acompanha e a
+    // outra coordenadora, que ocupa sempre).
     await waitFor(() =>
-      expect(checkAvailabilityManyMock.mock.calls.map(([arg]) => (arg as { usuarios_ids: number[] }).usuarios_ids)).toContainEqual([7, 98]),
+      expect(checkAvailabilityManyMock.mock.calls.map(([arg]) => (arg as { usuarios_ids: number[] }).usuarios_ids)).toContainEqual([7, 98, 8]),
     );
     expect(checkAvailabilityManyMock.mock.calls.map(([arg]) => (arg as { usuarios_ids: number[] }).usuarios_ids)).not.toContainEqual(
       expect.arrayContaining([99, 98]),
@@ -267,6 +293,7 @@ describe('NewSolicitacaoWizard — "+ horário" (03/11/2026)', { timeout: 30000 
         fim: '2026-08-01T14:00:00Z',
         formadorIds: [99],
         coordenadorResponsavelId: null,
+        coordenadorExtraIds: [],
         coordenadorAcompanha: false,
       }),
       buildSolicitacaoPayload({
@@ -275,6 +302,7 @@ describe('NewSolicitacaoWizard — "+ horário" (03/11/2026)', { timeout: 30000 
         fim: '2026-08-01T19:00:00Z',
         formadorIds: [98],
         coordenadorResponsavelId: 7,
+        coordenadorExtraIds: [8],
         coordenadorAcompanha: true,
       }),
     ]);
@@ -516,6 +544,7 @@ describe('NewSolicitacaoWizard — "+ horário" (03/11/2026)', { timeout: 30000 
         fim: '2026-08-01T14:00:00Z',
         formadorIds: [99],
         coordenadorResponsavelId: null,
+        coordenadorExtraIds: [],
         coordenadorAcompanha: false,
       }),
       buildSolicitacaoPayload({
@@ -524,6 +553,7 @@ describe('NewSolicitacaoWizard — "+ horário" (03/11/2026)', { timeout: 30000 
         fim: '2026-08-02T13:00:00Z',
         formadorIds: [97],
         coordenadorResponsavelId: 7,
+        coordenadorExtraIds: [],
         coordenadorAcompanha: true,
       }),
     ]);

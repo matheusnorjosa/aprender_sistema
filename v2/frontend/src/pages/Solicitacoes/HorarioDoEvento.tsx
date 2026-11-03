@@ -1,9 +1,9 @@
 /**
  * HorarioDoEvento — um horário do cartão da Nova Solicitação (decisão do dono, 03/11/2026).
  *
- * Linha 2 do cartão (Data | Início | Fim), linha 3 (Formadores | Coordenador responsável, com "vai
- * acompanhar?") e a pergunta de avaliar o formador. Cada horário vira um evento separado no lote, e a
- * prévia de agenda roda aqui, só com as pessoas deste horário. Com mais de um horário, o bloco é um
+ * Linha 2 do cartão (Data | Início | Fim), linha 3 (Formadores | Coordenador(es), com "vai
+ * acompanhar?" sobre o 1º, o responsável) e a pergunta de avaliar o formador. Cada horário vira um
+ * evento separado no lote, e a prévia de agenda roda aqui, só com as pessoas deste horário. Com mais de um horário, o bloco é um
  * grupo nomeado pelo subtítulo "Horário N" e, do 2º em diante, tem "Remover horário". Com um só, nada
  * disso aparece e os ids são os de sempre (`evento-<chave>_…`): o 1º horário nunca sai do cartão.
  *
@@ -25,10 +25,9 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 
-import { lookupUsuarios, type LookupItem } from '../../api/lookup';
 import { useAvailabilityPreview } from '../../hooks/useAvailabilityPreview';
 import DateTimeRange, { type DateTimeRangeValue } from '../../components/DateTimeRange';
-import ComboBox from '../../components/ComboBox';
+import CoordenadoresPicker, { type CoordenadorItem } from '../../components/CoordenadoresPicker';
 import FormadoresPicker from '../../components/FormadoresPicker';
 import AvailabilityConflictAlert, { AvisosDeAgenda } from '../../components/AvailabilityConflictAlert';
 import logger from '../../utils/logger';
@@ -40,7 +39,6 @@ import {
   ORDEM_DO_HORARIO,
   participantesDo,
   perguntaAvaliarDo,
-  type ComboBoxValue,
   type FormDataType,
   type Horario,
   type ParticipantType,
@@ -174,13 +172,9 @@ export default function HorarioDoEvento({
     };
   }, [horario.inicio, horario.fim]);
 
-  // ComboBox "Coordenador responsável" (#1666): papel Coordenador vigente na gerência do projeto
-  // escolhido (PR 9, P9-5: num evento da gerência A só entram pessoas da A).
+  // Formadores e a caixa "Coordenador(es)" (#1666; 03/11/2026) oferecem só pessoas da gerência do
+  // projeto escolhido (PR 9, P9-5: num evento da gerência A só entram pessoas da A).
   const projetoId = dados.projeto?.id;
-  const lookupCoordenadores = useCallback(
-    (q: string): Promise<LookupItem[]> => lookupUsuarios(q, 'Coordenador', projetoId),
-    [projetoId],
-  );
 
   // DateTimeRange fica fora de Form.Item, então validateFields() não o vê. O gatilho da checagem
   // (#1452) depende dele. O backend recusa fim igual ou antes do início (`errors.fim`); aqui a
@@ -221,7 +215,7 @@ export default function HorarioDoEvento({
     }
   };
 
-  // Coordenador responsável: o escolhido; sem escolha, quem cria (se o backend aceita o vazio no projeto).
+  // Coordenador responsável: o 1º escolhido; sem escolha, quem cria (se o backend aceita o vazio no projeto).
   const vazioEhQuemCria = dados.projeto?.responsavel_padrao === true;
   const evento = useMemo(() => eventoDoHorario(dados, horario), [dados, horario]);
   const formadoresAvaliaveis = formadoresAvaliaveisDo(evento);
@@ -236,6 +230,14 @@ export default function HorarioDoEvento({
     if (!value.some((f) => f.avaliavel && f.id === form.getFieldValue('formadorAvaliado'))) {
       form.setFieldsValue({ formadorAvaliado: undefined });
     }
+  };
+
+  // Trocar o 1º coordenador troca o responsável: a resposta "vai acompanhar?" era do anterior e é apagada
+  // (o novo responsável responde). Mexer só nos demais a mantém.
+  const handleCoordenadoresChange = (value: CoordenadorItem[]): void => {
+    const trocouResponsavel = value[0]?.id !== horario.coordenadores[0]?.id;
+    mudar({ coordenadores: value, ...(trocouResponsavel ? { coordenadorAcompanha: null } : {}) });
+    if (trocouResponsavel) form.setFieldsValue({ coordenadorAcompanha: undefined });
   };
 
   // #1452: conflito recusado pelo servidor no envio (fecha o TOCTOU / cache).
@@ -263,7 +265,8 @@ export default function HorarioDoEvento({
     limparPessoas: () =>
       form.setFieldsValue({
         formadores: [],
-        coordenadorResponsavel: null,
+        coordenadores: [],
+        coordenadorAcompanha: undefined,
         pretendeAvaliar: undefined,
         formadorAvaliado: undefined,
       }),
@@ -384,7 +387,7 @@ export default function HorarioDoEvento({
           />
         </div>
 
-        {/* Linha 3: Formadores | Coordenador responsável (e se ele acompanha) */}
+        {/* Linha 3: Formadores | Coordenador(es) (e se o responsável, o 1º, acompanha) */}
         <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2">
           <div className="min-w-0">
             <Form.Item
@@ -400,18 +403,23 @@ export default function HorarioDoEvento({
             </Form.Item>
           </div>
           <div className="min-w-0">
+            {/* Decisão do dono (03/11/2026): mais de um; a ordem é a de escolha e o 1º é o responsável.
+                O `extra` vira a descrição acessível da caixa (aria-describedby do Form.Item). */}
             <Form.Item
-              label="Coordenador responsável"
-              name="coordenadorResponsavel"
-              extra={vazioEhQuemCria ? 'Vazio: você é o coordenador responsável.' : undefined}
+              label="Coordenador(es)"
+              name="coordenadores"
+              extra={
+                <>
+                  <span>O 1º escolhido é o coordenador responsável.</span>
+                  {vazioEhQuemCria && <> <span>Vazio: você é o coordenador responsável.</span></>}
+                </>
+              }
               rules={vazioEhQuemCria ? [] : [{ required: true, message: 'Escolha o coordenador responsável pelo evento.' }]}
             >
-              <ComboBox
-                lookupFunction={lookupCoordenadores}
-                onChange={(value: ComboBoxValue | null) => mudar({ coordenadorResponsavel: value })}
-                value={horario.coordenadorResponsavel}
-                placeholder={vazioEhQuemCria ? 'Busque o coordenador responsável (opcional)' : 'Busque o coordenador responsável'}
-                oQueCarrega="os coordenadores"
+              <CoordenadoresPicker
+                value={horario.coordenadores}
+                onChange={handleCoordenadoresChange}
+                projetoId={projetoId}
               />
             </Form.Item>
             <Form.Item

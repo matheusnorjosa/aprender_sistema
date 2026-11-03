@@ -1,10 +1,10 @@
 /**
  * EditSolicitacaoPage — respostas de "acompanha?" e "pretende avaliar o formador?" (05/10/2026).
  *
- * A edição mostra o coordenador responsável e as duas respostas gravadas, deixa trocá-las e
- * envia o que mudou. Evento antigo sem resposta de avaliar mostra "Não informado" e salva
- * sem obrigar a responder; evento em que a pergunta passa a valer na edição obriga. Pergunta
- * que deixa de se aplicar não manda resposta (a gravada fica; quem decide é o backend).
+ * A edição mostra o coordenador responsável (o 1º da caixa "Coordenador(es)") e as duas respostas
+ * gravadas, deixa trocá-las e envia o que mudou. Evento antigo sem resposta de avaliar mostra "Não
+ * informado" e salva sem obrigar a responder; evento em que a pergunta passa a valer na edição obriga.
+ * Pergunta que deixa de se aplicar não manda resposta (a gravada fica; quem decide é o backend).
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
@@ -129,7 +129,7 @@ describe('EditSolicitacaoPage — responsável e perguntas', { timeout: 20000 },
   test('mostra o responsável e as respostas gravadas', async () => {
     getSolicitacaoMock.mockResolvedValue(makeSolic());
     renderPage();
-    expect(await screen.findByText('Ana Coordenadora')).toBeInTheDocument();
+    expect(await screen.findByText('Ana Coordenadora (responsável)')).toBeInTheDocument();
     expect(within(screen.getByRole('radiogroup', { name: ACOMPANHA })).getByLabelText('Não')).toBeChecked();
     expect(within(screen.getByRole('radiogroup', { name: AVALIAR })).getByLabelText('Sim')).toBeChecked();
     expect(screen.getByText('Bruno Formador', { selector: '.ant-select-selection-item' })).toBeInTheDocument();
@@ -138,7 +138,7 @@ describe('EditSolicitacaoPage — responsável e perguntas', { timeout: 20000 },
   test('trocar a resposta de acompanhar envia o valor novo', async () => {
     getSolicitacaoMock.mockResolvedValue(makeSolic());
     renderPage();
-    await screen.findByText('Ana Coordenadora');
+    await screen.findByText('Ana Coordenadora (responsável)');
     fireEvent.click(within(screen.getByRole('radiogroup', { name: ACOMPANHA })).getByLabelText('Sim'));
     fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/ }));
     await waitFor(() => expect(updateSolicitacaoMock).toHaveBeenCalled());
@@ -151,7 +151,7 @@ describe('EditSolicitacaoPage — responsável e perguntas', { timeout: 20000 },
   test('evento antigo sem resposta de avaliar: "Não informado" e salva sem obrigar', async () => {
     getSolicitacaoMock.mockResolvedValue(makeSolic({ pretende_avaliar_formador: null, formador_avaliado: null }));
     renderPage();
-    await screen.findByText('Ana Coordenadora');
+    await screen.findByText('Ana Coordenadora (responsável)');
     expect(screen.getByText('Não informado')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/ }));
     await waitFor(() => expect(updateSolicitacaoMock).toHaveBeenCalled());
@@ -163,7 +163,7 @@ describe('EditSolicitacaoPage — responsável e perguntas', { timeout: 20000 },
       makeSolic({ projeto_pergunta_avaliar_formador: false, pretende_avaliar_formador: null, formador_avaliado: null })
     );
     renderPage();
-    await screen.findByText('Ana Coordenadora');
+    await screen.findByText('Ana Coordenadora (responsável)');
     expect(screen.queryByRole('radiogroup', { name: AVALIAR })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/ }));
     await waitFor(() => expect(updateSolicitacaoMock).toHaveBeenCalled());
@@ -174,7 +174,7 @@ describe('EditSolicitacaoPage — responsável e perguntas', { timeout: 20000 },
   test('gerência que deixou de perguntar: a resposta gravada não é apagada', async () => {
     getSolicitacaoMock.mockResolvedValue(makeSolic({ projeto_pergunta_avaliar_formador: false }));
     renderPage();
-    await screen.findByText('Ana Coordenadora');
+    await screen.findByText('Ana Coordenadora (responsável)');
     expect(screen.queryByRole('radiogroup', { name: AVALIAR })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/ }));
     await waitFor(() => expect(updateSolicitacaoMock).toHaveBeenCalled());
@@ -187,7 +187,7 @@ describe('EditSolicitacaoPage — responsável e perguntas', { timeout: 20000 },
     getSolicitacaoMock.mockResolvedValue(makeSolic());
     novaLista.value = [{ id: 7, label: 'Carla Coordenadora', avaliavel: false }];
     renderPage();
-    await screen.findByText('Ana Coordenadora');
+    await screen.findByText('Ana Coordenadora (responsável)');
     fireEvent.click(screen.getByRole('button', { name: 'Trocar formadores' }));
     expect(screen.queryByRole('radiogroup', { name: AVALIAR })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/ }));
@@ -218,7 +218,7 @@ describe('EditSolicitacaoPage — responsável e perguntas', { timeout: 20000 },
     );
     novaLista.value = [{ id: 99, label: 'Bruno Formador', avaliavel: true }];
     renderPage();
-    await screen.findByText('Ana Coordenadora');
+    await screen.findByText('Ana Coordenadora (responsável)');
     expect(screen.queryByRole('radiogroup', { name: AVALIAR })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Trocar formadores' }));
     expect(screen.getByRole('radiogroup', { name: AVALIAR })).toBeInTheDocument();

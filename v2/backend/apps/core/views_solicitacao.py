@@ -98,26 +98,28 @@ class _ExtraParticipantsSerializer(serializers.Serializer):
     )
     coord_acompanha_emails = ListaComTeto(child=serializers.EmailField(), required=False, default=list, max_length=_MAX)
 
-    _MSG_ACOMPANHANTES_SAIU = (
-        "A lista de coordenadores acompanhantes saiu. Coordenador que vai atuar no evento entra na "
-        "lista de formadores; o coordenador responsável responde se vai acompanhar."
-    )
+    _MSG_COORDENADOR_REPETIDO = "O mesmo coordenador foi escolhido mais de uma vez."
+    _MSG_COORDENADOR_POR_EMAIL = "Escolha os coordenadores pelo cadastro; e-mail solto não vale para coordenador."
 
     def validate_coord_acompanha_ids(self, value: list[int]) -> list[int]:
-        """Decisão do dono (05/10/2026): a lista saiu da tela. Vazia é aceita (cliente antigo)."""
-        if value:
-            raise serializers.ValidationError(self._MSG_ACOMPANHANTES_SAIU)
+        """Coordenadores além do responsável (decisão do dono, 03/11/2026): sem repetir entre si."""
+        if len(set(value)) != len(value):
+            raise serializers.ValidationError(self._MSG_COORDENADOR_REPETIDO)
         return value
 
     def validate_coord_acompanha_emails(self, value: list[str]) -> list[str]:
+        """Coordenador precisa do papel na gerência do projeto: convidado só por e-mail não tem."""
         if value:
-            raise serializers.ValidationError(self._MSG_ACOMPANHANTES_SAIU)
+            raise serializers.ValidationError(self._MSG_COORDENADOR_POR_EMAIL)
         return value
 
 
-def _campos_materiais(solicitacao: Solicitacao, formador_ids: set[int | None]) -> dict[str, Any]:
+def _campos_materiais(
+    solicitacao: Solicitacao, formador_ids: set[int | None], coordenador_ids: set[int | None]
+) -> dict[str, Any]:
     """O que a aprovação SUPER aprovou: projeto (M10-02/#1624) mais data, horário, município e
-    formadores (decisão do dono, 14/10/2026). Observação, local e evento online ficam de fora.
+    formadores (decisão do dono, 14/10/2026) e os coordenadores além do responsável (ocupam a agenda;
+    decisão do dono, 03/11/2026). Observação, local e evento online ficam de fora.
     Datas comparadas como instante (o mesmo horário em outro fuso não é mudança)."""
     return {
         "projeto": solicitacao.projeto_id,
@@ -125,15 +127,14 @@ def _campos_materiais(solicitacao: Solicitacao, formador_ids: set[int | None]) -
         "inicio": solicitacao.inicio,
         "fim": solicitacao.fim,
         "formadores": frozenset(formador_ids),
+        "coordenadores": frozenset(coordenador_ids),
     }
 
 
-def _formador_ids(solicitacao: Solicitacao) -> set[int | None]:
+def _ids_no_papel(solicitacao: Solicitacao, papel: str) -> set[int | None]:
     from .models import Participation
 
-    return set(
-        Participation.objects.filter(solicitacao=solicitacao, role="FORMADOR").values_list("usuario_id", flat=True)
-    )
+    return set(Participation.objects.filter(solicitacao=solicitacao, role=papel).values_list("usuario_id", flat=True))
 
 
 def _rebaixar_se_mudou_campo_material(solicitacao: Solicitacao, antes: dict[str, Any]) -> list[str]:
@@ -146,7 +147,9 @@ def _rebaixar_se_mudou_campo_material(solicitacao: Solicitacao, antes: dict[str,
         return []
     if resolve_initial_status(projeto=solicitacao.projeto).status != "pendente":
         return []
-    depois = _campos_materiais(solicitacao, _formador_ids(solicitacao))
+    depois = _campos_materiais(
+        solicitacao, _ids_no_papel(solicitacao, "FORMADOR"), _ids_no_papel(solicitacao, "COORD_ACOMPANHA")
+    )
     mudaram = [campo for campo, valor in antes.items() if depois[campo] != valor]
     # Sem projeto o fluxo é NAO_SUPER (`get_fluxo`): só o M10-02 (o projeto mudou) rebaixa.
     if solicitacao.projeto_id is None and "projeto" not in mudaram:
@@ -628,6 +631,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # Convite do Google para o responsável, mesmo que não acompanhe (decisão do dono,
         # 05/10/2026). O papel COORDENADOR não ocupa a agenda (`ENFORCED_ROLES`).
         Participation.objects.get_or_create(solicitacao=instance, usuario=coordenador, role="COORDENADOR")
+        self._assert_responsavel_fora_dos_extras(instance)
         validar_avaliacao_formador(instance, criando=True, resposta_anterior=None)
         return instance
 
@@ -705,6 +709,57 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         if self._coordenador_fora_da_gerencia(projeto, coordenador):
             raise serializers.ValidationError({"coordenador": [self._MSG_RESPONSAVEL_FORA_DA_GERENCIA]})
 
+    _MSG_EXTRA_FORA_DA_GERENCIA = "Cada coordenador precisa ser coordenador da gerência do projeto."
+    _MSG_EXTRA_E_O_RESPONSAVEL = "O coordenador responsável já está no evento; não o repita entre os demais."
+
+    def _coordenadores_extras(self, projeto, ids):
+        """Os coordenadores além do responsável (COORD_ACOMPANHA; decisão do dono, 03/11/2026), na ordem.
+
+        Cada um precisa do papel COORDENADOR vigente (`_extras_que_nao_coordenam`). Id inexistente ou de
+        pessoa inativa também é recusado. Erro no campo `coord_acompanha_ids` (a caixa da tela).
+        """
+        from .models import Usuario
+
+        if not ids:
+            return []
+        usuarios = {u.id: u for u in Usuario.objects.filter(id__in=ids, is_active=True)}
+        if len(usuarios) != len(set(ids)) or self._extras_que_nao_coordenam(projeto, list(usuarios.values())):
+            raise serializers.ValidationError({"coord_acompanha_ids": [self._MSG_EXTRA_FORA_DA_GERENCIA]})
+        return [usuarios[i] for i in ids]
+
+    def _extras_que_nao_coordenam(self, projeto, usuarios):
+        """Os `usuarios` que não podem ser coordenador além do responsável num evento de `projeto`.
+
+        Quem cria precisa atuar na gerência do projeto e o extra precisa do papel COORDENADOR vigente nela
+        (a regra do responsável, PR 9). Quem cria com alcance global escapa da gerência, não do papel
+        (revisão de 03/11/2026): o extra precisa do papel COORDENADOR vigente em alguma gerência ativa.
+        """
+        from .models import EquipeGerencia
+
+        creator = getattr(getattr(self, "request", None), "user", None)
+        fora = participantes_fora_da_gerencia(creator, projeto, usuarios, papeis=frozenset({"COORDENADOR"}))
+        coordenam = set(
+            EquipeGerencia.vigentes_em()
+            .filter(papel="COORDENADOR", gerencia__ativo=True, usuario_id__in=[u.id for u in usuarios])
+            .values_list("usuario_id", flat=True)
+        )
+        return [u for u in usuarios if u in fora or u.id not in coordenam]
+
+    def _assert_responsavel_fora_dos_extras(self, solicitacao):
+        """O responsável (sem a FK, quem criou) não se repete entre os demais coordenadores: na criação, no
+        lote, na edição da lista e ao trocar o responsável por um deles. Ser também formador do evento pode
+        (decisão do dono, 03/11/2026): a pessoa conta uma vez por evento. Roda sobre o estado gravado, dentro
+        do atomic → 400 desfaz."""
+        from .models import Participation
+
+        if Participation.objects.filter(
+            solicitacao=solicitacao,
+            role="COORD_ACOMPANHA",
+            usuario__isnull=False,
+            usuario_id=solicitacao.coordenador_id or solicitacao.usuario_id,
+        ).exists():
+            raise serializers.ValidationError({"coord_acompanha_ids": [self._MSG_EXTRA_E_O_RESPONSAVEL]})
+
     _MSG_PROJETO_FORA_DA_GERENCIA = "Você só pode criar ou mover solicitação para projeto da sua gerência."
 
     def _assert_projeto_na_gerencia(self, projeto):
@@ -742,22 +797,20 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             "coordenador_id": int,  # sempre o request.user, mas pode ser explícito
             "formador_ids": [int, ...],
             "formador_emails": [str, ...],
+            "coord_acompanha_ids": [int, ...],  # coordenadores além do responsável (03/11/2026)
         }
-        `coord_acompanha_ids/_emails` não são mais aceitos com itens (decisão do dono, 05/10/2026;
-        `_ExtraParticipantsSerializer` recusa): os laços abaixo só veem listas vazias.
+        `coord_acompanha_emails` com itens o `_ExtraParticipantsSerializer` recusa.
         """
         from .models import Participation, Usuario
 
         # PERF-SQL-02: Batch fetch all referenced users in 2 queries instead of N
         all_ids = set()
         all_ids.update(fid for fid in extra.get("formador_ids", []) if fid)
-        all_ids.update(cid for cid in extra.get("coord_acompanha_ids", []) if cid)
         # M10-04 (#1626): só usuários ATIVOS viram participantes por id.
         usuarios_by_id = {u.id: u for u in Usuario.objects.filter(id__in=all_ids, is_active=True)} if all_ids else {}
 
         all_emails = set()
         all_emails.update(e.strip().lower() for e in extra.get("formador_emails", []) if e and e.strip())
-        all_emails.update(e.strip().lower() for e in extra.get("coord_acompanha_emails", []) if e and e.strip())
         # O e-mail cadastrado pode ter maiúscula: comparar sem diferenciar, senão a pessoa vira convidada
         # e escapa da checagem de gerência abaixo (PR 9, P9-5).
         usuarios_by_email = (
@@ -772,7 +825,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         )
 
         # PR 9 (P9-5): escopo pela gerência do projeto ANTES de materializar
-        # qualquer Participation (perform_create é atômico → 400 desfaz tudo).
+        # qualquer Participation (perform_create é atômico → 400 desfaz tudo). Os coordenadores
+        # além do responsável passam pela regra do responsável, no campo deles.
+        coordenadores_extras = self._coordenadores_extras(solicitacao.projeto, extra.get("coord_acompanha_ids", []))
         self._assert_participantes_na_gerencia(
             solicitacao.projeto,
             list({u.id: u for u in (*usuarios_by_id.values(), *usuarios_by_email.values())}.values()),
@@ -800,28 +855,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                         solicitacao=solicitacao, guest_email=email.strip().lower(), role="FORMADOR"
                     )
 
-        # Coordenadores acompanhantes por ID
-        for coord_id in extra.get("coord_acompanha_ids", []):
-            if coord_id:
-                usuario = usuarios_by_id.get(coord_id)
-                if usuario:
-                    Participation.objects.get_or_create(
-                        solicitacao=solicitacao, usuario=usuario, role="COORD_ACOMPANHA"
-                    )
-
-        # Coordenadores acompanhantes por email (guest)
-        for email in extra.get("coord_acompanha_emails", []):
-            if email and email.strip():
-                usuario = usuarios_by_email.get(email.strip().lower())
-                if usuario:
-                    Participation.objects.get_or_create(
-                        solicitacao=solicitacao, usuario=usuario, role="COORD_ACOMPANHA"
-                    )
-                else:
-                    # Criar como guest_email mantendo role=COORD_ACOMPANHA para GCal
-                    Participation.objects.get_or_create(
-                        solicitacao=solicitacao, guest_email=email.strip().lower(), role="COORD_ACOMPANHA"
-                    )
+        # Coordenadores além do responsável: ocupam a agenda e recebem o convite (03/11/2026).
+        for usuario in coordenadores_extras:
+            Participation.objects.get_or_create(solicitacao=solicitacao, usuario=usuario, role="COORD_ACOMPANHA")
 
     def perform_update(self, serializer):
         """
@@ -836,14 +872,15 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         #1452: editar data, município ou formadores realoca gente — a checagem roda depois
         das alterações, sobre o estado final, e um conflito desfaz a edição inteira.
 
-        Reaprovação: SUPER aprovada com projeto, data, horário, município ou formadores mudados
-        volta para pendente (`_rebaixar_se_mudou_campo_material`; o AuditLog leva `reaprovacao`).
+        Reaprovação: SUPER aprovada com projeto, data, horário, município, formadores ou coordenadores
+        além do responsável mudados volta para pendente (`_rebaixar_se_mudou_campo_material`; o
+        AuditLog leva `reaprovacao`).
         Aprovada que não volta porque o projeto de origem ou o de destino saiu do SUPER depois da
         aprovação (troca de fluxo) fica marcada: o AuditLog leva `editada_com_fluxo_nao_super`.
         """
         from django.db import transaction
 
-        from .models import Participation, Usuario
+        from .models import Usuario
         from .services.avaliacao_formador import pergunta_se_aplica, validar_avaliacao_formador
         from .services.solicitacao_availability import enforce_solicitacao_availability
 
@@ -878,10 +915,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         avaliado_anterior_id = instance.formador_avaliado_id
         avaliar_aplicavel_antes = pergunta_se_aplica(instance)
 
-        # Captura formadores atuais antes do update
-        old_formador_ids = set(
-            Participation.objects.filter(solicitacao=instance, role="FORMADOR").values_list("usuario_id", flat=True)
-        )
+        # Captura formadores e coordenadores além do responsável antes do update
+        old_formador_ids = _ids_no_papel(instance, "FORMADOR")
+        old_coord_ids = _ids_no_papel(instance, "COORD_ACOMPANHA")
 
         old_data = {
             "status": instance.status,
@@ -901,9 +937,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             "encontro": instance.encontro,
             "segmento": instance.segmento,
             "formador_ids": list(old_formador_ids),
+            "coord_acompanha_ids": list(old_coord_ids),
         }
 
-        materiais_antes = _campos_materiais(instance, old_formador_ids)
+        materiais_antes = _campos_materiais(instance, old_formador_ids, old_coord_ids)
         # Trava de exclusão: a edição que parte de uma SUPER `aprovado` deixa a prova no AuditLog,
         # com ou sem APPROVE (carga antiga, admin Django, data-fix) e mesmo se ela sair do SUPER.
         aprovada_como_super = instance.status == "aprovado" and getattr(instance.projeto, "fluxo", None) == "SUPER"
@@ -934,6 +971,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
             if instance.coordenador_id != coordenador_antigo_id:
                 self._trocar_convite_do_responsavel(instance, coordenador_antigo_id)
+            self._assert_responsavel_fora_dos_extras(instance)
 
             campos_reaprovacao = _rebaixar_se_mudou_campo_material(instance, materiais_antes)
 
@@ -951,10 +989,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             # Coleta dados novos após save
             instance.refresh_from_db()
 
-            # Captura formadores novos
-            new_formador_ids = set(
-                Participation.objects.filter(solicitacao=instance, role="FORMADOR").values_list("usuario_id", flat=True)
-            )
+            # Captura formadores e coordenadores além do responsável novos
+            new_formador_ids = _ids_no_papel(instance, "FORMADOR")
+            new_coord_ids = _ids_no_papel(instance, "COORD_ACOMPANHA")
 
             new_data = {
                 "status": instance.status,
@@ -974,6 +1011,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 "encontro": instance.encontro,
                 "segmento": instance.segmento,
                 "formador_ids": list(new_formador_ids),
+                "coord_acompanha_ids": list(new_coord_ids),
             }
 
             # Identifica campos alterados
@@ -999,7 +1037,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 if (
                     old_data["status"] == "aprovado"
                     and not campos_reaprovacao
-                    and _campos_materiais(instance, new_formador_ids) != materiais_antes
+                    and _campos_materiais(instance, new_formador_ids, new_coord_ids) != materiais_antes
                     and _projeto_saiu_do_super_depois_da_aprovacao(
                         instance, {old_data["projeto_id"], instance.projeto_id}
                     )
@@ -1015,20 +1053,23 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 )
 
     def _assert_pessoas_na_gerencia_do_projeto_novo(self, solicitacao):
-        """P9-5 ao mover o evento para projeto de OUTRA gerência: quem fica (formadores, acompanhantes e
-        o responsável) tem que ser da gerência do projeto novo. Roda sobre o estado final, dentro do
+        """P9-5 ao mover o evento para projeto de OUTRA gerência: quem fica (formadores, coordenadores
+        além do responsável e o responsável) tem que ser da gerência do projeto novo; os coordenadores, com o
+        papel COORDENADOR nela (a regra do responsável, 03/11/2026). Roda sobre o estado final, dentro do
         atomic → 400 desfaz. Editar sem trocar o projeto não revalida quem já está (decisão do dono,
         15/10), nem trocar por projeto da mesma gerência. Tirar o projeto o serializer recusa (revisão do
         #2149); o evento legado sem projeto é isento, como em `projeto_fora_da_gerencia`."""
         from .models import Participation
 
-        ficam = [
-            p.usuario
-            for p in Participation.objects.filter(
+        ficam = list(
+            Participation.objects.filter(
                 solicitacao=solicitacao, role__in=("FORMADOR", "COORD_ACOMPANHA"), usuario__isnull=False
             ).select_related("usuario")
-        ]
-        self._assert_participantes_na_gerencia(solicitacao.projeto, ficam)
+        )
+        self._assert_participantes_na_gerencia(solicitacao.projeto, [p.usuario for p in ficam if p.role == "FORMADOR"])
+        extras = [p.usuario for p in ficam if p.role == "COORD_ACOMPANHA"]
+        if self._extras_que_nao_coordenam(solicitacao.projeto, extras):
+            raise serializers.ValidationError({"coord_acompanha_ids": [self._MSG_EXTRA_FORA_DA_GERENCIA]})
         if solicitacao.coordenador is not None:
             self._assert_coordenador_na_gerencia(solicitacao.projeto, solicitacao.coordenador)
 
@@ -1051,11 +1092,11 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
     def _update_formadores(self, solicitacao, extra):
         """
-        Atualiza formadores de uma solicitação.
+        Atualiza formadores e coordenadores além do responsável de uma solicitação.
 
-        Estratégia: substituição completa
-        - Remove formadores não presentes na nova lista
-        - Adiciona novos formadores com batch fetch (#406)
+        Estratégia: substituição completa, por papel
+        - Remove quem não está na nova lista
+        - Adiciona os novos com batch fetch (#406)
 
         Retorna True se houve alteração.
         """
@@ -1065,9 +1106,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         changed = False
         touched: set[int] = set()
 
-        # Reconcilia FORMADOR por id (diff-set), espelhando o create. COORD_ACOMPANHA saiu da tela
-        # (05/10/2026): as linhas antigas ficam como estão (convite do Google, sem ocupar).
-        for role, key in (("FORMADOR", "formador_ids"),):
+        # Reconcilia FORMADOR e COORD_ACOMPANHA (coordenadores além do responsável, 03/11/2026) por id
+        # (diff-set), espelhando o create.
+        for role, key in (("FORMADOR", "formador_ids"), ("COORD_ACOMPANHA", "coord_acompanha_ids")):
             if key not in extra:
                 continue  # campo ausente = não mexer neste papel
             new_ids = {i for i in extra.get(key, []) if i}
@@ -1090,10 +1131,14 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             # não filtrava → pessoa desligada marcada ativa voltava a ser anexada).
             # Batch fetch: 1 query para todos (#406).
             if to_add:
-                usuarios = {u.id: u for u in Usuario.objects.filter(id__in=to_add, is_active=True)}
-                # PR 9 (P9-5): barra ADIÇÃO de fora da gerência do projeto (só as novas; manter
-                # quem já está não reprova). perform_update é atômico → 400 desfaz tudo.
-                self._assert_participantes_na_gerencia(solicitacao.projeto, list(usuarios.values()))
+                if role == "COORD_ACOMPANHA":
+                    # A regra do responsável, só para quem entra (manter quem já está não reprova).
+                    usuarios = {u.id: u for u in self._coordenadores_extras(solicitacao.projeto, sorted(to_add))}
+                else:
+                    usuarios = {u.id: u for u in Usuario.objects.filter(id__in=to_add, is_active=True)}
+                    # PR 9 (P9-5): barra ADIÇÃO de fora da gerência do projeto (só as novas; manter
+                    # quem já está não reprova). perform_update é atômico → 400 desfaz tudo.
+                    self._assert_participantes_na_gerencia(solicitacao.projeto, list(usuarios.values()))
                 added = [uid for uid in to_add if uid in usuarios]
                 if added:
                     Participation.objects.bulk_create(

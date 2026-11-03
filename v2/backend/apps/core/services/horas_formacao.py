@@ -9,8 +9,9 @@ SSOT da contagem usada pela Grade Mensal e pelo painel de Equipe:
 - O evento conta inteiro no dia local (America/Fortaleza) do INÍCIO, mesmo cruzando a
   meia-noite. Sem desconto de almoço. Online conta igual.
 - Só evento aprovado, de qualquer projeto ou gerência.
-- Conta o participante FORMADOR sempre; o coordenador responsável (`coordenador`; sem ele,
-  quem criou) só quando `coordenador_acompanha=True`. COORD_ACOMPANHA e convidado não contam.
+- Conta sempre quem ocupa a agenda pelo papel (`ENFORCED_ROLES`: FORMADOR e, desde 03/11/2026,
+  COORD_ACOMPANHA, o coordenador além do responsável); o coordenador responsável (`coordenador`;
+  sem ele, quem criou) só quando `coordenador_acompanha=True`. Convidado não conta.
   A mesma pessoa conta uma vez por evento.
 """
 
@@ -28,7 +29,7 @@ from django.conf import settings
 from django.db.models import Q
 
 from apps.core.models import Participation, Solicitacao
-from apps.core.services.availability_service import to_local
+from apps.core.services.availability_service import ENFORCED_ROLES, to_local
 from apps.core.services.config_service import parametros_disponibilidade
 
 
@@ -58,7 +59,7 @@ def horas_formacao(usuario_ids: Iterable[int], *, de: date, ate: date) -> dict[i
     eventos: dict[tuple[int, int], tuple[datetime, datetime]] = {}
     if ids:
         formadores = Participation.objects.filter(
-            role=Participation.Role.FORMADOR,
+            role__in=ENFORCED_ROLES,
             usuario_id__in=ids,
             solicitacao__status=Solicitacao.Status.APROVADO,
             solicitacao__inicio__gte=janela_inicio,

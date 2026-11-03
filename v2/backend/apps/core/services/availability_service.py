@@ -37,19 +37,20 @@ from apps.core.utils.cache_utils import cache_availability_check
 # agenda para efeito de conflito/capacidade. Usado tanto no enforcement
 # (solicitacao_availability) quanto na query de eventos existentes aqui — um único
 # predicado, sem lista de papéis duplicada fora deste módulo. (M08-07 / #1664)
-# Decisão do dono (05/10/2026): só o FORMADOR ocupa por papel. COORDENADOR (quem criou),
-# COORD_ACOMPANHA (lista que saiu da tela) e CONVIDADO não ocupam; servem ao convite do
-# Google. O coordenador responsável ocupa só quando acompanha: ver `ocupa_agenda_q` e
-# `coordenador_ocupante`.
-ENFORCED_ROLES: tuple[str, ...] = (Participation.Role.FORMADOR.value,)
+# Decisão do dono (05/10/2026): COORDENADOR (quem criou) e CONVIDADO não ocupam; servem ao
+# convite do Google. O coordenador responsável ocupa só quando acompanha: ver `ocupa_agenda_q` e
+# `coordenador_ocupante`. Decisão do dono (03/11/2026): os coordenadores além do responsável
+# (COORD_ACOMPANHA, da caixa "Coordenador(es)") ocupam SEMPRE, como o formador.
+ENFORCED_ROLES: tuple[str, ...] = (Participation.Role.FORMADOR.value, Participation.Role.COORD_ACOMPANHA.value)
 
 
 def ocupa_agenda_q(usuario: Usuario | int) -> Q:
     """Eventos (Solicitacao) que ocupam a agenda de `usuario` — SSOT do lado "evento existente".
 
-    Ocupa se a pessoa é FORMADORA no evento, ou se é a coordenadora responsável e o evento
-    tem `coordenador_acompanha=True` (sem `coordenador` gravado, a responsável é quem criou —
-    mesma queda de `coordenador_ocupante` e da tela). Decisão do dono, 05/10/2026.
+    Ocupa se a pessoa é FORMADORA ou coordenadora além da responsável (COORD_ACOMPANHA, 03/11/2026)
+    no evento, ou se é a coordenadora responsável e o evento tem `coordenador_acompanha=True` (sem
+    `coordenador` gravado, a responsável é quem criou — mesma queda de `coordenador_ocupante` e da
+    tela). Decisão do dono, 05/10/2026.
     """
     responsavel = Q(coordenador=usuario) | Q(coordenador__isnull=True, usuario=usuario)
     return Q(participations__usuario=usuario, participations__role__in=ENFORCED_ROLES) | (

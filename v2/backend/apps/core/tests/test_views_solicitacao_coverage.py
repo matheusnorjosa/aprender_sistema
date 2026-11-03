@@ -572,7 +572,7 @@ class TestExtraParticipantsEdgeCases:
             ("coord_acompanha_emails", "guest_coord_x@example.invalid"),
         ],
     )
-    def test_coord_acompanha_com_itens_e_recusado(
+    def test_coord_acompanha_sem_papel_ou_por_email_e_recusado(
         self,
         api_client,
         usuario_coordenador,
@@ -583,10 +583,8 @@ class TestExtraParticipantsEdgeCases:
         chave,
         valor,
     ):
-        """Decisão do dono (05/10/2026): a lista de coordenadores acompanhantes saiu (ids e e-mails).
-
-        Coordenador que atua entra em `formador_ids`; o responsável responde `coordenador_acompanha`.
-        """
+        """Coordenador além do responsável (03/11/2026): só por id, de quem é coordenador da gerência
+        do projeto. Formador, id inexistente e e-mail são recusados no campo."""
         api_client.force_authenticate(user=usuario_coordenador)
         item = {"formador": usuario_formador.id, "formador_email": usuario_formador.email.upper()}.get(valor, valor)
         extra = {"formador_ids": [], "formador_emails": [], "coord_acompanha_ids": [], "coord_acompanha_emails": []}

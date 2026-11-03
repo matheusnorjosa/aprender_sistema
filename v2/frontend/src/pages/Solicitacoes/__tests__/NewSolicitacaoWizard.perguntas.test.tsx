@@ -29,6 +29,8 @@ const {
   formadoresEscolhidos,
   lookupUsuariosMock,
   formadoresPickerProps,
+  coordenadoresPickerProps,
+  coordenadoresDoMock,
 } = vi.hoisted(() => ({
   createSolicitacoesEmLoteMock: vi.fn(),
   getMeMock: vi.fn(),
@@ -39,6 +41,8 @@ const {
   formadoresEscolhidos: { atual: [] as Array<{ id: number; label: string; avaliavel?: boolean }> },
   lookupUsuariosMock: vi.fn(),
   formadoresPickerProps: { projetoIds: [] as unknown[] },
+  coordenadoresPickerProps: { projetoIds: [] as unknown[] },
+  coordenadoresDoMock: { atual: [{ id: 7, label: 'Carla Coordenadora' }] as Array<{ id: number; label: string }> },
 }));
 
 vi.mock('../../../api/solicitacoes', () => ({ createSolicitacoesEmLote: createSolicitacoesEmLoteMock }));
@@ -76,6 +80,34 @@ vi.mock('../../../components/FormadoresPicker', () => ({
 
 let projetoEscolhido: Record<string, unknown> = {};
 
+// A caixa "Coordenador(es)" (03/11/2026): escolhe a Carla, que é a 1ª e por isso a responsável.
+vi.mock('../../../components/CoordenadoresPicker', () => ({
+  default: ({
+    onChange,
+    id,
+    'aria-invalid': invalido,
+    projetoId,
+  }: {
+    onChange?: (v: unknown) => void;
+    id?: string;
+    'aria-invalid'?: boolean | 'true' | 'false';
+    projetoId?: unknown;
+  }) => {
+    coordenadoresPickerProps.projetoIds.push(projetoId);
+    return (
+      <button
+        type="button"
+        id={id}
+        aria-invalid={invalido}
+        data-testid="cb-responsavel"
+        onClick={() => onChange?.(coordenadoresDoMock.atual)}
+      >
+        cb-responsavel
+      </button>
+    );
+  },
+}));
+
 function MockComboBox({
   placeholder = '',
   lookupFunction,
@@ -89,13 +121,11 @@ function MockComboBox({
   useEffect(() => {
     void lookupFunction('');
   }, [lookupFunction]);
-  const testid = placeholder.includes('respons')
-    ? 'cb-responsavel'
-    : placeholder.includes('munic')
-      ? 'cb-municipio'
-      : placeholder.includes('projeto')
-        ? 'cb-projeto'
-        : 'cb-tipo';
+  const testid = placeholder.includes('munic')
+    ? 'cb-municipio'
+    : placeholder.includes('projeto')
+      ? 'cb-projeto'
+      : 'cb-tipo';
   return (
     <button
       type="button"
@@ -103,7 +133,6 @@ function MockComboBox({
       onClick={() => {
         if (testid === 'cb-projeto') onChange?.(projetoEscolhido);
         else if (testid === 'cb-tipo') onChange?.({ id: 789, label: 'Formação' });
-        else if (testid === 'cb-responsavel') onChange?.({ id: 7, label: 'Carla Coordenadora' });
         else onChange?.({ id: 456, label: 'Fortaleza - CE' });
       }}
     >
@@ -195,6 +224,8 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     createSolicitacoesEmLoteMock.mockResolvedValue({ eventos: [{ indice: 0, id: 1, status: 'aprovado' }] });
     lookupUsuariosMock.mockResolvedValue([]);
     formadoresPickerProps.projetoIds.length = 0;
+    coordenadoresPickerProps.projetoIds.length = 0;
+    coordenadoresDoMock.atual = [{ id: 7, label: 'Carla Coordenadora' }];
   });
 
   test('formadores e responsável vêm da gerência do projeto escolhido (PR 9, P9-5)', async () => {
@@ -203,10 +234,10 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     renderWizard();
     await preencherEvento();
     expect(formadoresPickerProps.projetoIds.at(-1)).toBe(123);
-    await waitFor(() => expect(lookupUsuariosMock).toHaveBeenCalledWith('', 'Coordenador', 123));
+    expect(coordenadoresPickerProps.projetoIds.at(-1)).toBe(123);
   });
 
-  test('a lista de coordenadores acompanhantes saiu e a pergunta Sim/Não entrou', async () => {
+  test('não volta a lista separada "Coordenadores Acompanhantes"; a pergunta Sim/Não fica', async () => {
     renderWizard();
     await preencherEvento();
     expect(screen.queryByText('Coordenadores Acompanhantes')).not.toBeInTheDocument();
@@ -305,7 +336,7 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     const payload = createSolicitacoesEmLoteMock.mock.calls[0][0][0];
     expect(payload.coordenador_acompanha).toBe(true);
     expect(payload.pretende_avaliar_formador).toBe(false);
-    expect(payload.extra_participants).toEqual({ formador_ids: [99] });
+    expect(payload.extra_participants).toEqual({ formador_ids: [99], coord_acompanha_ids: [] });
   });
 
   // Prints de 28/10/2026: o antd não foca um Radio.Group; o foco vai à primeira opção da pergunta.
@@ -355,7 +386,21 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     confirmar.mockRestore();
   });
 
-  test('trocar o projeto limpa os formadores e o responsável já escolhidos (PR 9, P9-5)', async () => {
+  test('trocar o projeto esvazia a caixa de coordenadores e apaga a resposta de acompanhar', async () => {
+    renderWizard();
+    await preencherEvento();
+    fireEvent.click(screen.getByTestId('cb-responsavel'));
+    responder(ACOMPANHA, 'Sim');
+    expect(within(grupoDaPergunta(ACOMPANHA)).getByLabelText('Sim')).toBeChecked();
+
+    projetoEscolhido = { ...projetoEscolhido, id: 124, label: 'Projeto Y' };
+    fireEvent.click(screen.getByTestId('cb-projeto'));
+    await waitFor(() => expect(within(grupoDaPergunta(ACOMPANHA)).getByLabelText('Sim')).not.toBeChecked());
+    expect(within(grupoDaPergunta(ACOMPANHA)).getByLabelText('Não')).not.toBeChecked();
+  });
+
+  test('trocar o projeto limpa os formadores e os coordenadores já escolhidos (PR 9, P9-5)', async () => {
+    coordenadoresDoMock.atual = [{ id: 7, label: 'Carla Coordenadora' }, { id: 8, label: 'Dora Coordenadora' }];
     renderWizard();
     await preencherEvento();
     fireEvent.click(screen.getByTestId('cb-responsavel'));
@@ -379,6 +424,6 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     const payload = createSolicitacoesEmLoteMock.mock.calls[0][0][0];
     expect(payload.projeto).toBe(124);
     expect(payload.coordenador).toBeNull();
-    expect(payload.extra_participants).toEqual({ formador_ids: [99] });
+    expect(payload.extra_participants).toEqual({ formador_ids: [99], coord_acompanha_ids: [] });
   });
 });

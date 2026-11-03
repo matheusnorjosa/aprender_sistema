@@ -830,6 +830,17 @@ def _editar(user: Usuario, sol: Solicitacao, dados: dict[str, Any]):
 
 
 class TestQuemEditouNaoDecide:
+    def test_mudou_so_os_coordenadores_extras_nao_decide(self, g19, g1):
+        """03/11/2026: os coordenadores além do responsável são campo material (ocupam a agenda)."""
+        dat = _dat(g19)
+        sol = _pendente_super(g1)
+        coordenadora = UsuarioFactory()
+        com_papel(coordenadora, "COORDENADOR", g1)
+        resp = _editar(dat, sol, {"extra_participants": {"coord_acompanha_ids": [coordenadora.id]}})
+        assert resp.status_code == 200, resp.content
+        resp = _approve(dat, sol)
+        assert resp.status_code == 403 and resp.data["code"] == EDITED
+
     def test_editou_campo_material_nao_decide(self, g19, g1):
         dat = _dat(g19)
         sol = _pendente_super(g1)
@@ -1077,7 +1088,9 @@ class TestQuemEditouNaoDecide:
         from apps.core.views_solicitacao import _campos_materiais
 
         sol = _pendente_super(g1)
-        assert set(solicitacao_approval.CAMPOS_MATERIAIS_NO_AUDITLOG.values()) == set(_campos_materiais(sol, set()))
+        assert set(solicitacao_approval.CAMPOS_MATERIAIS_NO_AUDITLOG.values()) == set(
+            _campos_materiais(sol, set(), set())
+        )
 
     def test_audit_update_solicitacao_dentro_do_atomic(self, g19, g1):
         dat = _dat(g19)

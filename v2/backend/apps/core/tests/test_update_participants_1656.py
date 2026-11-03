@@ -132,13 +132,15 @@ class TestUpdateFiltersInactive:
         assert inativo.id not in formadores, "usuário INATIVO não pode ser anexado como formador no update"
 
 
-class TestUpdateCoordAcompanhaSaiu:
-    """Decisão do dono (05/10/2026): a lista de coordenadores acompanhantes saiu da tela e da API.
+class TestUpdateCoordAcompanha:
+    """Decisão do dono (03/11/2026): os coordenadores além do responsável voltaram (caixa "Coordenador(es)").
 
-    Com itens → 400; vazia → aceita sem apagar as linhas antigas (convite do Google, sem ocupar).
+    O UPDATE reconcilia a lista; quem entra precisa do papel COORDENADOR na gerência do projeto.
     """
 
-    def test_coord_acompanha_com_itens_recusado_no_update(self, client_coord, municipio, projeto, tipo_evento):
+    def test_coord_acompanha_sem_papel_coordenador_recusado_no_update(
+        self, client_coord, municipio, projeto, tipo_evento
+    ):
         f_a = _formador("ca0", projeto.gerencia)
         coord_a = _formador("ca", projeto.gerencia)
         coord_b = _formador("cb", projeto.gerencia)
@@ -153,7 +155,7 @@ class TestUpdateCoordAcompanhaSaiu:
         assert resp.status_code == 400, resp.data
         assert _ids(sol_id, "COORD_ACOMPANHA") == {coord_a.id}
 
-    def test_coord_acompanha_vazia_nao_apaga_linha_antiga(self, client_coord, municipio, projeto, tipo_evento):
+    def test_coord_acompanha_vazia_tira_os_coordenadores(self, client_coord, municipio, projeto, tipo_evento):
         f_a = _formador("cv0", projeto.gerencia)
         coord_a = _formador("cv", projeto.gerencia)
         sol_id = _create_sol(client_coord, municipio, projeto, tipo_evento, {"formador_ids": [f_a.id]})
@@ -163,7 +165,7 @@ class TestUpdateCoordAcompanhaSaiu:
             f"/api/solicitacoes/{sol_id}/", {"extra_participants": {"coord_acompanha_ids": []}}, format="json"
         )
         assert resp.status_code in (200, 202), resp.data
-        assert _ids(sol_id, "COORD_ACOMPANHA") == {coord_a.id}
+        assert _ids(sol_id, "COORD_ACOMPANHA") == set()
 
 
 class TestUpdateReconcilesFormadores:

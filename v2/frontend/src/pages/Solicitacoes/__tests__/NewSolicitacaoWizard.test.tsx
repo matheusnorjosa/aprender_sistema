@@ -46,6 +46,10 @@ vi.mock('../../../components/FormadoresPicker', () => ({
   default: () => <div data-testid="formadores-picker">FormadoresPicker</div>,
 }));
 
+vi.mock('../../../components/CoordenadoresPicker', () => ({
+  default: () => <div data-testid="coordenadores-picker">CoordenadoresPicker</div>,
+}));
+
 
 function MockComboBox({
   placeholder = '',
@@ -253,12 +257,12 @@ describe('NewSolicitacaoWizard - página única com um cartão de evento (28/10/
       'Busque ou selecione um projeto',
       'Busque ou selecione um tipo de evento',
       'Selecione um projeto para carregar municípios elegíveis',
-      'Busque o coordenador responsável',
     ]) {
       expect(within(cartao).getByRole('button', { name: campo })).toBeInTheDocument();
     }
     expect(within(cartao).getByTestId('datetime-range')).toBeInTheDocument();
     expect(within(cartao).getByTestId('formadores-picker')).toBeInTheDocument();
+    expect(within(cartao).getByTestId('coordenadores-picker')).toBeInTheDocument();
     expect(within(cartao).getByRole('radiogroup', { name: /vai acompanhar o evento/ })).toBeInTheDocument();
     // Os detalhes opcionais ficam recolhidos, mas montados (os limites de tamanho valem recolhidos).
     expect(within(cartao).getByRole('button', { name: /Mais detalhes/ })).toHaveAttribute('aria-expanded', 'false');
@@ -285,7 +289,7 @@ describe('NewSolicitacaoWizard - página única com um cartão de evento (28/10/
 
     const linha3 = screen.getByTestId('formadores-picker').closest('.md\\:grid-cols-2');
     expect(linha3).toHaveClass('grid', 'grid-cols-1');
-    expect(linha3).toHaveTextContent('Coordenador responsável');
+    expect(linha3).toHaveTextContent('Coordenador(es)');
     // A pergunta obrigatória fica junto do coordenador, não escondida em "Mais detalhes".
     expect(linha3).toHaveTextContent('O coordenador responsável vai acompanhar o evento?');
     expect(Array.from(linha3!.children).every((c) => c.classList.contains('min-w-0'))).toBe(true);

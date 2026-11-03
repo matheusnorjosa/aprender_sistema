@@ -2,9 +2,10 @@
  * Payload de criação da Nova Solicitação.
  *
  * #1666: o FK `coordenador` (responsável) vai no payload quando escolhido.
- * Decisão do dono (05/10/2026): a lista "Coordenadores Acompanhantes" saiu; `coordenador_acompanha`
- * é a resposta Sim/Não da pergunta "O coordenador responsável vai acompanhar o evento?". A resposta
- * de "pretende avaliar o formador" só vai quando a pergunta foi feita.
+ * Decisão do dono (05/10/2026): `coordenador_acompanha` é a resposta Sim/Não da pergunta "O
+ * coordenador responsável vai acompanhar o evento?". Decisão do dono (03/11/2026): os coordenadores
+ * além do responsável vão em `extra_participants.coord_acompanha_ids`. A resposta de "pretende
+ * avaliar o formador" só vai quando a pergunta foi feita.
  */
 import { describe, it, expect } from 'vitest';
 import { buildSolicitacaoPayload } from '../NewSolicitacaoWizard';
@@ -23,6 +24,7 @@ const base = {
   isOnline: false,
   formadorIds: [10],
   coordenadorResponsavelId: null as number | null,
+  coordenadorExtraIds: [] as number[],
   coordenadorAcompanha: false,
   avaliar: null as { pretende: boolean; formadorAvaliadoId: number | null } | null,
 };
@@ -41,9 +43,15 @@ describe('buildSolicitacaoPayload', () => {
     expect(buildSolicitacaoPayload({ ...base, coordenadorAcompanha: false }).coordenador_acompanha).toBe(false);
   });
 
-  it('não manda mais a lista de coordenadores acompanhantes', () => {
+  it('sem outros coordenadores, manda a lista vazia (03/11/2026)', () => {
     const p = buildSolicitacaoPayload(base);
-    expect(p.extra_participants).toEqual({ formador_ids: [10] });
+    expect(p.extra_participants).toEqual({ formador_ids: [10], coord_acompanha_ids: [] });
+  });
+
+  it('os coordenadores além do responsável vão em coord_acompanha_ids, na ordem', () => {
+    const p = buildSolicitacaoPayload({ ...base, coordenadorResponsavelId: 42, coordenadorExtraIds: [8, 5] });
+    expect(p.coordenador).toBe(42);
+    expect(p.extra_participants).toEqual({ formador_ids: [10], coord_acompanha_ids: [8, 5] });
   });
 
   it('sem a pergunta de avaliar, não manda resposta', () => {

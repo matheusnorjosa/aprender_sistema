@@ -201,18 +201,28 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
 
     # Formadores (via Participation, a mesma fonte dos attendees; a M2M `formadores` ninguém grava, M10-06).
     # Só quem tem conta: o convidado só por e-mail já vai nos attendees e o e-mail não entra no texto.
-    formadores = {
-        p.usuario_id: p.usuario
-        for p in s.participations.filter(role="FORMADOR", usuario__isnull=False).select_related("usuario")
-    }
+    # Uma consulta para formadores e coordenadores além do responsável (COORD_ACOMPANHA, 03/11/2026).
+    equipe = list(
+        s.participations.filter(role__in=("FORMADOR", "COORD_ACOMPANHA"), usuario__isnull=False).select_related(
+            "usuario"
+        )
+    )
+    formadores = {p.usuario_id: p.usuario for p in equipe if p.role == "FORMADOR"}
     if formadores:
         formadores_names = sorted(str(f) for f in formadores.values())  # nome ou "Usuario #id", nunca o login (CPF)
         equipe_parts.append(f"Formador(es): {', '.join(formadores_names)}")
 
-    # Coordenador
-    if coordenador:
-        coord_name = str(coordenador)
-        equipe_parts.append(f"Coordenador(a): {coord_name}")
+    # Coordenador: o responsável e, depois dele, os demais (COORD_ACOMPANHA; decisão do dono, 03/11/2026).
+    extras = sorted(
+        str(p.usuario)
+        for p in equipe
+        if p.role == "COORD_ACOMPANHA" and p.usuario_id != getattr(coordenador, "pk", None)
+    )
+    coordenadores = ([str(coordenador)] if coordenador else []) + extras
+    if len(coordenadores) == 1:
+        equipe_parts.append(f"Coordenador(a): {coordenadores[0]}")
+    elif coordenadores:
+        equipe_parts.append(f"Coordenador(es): {', '.join(coordenadores)}")
 
     if equipe_parts:
         description_lines.append("")

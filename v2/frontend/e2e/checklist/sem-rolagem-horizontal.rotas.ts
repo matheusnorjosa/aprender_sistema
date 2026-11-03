@@ -441,6 +441,8 @@ export const TELA_LOGIN = 'login';
  * as 4 de /dat/registros. Ficam 59. A vista "expandida" de cada uma é medida e não rola.
  * Gestão de Compras (item 38, 26/10/2026): saíram as 4 de /controle/compras. Ficam 55. A vista
  * "expandida" é medida e não rola.
+ * Edição de solicitação (03/11/2026, caixa única de coordenadores): saiu /solicitacoes/:id/editar
+ * @ 360. Ficam 54.
  * O ratchet do Vitest (semRolagemHorizontal.pendentes.test.ts) trava a lista: nada novo
  * entra e o tamanho só desce.
  */
@@ -451,7 +453,6 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/dashboards/gcal': [360, 768, 1024],
   '/mapa-brasil': [360, 1024, 1280],
   '/mapa-brasil#lista': [360, 1024, 1280],
-  '/solicitacoes/:id/editar': [360],
   '/solicitacoes/disponibilidade': [360, 768, 1024],
   '/solicitacoes/bloqueios': [360, 768, 1024, 1280],
   '/solicitacoes/deslocamentos': [360, 768, 1024, 1280],

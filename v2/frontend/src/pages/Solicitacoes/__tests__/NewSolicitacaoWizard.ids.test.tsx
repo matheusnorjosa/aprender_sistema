@@ -5,7 +5,7 @@
  * põem os ids nos campos. Id repetido quebra `label for`, `aria-describedby` e o foco do resumo:
  * o leitor de tela leria o campo (ou o erro) do outro evento.
  */
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { renderNoRoteador } from '../../../test/comRoteador';
 import { botaoDoTexto, cartao } from './localizadores';
@@ -62,6 +62,25 @@ describe('NewSolicitacaoWizard — ids com vários eventos', { timeout: 30000 },
       { timeout: 5000 },
     );
     await waitFor(() => expect(screen.getAllByText('Por favor selecione um projeto')).toHaveLength(3), { timeout: 5000 });
+    expect(idsRepetidos()).toEqual([]);
+    expect(nomesDeRadioRepetidos()).toEqual([]);
+  });
+
+  test('com 2 horários em cada um de 2 eventos, e com os erros à vista, nenhum id nem nome de radio se repete', async () => {
+    renderNoRoteador(<NewSolicitacaoWizard />);
+    await waitFor(() => cartao(1));
+    fireEvent.click(botaoDoTexto(/Adicionar outro evento/));
+    fireEvent.click(within(cartao(1)).getByLabelText('Adicionar horário ao evento 1'));
+    fireEvent.click(within(cartao(2)).getByLabelText('Adicionar horário ao evento 2'));
+    expect(idsRepetidos()).toEqual([]);
+    expect(nomesDeRadioRepetidos()).toEqual([]);
+
+    fireEvent.click(botaoDoTexto('Criar 4 eventos'));
+    await waitFor(
+      () => expect(screen.getAllByText('Escolha a data e os horários de início e de fim do evento.')).toHaveLength(4),
+      { timeout: 5000 },
+    );
+    await waitFor(() => expect(screen.getAllByText('Por favor selecione pelo menos um formador')).toHaveLength(4), { timeout: 5000 });
     expect(idsRepetidos()).toEqual([]);
     expect(nomesDeRadioRepetidos()).toEqual([]);
   });

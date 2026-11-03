@@ -53,3 +53,25 @@ def test_formadores_legado_intacto_nao_inclui_guests():
     Participation.objects.create(solicitacao=sol, guest_nome="Formador Que Saiu", role=Participation.Role.FORMADOR)
     formadores = MeEventSerializer(sol).data["formadores"]
     assert formadores == ["Ana Souza"], "formadores legado = só usuario, sem guests"
+
+
+# Vários coordenadores (03/11/2026): Meus Eventos mostra o responsável junto dos extras.
+# O responsável é `coordenador`; nulo, é quem criou (`usuario`) — igual ao `coordenador_nome`
+# das listas de solicitação. Nunca o login, que é o CPF.
+def test_coordenador_nome_e_o_responsavel():
+    criador = UsuarioFactory(username="criador_x", first_name="Cris", last_name="Criadora")
+    resp = UsuarioFactory(username="resp_x", first_name="Rita", last_name="Responsavel")
+    sol = SolicitacaoFactory(usuario=criador, coordenador=resp)
+    assert MeEventSerializer(sol).data["coordenador_nome"] == "Rita Responsavel"
+
+
+def test_coordenador_nome_sem_responsavel_cai_em_quem_criou():
+    criador = UsuarioFactory(username="criador_y", first_name="Cris", last_name="Criadora")
+    sol = SolicitacaoFactory(usuario=criador, coordenador=None)
+    assert MeEventSerializer(sol).data["coordenador_nome"] == "Cris Criadora"
+
+
+def test_coordenador_nome_sem_nome_nunca_e_o_login():
+    sem_nome = UsuarioFactory(username="52998224725", first_name="", last_name="")
+    sol = SolicitacaoFactory(usuario=sem_nome, coordenador=None)
+    assert MeEventSerializer(sol).data["coordenador_nome"] == f"Usuario #{sem_nome.pk}"

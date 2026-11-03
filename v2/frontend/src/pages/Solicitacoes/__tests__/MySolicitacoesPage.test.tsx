@@ -128,4 +128,32 @@ describe('MySolicitacoesPage', () => {
     renderPage();
     expect(await screen.findByText(/João Silva, Maria Ex/)).toBeInTheDocument();
   });
+
+  // Vários coordenadores (03/11/2026): coluna Coordenador(es) = responsável + extras (COORD_ACOMPANHA).
+  // A participação COORDENADOR é quem criou, não entra.
+  test('coluna Coordenador(es) mostra o responsável e os extras', async () => {
+    const extra = { usuario: { id: 7, username: 'beto', first_name: 'Beto', last_name: 'Extra', email: '' }, guest_email: null, guest_nome: null, email: null, role: 'COORD_ACOMPANHA' as const, ch_horas: null, observacao: null };
+    const criador = { ...extra, usuario: { ...extra.usuario, id: 8, first_name: 'Quem', last_name: 'Criou' }, role: 'COORDENADOR' as const };
+    listSolicitacoesMock.mockResolvedValueOnce({
+      count: 1,
+      next: null,
+      previous: null,
+      results: [makeSolic({ id: 12, coordenador_nome: 'Rita Resp', participations: [criador, extra] })],
+    });
+    renderPage();
+    expect(await screen.findByRole('columnheader', { name: 'Coordenador(es)' })).toBeInTheDocument();
+    expect(await screen.findByText('Rita Resp, Beto Extra')).toBeInTheDocument();
+    expect(screen.queryByText(/Quem Criou/)).not.toBeInTheDocument();
+  });
+
+  test('coluna Coordenador(es) sem extra mostra só o responsável', async () => {
+    listSolicitacoesMock.mockResolvedValueOnce({
+      count: 1,
+      next: null,
+      previous: null,
+      results: [makeSolic({ id: 13, coordenador_nome: 'Sol Sozinha' })],
+    });
+    renderPage();
+    expect(await screen.findByText('Sol Sozinha')).toBeInTheDocument();
+  });
 });

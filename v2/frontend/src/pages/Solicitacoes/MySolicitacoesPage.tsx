@@ -34,7 +34,7 @@ import { MeetLink } from '../../components/MeetLink';
 import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 import { AcoesLinha, larguraAcoesLinha, type AcaoDaLinha } from '../../components/AcoesLinha';
 import type { ID, Solicitacao, SolicitacaoStatus, FluxoType, GCalStatus, PaginatedResponse } from '../../types';
-import { formadoresLabel } from '../../utils/participants';
+import { coordenadoresTexto, extrasLabels, formadoresLabel } from '../../utils/participants';
 import { formatFortaleza } from '../../utils/datetime';
 import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 import {
@@ -334,6 +334,15 @@ export default function MySolicitacoesPage(): JSX.Element {
       responsive: VISIVEL_A_PARTIR.xl,
       // Nome do formador (inclui convidados "que saíram" via guest_nome — sem FK). Ver utils/participants.
       render: (_, record) => formadoresLabel(record.participations) || '-',
+      ellipsis: true,
+    },
+    {
+      title: 'Coordenador(es)',
+      dataIndex: 'coordenador_nome',
+      key: 'coordenadores',
+      responsive: VISIVEL_A_PARTIR.xl,
+      // 03/11/2026: o responsável e os extras (COORD_ACOMPANHA). Ver utils/participants.
+      render: (_, record) => coordenadoresTexto(record.coordenador_nome, extrasLabels(record.participations)) || '-',
       ellipsis: true,
     },
     {

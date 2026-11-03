@@ -43,6 +43,7 @@ function makeEvent(overrides: Partial<MeEvent> = {}): MeEvent {
       { role: 'FORMADOR', nome: 'Ana Vidas' },
       { role: 'FORMADOR', nome: 'Bruno Fluir' },
     ],
+    coordenador_nome: null,
     is_online: false,
     meet_link: null,
     status: 'aprovado',
@@ -101,6 +102,34 @@ describe('MeusEventosPage', () => {
 
     expect(await screen.findByText('Carla Ativa, Diego Saiu')).toBeInTheDocument();
     expect(screen.queryByText(/Elis Coord/)).not.toBeInTheDocument();
+  });
+
+  // Vários coordenadores (03/11/2026): coluna Coordenador(es) = responsável (`coordenador_nome`) +
+  // extras (COORD_ACOMPANHA). A participação COORDENADOR é quem criou, não entra.
+  test('coluna Coordenador(es) mostra o responsável e os extras', async () => {
+    getMyEventsMock.mockResolvedValueOnce(
+      makePage([
+        makeEvent({
+          id: 60,
+          coordenador_nome: 'Rita Resp',
+          participantes: [
+            { role: 'FORMADOR', nome: 'Ana Vidas' },
+            { role: 'COORDENADOR', nome: 'Quem Criou' },
+            { role: 'COORD_ACOMPANHA', nome: 'Beto Extra' },
+          ],
+        }),
+      ])
+    );
+    renderPage();
+    expect(await screen.findByRole('columnheader', { name: 'Coordenador(es)' })).toBeInTheDocument();
+    expect(await screen.findByText('Rita Resp, Beto Extra')).toBeInTheDocument();
+    expect(screen.queryByText(/Quem Criou/)).not.toBeInTheDocument();
+  });
+
+  test('coluna Coordenador(es) sem extra mostra só o responsável', async () => {
+    getMyEventsMock.mockResolvedValueOnce(makePage([makeEvent({ id: 61, coordenador_nome: 'Sol Sozinha' })]));
+    renderPage();
+    expect(await screen.findByText('Sol Sozinha')).toBeInTheDocument();
   });
 
   test('mostra empty state quando não há eventos', async () => {

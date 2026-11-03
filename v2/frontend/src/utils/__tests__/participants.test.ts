@@ -4,7 +4,14 @@
  * Cadeia: usuario (nome) → guest_nome → guest_email → email.
  */
 import { describe, it, expect } from 'vitest';
-import { participantLabel, formadoresLabel, formadoresNomes } from '../participants';
+import {
+  participantLabel,
+  formadoresLabel,
+  formadoresNomes,
+  extrasLabels,
+  extrasNomes,
+  coordenadoresTexto,
+} from '../participants';
 import type { Participation } from '../../types/solicitacao';
 
 const base: Participation = {
@@ -83,5 +90,58 @@ describe('formadoresNomes (MeusEventos — shape pré-resolvido [{role, nome}])'
     expect(formadoresNomes([{ role: 'FORMADOR', nome: '' }])).toBe('');
     expect(formadoresNomes(undefined)).toBe('');
     expect(formadoresNomes([])).toBe('');
+  });
+});
+
+// Vários coordenadores (03/11/2026): os extras são as participações COORD_ACOMPANHA. A de papel
+// COORDENADOR é quem criou, não um extra.
+describe('extrasLabels (Participation[])', () => {
+  it('só COORD_ACOMPANHA, por nome; descarta vazio e outros papéis (inclusive COORDENADOR)', () => {
+    const parts: Participation[] = [
+      { ...base, role: 'COORD_ACOMPANHA', usuario: usuario({ first_name: 'Beto', last_name: 'Extra' }) },
+      { ...base, role: 'COORD_ACOMPANHA', guest_nome: 'Caio Saiu' },
+      { ...base, role: 'COORD_ACOMPANHA' }, // sem nome nenhum → fora
+      { ...base, role: 'COORDENADOR', usuario: usuario({ first_name: 'Quem', last_name: 'Criou' }) },
+      { ...base, role: 'FORMADOR', usuario: usuario() },
+    ];
+    expect(extrasLabels(parts)).toEqual(['Beto Extra', 'Caio Saiu']);
+  });
+
+  it('lista vazia/undefined → []', () => {
+    expect(extrasLabels(undefined)).toEqual([]);
+    expect(extrasLabels([])).toEqual([]);
+  });
+});
+
+describe('extrasNomes (shape pré-resolvido [{role, nome}])', () => {
+  it('só COORD_ACOMPANHA; descarta vazio e outros papéis', () => {
+    expect(
+      extrasNomes([
+        { role: 'COORD_ACOMPANHA', nome: 'Beto Extra' },
+        { role: 'COORD_ACOMPANHA', nome: '' },
+        { role: 'COORDENADOR', nome: 'Quem Criou' },
+        { role: 'FORMADOR', nome: 'Ana Formadora' },
+      ]),
+    ).toEqual(['Beto Extra']);
+    expect(extrasNomes(undefined)).toEqual([]);
+  });
+});
+
+describe('coordenadoresTexto', () => {
+  it('responsável primeiro, depois os extras, separados por vírgula', () => {
+    expect(coordenadoresTexto('Rita Resp', ['Beto Extra', 'Caio Extra'])).toBe('Rita Resp, Beto Extra, Caio Extra');
+  });
+
+  it('sem extras → só o responsável', () => {
+    expect(coordenadoresTexto('Rita Resp', [])).toBe('Rita Resp');
+  });
+
+  it('não repete nome (extra igual ao responsável ou repetido) e descarta vazios', () => {
+    expect(coordenadoresTexto('Rita Resp', ['Rita Resp', ' ', 'Beto Extra', 'Beto Extra'])).toBe('Rita Resp, Beto Extra');
+  });
+
+  it('sem responsável → só os extras; nada → string vazia', () => {
+    expect(coordenadoresTexto(null, ['Beto Extra'])).toBe('Beto Extra');
+    expect(coordenadoresTexto(undefined, [])).toBe('');
   });
 });

@@ -221,6 +221,34 @@ describe('ApprovalsPage', () => {
     expect(within(antigo).queryByText(/avaliar/)).not.toBeInTheDocument();
   });
 
+  // Vários coordenadores (03/11/2026): o responsável e os extras (COORD_ACOMPANHA) na mesma linha;
+  // a 2ª linha continua sendo a resposta do responsável. Sem extra, igual a antes.
+  test('coluna Coordenador(es): responsável + extras; sem extra fica como antes', async () => {
+    const extra = { usuario: { id: 7, username: 'beto', first_name: 'Beto', last_name: 'Extra', email: '' }, guest_email: null, guest_nome: null, email: null, role: 'COORD_ACOMPANHA' as const, ch_horas: null, observacao: null };
+    const criador = { ...extra, usuario: { ...extra.usuario, id: 8, first_name: 'Quem', last_name: 'Criou' }, role: 'COORDENADOR' as const };
+    vi.mocked(listSolicitacoes).mockResolvedValue({
+      count: 2,
+      next: null,
+      previous: null,
+      results: [
+        pendingRow({ id: 1, municipio_nome: 'MunicipioComExtra', coordenador_nome: 'Rita Resp', coordenador_acompanha: true, participations: [extra, criador] }),
+        pendingRow({ id: 2, municipio_nome: 'MunicipioSemExtra', coordenador_nome: 'Sol Sozinha', coordenador_acompanha: false, participations: [criador] }),
+      ],
+    });
+
+    renderPage();
+
+    const com = (await screen.findByText('MunicipioComExtra')).closest('tr') as HTMLElement;
+    expect(screen.getByRole('columnheader', { name: 'Coordenador(es)' })).toBeInTheDocument();
+    expect(within(com).getByText('Rita Resp, Beto Extra')).toHaveAttribute('title', 'Rita Resp, Beto Extra');
+    expect(within(com).getByText('Responsável acompanha')).toBeInTheDocument();
+    expect(within(com).queryByText(/Quem Criou/)).not.toBeInTheDocument();
+    const sem = screen.getByText('MunicipioSemExtra').closest('tr') as HTMLElement;
+    expect(within(sem).getByText('Sol Sozinha')).toBeInTheDocument();
+    expect(within(sem).getByText('Não acompanha')).toBeInTheDocument();
+    expect(within(sem).queryByText(/Responsável/)).not.toBeInTheDocument();
+  });
+
   test('com permissão: exibe "Aprovar"/"Reprovar" para solicitação pendente', async () => {
     vi.mocked(listSolicitacoes).mockResolvedValue({
       count: 1,

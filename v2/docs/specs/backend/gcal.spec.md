@@ -1,7 +1,7 @@
 ---
 title: Integração Google Calendar + Meet
 status: canonical
-last_verified: 2026-10-30
+last_verified: 2026-11-03
 verified_at_commit: 804df36a1741d1faa53586eafade5c4c74c0659d
 sources_of_truth:
   - v2/backend/apps/core/services/gcal_client_factory.py
@@ -147,7 +147,7 @@ Decisões do dono de 29 e 30/10/2026; plano v3 de 30/10 (plano_copia_google_v3_2
 
 - **D1**: construir agora e ligar só na virada.
 - **D2**: cancelado no Google vira `reprovado`, motivo `cancelado_no_google`. Grava `AuditLog` `REJECT` no formato da carga da virada (`usuario=None`, `details.origem="gcal_copia"`, `motivo`, `status_anterior`, `event_id_antigo`) **sem `autoridade`**, porque não é decisão humana; a exceção está registrada na [política de aprovação](../domain/politica-aprovacao.spec.md). Grava também `GCAL_COPIA_GOOGLE` (`campo="status"`), para a linha do tempo. Não existe "reabrir": um falso positivo se desfaz por data-fix, com o OK do dono. O freio de massa e o modo `observar` existem para isso não acontecer.
-- **D3**: choque de horário copia mesmo assim. Depois de copiar roda `check_solicitacao_availability(lock=True)`, e o `GCAL_COPIA_GOOGLE` (`campo="horario"`, `antes`, `depois`) leva `choque=[{"usuario_id", "codigo"}]`, só ids e códigos. O aviso na tela fica para um PR à parte; por ora ele aparece na linha do tempo do evento.
+- **D3**: choque de horário copia mesmo assim. Depois de copiar roda `check_solicitacao_availability(lock=True)`, e o `GCAL_COPIA_GOOGLE` (`campo="horario"`, `antes`, `depois`) leva `choque=[{"usuario_id", "codigo"}]`, só ids e códigos. Na linha do tempo do detalhe do evento (painel do Google, `GCalDashboardPage`), o registro sai como "Mudança feita no Google", com o horário antes → depois no fuso de Fortaleza ou "Cancelado no Google: o evento foi reprovado", e o choque vira um aviso "Choque de agenda: N pessoas (códigos)". Teste: `GCalDashboardPage.copiaGoogle.test.tsx`.
 - **D4**: SUPER aprovada com data mudada no Google continua `aprovado` (o adendo da reaprovação da PA-04 não vale para a cópia). O `GCAL_COPIA_GOOGLE` leva `aprovada_como_super` e `mudou_material_sem_reaprovacao`.
 - **D7**: antes de ligar, o dono revisa no Google quem tem "Fazer alterações nos eventos" na agenda (em 30/10: 12 pessoas e 5 grupos). O Google não diz quem fez a edição; com a cópia ligada, qualquer editor da agenda muda data e cancela evento aprovado no sistema. É um poder novo.
 

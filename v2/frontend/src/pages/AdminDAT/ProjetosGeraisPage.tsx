@@ -60,6 +60,7 @@ interface ProjetoGeralFormValues {
   multiplicador_professor?: number | string;
   ativo?: boolean;
   descricao?: string;
+  nome_na_agenda?: string;
 }
 
 export default function ProjetosGeraisPage(): JSX.Element {
@@ -126,6 +127,7 @@ export default function ProjetosGeraisPage(): JSX.Element {
       multiplicador_professor: record.multiplicador_professor,
       ativo: record.ativo,
       descricao: record.descricao,
+      nome_na_agenda: record.nome_na_agenda,
     });
     setModalVisible(true);
   };
@@ -145,6 +147,7 @@ export default function ProjetosGeraisPage(): JSX.Element {
         }),
         ...(values.ativo !== undefined && { ativo: values.ativo }),
         ...(values.descricao !== undefined && { descricao: values.descricao }),
+        ...(values.nome_na_agenda !== undefined && { nome_na_agenda: values.nome_na_agenda }),
       };
       if (editing) {
         await updateProjetoGeral(editing.id, payload);
@@ -337,6 +340,13 @@ export default function ProjetosGeraisPage(): JSX.Element {
         <Form form={form} layout="vertical" autoComplete="off" onFinish={handleSave}>
           <Form.Item name="nome" label="Nome" rules={[{ required: true, message: 'Nome é obrigatório' }]}>
             <Input placeholder="Ex: PROJETO AMMA" />
+          </Form.Item>
+          <Form.Item
+            name="nome_na_agenda"
+            label="Nome na agenda"
+            extra="Vai entre colchetes no título do evento no Google. Vazio: o nome da coleção em maiúsculas."
+          >
+            <Input maxLength={100} placeholder="Ex: VIDA & LINGUAGEM" />
           </Form.Item>
           <Form.Item
             name="tipo_calculo_codigos"

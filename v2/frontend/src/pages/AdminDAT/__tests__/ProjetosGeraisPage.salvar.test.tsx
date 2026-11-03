@@ -171,6 +171,26 @@ describe('ProjetosGeraisPage: salvar e excluir (C2)', () => {
     expect(within(modal).getByText('Cálculo: não gera códigos.')).toBeInTheDocument();
   }, 40000);
 
+  test('"Nome na agenda" (título do evento no Google): vem do registro, é opcional e vai no salvar', async () => {
+    vi.mocked(listProjetosGerais).mockResolvedValue({
+      results: [{ ...ITEM, nome_na_agenda: 'AMMA' }], count: 1, next: null, previous: null,
+    } as never);
+    const user = userEvent.setup();
+    renderPage();
+
+    const modal = await abrirEditar(user);
+    const campo = within(modal).getByLabelText('Nome na agenda');
+    expect(campo).toHaveValue('AMMA');
+    expect(campo).toHaveAttribute('maxlength', '100');
+
+    await user.clear(campo);
+    await user.type(campo, 'AMMA & CIA');
+    await user.click(within(modal).getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => expect(updateProjetoGeral).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(updateProjetoGeral).mock.calls[0]![1]).toMatchObject({ nome_na_agenda: 'AMMA & CIA' });
+  }, 40000);
+
   test('falha ao carregar a lista: o motivo e "Tentar de novo", não "Não há dados"', async () => {
     vi.mocked(listProjetosGerais).mockRejectedValue(new Error('Você não tem permissão para realizar esta ação.'));
     renderPage();

@@ -9,6 +9,7 @@ Functions for building Google Calendar event payloads.
 from __future__ import annotations
 
 import logging
+import unicodedata
 from datetime import timezone as dt_timezone
 
 from django.conf import settings
@@ -68,7 +69,7 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
     Constrói payload do evento para Google Calendar API (Fase 3 - Template Padronizado).
 
     Template Format:
-    - Title: "{municipio.nome} - {municipio.uf} {segmento} {modalidade} [{projeto.codigo}]"
+    - Title: "{MUNICÍPIO} - {UF} {N}º EF - {tipo_evento.nome} [{NOME NA AGENDA} {segmento}]" (igual à planilha)
     - Description: Structured multi-line sections (Município, Projeto, Data, Modalidade, Equipe, Links/Observações)
 
     Args:
@@ -90,37 +91,44 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
     coordenador = getattr(s, "coordenador", None)
 
     # ================================================================
-    # TITLE (SUMMARY) - Fase 3 Template
+    # TITLE (SUMMARY) - igual ao da planilha (decisão do dono, 03/11/2026; 417 títulos medidos)
     # ================================================================
-    # Format: "{municipio.nome} - {municipio.uf} {segmento} {modalidade} [{projeto.codigo ou nome}]"
-    # Example: "Salvador - BA Fundamental I Online [ACERTA]"
+    # Formação:       "{MUNICÍPIO} - {UF} {N}º EF - {tipo_evento.nome} [{NOME NA AGENDA} {segmento}]"
+    # Acompanhamento: "{MUNICÍPIO} - {UF} {N}º Acompanhamento [{NOME NA AGENDA} {segmento}]"
+    # Ex.: "CURVELO - MG 4º EF - Presencial [SUPERATIVAR 4º ano MAT]"
     title_parts = []
 
-    # 1. Município - UF
+    # 1. MUNICÍPIO - UF
     if municipio:
         nome_mun = getattr(municipio, "nome", "")
         uf_mun = getattr(municipio, "uf", "")
         if nome_mun:
-            mun_part = f"{nome_mun} - {uf_mun}" if uf_mun else nome_mun
+            mun_part = f"{nome_mun.upper()} - {uf_mun}" if uf_mun else nome_mun.upper()
             title_parts.append(mun_part)
 
-    # 2. Segmento (ex: "Fundamental I", "Fundamental II")
-    segmento = getattr(s, "segmento", "")
-    if segmento:
-        title_parts.append(segmento.strip())
+    # 2. Número do encontro: dígitos ganham "º"; "4º" ou outro texto ficam como estão; vazio, sem número.
+    numero = (getattr(s, "encontro", "") or "").strip()
+    if numero.isdigit():
+        numero = f"{numero}º"
+    if numero:
+        title_parts.append(numero)
 
-    # 3. Modalidade (Online/Presencial)
+    # 3. Tipo de evento: "Acompanhamento" sem "EF"; os outros "EF - {nome}". Sem tipo, a modalidade.
     is_online = getattr(s, "is_online", False)
     modalidade = "Online" if is_online else "Presencial"
-    title_parts.append(modalidade)
+    nome_tipo = (getattr(tipo, "nome", "") or "").strip() or modalidade
+    sem_acento = "".join(c for c in unicodedata.normalize("NFKD", nome_tipo) if not unicodedata.combining(c))
+    title_parts.append("Acompanhamento" if sem_acento.casefold() == "acompanhamento" else f"EF - {nome_tipo}")
 
-    # 4. Projeto [codigo] ou [nome] como fallback
+    # 4. [NOME NA AGENDA segmento]: o da coleção; vazio, a coleção em maiúsculas; sem coleção, o projeto.
     if projeto:
-        projeto_codigo = getattr(projeto, "codigo", "")
-        projeto_nome = getattr(projeto, "nome", "")
-        projeto_label = projeto_codigo if projeto_codigo else projeto_nome
-        if projeto_label:
-            title_parts.append(f"[{projeto_label}]")
+        colecao = getattr(projeto, "projeto_geral", None)
+        rotulo = (getattr(colecao, "nome_na_agenda", "") or "").strip() or (getattr(colecao, "nome", "") or "").upper()
+        rotulo = rotulo or (getattr(projeto, "nome", "") or "").upper()
+        segmento = (getattr(s, "segmento", "") or "").strip()
+        rotulo = f"{rotulo} {segmento}".strip()
+        if rotulo:
+            title_parts.append(f"[{rotulo}]")
 
     summary = " ".join(title_parts) if title_parts else f"Solicitação #{s.id}"
 

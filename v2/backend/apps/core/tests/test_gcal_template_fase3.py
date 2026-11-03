@@ -2,7 +2,8 @@
 Fase 3 - Testes para Template Padronizado Google Calendar
 
 Valida formatação de título e descrição conforme especificação Fase 3:
-- Title: "{municipio.nome} - {municipio.uf} {segmento} {modalidade} [{projeto.codigo}]"
+- Title: "{MUNICÍPIO} - {UF} {N}º EF - {tipo_evento.nome} [{NOME NA AGENDA} {segmento}]" (igual à planilha;
+  os casos do formato novo estão em test_gcal_titulo_planilha.py)
 - Description: Seções estruturadas (Município, Projeto, Data, Modalidade, Equipe, Observações)
 
 Cobertura:
@@ -100,7 +101,7 @@ class GCalTemplateFase3Tests(TestCase):
         """
         Fase 3 - Título completo com todos os campos presentes
 
-        Expected: "Salvador - BA Fundamental I Online [ACERTA]"
+        Expected: "SALVADOR - BA 2º EF - Formação Presencial [PROJETO ACERTA Fundamental I]"
         """
         solicitacao = SolicitacaoFactory(
             usuario=self.coord,
@@ -111,20 +112,21 @@ class GCalTemplateFase3Tests(TestCase):
             fim=self.fim,
             status="aprovado",
             segmento="Fundamental I",
+            encontro="2",
             is_online=True,
         )
 
         payload = build_event_payload(solicitacao, enable_meet=False)
 
-        # Validar summary
-        expected_title = "Salvador - BA Fundamental I Online [ACERTA]"
+        # Validar summary (o texto depois de "EF - " é o nome do tipo de evento, não a modalidade)
+        expected_title = "SALVADOR - BA 2º EF - Formação Presencial [PROJETO ACERTA Fundamental I]"
         self.assertEqual(payload["summary"], expected_title)
 
     def test_title_format_without_segmento(self):
         """
         Fase 3 - Título sem segmento (opcional)
 
-        Expected: "Salvador - BA Presencial [ACERTA]"
+        Expected: "SALVADOR - BA EF - Formação Presencial [PROJETO ACERTA]"
         """
         solicitacao = SolicitacaoFactory(
             usuario=self.coord,
@@ -141,14 +143,14 @@ class GCalTemplateFase3Tests(TestCase):
         payload = build_event_payload(solicitacao, enable_meet=False)
 
         # Validar summary (sem segmento)
-        expected_title = "Salvador - BA Presencial [ACERTA]"
+        expected_title = "SALVADOR - BA EF - Formação Presencial [PROJETO ACERTA]"
         self.assertEqual(payload["summary"], expected_title)
 
     def test_title_format_without_projeto_codigo(self):
         """
-        Fase 3 - Título com projeto sem código (usa nome como fallback)
+        Título com projeto sem código e sem coleção: o código não entra; vai o nome do projeto em maiúsculas
 
-        Expected: "Salvador - BA Online [Projeto sem Código]"
+        Expected: "SALVADOR - BA EF - Formação Presencial [PROJETO SEM CÓDIGO]"
         """
         projeto_sem_codigo = ProjetoFactory(
             nome="Projeto sem Código",
@@ -169,15 +171,15 @@ class GCalTemplateFase3Tests(TestCase):
 
         payload = build_event_payload(solicitacao, enable_meet=False)
 
-        # Validar summary (usa nome do projeto como fallback)
-        expected_title = "Salvador - BA Online [Projeto sem Código]"
+        # Validar summary (sem coleção, usa o nome do projeto em maiúsculas)
+        expected_title = "SALVADOR - BA EF - Formação Presencial [PROJETO SEM CÓDIGO]"
         self.assertEqual(payload["summary"], expected_title)
 
     def test_title_modalidade_presencial(self):
         """
-        Fase 3 - Modalidade "Presencial" quando is_online=False
+        Sem tipo de evento, a modalidade "Presencial" (is_online=False) vai no lugar do nome do tipo
 
-        Expected: "... Presencial ..."
+        Expected: "... EF - Presencial ..."
         """
         solicitacao = SolicitacaoFactory(
             usuario=self.coord,
@@ -189,11 +191,12 @@ class GCalTemplateFase3Tests(TestCase):
             status="aprovado",
             is_online=False,
         )
+        solicitacao.tipo_evento = None  # só em memória: a coluna é NOT NULL
 
         payload = build_event_payload(solicitacao, enable_meet=False)
 
         # Validar que contém "Presencial"
-        self.assertIn("Presencial", payload["summary"])
+        self.assertIn("EF - Presencial", payload["summary"])
         self.assertNotIn("Online", payload["summary"])
 
     def test_description_format_complete(self):
@@ -345,7 +348,7 @@ class GCalTemplateFase3Tests(TestCase):
         self.assertIn("BA", payload["summary"])  # UF
         self.assertIn("D" * 95, payload["summary"])  # Segmento
         self.assertIn("Presencial", payload["summary"])  # Modalidade
-        self.assertIn("[" + "C" * 50 + "]", payload["summary"])  # Projeto codigo
+        self.assertIn("[" + "B" * 200 + " " + "D" * 95 + "]", payload["summary"])  # Projeto nome + segmento
 
         # Validar que não truncou (ainda < 1000 chars)
         self.assertLess(len(payload["summary"]), 1000)
@@ -414,10 +417,10 @@ class GCalTemplateFase3Tests(TestCase):
         # Validar payload contém título formatado (estrutura: data["preview"]["payload"])
         self.assertIn("preview", data)
         payload = data["preview"]["payload"]
-        self.assertIn("Salvador - BA", payload["summary"])
+        self.assertIn("SALVADOR - BA", payload["summary"])
         self.assertIn("Fundamental II", payload["summary"])
-        self.assertIn("Online", payload["summary"])
-        self.assertIn("[ACERTA]", payload["summary"])
+        self.assertIn("EF - Formação Presencial", payload["summary"])
+        self.assertIn("[PROJETO ACERTA Fundamental II]", payload["summary"])
 
         # Validar payload contém descrição formatada
         self.assertIn("📋 Solicitação", payload["description"])
@@ -503,8 +506,8 @@ class GCalTemplateFase3Tests(TestCase):
 
         # Validar payload formatado
         payload = preview["payload"]
-        self.assertIn("Salvador - BA", payload["summary"])
-        self.assertIn("Online", payload["summary"])
+        self.assertIn("SALVADOR - BA", payload["summary"])
+        self.assertIn("EF - Formação Presencial", payload["summary"])
         self.assertIn("📋 Solicitação", payload["description"])
 
         # Validar meet_link fake (preview apenas)

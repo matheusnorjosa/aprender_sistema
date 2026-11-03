@@ -65,6 +65,12 @@ class ProjetoGeral(models.Model):
     )
     ativo = models.BooleanField(default=True)
     descricao = models.TextField(blank=True, help_text="Descrição adicional do projeto geral")
+    nome_na_agenda = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Nome entre colchetes no título do evento no Google; vazio = nome da coleção em maiúsculas",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

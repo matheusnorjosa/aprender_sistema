@@ -67,6 +67,7 @@ class ProjetoGeralSerializer(serializers.ModelSerializer["ProjetoGeral"]):
             "multiplicador_professor",
             "ativo",
             "descricao",
+            "nome_na_agenda",
             "projetos_count",
             "created_at",
             "updated_at",

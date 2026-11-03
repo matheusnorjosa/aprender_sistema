@@ -464,6 +464,8 @@ export interface ProjetoGeralRecord {
   multiplicador_professor: string;
   ativo: boolean;
   descricao: string;
+  // Entre colchetes no título do evento no Google; vazio = nome da coleção em maiúsculas.
+  nome_na_agenda: string;
   projetos_count: number;
   created_at: string;
   updated_at: string;
@@ -477,6 +479,7 @@ export interface ProjetoGeralPayload {
   multiplicador_professor?: string;
   ativo?: boolean;
   descricao?: string;
+  nome_na_agenda?: string;
 }
 
 export async function listProjetosGerais(params: ListParams = {}): Promise<PaginatedResponse<ProjetoGeralRecord>> {

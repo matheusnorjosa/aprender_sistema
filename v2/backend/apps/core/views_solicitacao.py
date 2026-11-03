@@ -1687,6 +1687,17 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                             "skipped_guests": resultado.skipped_guests,
                         },
                     )
+                if not resultado.ok:
+                    # Mesmo log da criação avulsa (`enforce_solicitacao_availability`).
+                    logger.info(
+                        "availability_blocked",
+                        extra={
+                            "event": "availability_blocked",
+                            "action": "lote",
+                            "solicitacao_id": instance.pk,
+                            "blocked_usuario_ids": [p.usuario_id for p in resultado.blocked],
+                        },
+                    )
                 try:
                     guard.raise_if_blocked(resultado, action="create")
                 except ValidationAPIError as exc:

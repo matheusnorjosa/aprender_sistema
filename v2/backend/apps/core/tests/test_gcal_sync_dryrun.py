@@ -622,7 +622,7 @@ class TestGCalSyncEdgeCases:
         assert "attendees" in event, "Deve ter attendees"
 
         # Verificar conteúdo
-        assert municipio_test.nome in event["summary"]
+        assert municipio_test.nome.upper() in event["summary"]
         assert tipo_evento_test.nome in event["summary"]
         assert f"Solicitação #{sol.id}" in event["description"]
         assert sol.observacoes in event["description"]

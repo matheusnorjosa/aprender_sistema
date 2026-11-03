@@ -148,7 +148,7 @@ class DashboardMetricsView(APIView):
         "recent_errors": [
             {
                 "id": 789,
-                "summary": "Fortaleza - CE Fundamental I Online [ACERTA]",
+                "summary": "FORTALEZA - CE 4º EF - Online [ACERTA 5º ano MAT]",
                 "gcal_last_error": "500 Internal Server Error",
                 "updated_at": "2025-11-08T10:30:00Z"
             },

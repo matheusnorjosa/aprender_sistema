@@ -1,9 +1,9 @@
 /**
  * CartaoEvento — um evento da Nova Solicitação, com os campos lado a lado (decisão do dono, 28/10/2026).
  *
- * Linha 1: Projeto | Tipo de Evento | Município. Linha 2: Data | Início | Fim. Linha 3: Formadores |
+ * Linha 1: Projeto | Tipo de Evento | Nº da formação | Município. Linha 2: Data | Início | Fim. Linha 3: Formadores |
  * Coordenador responsável, com a pergunta "vai acompanhar?" junto dele. A pergunta de avaliar o
- * formador fica à vista quando se aplica (é obrigatória). O resto (tipo, encontro, segmento, local,
+ * formador fica à vista quando se aplica (é obrigatória). O resto (tipo, segmento, local,
  * observações, online) fica em "Mais detalhes": recolhido, mas montado, para os limites de tamanho
  * valerem mesmo fechado. No celular os campos empilham; nenhuma linha passa da largura da tela.
  *
@@ -115,7 +115,7 @@ const ORDEM_DA_TELA = [
 ];
 
 /** Campos dentro de "Mais detalhes": com erro num deles, a seção abre antes do foco. */
-const CAMPOS_DOS_DETALHES = new Set(['tipo', 'encontro', 'segmento', 'local', 'observacoes', 'is_online']);
+const CAMPOS_DOS_DETALHES = new Set(['tipo', 'segmento', 'local', 'observacoes', 'is_online']);
 
 interface Problema {
   campo: string;
@@ -502,8 +502,8 @@ export default function CartaoEvento({
       )}
 
       <Form form={form} name={`evento-${chave}`} layout="vertical" autoComplete="off">
-        {/* Linha 1: Projeto | Tipo de Evento | Município */}
-        <div className="grid grid-cols-1 gap-x-4 md:grid-cols-3">
+        {/* Linha 1: Projeto | Tipo de Evento | Nº da formação | Município */}
+        <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2 xl:grid-cols-4">
           <div className="min-w-0">
             <Form.Item
               label="Projeto"
@@ -532,6 +532,16 @@ export default function CartaoEvento({
                 value={dados.tipoEvento}
                 placeholder="Busque ou selecione um tipo de evento"
                 oQueCarrega="os tipos de evento"
+              />
+            </Form.Item>
+          </div>
+          <div className="min-w-0">
+            {/* O número da formação vai para o título do evento no Google ("4º EF", "2º Acompanhamento"). */}
+            <Form.Item label="Nº da formação" name="encontro" rules={[{ max: 100, message: 'Máximo 100 caracteres' }]}>
+              <Input
+                placeholder="Ex: 4"
+                value={dados.encontro}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => mudar({ encontro: e.target.value })}
               />
             </Form.Item>
           </div>
@@ -680,15 +690,6 @@ export default function CartaoEvento({
                           placeholder="Ex: evento, reunião"
                           value={dados.tipo}
                           onChange={(e: ChangeEvent<HTMLInputElement>) => mudar({ tipo: e.target.value })}
-                        />
-                      </Form.Item>
-                    </div>
-                    <div className="min-w-0">
-                      <Form.Item label="Encontro" name="encontro" rules={[{ max: 100, message: 'Máximo 100 caracteres' }]}>
-                        <Input
-                          placeholder="Ex: Encontro 1"
-                          value={dados.encontro}
-                          onChange={(e: ChangeEvent<HTMLInputElement>) => mudar({ encontro: e.target.value })}
                         />
                       </Form.Item>
                     </div>

@@ -219,14 +219,22 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
     await preencherTudo();
     const detalhes = cabecalhoDoTexto(/Mais detalhes/);
     expect(detalhes).toHaveAttribute('aria-expanded', 'false');
-    const encontro = screen.getByLabelText('Encontro');
-    fireEvent.change(encontro, { target: { value: 'x'.repeat(101) } });
+    const segmento = screen.getByLabelText('Segmento');
+    fireEvent.change(segmento, { target: { value: 'x'.repeat(101) } });
 
     fireEvent.click(criar());
     expect(await screen.findByText('Máximo 100 caracteres', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
     await waitFor(() => expect(detalhes).toHaveAttribute('aria-expanded', 'true'));
-    await waitFor(() => expect(encontro).toHaveFocus(), ESPERA_VALIDACAO);
+    await waitFor(() => expect(segmento).toHaveFocus(), ESPERA_VALIDACAO);
     expect(createSolicitacoesEmLoteMock).not.toHaveBeenCalled();
+  });
+
+  test('"Nº da formação" fica à vista, fora de "Mais detalhes"', async () => {
+    renderWizard();
+    await screen.findByTestId('cb-projeto');
+    const numero = screen.getByLabelText('Nº da formação');
+    expect(numero.closest('.ant-collapse')).toBeNull();
+    expect(screen.queryByLabelText('Encontro')).not.toBeInTheDocument();
   });
 
   test('recusa do backend por campo mostra o motivo junto do campo e no resumo, não "Erro de validação."', async () => {

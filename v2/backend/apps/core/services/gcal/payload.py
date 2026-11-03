@@ -171,6 +171,11 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
         if tipo_nome:
             description_lines.append(f"🎯 Tipo: {tipo_nome}")
 
+    # Seção 3b: Nº da formação (campo `encontro`; decisão do dono de 03/11/2026)
+    encontro = (getattr(s, "encontro", "") or "").strip()
+    if encontro:
+        description_lines.append(f"🔢 Nº da formação: {encontro}")
+
     # Seção 4: Data/Horário (formatado em America/Fortaleza)
     from zoneinfo import ZoneInfo
 

@@ -584,3 +584,27 @@ class GCalTemplateFase3Tests(TestCase):
         self.assertIn("Coordenador(a): Maria Silva", description)
         for vazado in ("formador_fase3", "formador2_fase3", "22222222222", "44444444444", "convidado.externo"):
             self.assertNotIn(vazado, description)
+
+    def test_numero_da_formacao_vai_para_a_descricao(self):
+        """O "Nº da formação" (campo `encontro`, decisão do dono de 03/11) sai na descrição; vazio, a linha não sai."""
+        com_numero = SolicitacaoFactory(
+            usuario=self.coord,
+            municipio=self.municipio,
+            projeto=self.projeto,
+            tipo_evento=self.tipo_evento,
+            inicio=self.inicio,
+            fim=self.fim,
+            encontro="4",
+        )
+        sem_numero = SolicitacaoFactory(
+            usuario=self.coord,
+            municipio=self.municipio,
+            projeto=self.projeto,
+            tipo_evento=self.tipo_evento,
+            inicio=self.inicio,
+            fim=self.fim,
+            encontro="",
+        )
+
+        self.assertIn("🔢 Nº da formação: 4\n", build_event_payload(com_numero, enable_meet=False)["description"])
+        self.assertNotIn("Nº da formação", build_event_payload(sem_numero, enable_meet=False)["description"])

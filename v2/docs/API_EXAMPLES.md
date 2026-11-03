@@ -1,6 +1,6 @@
 ﻿# API Examples - Aprender Sistema v2
 
-**Ultima verificacao contra o codigo**: 2026-07-24
+**Ultima verificacao contra o codigo**: 2026-10-30
 
 Exemplos práticos de uso da API para desenvolvedores.
 Contrato completo em [API_REFERENCE.md](API_REFERENCE.md); inventario executavel
@@ -78,7 +78,8 @@ Campos gravaveis: `municipio`, `projeto`, `tipo_evento`, `tipo`, `encontro`,
 
 Criar exige a capability `create_solicitation` (`SolicitacaoViewSet.get_permissions`, `views_solicitacao.py`).
 Na criacao, `coordenador_acompanha` e obrigatorio: sem ele o POST responde 400 nesse campo
-(`SolicitacaoSerializer.validate`).
+(`SolicitacaoSerializer.validate`). `projeto` e `municipio` tambem sao obrigatorios, evento online
+inclusive: ausente ou `null` responde 400 no campo (`SolicitacaoSerializer.Meta.extra_kwargs`).
 
 ### Criar Solicitacao Presencial
 
@@ -138,6 +139,7 @@ curl -X POST http://localhost:8000/api/solicitacoes/ \
   -d '{
     "inicio": "2026-01-20T14:00:00-03:00",
     "fim": "2026-01-20T16:00:00-03:00",
+    "municipio": 1,
     "projeto": 2,
     "tipo_evento": 1,
     "is_online": true,

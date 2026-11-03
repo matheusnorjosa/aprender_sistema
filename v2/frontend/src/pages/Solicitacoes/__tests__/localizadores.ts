@@ -9,7 +9,7 @@
  * o esconde. O nome acessível calculado segue conferido onde ele é o assunto do teste
  * (getByRole/toHaveAccessibleName, contagem de regiões, diálogo).
  */
-import { within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { expect } from 'vitest';
 
 export function semEsconder<T extends HTMLElement>(el: T | null, tag: string): T {
@@ -78,6 +78,26 @@ export const botaoRemover = (n: number): HTMLElement => {
   expect(botao).not.toHaveAttribute('aria-labelledby');
   return botao;
 };
+
+/**
+ * O bloco "Horário N" do cartão: com mais de um horário, cada um é um grupo (role=group) nomeado pelo
+ * subtítulo h4. Com um só, não há bloco nem subtítulo (a tela é a de sempre).
+ */
+export function blocoDoHorario(c: HTMLElement, n: number): HTMLElement {
+  const subtitulos = [...c.querySelectorAll<HTMLElement>('h4')].filter((h) => h.textContent?.trim() === `Horário ${n}`);
+  expect(subtitulos).toHaveLength(1);
+  const grupo = subtitulos[0]!.closest<HTMLElement>('[role="group"]');
+  expect(grupo?.getAttribute('aria-labelledby')).toBe(subtitulos[0]!.id);
+  return semEsconder(grupo, 'DIV');
+}
+
+/** "+ Adicionar outro evento", fora dos cartões: no limite, o "+ horário" de cada cartão diz o mesmo texto. */
+export function botaoAdicionarEvento(): HTMLElement {
+  const texto = /Adicionar outro evento|Limite de 10 eventos por vez/;
+  const fora = screen.getAllByText(texto).filter((el) => !el.closest('section[aria-labelledby^="evento-"]'));
+  expect(fora).toHaveLength(1);
+  return botaoDoTexto(texto, fora[0]!.closest('button')!.parentElement!);
+}
 
 export const PERGUNTA_ACOMPANHA = 'O coordenador responsável vai acompanhar o evento?';
 

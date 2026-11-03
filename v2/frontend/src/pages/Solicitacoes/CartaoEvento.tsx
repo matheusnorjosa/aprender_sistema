@@ -1,18 +1,21 @@
 /**
  * CartaoEvento — um evento da Nova Solicitação, com os campos lado a lado (decisão do dono, 28/10/2026).
  *
- * Linha 1: Projeto | Tipo de Evento | Nº da formação | Município. Linha 2: Data | Início | Fim. Linha 3: Formadores |
- * Coordenador responsável, com a pergunta "vai acompanhar?" junto dele. A pergunta de avaliar o
- * formador fica à vista quando se aplica (é obrigatória). O resto (tipo, segmento, local,
- * observações, online) fica em "Mais detalhes": recolhido, mas montado, para os limites de tamanho
- * valerem mesmo fechado. No celular os campos empilham; nenhuma linha passa da largura da tela.
+ * Linha 1: Projeto | Tipo de Evento | Nº da formação | Município. Depois, os horários
+ * (`HorarioDoEvento`: Data | Início | Fim; Formadores | Coordenador responsável, com "vai
+ * acompanhar?"; a pergunta de avaliar o formador) e "+ horário" (decisão do dono, 03/11/2026: cada
+ * horário vira um evento separado no Google; o que fica fora dos horários se preenche uma vez). O
+ * resto (tipo, segmento, local, observações, online) fica em "Mais detalhes": recolhido, mas montado,
+ * para os limites de tamanho valerem mesmo fechado. No celular os campos empilham; nenhuma linha passa
+ * da largura da tela.
  *
- * Controlado: os dados vêm da página (`dados`) e cada mudança volta por `onChange`. O Form do antd é
- * do cartão (nome `evento-<chave>`, que prefixa os ids). A página confere o cartão pelo `ref`
- * (`validar`, `focarTitulo`) e devolve a ele o que o servidor recusou no envio do lote
- * (`erroDoEnvio`): erro de campo vai ao campo, conflito de agenda ao alerta do cartão e o resto ao
- * topo do cartão. A página tira esse erro quando qualquer evento muda, menos o conflito de agenda,
- * que sai quando muda o horário, o município ou quem participa de algum evento.
+ * Controlado: os dados vêm da página (`dados`) e cada mudança volta por `onChange` (o que é do
+ * evento) ou `onChangeHorario`. O Form do antd do cartão (nome `evento-<chave>`, que prefixa os ids)
+ * tem os campos do evento; cada horário tem o seu. A página confere o cartão pelo `ref` (`validar`,
+ * `focarTitulo`, `focarData`) e devolve a ele o que o servidor recusou no envio do lote, por horário
+ * (`errosDoLote`): erro de campo vai ao campo (do evento ou do horário), conflito de agenda ao alerta
+ * do horário e o resto ao topo do cartão. A página tira esse erro quando qualquer evento muda, menos o
+ * conflito de agenda, que sai quando muda o horário, o município ou quem participa de algum evento.
  */
 
 import {
@@ -38,12 +41,10 @@ import Checkbox from 'antd/es/checkbox';
 import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 import Collapse from 'antd/es/collapse';
 import Modal from 'antd/es/modal';
-import Radio from 'antd/es/radio';
-import type { RadioChangeEvent } from 'antd/es/radio';
-import Select from 'antd/es/select';
 import Typography from 'antd/es/typography';
 // icons - direct imports for tree-shaking (Issue #425)
 import ExclamationCircleOutlined from '@ant-design/icons/ExclamationCircleOutlined';
+import PlusOutlined from '@ant-design/icons/PlusOutlined';
 import RightOutlined from '@ant-design/icons/RightOutlined';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -53,27 +54,23 @@ import {
   lookupMunicipiosWithFilters,
   lookupProjetos,
   lookupTiposEvento,
-  lookupUsuarios,
   type LookupItem,
 } from '../../api/lookup';
-import { useAvailabilityPreview } from '../../hooks/useAvailabilityPreview';
-import DateTimeRange, { type DateTimeRangeValue } from '../../components/DateTimeRange';
 import ComboBox from '../../components/ComboBox';
-import FormadoresPicker from '../../components/FormadoresPicker';
-import AvailabilityConflictAlert, { AvisosDeAgenda } from '../../components/AvailabilityConflictAlert';
 import logger from '../../utils/logger';
-import type { BlockedParticipant } from '../../types';
 import type { ErroDoEventoNoLote } from '../../api/solicitacoes';
+import HorarioDoEvento, { type ErrosDoHorario, type HorarioDoEventoHandle, type Problema } from './HorarioDoEvento';
 import {
   estaEmBranco,
-  formadoresAvaliaveisDo,
-  participantesDo,
+  eventoDoHorario,
+  ORDEM_DO_CARTAO,
+  ORDEM_DO_HORARIO,
   perguntaAvaliarDo,
   separarErrosDoServidor,
+  TEXTO_DO_LIMITE,
   type ComboBoxValue,
-  type ErrosDoServidor,
   type FormDataType,
-  type ParticipantType,
+  type Horario,
   type QuemCria,
 } from './evento';
 
@@ -84,53 +81,39 @@ dayjs.tz.setDefault('America/Fortaleza');
 const { TextArea } = Input;
 const { Title, Text } = Typography;
 
-const RANGE_TIMEZONE = 'America/Fortaleza';
-
-/** Opções das perguntas Sim/Não (decisão do dono, 05/10/2026). */
-const SIM_NAO = [
-  { label: 'Sim', value: true },
-  { label: 'Não', value: false },
-];
-
-/** Lista vazia estável (sem conflito recusado no envio). */
-const SEM_BLOQUEADOS: BlockedParticipant[] = [];
-
-/** Ordem dos campos na tela: a do resumo de erros e a do foco. `horario` é o DateTimeRange (fora do Form). */
-const ORDEM_DA_TELA = [
-  'projeto',
-  'tipoEvento',
-  'municipio',
-  'horario',
-  'formadores',
-  'coordenadorResponsavel',
-  'coordenadorAcompanha',
-  'pretendeAvaliar',
-  'formadorAvaliado',
-  'tipo',
-  'encontro',
-  'segmento',
-  'local',
-  'observacoes',
-  'is_online',
-];
+/** Ordem dos campos do evento na tela (a do resumo e a do foco). */
+const ORDEM_DA_TELA = ORDEM_DO_CARTAO;
 
 /** Campos dentro de "Mais detalhes": com erro num deles, a seção abre antes do foco. */
 const CAMPOS_DOS_DETALHES = new Set(['tipo', 'segmento', 'local', 'observacoes', 'is_online']);
 
-interface Problema {
-  campo: string;
-  motivos: string[];
+/** Um motivo de o evento não poder ser criado: de um horário (a chave dele) ou do evento (null). */
+export interface MotivoDoCartao {
+  horario: number | null;
+  texto: string;
+}
+
+/** O que o servidor recusou no cartão: o que é do evento (campos e topo) e o que é de cada horário. */
+interface ErrosDoCartao {
+  campos: Record<string, string[]>;
+  topo: string[];
+  porHorario: Record<number, ErrosDoHorario>;
 }
 
 /** O que a página pede ao cartão. */
 export interface CartaoEventoHandle {
   /**
-   * Confere os campos e o horário. Com `focar`, leva o foco ao primeiro problema (abrindo "Mais
-   * detalhes" se ele estiver lá). Devolve os motivos na ordem da tela; vazio = pode enviar.
+   * Confere os campos do evento e os de cada horário. Com `focar`, leva o foco ao primeiro problema
+   * (abrindo "Mais detalhes" se ele estiver lá). Devolve os motivos na ordem da tela; vazio = pode enviar.
    */
-  validar: (opcoes: { focar: boolean }) => Promise<string[]>;
-  /** Leva o foco ao título do cartão ("Evento N"). */
-  focarTitulo: () => void;
+  validar: (opcoes: { focar: boolean }) => Promise<MotivoDoCartao[]>;
+  /**
+   * Leva o foco ao título do cartão ("Evento N") ou, com `horario` e mais de um horário no cartão, ao
+   * subtítulo dele ("Horário 2").
+   */
+  focarTitulo: (horario?: number | null) => void;
+  /** Leva o foco ao campo Data do horário (depois do "+ horário"). */
+  focarData: (horario: number) => void;
 }
 
 export interface CartaoEventoProps {
@@ -140,14 +123,20 @@ export interface CartaoEventoProps {
   numero: number;
   dados: FormDataType;
   onChange: (chave: number, parcial: Partial<FormDataType>) => void;
+  onChangeHorario: (chave: number, chaveDoHorario: number, parcial: Partial<Horario>) => void;
+  /** "+ horário" e "Remover horário": a página guarda as chaves e o limite de eventos por envio. */
+  onAdicionarHorario: (chave: number) => void;
+  onRemoverHorario: (chave: number, chaveDoHorario: number) => void;
+  /** O envio chegou ao limite de eventos (cada horário conta um): "+ horário" desabilita e diz o porquê. */
+  noLimite: boolean;
   /** Quem cria (do /me): é o responsável quando o projeto aceita o vazio. */
   me: QuemCria | null;
   /** Regra da compra: quem tem create_solicitation_without_purchase escolhe projeto e município sem compra. */
   dispensaCompra: boolean;
-  /** O que trava o "Criar": o id do alerta que diz o motivo (para o `aria-describedby`), ou null. */
-  onTrava: (chave: number, idDoMotivo: string | null) => void;
-  /** O que o servidor recusou neste evento no último envio do lote (null: nada). */
-  erroDoEnvio: ErroDoEventoNoLote | null;
+  /** O que trava o "Criar", por horário: o id do alerta que diz o motivo (para o `aria-describedby`), ou null. */
+  onTrava: (chaveDoHorario: number, idDoMotivo: string | null) => void;
+  /** O que o servidor recusou no último envio do lote, por chave do horário (null: nada). */
+  errosDoLote: Record<number, ErroDoEventoNoLote> | null;
   /** O evento está no resumo de problemas do topo: o cartão fica vermelho e o título diz "com problema". */
   comProblema: boolean;
   /** Evento extra: "Remover". O primeiro evento não tem. */
@@ -160,70 +149,56 @@ export default function CartaoEvento({
   numero,
   dados,
   onChange,
+  onChangeHorario,
+  onAdicionarHorario,
+  onRemoverHorario,
+  noLimite,
   me,
   dispensaCompra,
   onTrava,
-  erroDoEnvio,
+  errosDoLote,
   comProblema,
   onRemover,
   ref,
 }: CartaoEventoProps): JSX.Element {
   const [form] = Form.useForm();
-  const cartaoRef = useRef<HTMLElement>(null);
   const [municipioLookupHasResults, setMunicipioLookupHasResults] = useState<boolean | null>(null);
-  // Motivo de o horário não valer (faltando, ou fim antes do início), junto dos campos.
-  const [erroHorario, setErroHorario] = useState<string | null>(null);
   const [detalhesAbertos, setDetalhesAbertos] = useState(false);
+  const horarios = useRef(new Map<number, HorarioDoEventoHandle>());
 
   const mudar = useCallback((parcial: Partial<FormDataType>): void => onChange(chave, parcial), [chave, onChange]);
-
-  // Handler para DateTimeRange: converte {date, start, end} para ISO UTC (Issue #428)
-  const handleRangeChange = useCallback((range: DateTimeRangeValue): void => {
-    setErroHorario(null);
-    if (!range.date || !range.start || !range.end) {
-      mudar({ inicio: null, fim: null });
-      return;
-    }
-    try {
-      const inicioLocal = dayjs.tz(`${range.date} ${range.start}`, RANGE_TIMEZONE);
-      const fimLocal = dayjs.tz(`${range.date} ${range.end}`, RANGE_TIMEZONE);
-      mudar({ inicio: inicioLocal.utc().format(), fim: fimLocal.utc().format() });
-    } catch (error) {
-      logger.error('Erro ao converter data/hora:', error);
-      mudar({ inicio: null, fim: null });
-    }
-  }, [mudar]);
-
-  // Derivar rangeValue memoizado (Issue #428)
-  const rangeValue = useMemo((): DateTimeRangeValue => {
-    if (!dados.inicio || !dados.fim) {
-      return { date: '', start: '', end: '' };
-    }
-    return {
-      date: dayjs(dados.inicio).tz(RANGE_TIMEZONE).format('YYYY-MM-DD'),
-      start: dayjs(dados.inicio).tz(RANGE_TIMEZONE).format('HH:mm'),
-      end: dayjs(dados.fim).tz(RANGE_TIMEZONE).format('HH:mm'),
-    };
-  }, [dados.inicio, dados.fim]);
+  const mudarHorario = useCallback(
+    (chaveDoHorario: number, parcial: Partial<Horario>): void => onChangeHorario(chave, chaveDoHorario, parcial),
+    [chave, onChangeHorario],
+  );
+  const removerHorario = useCallback(
+    (chaveDoHorario: number): void => onRemoverHorario(chave, chaveDoHorario),
+    [chave, onRemoverHorario],
+  );
 
   const handleProjetoChange = (value: ComboBoxValue | null): void => {
     const projetoChanged = dados.projeto?.id !== value?.id;
     // Trocar o projeto pode trocar a gerência (PR 9, P9-5: só entram pessoas da gerência do projeto):
-    // formadores, responsável e a resposta de avaliar escolhidos para o projeto anterior saem.
+    // formadores, responsável e a resposta de avaliar escolhidos para o projeto anterior saem, em
+    // todos os horários.
     mudar({
       projeto: value,
       ...(projetoChanged
-        ? { municipio: null, formadores: [], coordenadorResponsavel: null, pretendeAvaliar: null, formadorAvaliado: null }
+        ? {
+            municipio: null,
+            horarios: dados.horarios.map((h) => ({
+              ...h,
+              formadores: [],
+              coordenadorResponsavel: null,
+              pretendeAvaliar: null,
+              formadorAvaliado: null,
+            })),
+          }
         : {}),
     });
     if (projetoChanged) {
-      form.setFieldsValue({
-        municipio: null,
-        formadores: [],
-        coordenadorResponsavel: null,
-        pretendeAvaliar: undefined,
-        formadorAvaliado: undefined,
-      });
+      form.setFieldsValue({ municipio: null });
+      horarios.current.forEach((h) => h.limparPessoas());
       setMunicipioLookupHasResults(null);
     }
   };
@@ -246,31 +221,14 @@ export default function CartaoEvento({
     return results;
   }, [projetoId, dispensaCompra]);
 
-  // ComboBox "Coordenador responsável" (#1666): papel Coordenador vigente na gerência do projeto
-  // escolhido (PR 9, P9-5: num evento da gerência A só entram pessoas da A).
-  const lookupCoordenadores = useCallback(
-    (q: string): Promise<LookupItem[]> => lookupUsuarios(q, 'Coordenador', projetoId),
-    [projetoId],
-  );
-
   // Regra da compra: projeto sem compra que o libere ("em espera") some da lista.
   const lookupProjetosElegiveis = useCallback(
     (q: string): Promise<LookupItem[]> => lookupProjetos(q, dispensaCompra ? {} : { com_compra: true }),
     [dispensaCompra],
   );
 
-  // DateTimeRange fica fora de Form.Item, então validateFields() não o vê. O gatilho da checagem
-  // (#1452) depende dele. O backend recusa fim igual ou antes do início (`errors.fim`); aqui a
-  // pessoa vê antes.
-  const motivoDoHorario = (): string | null => {
-    if (!dados.inicio || !dados.fim) return 'Escolha a data e os horários de início e de fim do evento.';
-    if (!dayjs(dados.fim).isAfter(dayjs(dados.inicio))) return 'O horário de fim precisa ser depois do início.';
-    return null;
-  };
-
-  const validar = async ({ focar }: { focar: boolean }): Promise<string[]> => {
-    const motivoHorario = motivoDoHorario();
-    setErroHorario(motivoHorario);
+  // Confere o evento e os horários; a ordem é a da tela (os campos do evento antes e depois dos horários).
+  const validar = async ({ focar }: { focar: boolean }): Promise<MotivoDoCartao[]> => {
     let errorFields: Array<{ name: Array<string | number>; errors: string[] }> = [];
     try {
       await form.validateFields();
@@ -278,73 +236,80 @@ export default function CartaoEvento({
       logger.debug('Validação falhou:', err);
       errorFields = (err as { errorFields?: typeof errorFields }).errorFields ?? [];
     }
-    const problemas: Problema[] = [
-      ...errorFields.map((f) => ({ campo: String(f.name[0]), motivos: f.errors })),
-      ...(motivoHorario ? [{ campo: 'horario', motivos: [motivoHorario] }] : []),
-    ].sort((a, b) => ORDEM_DA_TELA.indexOf(a.campo) - ORDEM_DA_TELA.indexOf(b.campo));
+    const lugar = (p: Problema): number => ORDEM_DA_TELA.indexOf(p.campo);
+    const doEvento: Problema[] = errorFields
+      .map((f) => ({ campo: String(f.name[0]), motivos: f.errors }))
+      .sort((a, b) => lugar(a) - lugar(b));
+    const dosHorarios = await Promise.all(
+      dados.horarios.map(async (h) => ({ chave: h.chave, problemas: (await horarios.current.get(h.chave)?.validar()) ?? [] })),
+    );
+    const meio = ORDEM_DA_TELA.indexOf('horarios');
+    const problemas: Array<{ horario: number | null; problema: Problema }> = [
+      ...doEvento.filter((p) => lugar(p) < meio).map((problema) => ({ horario: null, problema })),
+      ...dosHorarios.flatMap(({ chave: horario, problemas: lista }) => lista.map((problema) => ({ horario, problema }))),
+      ...doEvento.filter((p) => lugar(p) > meio).map((problema) => ({ horario: null, problema })),
+    ];
 
     const primeiro = problemas[0];
     if (focar && primeiro) {
       // Nada de clique mudo: leva a tela e o foco ao primeiro problema.
-      if (primeiro.campo === 'horario') {
-        setTimeout(() => cartaoRef.current?.querySelector<HTMLElement>('[data-campo-horario][aria-invalid="true"]')?.focus());
+      const { campo } = primeiro.problema;
+      if (primeiro.horario !== null) {
+        horarios.current.get(primeiro.horario)?.focar(campo);
       } else {
         // Campo escondido não recebe foco: abre "Mais detalhes" antes de focar.
-        if (CAMPOS_DOS_DETALHES.has(primeiro.campo)) flushSync(() => setDetalhesAbertos(true));
-        form.scrollToField(primeiro.campo, { block: 'center', focus: true });
-        // O antd não foca um Radio.Group (o id fica no <div> do grupo): o foco vai à primeira
-        // opção da pergunta Sim/Não (ou à caixa de marcar) que faltou.
-        const campo = document.getElementById(`evento-${chave}_${primeiro.campo}`);
-        if (campo && !campo.matches('input, textarea, select, button')) {
-          campo.querySelector<HTMLElement>('input[type="radio"], input[type="checkbox"]')?.focus();
+        if (CAMPOS_DOS_DETALHES.has(campo)) flushSync(() => setDetalhesAbertos(true));
+        form.scrollToField(campo, { block: 'center', focus: true });
+        // O antd não foca a caixa de marcar pelo id do Form.Item: o foco vai a ela.
+        const elemento = document.getElementById(`evento-${chave}_${campo}`);
+        if (elemento && !elemento.matches('input, textarea, select, button')) {
+          elemento.querySelector<HTMLElement>('input[type="radio"], input[type="checkbox"]')?.focus();
         }
       }
     }
-    return problemas.flatMap((p) => p.motivos);
+    return problemas.flatMap(({ horario, problema }) => problema.motivos.map((texto) => ({ horario, texto })));
   };
 
-  // Coordenador responsável: o escolhido; sem escolha, quem cria (se o backend aceita o vazio no projeto).
-  const vazioEhQuemCria = dados.projeto?.responsavel_padrao === true;
-  const formadoresAvaliaveis = formadoresAvaliaveisDo(dados);
-  const perguntaAvaliar = perguntaAvaliarDo(dados);
-  const participantes = useMemo(() => participantesDo(dados, me), [dados, me]);
-
-  // Trocar a lista de formadores: se o escolhido para avaliação saiu, a escolha é limpa.
-  const handleFormadoresChange = (value: ParticipantType[]): void => {
-    const aindaAvaliavel = value.some((f) => f.avaliavel && f.id === dados.formadorAvaliado);
-    mudar({ formadores: value, formadorAvaliado: aindaAvaliavel ? dados.formadorAvaliado : null });
-    if (!value.some((f) => f.avaliavel && f.id === form.getFieldValue('formadorAvaliado'))) {
-      form.setFieldsValue({ formadorAvaliado: undefined });
-    }
-  };
-
-  // #1452: conflito recusado pelo servidor no envio (fecha o TOCTOU / cache). No lote,
-  // `blocked_participants` vem no topo do item (formato do batch-approve).
-  const bloqueadosDoEnvio = erroDoEnvio?.code === 'availability_conflict' ? erroDoEnvio.blocked_participants : undefined;
-  const submitConflito: BlockedParticipant[] =
-    bloqueadosDoEnvio && bloqueadosDoEnvio.length > 0 ? bloqueadosDoEnvio : SEM_BLOQUEADOS;
-
-  // O resto do que o servidor recusou: erro de campo vai ao campo, do horário ao horário e o que não
-  // é de um campo à vista ao topo do cartão. Sem nada por campo, o `detail` do item vai ao topo.
-  const pretendeAvaliar = dados.pretendeAvaliar;
-  const errosDoEnvio = useMemo((): ErrosDoServidor | null => {
-    if (!erroDoEnvio || submitConflito.length > 0) return null;
-    const campoNaTela = (campo: string): boolean => {
-      if (campo === 'pretendeAvaliar') return perguntaAvaliar;
-      if (campo === 'formadorAvaliado') return perguntaAvaliar && pretendeAvaliar === true;
-      return campo !== 'horario' && ORDEM_DA_TELA.includes(campo);
-    };
-    const separados = separarErrosDoServidor(erroDoEnvio.errors ?? {}, campoNaTela);
-    const algum = separados.topo.length + separados.horario.length + Object.keys(separados.campos).length;
-    if (algum === 0) separados.topo.push(erroDoEnvio.detail);
+  // O que o servidor recusou, por horário (cada horário é um item do lote): o que é do horário vai ao
+  // horário; o que é do evento, ao campo do cartão; o que não é de um campo à vista, ao topo do cartão
+  // (com "Horário N:" quando há mais de um). Sem nada por campo, o `detail` do item vai ao topo.
+  const errosDoEnvio = useMemo((): ErrosDoCartao => {
+    const separados: ErrosDoCartao = { campos: {}, topo: [], porHorario: {} };
+    dados.horarios.forEach((horario, indice) => {
+      const item = errosDoLote?.[horario.chave];
+      if (!item) return;
+      // #1452: conflito recusado pelo servidor no envio (fecha o TOCTOU / cache). No lote,
+      // `blocked_participants` vem no topo do item (formato do batch-approve).
+      const bloqueados = item.code === 'availability_conflict' ? (item.blocked_participants ?? []) : [];
+      if (bloqueados.length > 0) {
+        separados.porHorario[horario.chave] = { campos: {}, horario: [], bloqueados };
+        return;
+      }
+      const perguntaAvaliar = perguntaAvaliarDo(eventoDoHorario(dados, horario));
+      const campoNaTela = (campo: string): boolean => {
+        if (campo === 'pretendeAvaliar') return perguntaAvaliar;
+        if (campo === 'formadorAvaliado') return perguntaAvaliar && horario.pretendeAvaliar === true;
+        return (campo !== 'horarios' && ORDEM_DA_TELA.includes(campo)) || (campo !== 'horario' && ORDEM_DO_HORARIO.includes(campo));
+      };
+      const doItem = separarErrosDoServidor(item.errors ?? {}, campoNaTela);
+      if (doItem.topo.length + doItem.horario.length + Object.keys(doItem.campos).length === 0) doItem.topo.push(item.detail);
+      const prefixo = dados.horarios.length > 1 ? `Horário ${indice + 1}: ` : '';
+      separados.topo.push(...doItem.topo.map((texto) => `${prefixo}${texto}`).filter((t) => !separados.topo.includes(t)));
+      const doHorario: Record<string, string[]> = {};
+      for (const [campo, mensagens] of Object.entries(doItem.campos)) {
+        if (ORDEM_DO_HORARIO.includes(campo)) doHorario[campo] = mensagens;
+        else separados.campos[campo] = [...new Set([...(separados.campos[campo] ?? []), ...mensagens])];
+      }
+      separados.porHorario[horario.chave] = { campos: doHorario, horario: doItem.horario, bloqueados: [] };
+    });
     return separados;
-  }, [erroDoEnvio, submitConflito, perguntaAvaliar, pretendeAvaliar]);
+  }, [errosDoLote, dados]);
 
   // Os erros de campo do envio entram no Form; quando saem (a página os tira ao mexer em qualquer
   // evento), saem do campo, a menos que a validação da tela já tenha posto outro no lugar.
   const marcadosPeloEnvio = useRef<Record<string, string[]>>({});
   useEffect(() => {
-    const campos = errosDoEnvio?.campos ?? {};
+    const campos = errosDoEnvio.campos;
     const sair = Object.entries(marcadosPeloEnvio.current)
       .filter(([nome, erros]) => !(nome in campos) && JSON.stringify(form.getFieldError(nome)) === JSON.stringify(erros))
       .map(([nome]) => ({ name: nome, errors: [] }));
@@ -352,68 +317,17 @@ export default function CartaoEvento({
     if (sair.length + entrar.length > 0) form.setFields([...sair, ...entrar]);
     marcadosPeloEnvio.current = campos;
   }, [errosDoEnvio, form]);
-  const erroDoHorario = erroHorario ?? (errosDoEnvio?.horario.length ? errosDoEnvio.horario.join(' ') : null);
 
   const idTitulo = `evento-${chave}-titulo`;
+  const variosHorarios = dados.horarios.length > 1;
   useImperativeHandle(ref, () => ({
     validar,
-    focarTitulo: () => document.getElementById(idTitulo)?.focus(),
+    focarTitulo: (horario?: number | null) => {
+      if (horario != null && variosHorarios && horarios.current.has(horario)) horarios.current.get(horario)?.focarTitulo();
+      else document.getElementById(idTitulo)?.focus();
+    },
+    focarData: (horario: number) => horarios.current.get(horario)?.focarData(),
   }));
-
-  const preview = useAvailabilityPreview({
-    inicio: dados.inicio,
-    fim: dados.fim,
-    municipioId: dados.municipio?.id ?? null,
-    participantes,
-  });
-
-  // #1452: conflito antecipado ou recusado no envio trava o "Criar"; o botão aponta o alerta.
-  const idPreviewConflito = `preview-conflito-${chave}`;
-  const idSubmitConflito = `submit-conflito-${chave}`;
-  const idDaTrava =
-    preview.status === 'conflito' ? idPreviewConflito : submitConflito.length > 0 ? idSubmitConflito : null;
-  useEffect(() => {
-    onTrava(chave, idDaTrava);
-    return () => onTrava(chave, null);
-  }, [chave, idDaTrava, onTrava]);
-
-  // Bloco de UX da checagem (aviso antecipado). Só render — o gate real é o backend.
-  const renderPreviewEstado = (): ReactNode => {
-    if (preview.status === 'conflito') {
-      return <AvailabilityConflictAlert bloqueados={preview.bloqueados} id={idPreviewConflito} />;
-    }
-    if (preview.status === 'checking') {
-      return (
-        <Alert
-          type="info"
-          showIcon
-          className="mb-4"
-          message="Verificando disponibilidade dos participantes…"
-        />
-      );
-    }
-    if (preview.status === 'indisponivel') {
-      return (
-        <Alert
-          type="warning"
-          showIcon
-          className="mb-4"
-          message="Não foi possível verificar a disponibilidade agora"
-          description={
-            preview.motivo === 'throttled'
-              ? 'Muitas verificações em sequência. Aguarde alguns segundos. Você pode continuar; o sistema recusa o evento na criação se houver conflito.'
-              : 'Você pode continuar; o sistema recusa o evento na criação se houver conflito.'
-          }
-        />
-      );
-    }
-    return null;
-  };
-
-  // Limite diário (RD-05): só avisa, o botão continua liberado. A região do aviso fica
-  // sempre montada (vazia sem aviso) para o leitor de tela anunciar quando o texto entrar.
-  const avisosDaPrevia =
-    preview.status === 'ok' || preview.status === 'conflito' ? (preview.avisos ?? []) : [];
 
   // Situação do evento, em texto fixo (sem região viva por cartão): o fluxo de aprovação e a compra.
   const situacao: string[] = [
@@ -423,9 +337,6 @@ export default function CartaoEvento({
       ? ['Sem municípios com compra para este projeto']
       : []),
   ];
-
-  const idPerguntaAcompanha = `pergunta-acompanha-${chave}`;
-  const idPerguntaAvaliar = `pergunta-avaliar-${chave}`;
 
   // "Remover": evento em branco sai direto; preenchido pergunta antes num diálogo de verdade
   // (role=dialog, foco preso, Esc em qualquer ponto e o foco de volta ao "Remover" ao fechar), que
@@ -464,7 +375,6 @@ export default function CartaoEvento({
 
   return (
     <section
-      ref={cartaoRef}
       aria-labelledby={idTitulo}
       className={`mt-6 rounded-lg border-solid p-4 ${comProblema ? 'border-2 border-red-600' : 'border border-gray-200'}`}
     >
@@ -483,7 +393,7 @@ export default function CartaoEvento({
       </div>
 
       {/* O que o servidor recusou e não é de um campo à vista. Sem região viva: quem anuncia é o resumo do topo. */}
-      {errosDoEnvio && errosDoEnvio.topo.length > 0 && (
+      {errosDoEnvio.topo.length > 0 && (
         <Alert
           type="error"
           showIcon
@@ -571,99 +481,44 @@ export default function CartaoEvento({
           </div>
         </div>
 
-        {/* Linha 2: Data | Início | Fim */}
-        <div className="mb-6">
-          <DateTimeRange
-            layout="linha"
-            idPrefix={`evento-${chave}-`}
-            erro={erroDoHorario}
-            value={rangeValue}
-            onChange={handleRangeChange}
+        {/* Os horários: cada um vira um evento no Google, com o seu dia e as suas pessoas. */}
+        {dados.horarios.map((horario, indice) => (
+          <HorarioDoEvento
+            key={horario.chave}
+            ref={(h: HorarioDoEventoHandle | null) => {
+              if (h) horarios.current.set(horario.chave, h);
+              else horarios.current.delete(horario.chave);
+            }}
+            chaveDoEvento={chave}
+            numeroDoEvento={numero}
+            dados={dados}
+            horario={horario}
+            indice={indice}
+            total={dados.horarios.length}
+            onChange={mudarHorario}
+            me={me}
+            onTrava={onTrava}
+            erroDoEnvio={errosDoEnvio.porHorario[horario.chave] ?? null}
+            onRemover={indice > 0 ? removerHorario : undefined}
           />
-        </div>
+        ))}
 
-        {/* Linha 3: Formadores | Coordenador responsável (e se ele acompanha) */}
-        <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2">
-          <div className="min-w-0">
-            <Form.Item
-              label="Formadores"
-              name="formadores"
-              rules={[{ required: true, message: 'Por favor selecione pelo menos um formador' }]}
-            >
-              <FormadoresPicker
-                value={dados.formadores}
-                onChange={handleFormadoresChange}
-                projetoId={projetoId}
-              />
-            </Form.Item>
-          </div>
-          <div className="min-w-0">
-            <Form.Item
-              label="Coordenador responsável"
-              name="coordenadorResponsavel"
-              extra={vazioEhQuemCria ? 'Vazio: você é o coordenador responsável.' : undefined}
-              rules={vazioEhQuemCria ? [] : [{ required: true, message: 'Escolha o coordenador responsável pelo evento.' }]}
-            >
-              <ComboBox
-                lookupFunction={lookupCoordenadores}
-                onChange={(value: ComboBoxValue | null) => mudar({ coordenadorResponsavel: value })}
-                value={dados.coordenadorResponsavel}
-                placeholder={vazioEhQuemCria ? 'Busque o coordenador responsável (opcional)' : 'Busque o coordenador responsável'}
-                oQueCarrega="os coordenadores"
-              />
-            </Form.Item>
-            <Form.Item
-              label={<span id={idPerguntaAcompanha}>O coordenador responsável vai acompanhar o evento?</span>}
-              name="coordenadorAcompanha"
-              rules={[{ required: true, message: 'Responda se o coordenador responsável vai acompanhar o evento.' }]}
-            >
-              <Radio.Group
-                // role e aria-* vão ao <div> do grupo (o tipo do antd não declara role)
-                {...{ role: 'radiogroup' }}
-                aria-labelledby={idPerguntaAcompanha}
-                name={`coordenador_acompanha_${chave}`}
-                options={SIM_NAO}
-                onChange={(e: RadioChangeEvent) => mudar({ coordenadorAcompanha: e.target.value as boolean })}
-              />
-            </Form.Item>
-          </div>
+        {/* "+ horário": o nome acessível diz de qual evento (e contém o texto à vista). No limite, o
+            mesmo texto do "+ evento". */}
+        <div className="mb-4">
+          <Button
+            icon={<PlusOutlined aria-hidden />}
+            onClick={() => onAdicionarHorario(chave)}
+            disabled={noLimite}
+            aria-label={
+              noLimite
+                ? `Adicionar horário ao evento ${numero}: ${TEXTO_DO_LIMITE.toLowerCase()}`
+                : `Adicionar horário ao evento ${numero}`
+            }
+          >
+            {noLimite ? TEXTO_DO_LIMITE : 'Adicionar horário'}
+          </Button>
         </div>
-
-        {/* Avaliar o formador: obrigatória quando se aplica, então fica à vista (fora de "Mais detalhes"). */}
-        {perguntaAvaliar && (
-          <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2">
-            <div className="min-w-0">
-              <Form.Item
-                label={<span id={idPerguntaAvaliar}>Você pretende avaliar o formador nesse evento?</span>}
-                name="pretendeAvaliar"
-                rules={[{ required: true, message: 'Responda se você pretende avaliar o formador.' }]}
-              >
-                <Radio.Group
-                  {...{ role: 'radiogroup' }}
-                  aria-labelledby={idPerguntaAvaliar}
-                  name={`pretende_avaliar_formador_${chave}`}
-                  options={SIM_NAO}
-                  onChange={(e: RadioChangeEvent) => mudar({ pretendeAvaliar: e.target.value as boolean })}
-                />
-              </Form.Item>
-            </div>
-            {dados.pretendeAvaliar === true && (
-              <div className="min-w-0">
-                <Form.Item
-                  label="Qual formador você pretende avaliar?"
-                  name="formadorAvaliado"
-                  rules={[{ required: true, message: 'Escolha qual formador você pretende avaliar.' }]}
-                >
-                  <Select
-                    placeholder="Escolha um formador"
-                    options={formadoresAvaliaveis.map((f) => ({ value: f.id, label: f.label || f.name || `#${f.id}` }))}
-                    onChange={(value: ParticipantType['id']) => mudar({ formadorAvaliado: value })}
-                  />
-                </Form.Item>
-              </div>
-            )}
-          </div>
-        )}
 
         <Collapse
           className="mb-4"
@@ -741,14 +596,6 @@ export default function CartaoEvento({
           ]}
         />
       </Form>
-
-      {/* #1452: aviso antecipado de conflito e o conflito recusado no envio, no próprio cartão. */}
-      {renderPreviewEstado()}
-      {/* Sem região viva: no envio, quem anuncia é o resumo do topo. */}
-      {submitConflito.length > 0 && (
-        <AvailabilityConflictAlert bloqueados={submitConflito} id={idSubmitConflito} regiaoViva={false} />
-      )}
-      <AvisosDeAgenda avisos={avisosDaPrevia} />
 
       {situacao.length > 0 && (
         <p className="mb-0">

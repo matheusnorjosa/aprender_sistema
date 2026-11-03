@@ -28,11 +28,18 @@ export interface QuemCria {
   nome: string;
 }
 
-/** O que a pessoa preenche num evento. */
-export interface FormDataType {
-  projeto: ComboBoxValue | null;
-  tipoEvento: ComboBoxValue | null;
-  municipio: ComboBoxValue | null;
+/** Limite de eventos por envio (o mesmo `MAX_EVENTOS_LOTE` do servidor). Cada horário é um evento. */
+export const MAX_EVENTOS = 10;
+/** O texto dos botões de adicionar (evento e horário) quando o envio chega ao limite. */
+export const TEXTO_DO_LIMITE = `Limite de ${MAX_EVENTOS} eventos por vez`;
+
+/**
+ * Um horário do evento (decisão do dono, 03/11/2026): cada um tem o seu dia, início, fim e pessoas, e
+ * vira um evento separado no Google, como a planilha faz com manhã e tarde.
+ */
+export interface Horario {
+  /** Identidade estável do horário na página (ids, React key e o item do lote); não se repete. */
+  chave: number;
   inicio: string | null;
   fim: string | null;
   formadores: ParticipantType[];
@@ -42,6 +49,14 @@ export interface FormDataType {
   coordenadorAcompanha: boolean | null;
   pretendeAvaliar: boolean | null;
   formadorAvaliado: ID | null;
+}
+
+/** O que a pessoa preenche num evento: o que vale para todos os horários e os horários (pelo menos 1). */
+export interface FormDataType {
+  projeto: ComboBoxValue | null;
+  tipoEvento: ComboBoxValue | null;
+  municipio: ComboBoxValue | null;
+  horarios: Horario[];
   // Mais detalhes (opcionais)
   tipo: string;
   encontro: string;
@@ -52,18 +67,56 @@ export interface FormDataType {
   is_online: boolean;
 }
 
-/** Evento em branco: o estado inicial do cartão e a régua de "tem algo preenchido" ao sair. */
+/**
+ * Ordem dos campos do cartão (os que valem para todos os horários) na tela: a do resumo e a do foco.
+ * `horarios` é o lugar dos horários (cada um com a sua ordem, `ORDEM_DO_HORARIO`).
+ */
+export const ORDEM_DO_CARTAO = [
+  'projeto',
+  'tipoEvento',
+  'municipio',
+  'horarios',
+  'tipo',
+  'encontro',
+  'segmento',
+  'local',
+  'observacoes',
+  'is_online',
+];
+
+/** Ordem dos campos de um horário na tela (a do resumo e a do foco). `horario` é o DateTimeRange (fora do Form). */
+export const ORDEM_DO_HORARIO = [
+  'horario',
+  'formadores',
+  'coordenadorResponsavel',
+  'coordenadorAcompanha',
+  'pretendeAvaliar',
+  'formadorAvaliado',
+];
+
+/** Um horário com o que é do evento: o que vai num item do lote (um evento no Google). */
+export type EventoDeUmHorario = Omit<FormDataType, 'horarios'> & Omit<Horario, 'chave'>;
+
+/** Horário em branco: o do evento novo e o do "+ horário". */
+export function horarioEmBranco(chave: number): Horario {
+  return {
+    chave,
+    inicio: null,
+    fim: null,
+    formadores: [],
+    coordenadorResponsavel: null,
+    coordenadorAcompanha: null,
+    pretendeAvaliar: null,
+    formadorAvaliado: null,
+  };
+}
+
+/** Evento em branco (com o horário de chave 1): o estado inicial da página e a régua do `estaEmBranco`. */
 export const FORM_INICIAL: FormDataType = {
   projeto: null,
   tipoEvento: null,
   municipio: null,
-  inicio: null,
-  fim: null,
-  formadores: [],
-  coordenadorResponsavel: null,
-  coordenadorAcompanha: null,
-  pretendeAvaliar: null,
-  formadorAvaliado: null,
+  horarios: [horarioEmBranco(1)],
   tipo: '',
   encontro: '',
   segmento: '',
@@ -72,8 +125,15 @@ export const FORM_INICIAL: FormDataType = {
   is_online: false,
 };
 
+/** O evento visto de um horário: o que é do evento mais o que é daquele horário. */
+export function eventoDoHorario(dados: FormDataType, horario: Horario): EventoDeUmHorario {
+  const { horarios: _horarios, ...doEvento } = dados;
+  const { chave: _chave, ...doHorario } = horario;
+  return { ...doEvento, ...doHorario };
+}
+
 /** Formadores que podem ser avaliados (função Formador sem a função Coordenador). */
-export function formadoresAvaliaveisDo(dados: FormDataType): ParticipantType[] {
+export function formadoresAvaliaveisDo(dados: EventoDeUmHorario): ParticipantType[] {
   return dados.formadores.filter((f) => f.avaliavel);
 }
 
@@ -81,12 +141,12 @@ export function formadoresAvaliaveisDo(dados: FormDataType): ParticipantType[] {
  * "Você pretende avaliar o formador?" só quando a gerência do projeto pergunta e há formador
  * avaliável. Mesma regra do backend.
  */
-export function perguntaAvaliarDo(dados: FormDataType): boolean {
+export function perguntaAvaliarDo(dados: EventoDeUmHorario): boolean {
   return dados.projeto?.pergunta_avaliar_formador !== false && formadoresAvaliaveisDo(dados).length > 0;
 }
 
 /** Coordenador responsável: o escolhido; sem escolha, quem cria (se o backend aceita o vazio no projeto). */
-export function responsavelDo(dados: FormDataType, me: QuemCria | null): QuemCria | null {
+export function responsavelDo(dados: EventoDeUmHorario, me: QuemCria | null): QuemCria | null {
   if (dados.coordenadorResponsavel) {
     return { id: dados.coordenadorResponsavel.id, nome: dados.coordenadorResponsavel.label };
   }
@@ -98,7 +158,7 @@ export function responsavelDo(dados: FormDataType, me: QuemCria | null): QuemCri
  * todos os formadores; o coordenador responsável só se vai acompanhar. Deduplicado por id
  * (o responsável pode estar também na lista de formadores; sem dedup contaria 2x no RD-05).
  */
-export function participantesDo(dados: FormDataType, me: QuemCria | null): PreviewParticipant[] {
+export function participantesDo(dados: EventoDeUmHorario, me: QuemCria | null): PreviewParticipant[] {
   const responsavel = responsavelDo(dados, me);
   const lista: PreviewParticipant[] = [
     ...(dados.coordenadorAcompanha === true && responsavel
@@ -110,9 +170,19 @@ export function participantesDo(dados: FormDataType, me: QuemCria | null): Previ
   return lista.filter((p) => (vistos.has(p.id) ? false : (vistos.add(p.id), true)));
 }
 
-/** O evento continua como nasceu (nada preenchido): "Remover" não pergunta e sair não conta ele. */
+/** O horário continua como nasceu (nada preenchido): "Remover horário" não pergunta. */
+export function horarioEstaEmBranco(horario: Horario): boolean {
+  return JSON.stringify(horario) === JSON.stringify(horarioEmBranco(horario.chave));
+}
+
+/**
+ * O evento continua como nasceu (nada preenchido, em nenhum horário): "Remover" não pergunta e sair
+ * não conta ele.
+ */
 export function estaEmBranco(dados: FormDataType): boolean {
-  return JSON.stringify(dados) === JSON.stringify(FORM_INICIAL);
+  const { horarios, ...doEvento } = dados;
+  const { horarios: _horarios, ...doEventoEmBranco } = FORM_INICIAL;
+  return JSON.stringify(doEvento) === JSON.stringify(doEventoEmBranco) && horarios.every(horarioEstaEmBranco);
 }
 
 /** Chave do erro no servidor → campo do Form do cartão, quando o nome não é o mesmo. */

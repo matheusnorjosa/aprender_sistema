@@ -14,7 +14,7 @@ import message from 'antd/es/message';
 import Modal from 'antd/es/modal';
 import { enderecoAtual, renderNoRoteador } from '../../../test/comRoteador';
 import { buildSolicitacaoPayload } from '../NewSolicitacaoWizard';
-import { botaoDoTexto, botaoRemover, cartao, cartoes, dialogo, grupoDaPergunta, PERGUNTA_ACOMPANHA, titulo } from './localizadores';
+import { botaoAdicionarEvento, botaoDoTexto, botaoRemover, cartao, cartoes, dialogo, grupoDaPergunta, PERGUNTA_ACOMPANHA, titulo } from './localizadores';
 
 const {
   createSolicitacoesEmLoteMock,
@@ -127,7 +127,7 @@ function abrir() {
 }
 
 // Localizadores baratos (o porquê está em ./localizadores.ts).
-const adicionar = (): HTMLElement => botaoDoTexto(/Adicionar outro evento|Limite de 10 eventos/);
+const adicionar = botaoAdicionarEvento;
 const botaoCriar = (): HTMLElement => botaoDoTexto(/^Criar /);
 /** O radiogroup "vai acompanhar o evento?" do cartão (nomeado pela pergunta, via aria-labelledby). */
 const grupoAcompanha = (c: HTMLElement): HTMLElement => grupoDaPergunta(PERGUNTA_ACOMPANHA, c);

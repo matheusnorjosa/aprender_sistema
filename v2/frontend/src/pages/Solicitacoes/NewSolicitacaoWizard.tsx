@@ -2,15 +2,17 @@
  * Nova Solicitação — página única, com vários eventos (decisões do dono, 28/10/2026).
  *
  * Cada evento é um cartão (`CartaoEvento`) com os campos lado a lado. A página começa com 1 evento;
- * "+ Adicionar outro evento" acrescenta um em branco (até 10) e cada evento extra tem "Remover".
- * Nada é comum entre os eventos. Um só botão no fim ("Criar solicitação" com 1 evento, "Criar N
+ * "+ Adicionar outro evento" acrescenta um em branco e cada evento extra tem "Remover". Nada é comum
+ * entre os cartões. Dentro de um cartão, "+ horário" (decisão do dono, 03/11/2026) acrescenta um
+ * horário: cada horário vira um evento do lote, com o que é do cartão repetido. O limite de 10 conta
+ * eventos, isto é, horários. Um só botão no fim ("Criar solicitação" com 1 evento, "Criar N
  * eventos" com mais): o clique confere todos, na ordem; com campo faltando, nada é enviado, o
  * resumo do topo diz o que falta e o foco vai ao primeiro campo com problema. O envio é sempre o
  * lote (`createSolicitacoesEmLote`, tudo ou nada): no 400 `lote_invalido` cada item volta ao
- * cartão que estava naquela posição, e o choque entre os eventos quem confere é o servidor.
+ * cartão e ao horário que estavam naquela posição, e o choque entre os eventos quem confere é o servidor.
  */
 
-import { useState, useCallback, useEffect, useRef, JSX } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, JSX } from 'react';
 import { flushSync } from 'react-dom';
 import { useBlocker, useNavigate, type BlockerFunction } from 'react-router';
 // antd - direct imports for tree-shaking (Issue #424)
@@ -36,11 +38,18 @@ import type { ID, SolicitacaoPayload } from '../../types';
 import CartaoEvento, { type CartaoEventoHandle } from './CartaoEvento';
 import {
   estaEmBranco,
+  eventoDoHorario,
   FORM_INICIAL,
-  mensagensDe,
+  horarioEmBranco,
+  MAX_EVENTOS,
+  ORDEM_DO_CARTAO,
   participantesDo,
   perguntaAvaliarDo,
+  separarErrosDoServidor,
+  TEXTO_DO_LIMITE,
+  type EventoDeUmHorario,
   type FormDataType,
+  type Horario,
   type QuemCria,
 } from './evento';
 
@@ -103,9 +112,6 @@ export function buildSolicitacaoPayload(input: SolicitacaoWizardPayloadInput): R
 }
 
 
-/** Limite de eventos por envio (o mesmo `MAX_EVENTOS_LOTE` do servidor). */
-const MAX_EVENTOS = 10;
-
 /**
  * Sem resposta (rede, ou 5xx do proxy): o lote pode ter sido criado e reenviar criaria de novo. Fica no
  * resumo do topo (não num toast que some) até o próximo clique ou a próxima mudança, e o próximo envio
@@ -122,9 +128,27 @@ interface EventoDaPagina {
   dados: FormDataType;
 }
 
-/** Uma linha do resumo do topo: um problema de um evento. */
+/**
+ * Um item do lote: um horário de um cartão, com o que é do cartão. `chave` é a do horário (única na
+ * página); `evento` é a chave do cartão.
+ */
+interface ItemDoLote {
+  chave: number;
+  evento: number;
+  dados: EventoDeUmHorario;
+}
+
+/** Os itens do lote, na ordem da tela: cada horário de cada cartão. */
+function itensDe(eventos: EventoDaPagina[]): ItemDoLote[] {
+  return eventos.flatMap((e) =>
+    e.dados.horarios.map((h) => ({ chave: h.chave, evento: e.chave, dados: eventoDoHorario(e.dados, h) })),
+  );
+}
+
+/** Uma linha do resumo do topo: um problema de um evento (de um horário dele, ou do evento todo: null). */
 interface LinhaDoResumo {
   chave: number;
+  horario: number | null;
   texto: string;
 }
 
@@ -134,20 +158,25 @@ interface Resumo {
   linhas: LinhaDoResumo[];
 }
 
-/** O que o servidor recusou no envio, por chave do evento, a agenda de que cada recusa depende e os enviados. */
+/**
+ * O que o servidor recusou no envio, por chave do horário (cada horário é um item do lote), a agenda
+ * de que cada recusa depende e os enviados.
+ */
 interface ErrosDoLote {
   agendas: Record<number, string>;
   enviados: number[];
   porChave: Record<number, ErroDoEventoNoLote>;
+  /** O nome, na tela do envio, de cada posição do lote ("evento 2" ou "evento 1, horário 2,"). */
+  rotulos: string[];
 }
 
 /**
- * O que pesa no choque de agenda, dos eventos enviados: horário, município e quem participa.
+ * O que pesa no choque de agenda, dos eventos (horários) enviados: horário, município e quem participa.
  * O que o servidor recusou só vale enquanto isso for o do envio (o choque pode ser com outro evento
  * enviado); um evento que não estava no envio não pesa, e um enviado que sai conta como mudança.
  */
-function agendaDe(eventos: EventoDaPagina[], enviados: number[], me: QuemCria | null): string {
-  return eventos
+function agendaDe(itens: ItemDoLote[], enviados: number[], me: QuemCria | null): string {
+  return itens
     .filter((e) => enviados.includes(e.chave))
     .map(({ chave, dados }) =>
       [
@@ -182,11 +211,11 @@ function eventosDoChoque(item: ErroDoEventoNoLote, chave: number, enviados: numb
 function agendaDoErro(
   item: ErroDoEventoNoLote,
   chave: number,
-  eventos: EventoDaPagina[],
+  itens: ItemDoLote[],
   enviados: number[],
   me: QuemCria | null,
 ): string {
-  return agendaDe(eventos, eventosDoChoque(item, chave, enviados), me);
+  return agendaDe(itens, eventosDoChoque(item, chave, enviados), me);
 }
 
 /** Mudar outra coisa tira o que o servidor recusou, menos o conflito de agenda, que continua valendo. */
@@ -198,8 +227,11 @@ function soConflitos(erros: ErrosDoLote | null): ErrosDoLote | null {
   return Object.keys(porChave).length > 0 ? { ...erros, porChave } : null;
 }
 
-/** O payload de um evento conferido; null se faltar o que a conferência já exige (só estreita o tipo). */
-function payloadDo(dados: FormDataType): SolicitacaoPayload | null {
+/**
+ * O payload de um evento (um horário com o que é do cartão) conferido; null se faltar o que a
+ * conferência já exige (só estreita o tipo).
+ */
+function payloadDo(dados: EventoDeUmHorario): SolicitacaoPayload | null {
   if (
     !dados.projeto || !dados.tipoEvento || !dados.municipio || !dados.inicio || !dados.fim ||
     dados.coordenadorAcompanha === null
@@ -237,11 +269,47 @@ function mensagemDeSucesso(status: string[]): string {
   return `${criados} (${pendentes} ${pendentes === 1 ? 'vai' : 'vão'} para aprovação)`;
 }
 
-/** As linhas do resumo para um evento recusado pelo servidor: uma por mensagem. */
-function textosDoErro(item: ErroDoEventoNoLote): string[] {
-  if (item.code === 'availability_conflict') return [item.detail];
-  const textos = [...new Set(mensagensDe(item.errors ?? {}))];
-  return textos.length > 0 ? textos : [item.detail];
+/**
+ * O servidor cita "o evento N desta lista" pela posição no lote, que conta horários; a tela numera por
+ * cartão. Reescreve só o texto mostrado ("o evento 1, horário 2, desta lista"); `eventosDoChoque` usa o
+ * original. `rotulos[i]` é o nome, na tela, do item i do envio.
+ */
+function comNumerosDaTela(texto: string, rotulos: string[]): string {
+  return texto.replace(/\b(o|do) evento (\d+) desta lista/g, (trecho, artigo: string, numero: string) => {
+    const rotulo = rotulos[Number(numero) - 1];
+    return rotulo ? `${artigo} ${rotulo} desta lista` : trecho;
+  });
+}
+
+/** A cópia do item recusado que a tela mostra, com os números da tela. */
+function paraExibir(item: ErroDoEventoNoLote, rotulos: string[]): ErroDoEventoNoLote {
+  return {
+    ...item,
+    detail: comNumerosDaTela(item.detail, rotulos),
+    ...(item.blocked_participants
+      ? {
+          blocked_participants: item.blocked_participants.map((p) => ({
+            ...p,
+            conflicts: p.conflicts.map((c) => ({ ...c, detail: comNumerosDaTela(c.detail, rotulos) })),
+          })),
+        }
+      : {}),
+  };
+}
+
+/** Campos do Form do cartão (os que valem para todos os horários dele). */
+const ehCampoDoCartao = (campo: string): boolean => campo !== 'horarios' && ORDEM_DO_CARTAO.includes(campo);
+
+/**
+ * As linhas do resumo para um evento recusado pelo servidor: uma por mensagem. O que é de um campo do
+ * cartão (município, projeto…) fica à parte: vale para o evento inteiro, não para um horário.
+ */
+function textosDoErro(item: ErroDoEventoNoLote): { doCartao: string[]; doHorario: string[] } {
+  if (item.code === 'availability_conflict') return { doCartao: [], doHorario: [item.detail] };
+  const separados = separarErrosDoServidor(item.errors ?? {}, ehCampoDoCartao);
+  const doCartao = [...new Set(Object.values(separados.campos).flat())];
+  const doHorario = [...new Set([...separados.horario, ...separados.topo])].filter((t) => !doCartao.includes(t));
+  return doCartao.length + doHorario.length > 0 ? { doCartao, doHorario } : { doCartao: [], doHorario: [item.detail] };
 }
 
 export default function NewSolicitacaoWizard(): JSX.Element {
@@ -256,11 +324,15 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   // COORDENADOR na gerência do projeto, PR 9). Só entra na checagem de agenda se acompanhar.
   const [me, setMe] = useState<QuemCria | null>(null);
 
-  // Os eventos da página: começa com 1. A chave nunca se repete (nem depois de remover).
+  // Os eventos da página: começa com 1 (com o horário de chave 1). As chaves dos eventos e as dos
+  // horários nunca se repetem (nem depois de remover).
   const [eventos, setEventos] = useState<EventoDaPagina[]>([{ chave: 1, dados: FORM_INICIAL }]);
   const proximaChave = useRef(2);
+  const proximaChaveDoHorario = useRef(2);
   const cartoes = useRef(new Map<number, CartaoEventoHandle>());
-  // O que trava o "Criar", por evento: o id do alerta que diz o motivo.
+  // O que vai no lote: cada horário de cada cartão. O limite conta estes.
+  const itens = useMemo(() => itensDe(eventos), [eventos]);
+  // O que trava o "Criar", por horário: o id do alerta que diz o motivo.
   const [travas, setTravas] = useState<Record<number, string>>({});
   // Resumo do clique em "Criar" com problema e o anúncio de adicionar/remover: a única região viva.
   const [resumo, setResumo] = useState<Resumo | null>(null);
@@ -270,8 +342,9 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   const [errosDoLote, setErrosDoLote] = useState<ErrosDoLote | null>(null);
   // Com o lote em voo, os eventos ficam inertes: o que mudasse agora não iria no envio que já saiu.
   const [emVoo, setEmVoo] = useState(false);
-  // Título que recebe o foco depois de o cartão entrar ou sair da tela.
-  const focarDepois = useRef<number | null>(null);
+  // O que recebe o foco depois de um cartão ou horário entrar ou sair da tela: o título do cartão (ou
+  // o subtítulo do horário) ou, com `data`, o campo Data do horário.
+  const focarDepois = useRef<{ evento: number; horario?: number | undefined; data?: boolean } | null>(null);
   // O último envio ficou sem resposta: o lote pode ter sido gravado; o próximo envio pergunta antes.
   const talvezCriado = useRef(false);
   const perguntaDeReenvio = useRef<ReturnType<typeof Modal.confirm> | null>(null);
@@ -392,24 +465,46 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     setErrosDoLote(soConflitos);
     setEventos((atuais) => atuais.map((e) => (e.chave === chave ? { ...e, dados: { ...e.dados, ...parcial } } : e)));
   }, []);
+  const mudarHorario = useCallback((chave: number, chaveDoHorario: number, parcial: Partial<Horario>): void => {
+    setResumo(null);
+    setErrosDoLote(soConflitos);
+    setEventos((atuais) =>
+      atuais.map((e) =>
+        e.chave === chave
+          ? {
+              ...e,
+              dados: {
+                ...e.dados,
+                horarios: e.dados.horarios.map((h) => (h.chave === chaveDoHorario ? { ...h, ...parcial } : h)),
+              },
+            }
+          : e,
+      ),
+    );
+  }, []);
 
   const anunciar = (texto: string): void => setAnuncio((atual) => ({ texto, vez: (atual?.vez ?? 0) + 1 }));
 
-  // O foco vai ao título do cartão depois de a lista mudar na tela.
+  // O foco vai ao título do cartão (ou do horário), ou à Data do horário, depois de a lista mudar na tela.
   useEffect(() => {
-    if (focarDepois.current === null) return;
-    cartoes.current.get(focarDepois.current)?.focarTitulo();
+    const alvo = focarDepois.current;
+    if (alvo === null) return;
+    const cartao = cartoes.current.get(alvo.evento);
+    if (alvo.data && alvo.horario !== undefined) cartao?.focarData(alvo.horario);
+    else cartao?.focarTitulo(alvo.horario);
     focarDepois.current = null;
   }, [eventos]);
 
   const adicionarEvento = (): void => {
-    if (eventos.length >= MAX_EVENTOS) return;
+    if (itens.length >= MAX_EVENTOS) return;
     const chave = proximaChave.current;
     proximaChave.current += 1;
+    const chaveDoHorario = proximaChaveDoHorario.current;
+    proximaChaveDoHorario.current += 1;
     setResumo(null);
     setErrosDoLote(soConflitos);
-    setEventos([...eventos, { chave, dados: FORM_INICIAL }]);
-    focarDepois.current = chave;
+    setEventos([...eventos, { chave, dados: { ...FORM_INICIAL, horarios: [horarioEmBranco(chaveDoHorario)] } }]);
+    focarDepois.current = { evento: chave };
     anunciar(`Evento ${eventos.length + 1} adicionado`);
   };
 
@@ -419,8 +514,44 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     setResumo(null);
     setErrosDoLote(soConflitos);
     setEventos(eventos.filter((e) => e.chave !== chave));
-    focarDepois.current = eventos[posicao - 1]?.chave ?? null;
+    const anterior = eventos[posicao - 1];
+    focarDepois.current = anterior ? { evento: anterior.chave } : null;
     anunciar(`Evento ${posicao + 1} removido`);
+  };
+
+  // "+ horário": um horário em branco no fim do cartão, com o foco na Data dele.
+  const adicionarHorario = (chave: number): void => {
+    const posicao = eventos.findIndex((e) => e.chave === chave);
+    const evento = eventos[posicao];
+    if (!evento || itens.length >= MAX_EVENTOS) return;
+    const chaveDoHorario = proximaChaveDoHorario.current;
+    proximaChaveDoHorario.current += 1;
+    setResumo(null);
+    setErrosDoLote(soConflitos);
+    setEventos(
+      eventos.map((e) =>
+        e.chave === chave ? { ...e, dados: { ...e.dados, horarios: [...e.dados.horarios, horarioEmBranco(chaveDoHorario)] } } : e,
+      ),
+    );
+    focarDepois.current = { evento: chave, horario: chaveDoHorario, data: true };
+    anunciar(`Horário ${evento.dados.horarios.length + 1} adicionado ao evento ${posicao + 1}`);
+  };
+
+  // O 1º horário não sai; o foco vai ao horário anterior (com um só, ao título do cartão).
+  const removerHorario = (chave: number, chaveDoHorario: number): void => {
+    const posicao = eventos.findIndex((e) => e.chave === chave);
+    const horarios = eventos[posicao]?.dados.horarios ?? [];
+    const indice = horarios.findIndex((h) => h.chave === chaveDoHorario);
+    if (indice <= 0) return;
+    setResumo(null);
+    setErrosDoLote(soConflitos);
+    setEventos(
+      eventos.map((e) =>
+        e.chave === chave ? { ...e, dados: { ...e.dados, horarios: horarios.filter((h) => h.chave !== chaveDoHorario) } } : e,
+      ),
+    );
+    focarDepois.current = { evento: chave, horario: horarios[indice - 1]?.chave };
+    anunciar(`Horário ${indice + 1} do evento ${posicao + 1} removido`);
   };
 
   const marcarTrava = useCallback((chave: number, idDoMotivo: string | null): void => {
@@ -431,11 +562,11 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     });
   }, []);
   // #1452: conflito antecipado ou recusado no envio trava o botão; ele aponta o primeiro motivo.
-  const motivoDaTrava = eventos.map((e) => travas[e.chave]).find((id): id is string => Boolean(id)) ?? null;
+  const motivoDaTrava = itens.map((i) => travas[i.chave]).find((id): id is string => Boolean(id)) ?? null;
 
-  // O servidor recusou o lote (tudo ou nada): cada item volta ao evento que estava naquela posição
-  // no envio (`indice` conta do 0). Sem resposta ou 5xx: o aviso de conferir antes de reenviar.
-  const tratarRecusa = (error: unknown, enviados: EventoDaPagina[]): void => {
+  // O servidor recusou o lote (tudo ou nada): cada item volta ao evento e ao horário que estavam naquela
+  // posição no envio (`indice` conta do 0). Sem resposta ou 5xx: o aviso de conferir antes de reenviar.
+  const tratarRecusa = (error: unknown, enviados: ItemDoLote[]): void => {
     logger.error('Erro ao criar os eventos:', error);
     const resposta = (error as { response?: { status?: number; data?: unknown } } | null)?.response;
     if (!resposta || (resposta.status ?? 0) >= 500) {
@@ -445,30 +576,44 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     }
     talvezCriado.current = false;
     const data = resposta.data as { detail?: string; code?: string; errors?: { itens?: unknown } } | null | undefined;
-    const itens = Array.isArray(data?.errors?.itens) ? (data.errors.itens as ErroDoEventoNoLote[]) : null;
-    if (data?.code !== 'lote_invalido' || !itens) {
+    const recusados = Array.isArray(data?.errors?.itens) ? (data.errors.itens as ErroDoEventoNoLote[]) : null;
+    if (data?.code !== 'lote_invalido' || !recusados) {
       // Recusa do envio inteiro (permissão, limite de envios): o motivo no resumo do topo.
       setResumo({ titulo: data?.detail || 'Não foi possível criar. Tente de novo.', linhas: [] });
       return;
     }
+    // O nome de cada posição do lote na tela: o servidor cita "o evento N desta lista" pela posição.
+    const rotulos = enviados.map((enviado) => {
+      const posicao = eventos.findIndex((e) => e.chave === enviado.evento);
+      const horarios = eventos[posicao]?.dados.horarios ?? [];
+      const indice = horarios.findIndex((h) => h.chave === enviado.chave);
+      return horarios.length > 1 ? `evento ${posicao + 1}, horário ${indice + 1},` : `evento ${posicao + 1}`;
+    });
     const porChave: Record<number, ErroDoEventoNoLote> = {};
     const linhas: LinhaDoResumo[] = [];
-    for (const item of itens) {
-      const evento = enviados[item.indice];
-      if (!evento) continue;
-      porChave[evento.chave] = item;
-      linhas.push(...textosDoErro(item).map((texto) => ({ chave: evento.chave, texto })));
+    for (const item of recusados) {
+      const enviado = enviados[item.indice];
+      if (!enviado) continue;
+      porChave[enviado.chave] = item;
+      const { doCartao, doHorario } = textosDoErro(paraExibir(item, rotulos));
+      // O que é de um campo do cartão entra uma vez por cartão, sem horário (vale para todos eles).
+      const jaNoCartao = (texto: string): boolean =>
+        linhas.some((l) => l.chave === enviado.evento && l.horario === null && l.texto === texto);
+      linhas.push(
+        ...doCartao.filter((texto) => !jaNoCartao(texto)).map((texto) => ({ chave: enviado.evento, horario: null, texto })),
+        ...doHorario.map((texto) => ({ chave: enviado.evento, horario: enviado.chave, texto })),
+      );
     }
     const chaves = enviados.map((e) => e.chave);
     const agendas = Object.fromEntries(
       Object.entries(porChave).map(([chave, item]) => [chave, agendaDoErro(item, Number(chave), enviados, chaves, me)]),
     );
-    setErrosDoLote({ agendas, enviados: chaves, porChave });
+    setErrosDoLote({ agendas, enviados: chaves, porChave, rotulos });
     // Com 1 evento, o "1 de 1 eventos" do servidor não diz nada a quem fez uma solicitação só.
     const titulo = enviados.length === 1 ? 'Não foi possível criar a solicitação. Nada foi criado.' : data.detail;
     setResumo({ titulo: titulo || 'Nada foi criado.', linhas });
     const primeiro = linhas[0];
-    if (primeiro) cartoes.current.get(primeiro.chave)?.focarTitulo();
+    if (primeiro) cartoes.current.get(primeiro.chave)?.focarTitulo(primeiro.horario);
   };
 
   // Depois de um envio sem resposta, mandar de novo pode duplicar o lote: pergunta, começando no Cancelar.
@@ -498,16 +643,16 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     const linhas: LinhaDoResumo[] = [];
     for (const evento of eventos) {
       const motivos = (await cartoes.current.get(evento.chave)?.validar({ focar: linhas.length === 0 })) ?? [];
-      linhas.push(...motivos.map((texto) => ({ chave: evento.chave, texto })));
+      linhas.push(...motivos.map(({ horario, texto }) => ({ chave: evento.chave, horario, texto })));
     }
     if (linhas.length > 0) {
-      const titulo = eventos.length === 1 ? 'Corrija antes de criar a solicitação' : 'Corrija antes de criar os eventos';
+      const titulo = itens.length === 1 ? 'Corrija antes de criar a solicitação' : 'Corrija antes de criar os eventos';
       setResumo({ titulo, linhas });
       return;
     }
 
-    // Sempre o lote, também com 1 evento: tudo ou nada.
-    const enviados = eventos;
+    // Sempre o lote, também com 1 evento: tudo ou nada. Cada horário é um evento.
+    const enviados = itens;
     const payloads = enviados.map((e) => payloadDo(e.dados));
     if (payloads.some((p) => p === null)) return;
     if (talvezCriado.current && !(await confirmarReenvio(enviados.length))) return;
@@ -542,21 +687,44 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     }
   };
 
-  // Número visível de cada evento: a posição + 1 (muda quando um evento sai).
-  const numeroDe = (chave: number): number => eventos.findIndex((e) => e.chave === chave) + 1;
-  const linhasDoResumo = (resumo?.linhas ?? []).filter((l) => numeroDe(l.chave) > 0);
-  // Cada recusa vale enquanto a agenda de que ela depende for a do envio.
-  const errosValidos = errosDoLote
-    ? (Object.fromEntries(
-        Object.entries(errosDoLote.porChave).filter(
-          ([chave, item]) =>
-            errosDoLote.agendas[Number(chave)] === agendaDoErro(item, Number(chave), eventos, errosDoLote.enviados, me),
-        ),
-      ) as Record<number, ErroDoEventoNoLote>)
-    : null;
+  // De quem é a linha do resumo: "Evento 1" ou, com mais de um horário no evento, "Evento 1, horário 2"
+  // (números da posição + 1, que mudam quando um evento ou horário sai). null: o evento ou o horário saiu.
+  const rotuloDaLinha = (linha: LinhaDoResumo): string | null => {
+    const posicao = eventos.findIndex((e) => e.chave === linha.chave);
+    const horarios = eventos[posicao]?.dados.horarios;
+    if (!horarios) return null;
+    if (linha.horario === null) return `Evento ${posicao + 1}`;
+    const indice = horarios.findIndex((h) => h.chave === linha.horario);
+    if (indice < 0) return null;
+    return horarios.length > 1 ? `Evento ${posicao + 1}, horário ${indice + 1}` : `Evento ${posicao + 1}`;
+  };
+  const linhasDoResumo = (resumo?.linhas ?? []).flatMap((l) => {
+    const rotulo = rotuloDaLinha(l);
+    return rotulo ? [{ ...l, rotulo }] : [];
+  });
+  // Cada recusa vale enquanto a agenda de que ela depende for a do envio. Por chave do horário.
+  // A conta usa o item original; o cartão recebe a cópia com os números da tela.
+  const errosValidos = useMemo(
+    () =>
+      errosDoLote
+        ? (Object.fromEntries(
+            Object.entries(errosDoLote.porChave)
+              .filter(
+                ([chave, item]) =>
+                  errosDoLote.agendas[Number(chave)] === agendaDoErro(item, Number(chave), itens, errosDoLote.enviados, me),
+              )
+              .map(([chave, item]) => [chave, paraExibir(item, errosDoLote.rotulos)]),
+          ) as Record<number, ErroDoEventoNoLote>)
+        : null,
+    [errosDoLote, itens, me],
+  );
   // Com problema: o que o resumo do clique aponta e o que o servidor recusou e ainda vale (o conflito).
-  const comProblema = new Set([...linhasDoResumo.map((l) => l.chave), ...Object.keys(errosValidos ?? {}).map(Number)]);
-  const noLimite = eventos.length >= MAX_EVENTOS;
+  const eventoDoItem = new Map(itens.map((i) => [i.chave, i.evento]));
+  const comProblema = new Set([
+    ...linhasDoResumo.map((l) => l.chave),
+    ...Object.keys(errosValidos ?? {}).flatMap((chave) => eventoDoItem.get(Number(chave)) ?? []),
+  ]);
+  const noLimite = itens.length >= MAX_EVENTOS;
 
   return (
     <section className="p-6 max-w-4xl mx-auto" aria-labelledby="nova-solicitacao-title">
@@ -594,9 +762,9 @@ export default function NewSolicitacaoWizard(): JSX.Element {
                         <button
                           type="button"
                           className="cursor-pointer border-0 bg-transparent p-0 text-left underline break-words"
-                          onClick={() => cartoes.current.get(linha.chave)?.focarTitulo()}
+                          onClick={() => cartoes.current.get(linha.chave)?.focarTitulo(linha.horario)}
                         >
-                          Evento {numeroDe(linha.chave)}: {linha.texto}
+                          {linha.rotulo}: {linha.texto}
                         </button>
                       </li>
                     ))}
@@ -620,10 +788,14 @@ export default function NewSolicitacaoWizard(): JSX.Element {
               numero={indice + 1}
               dados={evento.dados}
               onChange={mudarEvento}
+              onChangeHorario={mudarHorario}
+              onAdicionarHorario={adicionarHorario}
+              onRemoverHorario={removerHorario}
+              noLimite={noLimite}
               me={me}
               dispensaCompra={dispensaCompra}
               onTrava={marcarTrava}
-              erroDoEnvio={errosValidos?.[evento.chave] ?? null}
+              errosDoLote={errosValidos}
               comProblema={comProblema.has(evento.chave)}
               onRemover={indice > 0 ? removerEvento : undefined}
             />
@@ -631,7 +803,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
 
           <div className="mt-4">
             <Button icon={<PlusOutlined aria-hidden />} onClick={adicionarEvento} disabled={noLimite}>
-              {noLimite ? `Limite de ${MAX_EVENTOS} eventos por vez` : 'Adicionar outro evento'}
+              {noLimite ? TEXTO_DO_LIMITE : 'Adicionar outro evento'}
             </Button>
           </div>
         </div>
@@ -645,7 +817,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
             disabled={motivoDaTrava !== null}
             aria-describedby={motivoDaTrava ?? undefined}
           >
-            {eventos.length === 1 ? 'Criar solicitação' : `Criar ${eventos.length} eventos`}
+            {itens.length === 1 ? 'Criar solicitação' : `Criar ${itens.length} eventos`}
           </Button>
         </footer>
       </Card>

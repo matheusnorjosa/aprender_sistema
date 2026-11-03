@@ -422,7 +422,6 @@ export default function CartaoEvento({
     ...(!dispensaCompra && dados.projeto && municipioLookupHasResults === false
       ? ['Sem municípios com compra para este projeto']
       : []),
-    ...(dispensaCompra ? ['Compra dispensada'] : []),
   ];
 
   const idPerguntaAcompanha = `pergunta-acompanha-${chave}`;
@@ -589,7 +588,6 @@ export default function CartaoEvento({
             <Form.Item
               label="Formadores"
               name="formadores"
-              extra="Coordenador que vai atuar no evento entra na lista de formadores."
               rules={[{ required: true, message: 'Por favor selecione pelo menos um formador' }]}
             >
               <FormadoresPicker
@@ -617,7 +615,6 @@ export default function CartaoEvento({
             <Form.Item
               label={<span id={idPerguntaAcompanha}>O coordenador responsável vai acompanhar o evento?</span>}
               name="coordenadorAcompanha"
-              extra="Se Sim, a agenda do coordenador responsável é conferida como a dos formadores."
               rules={[{ required: true, message: 'Responda se o coordenador responsável vai acompanhar o evento.' }]}
             >
               <Radio.Group
@@ -678,7 +675,7 @@ export default function CartaoEvento({
           items={[
             {
               key: 'detalhes',
-              label: 'Mais detalhes (opcional)',
+              label: 'Mais detalhes',
               // Montado mesmo recolhido: os limites de tamanho valem com a seção fechada.
               forceRender: true,
               children: (

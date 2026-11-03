@@ -245,6 +245,8 @@ class TestSolicitacaoRBAC:
         # O projeto é obrigatório na criação (revisão do #2149); o responsável é da gerência dele.
         gerencia = GerenciaFactory()
         projeto = ProjetoFactory(nome="Projeto Superuser", gerencia=gerencia)
+        # O município também é obrigatório, isentos inclusive; o superuser não precisa da compra.
+        municipio = MunicipioFactory(nome="Cidade Superuser", uf="CE")
         responsavel = UsuarioFactory()
         com_papel(responsavel, "COORDENADOR", gerencia)
         client.force_authenticate(user=superuser)
@@ -257,6 +259,7 @@ class TestSolicitacaoRBAC:
             "/api/solicitacoes/",
             {
                 "projeto": projeto.id,
+                "municipio": municipio.id,
                 "tipo_evento": tipo_evento.id,
                 "coordenador_acompanha": False,
                 # 05/10/2026: quem cria sem a função Coordenador informa o responsável.

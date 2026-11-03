@@ -549,7 +549,6 @@ export default function EditSolicitacaoPage(): JSX.Element {
 
           <Form.Item
             label={<span id="edit-pergunta-acompanha">O coordenador responsável vai acompanhar o evento?</span>}
-            extra="Se Sim, a agenda do coordenador responsável é conferida como a dos formadores."
           >
             <Radio.Group
               // role e aria-* vão ao <div> do grupo (o tipo do antd não declara role)

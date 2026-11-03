@@ -613,12 +613,12 @@ export default function EditSolicitacaoPage(): JSX.Element {
           </Form.Item>
 
           <Form.Item
-            label="Encontro"
+            label="Nº da formação"
             name="encontro"
             rules={[{ max: 100, message: 'Máximo 100 caracteres' }]}
           >
             <Input
-              placeholder="Ex: Encontro 1"
+              placeholder="Ex: 4"
               value={formData.encontro}
               onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, encontro: e.target.value })}
             />

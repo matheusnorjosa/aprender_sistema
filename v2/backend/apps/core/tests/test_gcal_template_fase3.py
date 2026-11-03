@@ -29,6 +29,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
+from apps.core.models import Participation
 from apps.core.services.gcal_sync_service import build_event_payload, build_preview_for_solicitacao
 from apps.core.tests.factories import (
     GroupFactory,
@@ -221,7 +222,7 @@ class GCalTemplateFase3Tests(TestCase):
             observacoes="Trazer materiais de apoio",
             is_online=False,
         )
-        solicitacao.formadores.add(self.formador)
+        Participation.objects.create(solicitacao=solicitacao, usuario=self.formador, role=Participation.Role.FORMADOR)
 
         payload = build_event_payload(solicitacao, enable_meet=False)
 
@@ -258,7 +259,7 @@ class GCalTemplateFase3Tests(TestCase):
             observacoes="",  # Sem observações
             is_online=False,
         )
-        # Sem formadores (ManyToMany vazio)
+        # Sem formadores (nenhuma Participation FORMADOR)
 
         payload = build_event_payload(solicitacao, enable_meet=False)
 
@@ -534,7 +535,8 @@ class GCalTemplateFase3Tests(TestCase):
             fim=self.fim,
             status="aprovado",
         )
-        solicitacao.formadores.add(self.formador, formador2)
+        for usuario in (self.formador, formador2):
+            Participation.objects.create(solicitacao=solicitacao, usuario=usuario, role=Participation.Role.FORMADOR)
 
         payload = build_event_payload(solicitacao, enable_meet=False)
 
@@ -544,3 +546,41 @@ class GCalTemplateFase3Tests(TestCase):
         self.assertIn("Formador(es): ", description)
         self.assertIn("João Santos", description)
         self.assertIn("Pedro Oliveira", description)
+
+    def test_formadores_da_descricao_vem_das_participacoes(self):
+        """
+        O sistema grava os formadores em Participation(role=FORMADOR), não na M2M `formadores`
+        (M10-06). A linha sai em ordem de nome, sem login/CPF e sem o e-mail de quem não tem conta.
+        """
+        formador2 = UsuarioFactory(
+            username="formador2_fase3",
+            email="formador2_fase3@example.com",
+            password="senha123",
+            cpf="44444444444",  # CPF único
+            first_name="Pedro",
+            last_name="Oliveira",
+        )
+        solicitacao = SolicitacaoFactory(
+            usuario=self.coord,
+            municipio=self.municipio,
+            projeto=self.projeto,
+            tipo_evento=self.tipo_evento,
+            inicio=self.inicio,
+            fim=self.fim,
+            status="aprovado",
+            coordenador=self.coord,
+        )
+        for usuario in (formador2, self.formador):
+            Participation.objects.create(solicitacao=solicitacao, usuario=usuario, role=Participation.Role.FORMADOR)
+        Participation.objects.create(
+            solicitacao=solicitacao, guest_email="convidado.externo@example.com", role=Participation.Role.FORMADOR
+        )
+        Participation.objects.create(solicitacao=solicitacao, usuario=self.coord, role=Participation.Role.COORDENADOR)
+        self.assertFalse(solicitacao.formadores.exists())
+
+        description = build_event_payload(solicitacao, enable_meet=False)["description"]
+
+        self.assertIn("  • Formador(es): João Santos, Pedro Oliveira\n", description)
+        self.assertIn("Coordenador(a): Maria Silva", description)
+        for vazado in ("formador_fase3", "formador2_fase3", "22222222222", "44444444444", "convidado.externo"):
+            self.assertNotIn(vazado, description)

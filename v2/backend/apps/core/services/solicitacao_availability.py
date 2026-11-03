@@ -84,7 +84,8 @@ def collect_participants(solicitacao: Solicitacao) -> tuple[list[Usuario], list[
     o payload de novo aqui abriria espaço para checar pessoas diferentes das que foram
     salvas, que é exatamente a falha que este guard existe para fechar.
 
-    Entram os FORMADORES (papéis de `ENFORCED_ROLES`) e, só quando o evento tem
+    Entram os FORMADORES e os coordenadores além do responsável (papéis de `ENFORCED_ROLES`;
+    COORD_ACOMPANHA desde 03/11/2026) e, só quando o evento tem
     `coordenador_acompanha=True`, o coordenador responsável (`coordenador_ocupante`). Quem
     criou não entra por ter criado (decisão do dono, 05/10/2026; antes entrava sempre).
 

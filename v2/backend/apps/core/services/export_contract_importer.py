@@ -1806,12 +1806,18 @@ class ExportContractImporter:
                     Solicitacao.objects.exclude(external_hash__isnull=True).values_list("external_hash", flat=True)
                 )
             skip_reasons = {"evento_existente": 0, "evento_passado_novo": 0, "coordenador_solicitante": 0}
+            # Desde 03/11/2026 o COORD_ACOMPANHA ocupa a agenda e só entra pela tela (gerência e agenda
+            # conferidas); o contrato v13 não traz esse papel. Vindo do CSV: recusado com motivo.
+            reject_reasons = {"coord_acompanha_do_csv": 0}
             cpf_idx: dict[str, int] | None = None
             for r in rows:
                 ehash = (r.get("evento_id") or r.get("evento_hash_natural") or "").strip()
                 role = _map_participation_role(r.get("role"))
                 if not ehash or role is None:
                     tally["would_reject"] += 1
+                elif role == Participation.Role.COORD_ACOMPANHA:
+                    tally["would_reject"] += 1
+                    reject_reasons["coord_acompanha_do_csv"] += 1
                 elif ehash in self._sol_criaria:
                     if role == Participation.Role.COORDENADOR:
                         cpf_idx = self._usuario_cpf_index() if cpf_idx is None else cpf_idx
@@ -1830,6 +1836,7 @@ class ExportContractImporter:
                 else:
                     tally["would_reject"] += 1
             tally["skip_reasons"] = skip_reasons
+            tally["reject_reasons"] = reject_reasons
 
         elif name == "formacao":
             # Filha de PlanoFormacoes. NK (plano_id, numero_formacao); plano pai resolvido por
@@ -3211,8 +3218,10 @@ class ExportContractImporter:
             ehash = (r.get("evento_id") or r.get("evento_hash_natural") or "").strip()
             sol_id = sol_idx.get(ehash)
             role = _map_participation_role(r.get("role"))
-            if sol_id is None or role is None:
-                continue  # evento não criado nesta execução (existente/órfã) ou papel fora do domínio
+            if sol_id is None or role is None or role == Participation.Role.COORD_ACOMPANHA:
+                # evento não criado nesta execução (existente/órfã), papel fora do domínio, ou COORD_ACOMPANHA
+                # (ocupa a agenda; só entra pela tela, 03/11/2026 — o classify o conta em `reject_reasons`)
+                continue
             usuario = self._resolve_participante(r, cpf_idx)
             if usuario is not None:
                 ukey = (sol_id, usuario.id, role)

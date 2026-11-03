@@ -2,7 +2,7 @@
  * CartaoEvento — um evento da Nova Solicitação, com os campos lado a lado (decisão do dono, 28/10/2026).
  *
  * Linha 1: Projeto | Tipo de Evento | Nº da formação | Município. Depois, os horários
- * (`HorarioDoEvento`: Data | Início | Fim; Formadores | Coordenador responsável, com "vai
+ * (`HorarioDoEvento`: Data | Início | Fim; Formadores | Coordenador(es), com "vai
  * acompanhar?"; a pergunta de avaliar o formador) e "+ horário" (decisão do dono, 03/11/2026: cada
  * horário vira um evento separado no Google; o que fica fora dos horários se preenche uma vez). O
  * resto (tipo, segmento, local, observações, online) fica em "Mais detalhes": recolhido, mas montado,
@@ -179,7 +179,7 @@ export default function CartaoEvento({
   const handleProjetoChange = (value: ComboBoxValue | null): void => {
     const projetoChanged = dados.projeto?.id !== value?.id;
     // Trocar o projeto pode trocar a gerência (PR 9, P9-5: só entram pessoas da gerência do projeto):
-    // formadores, responsável e a resposta de avaliar escolhidos para o projeto anterior saem, em
+    // formadores, coordenadores e a resposta de avaliar escolhidos para o projeto anterior saem, em
     // todos os horários.
     mudar({
       projeto: value,
@@ -189,7 +189,9 @@ export default function CartaoEvento({
             horarios: dados.horarios.map((h) => ({
               ...h,
               formadores: [],
-              coordenadorResponsavel: null,
+              coordenadores: [],
+              // A caixa ficou vazia: a resposta era do responsável que saiu.
+              coordenadorAcompanha: null,
               pretendeAvaliar: null,
               formadorAvaliado: null,
             })),

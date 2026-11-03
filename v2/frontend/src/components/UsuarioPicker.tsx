@@ -1,12 +1,12 @@
 /**
  * UsuarioPicker - Seleção múltipla de usuários por papel (autocomplete).
  *
- * Implementação compartilhada dos pickers de usuário (hoje o FormadoresPicker).
+ * Implementação compartilhada dos pickers de usuário (FormadoresPicker e CoordenadoresPicker).
  * Parametrizado por papel do lookup, cor da Tag e aria-label; cada picker de
  * domínio vira um wrapper fino sobre este.
  */
 
-import { useRef, useState, type JSX } from 'react';
+import { useEffect, useRef, useState, type JSX } from 'react';
 import { Tag, AutoComplete, Button, Spin } from 'antd';
 import type { RefSelectProps } from 'antd/es/select';
 import CloseOutlined from '@ant-design/icons/CloseOutlined';
@@ -48,6 +48,10 @@ export interface UsuarioPickerProps {
   ariaLabel?: string;
   /** O que o lookup carrega, com artigo ("os formadores"): vai na mensagem de falha ao carregar. */
   oQueCarrega?: string;
+  /** Marca da 1ª pessoa escolhida, no texto e no "Remover" (ex.: 'responsável'). Sem ela, nada muda. */
+  marcaDoPrimeiro?: string;
+  /** De qual lista o "Remover" tira (ex.: 'dos formadores'): a mesma pessoa pode estar em duas caixas. */
+  daLista?: string;
   /** Do Form.Item: liga o rótulo ao campo de busca e o erro ao leitor de tela. */
   id?: string;
   'aria-describedby'?: string;
@@ -62,6 +66,8 @@ export default function UsuarioPicker({
   tagColor = 'blue',
   ariaLabel,
   oQueCarrega = 'as pessoas',
+  marcaDoPrimeiro,
+  daLista,
   ...doFormItem
 }: UsuarioPickerProps): JSX.Element {
   const [options, setOptions] = useState<UserOption[]>([]);
@@ -70,6 +76,16 @@ export default function UsuarioPicker({
   // Falha ao carregar: o motivo fica na tela (com "Tentar de novo") em vez de uma lista vazia.
   const [erro, setErro] = useState<string | null>(null);
   const campoRef = useRef<RefSelectProps>(null);
+
+  // Outro projeto, outra gerência: as opções, a busca e o erro do anterior não valem (o foco busca de
+  // novo). A resposta que chegar atrasada de uma busca do projeto anterior é descartada.
+  const projetoAtual = useRef(projetoId);
+  useEffect(() => {
+    projetoAtual.current = projetoId;
+    setOptions([]);
+    setSearch('');
+    setErro(null);
+  }, [projetoId]);
 
   /** Busca e troca as opções; devolve se carregou. */
   const handleSearch = async (query: string): Promise<boolean> => {
@@ -81,9 +97,11 @@ export default function UsuarioPicker({
       return true;
     }
 
+    const projetoDaBusca = projetoId;
     try {
       setLoading(true);
-      const results = await lookupUsuarios(query || '', role, projetoId);
+      const results = await lookupUsuarios(query || '', role, projetoDaBusca);
+      if (projetoAtual.current !== projetoDaBusca) return false;
       setOptions(
         results.map(item => ({
           value: String(item.id),
@@ -94,6 +112,7 @@ export default function UsuarioPicker({
       setErro(null);
       return true;
     } catch (error) {
+      if (projetoAtual.current !== projetoDaBusca) return false;
       logger.error(`Erro ao buscar ${role}:`, error);
       setErro((error as Error)?.message || 'Tente de novo em instantes.');
       return false;
@@ -137,22 +156,26 @@ export default function UsuarioPicker({
       {/* Tags dos usuários selecionados */}
       {value.length > 0 && (
         <ul style={{ display: 'flex', flexWrap: 'wrap', gap: 8, listStyle: 'none', padding: 0, margin: '0 0 8px 0' }} aria-label={ariaLabel}>
-          {value.map((usuario) => (
-            <li key={usuario.id}>
-              {/* O "x" do Tag do antd não recebe foco: o botão próprio é alcançável pelo teclado. */}
-              <Tag color={tagColor} className="inline-flex items-center gap-1">
-                {usuario.label || usuario.name}
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<CloseOutlined />}
-                  aria-label={`Remover ${usuario.label || usuario.name}`}
-                  onClick={() => handleRemove(usuario.id)}
-                  style={{ width: 20, height: 20, minWidth: 20 }}
-                />
-              </Tag>
-            </li>
-          ))}
+          {value.map((usuario, indice) => {
+            const nome = `${usuario.label || usuario.name}${indice === 0 && marcaDoPrimeiro ? ` (${marcaDoPrimeiro})` : ''}`;
+            return (
+              <li key={usuario.id} className="max-w-full">
+                {/* O "x" do Tag do antd não recebe foco: o botão próprio é alcançável pelo teclado. Nome longo
+                    quebra dentro da tag (no celular a tag não passa da largura). */}
+                <Tag color={tagColor} className="inline-flex max-w-full items-center gap-1 whitespace-normal break-words">
+                  {nome}
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<CloseOutlined />}
+                    aria-label={`Remover ${nome}${daLista ? ` ${daLista}` : ''}`}
+                    onClick={() => handleRemove(usuario.id)}
+                    style={{ width: 20, height: 20, minWidth: 20 }}
+                  />
+                </Tag>
+              </li>
+            );
+          })}
         </ul>
       )}
 

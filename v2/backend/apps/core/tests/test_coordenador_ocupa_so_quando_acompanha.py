@@ -6,8 +6,9 @@ Decisão do dono (05/10/2026, OK explícito para mudar a regra de disponibilidad
   aviso M) vale para TODOS os formadores do evento, sempre;
 - o coordenador responsável (`Solicitacao.coordenador`; sem ele, quem criou) só entra quando
   `coordenador_acompanha=True`;
-- quem cria deixa de entrar automaticamente; as linhas COORDENADOR e COORD_ACOMPANHA não
-  ocupam mais (continuam servindo ao convite do Google).
+- quem cria deixa de entrar automaticamente; a linha COORDENADOR não ocupa (serve ao convite
+  do Google). COORD_ACOMPANHA (coordenador além do responsável) ocupa sempre desde 03/11/2026:
+  ver `test_solicitacao_varios_coordenadores.py`.
 
 Um evento existente ocupa a agenda de uma pessoa se ela é FORMADORA nele, ou se é a
 responsável e ele tem `coordenador_acompanha=True` (`availability_service.ocupa_agenda_q`).
@@ -109,12 +110,13 @@ class TestEventoExistenteOcupa:
         _evento_aprovado(criador=criador, coordenador=None, formadores=[formador], acompanha=True)
         assert not _ok(criador)
 
-    def test_coord_acompanha_antigo_nao_ocupa(self):
-        """Linha COORD_ACOMPANHA (lista que saiu da tela): convite do Google, sem ocupar."""
+    def test_coord_acompanha_ocupa_sempre(self):
+        """COORD_ACOMPANHA (coordenador além do responsável, 03/11/2026) ocupa mesmo sem "acompanha"."""
         coord, formador, outro = _pessoa("Coordenador"), _pessoa("Formador"), _pessoa("Coordenador")
         sol = _evento_aprovado(criador=coord, coordenador=coord, formadores=[formador], acompanha=False)
         Participation.objects.create(solicitacao=sol, usuario=outro, role=Participation.Role.COORD_ACOMPANHA)
-        assert _ok(outro)
+        assert not _ok(outro)
+        assert _ok(coord), "o responsável que não acompanha segue livre"
 
     def test_deslocamento_so_confere_responsavel_que_acompanha(self):
         coord, formador = _pessoa("Coordenador"), _pessoa("Formador")

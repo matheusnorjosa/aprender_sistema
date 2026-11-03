@@ -24,6 +24,7 @@ const {
   lookupProjetosMock,
   lookupTiposEventoMock,
   horario,
+  coordenadoresDoMock,
 } = vi.hoisted(() => ({
   createSolicitacoesEmLoteMock: vi.fn(),
   getMeMock: vi.fn(),
@@ -32,6 +33,7 @@ const {
   lookupProjetosMock: vi.fn(),
   lookupTiposEventoMock: vi.fn(),
   horario: { atual: { date: '2026-08-01', start: '09:00', end: '11:00' } },
+  coordenadoresDoMock: { atual: [{ id: 7, label: 'Carla Coordenadora' }] as Array<{ id: number; label: string }> },
 }));
 
 vi.mock('../../../api/solicitacoes', () => ({ createSolicitacoesEmLote: createSolicitacoesEmLoteMock }));
@@ -72,6 +74,29 @@ function chaveDoId(id: string | undefined): number {
   return Number(/^evento-(\d+)_/.exec(id ?? '')?.[1] ?? 0);
 }
 
+// A caixa "Coordenador(es)" (03/11/2026): escolhe a Carla, que é a 1ª e por isso a responsável.
+vi.mock('../../../components/CoordenadoresPicker', () => ({
+  default: ({
+    onChange,
+    id,
+    'aria-invalid': invalido,
+  }: {
+    onChange?: (v: unknown) => void;
+    id?: string;
+    'aria-invalid'?: boolean | 'true' | 'false';
+  }) => (
+    <button
+      type="button"
+      id={id}
+      aria-invalid={invalido}
+      data-testid="cb-responsavel"
+      onClick={() => onChange?.(coordenadoresDoMock.atual)}
+    >
+      cb-responsavel
+    </button>
+  ),
+}));
+
 function MockComboBox({
   placeholder = '',
   lookupFunction,
@@ -88,13 +113,11 @@ function MockComboBox({
   useEffect(() => {
     void lookupFunction('');
   }, [lookupFunction]);
-  const testid = placeholder.includes('respons')
-    ? 'cb-responsavel'
-    : placeholder.includes('munic')
-      ? 'cb-municipio'
-      : placeholder.includes('projeto')
-        ? 'cb-projeto'
-        : 'cb-tipo';
+  const testid = placeholder.includes('munic')
+    ? 'cb-municipio'
+    : placeholder.includes('projeto')
+      ? 'cb-projeto'
+      : 'cb-tipo';
   return (
     <button
       type="button"
@@ -107,7 +130,6 @@ function MockComboBox({
         if (testid === 'cb-projeto') {
           onChange?.({ id: 100 + chave, label: `Projeto ${chave}`, fluxo: chave % 2 === 0 ? 'SUPER' : 'NAO_SUPER', responsavel_padrao: true });
         } else if (testid === 'cb-tipo') onChange?.({ id: 789, label: 'Formação' });
-        else if (testid === 'cb-responsavel') onChange?.({ id: 7, label: 'Carla Coordenadora' });
         else onChange?.({ id: 456, label: 'Fortaleza - CE' });
       }}
     >
@@ -154,6 +176,7 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     vi.spyOn(message, 'error').mockImplementation(vi.fn()).mockClear();
     vi.spyOn(message, 'success').mockImplementation(vi.fn()).mockClear();
     horario.atual = { date: '2026-08-01', start: '09:00', end: '11:00' };
+    coordenadoresDoMock.atual = [{ id: 7, label: 'Carla Coordenadora' }];
     lookupProjetosMock.mockResolvedValue([]);
     lookupTiposEventoMock.mockResolvedValue([]);
     lookupMunicipiosWithFiltersMock.mockResolvedValue([]);
@@ -293,6 +316,11 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
     fireEvent.click(adicionar());
     horario.atual = { date: '2026-08-02', start: '14:00', end: '16:00' };
     await preencher(2);
+    // Só o evento 2 tem coordenadores escolhidos: a Carla (responsável) e a Dora (03/11/2026). Escolher o
+    // responsável apaga a resposta de acompanhar: responde de novo.
+    coordenadoresDoMock.atual = [{ id: 7, label: 'Carla Coordenadora' }, { id: 8, label: 'Dora Coordenadora' }];
+    fireEvent.click(within(cartao(2)).getByTestId('cb-responsavel'));
+    fireEvent.click(within(grupoAcompanha(cartao(2))).getByLabelText('Não'));
 
     fireEvent.click(botaoCriar());
 
@@ -310,12 +338,20 @@ describe('NewSolicitacaoWizard — vários eventos (PR 5)', { timeout: 30000 }, 
       isOnline: false,
       formadorIds: [99],
       coordenadorResponsavelId: null,
+      coordenadorExtraIds: [],
       coordenadorAcompanha: false,
       avaliar: null,
     };
     expect(eventos).toEqual([
       buildSolicitacaoPayload({ ...base, projetoId: 101, inicio: '2026-08-01T12:00:00Z', fim: '2026-08-01T14:00:00Z' }),
-      buildSolicitacaoPayload({ ...base, projetoId: 102, inicio: '2026-08-02T17:00:00Z', fim: '2026-08-02T19:00:00Z' }),
+      buildSolicitacaoPayload({
+        ...base,
+        projetoId: 102,
+        inicio: '2026-08-02T17:00:00Z',
+        fim: '2026-08-02T19:00:00Z',
+        coordenadorResponsavelId: 7,
+        coordenadorExtraIds: [8],
+      }),
     ]);
     await waitFor(() => expect(message.success).toHaveBeenCalledWith('2 eventos criados (1 vai para aprovação)'));
     await waitFor(() => expect(enderecoAtual(router)).toBe('/solicitacoes/minhas'));

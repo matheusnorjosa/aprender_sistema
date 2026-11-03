@@ -2,9 +2,9 @@
  * FormadoresPicker - Seleção de Formadores para Nova Solicitação.
  *
  * Wrapper fino de UsuarioPicker (implementação compartilhada): papéis 'Formador' e
- * 'Coordenador', Tag azul. Decisão do dono (05/10/2026): coordenador que atua no evento
- * entra na lista de formadores (a lista de acompanhantes saiu). Com `projetoId`, só pessoas da
- * gerência do projeto (PR 9, P9-5); o backend aplica a mesma regra.
+ * 'Coordenador', Tag azul. Coordenador que atua como formador pode entrar aqui; os coordenadores
+ * do evento ficam na caixa "Coordenador(es)" (CoordenadoresPicker, 03/11/2026). Com `projetoId`, só
+ * pessoas da gerência do projeto (PR 9, P9-5); o backend aplica a mesma regra.
  */
 
 import { type JSX } from 'react';
@@ -26,6 +26,7 @@ export default function FormadoresPicker(props: FormadoresPickerProps): JSX.Elem
       tagColor="blue"
       ariaLabel="Formadores selecionados"
       oQueCarrega="os formadores"
+      daLista="dos formadores"
     />
   );
 }

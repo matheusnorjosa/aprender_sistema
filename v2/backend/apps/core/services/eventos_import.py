@@ -713,9 +713,12 @@ def _sync_participations(
         sheet_usuario_ids.add(formador.pk)
         result["created" if created else "updated"] += 1
 
-    # Orfao: participante ocupante (ENFORCED_ROLES) que nao consta mais da planilha.
+    # Orfao: participante ocupante (ENFORCED_ROLES) que nao consta mais da planilha. O coordenador
+    # alem do responsavel (COORD_ACOMPANHA, 03/11/2026) entra pela tela e a planilha nao tem coluna
+    # para ele: nao e orfao.
     orfaos = (
         Participation.objects.filter(solicitacao=solicitacao, role__in=ENFORCED_ROLES)
+        .exclude(role=Participation.Role.COORD_ACOMPANHA)
         .exclude(usuario_id__in=sheet_usuario_ids)
         .select_related("usuario")
     )

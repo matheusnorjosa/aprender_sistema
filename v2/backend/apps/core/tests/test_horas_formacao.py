@@ -5,8 +5,8 @@ CH de um evento para uma pessoa = min(fim − início, TETO). TETO = o parâmetr
 Configurações `AVAILABILITY_DAILY_LIMIT_HOURS` (padrão 8 h). As CH do dia se somam (não há
 teto por dia). Evento que cruza a meia-noite conta inteiro no dia local do INÍCIO
 (America/Fortaleza). Online conta igual. Só evento aprovado, de qualquer projeto. Conta o
-FORMADOR sempre e o coordenador responsável só quando `coordenador_acompanha=True`;
-COORD_ACOMPANHA e convidado não contam.
+FORMADOR e o COORD_ACOMPANHA (coordenador além do responsável, 03/11/2026) sempre e o
+coordenador responsável só quando `coordenador_acompanha=True`; convidado não conta.
 
 A Grade Mensal e o painel de Equipe usam a mesma função e dão o mesmo número.
 """
@@ -151,11 +151,15 @@ class TestRegraDaContagem:
 
         assert _ch(coordenador) == 4.0
 
-    @pytest.mark.parametrize("papel", [Participation.Role.COORD_ACOMPANHA, Participation.Role.CONVIDADO])
-    def test_coord_acompanha_e_convidado_nao_contam(self, formador, papel):
-        _evento(_local(DIA, 8), _local(DIA, 12), formador=formador, papel=papel)
+    def test_convidado_nao_conta(self, formador):
+        _evento(_local(DIA, 8), _local(DIA, 12), formador=formador, papel=Participation.Role.CONVIDADO)
 
         assert _ch(formador) == 0.0
+
+    def test_coord_acompanha_conta_sempre(self, coordenador):
+        _evento(_local(DIA, 8), _local(DIA, 12), formador=coordenador, papel=Participation.Role.COORD_ACOMPANHA)
+
+        assert _ch(coordenador) == 4.0
 
     def test_online_conta_igual(self, formador):
         _evento(_local(DIA, 8), _local(DIA, 12), formador=formador, is_online=True)

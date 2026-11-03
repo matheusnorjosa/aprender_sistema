@@ -134,8 +134,9 @@ class TestCreateGerenciaScope:
         )
 
     def test_cross_gerencia_coord_acompanha_rejected(self, coordenador, gerencias, municipio, projeto, tipo_evento):
-        """`coord_acompanha_ids` com itens também é recusado (desde 05/10/2026 a lista não aceita itens)."""
-        outro = _formador("fluir_ca", gerencias["fluir"])
+        """`coord_acompanha_ids` de outra gerência também é recusado (regra do responsável, 03/11/2026)."""
+        outro = UsuarioFactory(username="coord_setor_fluir_ca", cpf=str(next(_CPF)))
+        com_papel(outro, "COORDENADOR", gerencias["fluir"])  # coordena, mas em outra gerência
         resp = _client(coordenador).post(
             "/api/solicitacoes/",
             _payload(municipio, projeto, tipo_evento, {"coord_acompanha_ids": [outro.id]}),

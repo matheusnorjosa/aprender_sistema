@@ -75,6 +75,29 @@ vi.mock('../../../components/FormadoresPicker', () => ({
   ),
 }));
 
+// A caixa "Coordenador(es)" (03/11/2026): escolhe a Carla, que é a 1ª e por isso a responsável.
+vi.mock('../../../components/CoordenadoresPicker', () => ({
+  default: ({
+    onChange,
+    id,
+    'aria-invalid': invalido,
+  }: {
+    onChange?: (v: unknown) => void;
+    id?: string;
+    'aria-invalid'?: boolean | 'true' | 'false';
+  }) => (
+    <button
+      type="button"
+      id={id}
+      aria-invalid={invalido}
+      data-testid="cb-responsavel"
+      onClick={() => onChange?.([{ id: 7, label: 'Carla Coordenadora' }])}
+    >
+      cb-responsavel
+    </button>
+  ),
+}));
+
 function MockComboBox({
   placeholder = '',
   lookupFunction,
@@ -89,13 +112,11 @@ function MockComboBox({
     void lookupFunction('');
   }, [lookupFunction]);
   // Página única: os quatro ComboBox do cartão ficam na tela ao mesmo tempo.
-  const testid = placeholder.includes('respons')
-    ? 'cb-responsavel'
-    : placeholder.includes('munic')
-      ? 'cb-municipio'
-      : placeholder.includes('projeto')
-        ? 'cb-projeto'
-        : 'cb-tipo';
+  const testid = placeholder.includes('munic')
+    ? 'cb-municipio'
+    : placeholder.includes('projeto')
+      ? 'cb-projeto'
+      : 'cb-tipo';
   return (
     <button
       type="button"
@@ -103,7 +124,6 @@ function MockComboBox({
       onClick={() => {
         if (testid === 'cb-projeto') onChange?.({ id: 123, label: 'Projeto X', fluxo: 'SUPER' });
         else if (testid === 'cb-tipo') onChange?.({ id: 789, label: 'Formação' });
-        else if (testid === 'cb-responsavel') onChange?.({ id: 7, label: 'Carla Coordenadora' });
         else onChange?.({ id: 456, label: 'Fortaleza - CE' });
       }}
     >

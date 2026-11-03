@@ -6,6 +6,7 @@
  */
 
 import type { LookupItem } from '../../components/ComboBox';
+import type { CoordenadorItem } from '../../components/CoordenadoresPicker';
 import type { FormadorItem } from '../../components/FormadoresPicker';
 import type { PreviewParticipant } from '../../hooks/useAvailabilityPreview';
 import type { FluxoType, ID } from '../../types';
@@ -43,8 +44,9 @@ export interface Horario {
   inicio: string | null;
   fim: string | null;
   formadores: ParticipantType[];
-  // #1666: coordenador RESPONSÁVEL (FK). Vazio: o backend usa quem cria, se for coordenador.
-  coordenadorResponsavel: ComboBoxValue | null;
+  // A caixa "Coordenador(es)" (decisão do dono, 03/11/2026), na ordem de escolha: o 1º é o RESPONSÁVEL
+  // (FK, #1666), os demais vão em `coord_acompanha_ids`. Vazia: o backend usa quem cria, se for coordenador.
+  coordenadores: CoordenadorItem[];
   // Decisão do dono (05/10/2026): respostas Sim/Não; null = ainda não respondida.
   coordenadorAcompanha: boolean | null;
   pretendeAvaliar: boolean | null;
@@ -88,7 +90,7 @@ export const ORDEM_DO_CARTAO = [
 export const ORDEM_DO_HORARIO = [
   'horario',
   'formadores',
-  'coordenadorResponsavel',
+  'coordenadores',
   'coordenadorAcompanha',
   'pretendeAvaliar',
   'formadorAvaliado',
@@ -104,7 +106,7 @@ export function horarioEmBranco(chave: number): Horario {
     inicio: null,
     fim: null,
     formadores: [],
-    coordenadorResponsavel: null,
+    coordenadores: [],
     coordenadorAcompanha: null,
     pretendeAvaliar: null,
     formadorAvaliado: null,
@@ -145,26 +147,35 @@ export function perguntaAvaliarDo(dados: EventoDeUmHorario): boolean {
   return dados.projeto?.pergunta_avaliar_formador !== false && formadoresAvaliaveisDo(dados).length > 0;
 }
 
-/** Coordenador responsável: o escolhido; sem escolha, quem cria (se o backend aceita o vazio no projeto). */
+/** Coordenador responsável: o 1º escolhido; sem escolha, quem cria (se o backend aceita o vazio no projeto). */
 export function responsavelDo(dados: EventoDeUmHorario, me: QuemCria | null): QuemCria | null {
-  if (dados.coordenadorResponsavel) {
-    return { id: dados.coordenadorResponsavel.id, nome: dados.coordenadorResponsavel.label };
+  const [primeiro] = dados.coordenadores;
+  if (primeiro) {
+    return { id: primeiro.id, nome: primeiro.label };
   }
   return dados.projeto?.responsavel_padrao === true && me ? me : null;
 }
 
+/** Os coordenadores além do responsável (do 2º em diante), na ordem de escolha. */
+export function coordenadoresExtrasDo(dados: EventoDeUmHorario): CoordenadorItem[] {
+  return dados.coordenadores.slice(1);
+}
+
 /**
- * Quem entra na checagem de disponibilidade. Espelha o backend (decisão do dono, 05/10/2026):
- * todos os formadores; o coordenador responsável só se vai acompanhar. Deduplicado por id
- * (o responsável pode estar também na lista de formadores; sem dedup contaria 2x no RD-05).
+ * Quem entra na checagem de disponibilidade. Espelha o backend: todos os formadores e os
+ * coordenadores além do responsável (decisão do dono, 03/11/2026); o responsável só se vai
+ * acompanhar (05/10/2026). Deduplicado por id (o responsável pode estar também na lista de
+ * formadores; sem dedup a mesma pessoa seria checada 2x).
  */
 export function participantesDo(dados: EventoDeUmHorario, me: QuemCria | null): PreviewParticipant[] {
   const responsavel = responsavelDo(dados, me);
+  const nome = (p: ParticipantType): string => p.label || p.name || `#${p.id}`;
   const lista: PreviewParticipant[] = [
     ...(dados.coordenadorAcompanha === true && responsavel
       ? [{ id: responsavel.id, nome: responsavel.nome, criador: false }]
       : []),
-    ...dados.formadores.map((f) => ({ id: f.id, nome: f.label || f.name || `#${f.id}`, criador: false })),
+    ...dados.formadores.map((f) => ({ id: f.id, nome: nome(f), criador: false })),
+    ...coordenadoresExtrasDo(dados).map((c) => ({ id: c.id, nome: nome(c), criador: false })),
   ];
   const vistos = new Set<ID>();
   return lista.filter((p) => (vistos.has(p.id) ? false : (vistos.add(p.id), true)));
@@ -188,7 +199,9 @@ export function estaEmBranco(dados: FormDataType): boolean {
 /** Chave do erro no servidor → campo do Form do cartão, quando o nome não é o mesmo. */
 const CAMPO_DO_SERVIDOR: Record<string, string> = {
   tipo_evento: 'tipoEvento',
-  coordenador: 'coordenadorResponsavel',
+  coordenador: 'coordenadores',
+  coord_acompanha_ids: 'coordenadores',
+  coord_acompanha_emails: 'coordenadores',
   extra_participants: 'formadores',
   formador_ids: 'formadores',
   coordenador_acompanha: 'coordenadorAcompanha',

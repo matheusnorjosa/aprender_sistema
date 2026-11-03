@@ -6,9 +6,10 @@ Decisões do dono (05/10/2026):
   coordenador e não informa, é ele; se não é, o responsável é obrigatório. O responsável
   passa pelo mesmo escopo de gerência dos formadores (a gerência do projeto, PR 9) e recebe
   o convite do Google mesmo respondendo "Não".
-- A lista "Coordenadores Acompanhantes" saiu: `coord_acompanha_ids/_emails` não são mais
-  aceitos. No lugar, `coordenador_acompanha` (Sim/Não) é obrigatório na criação; null nunca
-  vale como resposta.
+- A lista "Coordenadores Acompanhantes" saiu; no lugar, `coordenador_acompanha` (Sim/Não) é
+  obrigatório na criação; null nunca vale como resposta. Desde 03/11/2026 os coordenadores além
+  do responsável voltam pela mesma caixa (`coord_acompanha_ids`; ver
+  `test_solicitacao_varios_coordenadores.py`).
 - "Você pretende avaliar o formador nesse evento?" só se aplica quando a gerência do PROJETO
   pergunta (`Gerencia.pergunta_avaliar_formador`) e há na lista de formadores ao menos uma
   pessoa avaliável (função Formador sem a função Coordenador). Aplicável → obrigatória; "Sim"
@@ -134,14 +135,15 @@ class TestCoordenadorAcompanhaObrigatorio:
         assert resp.status_code == 200, resp.data
         assert Solicitacao.objects.get(pk=r.data["id"]).coordenador_acompanha is True
 
-    def test_lista_de_coordenadores_acompanhantes_saiu(self, c):
+    def test_coordenador_alem_do_responsavel_entra_com_o_papel_proprio(self, c):
+        """03/11/2026: o 2º coordenador da caixa vira COORD_ACOMPANHA; o 1º segue o responsável."""
         outro = _pessoa("Coordenador", gerencia=c["gerencia"], papel="COORDENADOR")
         payload = _payload(c, coordenador_acompanha=False, pretende_avaliar_formador=False)
         payload["extra_participants"]["coord_acompanha_ids"] = [outro.id]
         r = _post(c["coord"], payload)
-        assert r.status_code == 400, r.data
-        assert "lista de formadores" in str(get_field_errors(r))
-        assert not Participation.objects.filter(usuario=outro).exists()
+        assert r.status_code == 201, r.data
+        assert Solicitacao.objects.get(pk=r.data["id"]).coordenador_id == c["coord"].id
+        assert list(Participation.objects.filter(usuario=outro).values_list("role", flat=True)) == ["COORD_ACOMPANHA"]
 
 
 # ---------------------------------------------------------------- responsável

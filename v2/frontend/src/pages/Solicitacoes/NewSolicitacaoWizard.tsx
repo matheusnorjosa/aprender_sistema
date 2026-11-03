@@ -37,6 +37,7 @@ import { lerAvisoDoLogin, storageKeys } from '../../utils/storage';
 import type { ID, SolicitacaoPayload } from '../../types';
 import CartaoEvento, { type CartaoEventoHandle } from './CartaoEvento';
 import {
+  coordenadoresExtrasDo,
   estaEmBranco,
   eventoDoHorario,
   FORM_INICIAL,
@@ -73,6 +74,8 @@ export interface SolicitacaoWizardPayloadInput {
   formadorIds: ID[];
   /** #1666: FK do coordenador RESPONSÁVEL. null → backend usa quem cria, se for coordenador. */
   coordenadorResponsavelId: ID | null;
+  /** Os coordenadores além do responsável, na ordem de escolha (decisão do dono, 03/11/2026). */
+  coordenadorExtraIds: ID[];
   /** "O coordenador responsável vai acompanhar o evento?" */
   coordenadorAcompanha: boolean;
   /** "Você pretende avaliar o formador nesse evento?" — null quando a pergunta não foi feita. */
@@ -81,7 +84,7 @@ export interface SolicitacaoWizardPayloadInput {
 
 /**
  * Monta o payload de criação de solicitação (co-locado + exportado p/ teste, como buildCompraPayload).
- * A lista de coordenadores acompanhantes saiu (05/10/2026): só formadores em extra_participants.
+ * Em extra_participants: os formadores e os coordenadores além do responsável (03/11/2026).
  */
 export function buildSolicitacaoPayload(input: SolicitacaoWizardPayloadInput): Record<string, unknown> {
   return {
@@ -107,6 +110,7 @@ export function buildSolicitacaoPayload(input: SolicitacaoWizardPayloadInput): R
       : {}),
     extra_participants: {
       formador_ids: input.formadorIds,
+      coord_acompanha_ids: input.coordenadorExtraIds,
     },
   };
 }
@@ -252,8 +256,9 @@ function payloadDo(dados: EventoDeUmHorario): SolicitacaoPayload | null {
     // PR19: modalidade online/presencial
     isOnline: !!dados.is_online,
     formadorIds: dados.formadores.map((f) => f.id),
-    // #1666: FK do coordenador responsável escolhido (null → quem cria, se coordenador).
-    coordenadorResponsavelId: dados.coordenadorResponsavel?.id ?? null,
+    // #1666: FK do coordenador responsável, o 1º da caixa (null → quem cria, se coordenador).
+    coordenadorResponsavelId: dados.coordenadores[0]?.id ?? null,
+    coordenadorExtraIds: coordenadoresExtrasDo(dados).map((c) => c.id),
     coordenadorAcompanha: dados.coordenadorAcompanha,
     avaliar: perguntaAvaliarDo(dados)
       ? { pretende: dados.pretendeAvaliar === true, formadorAvaliadoId: dados.formadorAvaliado }

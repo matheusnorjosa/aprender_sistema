@@ -704,6 +704,29 @@ class TestEventosImportAvailabilityAndReimport:
         sol = Solicitacao.objects.get()
         assert sol.encontro == "EF9"
 
+    def test_reimport_nao_chama_de_orfao_o_coordenador_extra_posto_pela_tela(
+        self, coordenador_user, formador1_user, municipio, projeto_nao_super, tipo_evento
+    ):
+        """03/11/2026: COORD_ACOMPANHA ocupa a agenda, mas a planilha não tem coluna para ele."""
+        d = date.today() + timedelta(days=90)
+        linha = (
+            "municipio,projeto,tipo_evento,data,hora_inicio,hora_fim,coordenador,formador1\n"
+            f"{municipio.nome},{projeto_nao_super.nome},{tipo_evento.nome},{d.isoformat()},"
+            f"08:00,12:00,{coordenador_user.email},{formador1_user.email}\n"
+        )
+        csv1 = _write_csv(linha)
+        import_eventos_from_file(path=csv1, dry_run=False)
+        Path(csv1).unlink(missing_ok=True)
+        sol = Solicitacao.objects.get()
+        extra = UsuarioFactory(username="coord_extra_tela", email="coord_extra_tela@example.invalid")
+        Participation.objects.create(solicitacao=sol, usuario=extra, role="COORD_ACOMPANHA")
+
+        csv2 = _write_csv(linha)
+        result = import_eventos_from_file(path=csv2, dry_run=False)
+        Path(csv2).unlink(missing_ok=True)
+        assert result["pendencias"]["orfaos"] == []
+        assert Participation.objects.filter(solicitacao=sol, usuario=extra, role="COORD_ACOMPANHA").exists()
+
     def test_reimport_orphan_formador_reported_not_removed(
         self, coordenador_user, formador1_user, municipio, projeto_nao_super, tipo_evento
     ):

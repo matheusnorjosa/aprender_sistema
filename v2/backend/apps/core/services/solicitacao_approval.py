@@ -109,6 +109,7 @@ CAMPOS_MATERIAIS_NO_AUDITLOG: dict[str, str] = {
     "inicio": "inicio",
     "fim": "fim",
     "formador_ids": "formadores",
+    "coord_acompanha_ids": "coordenadores",
 }
 
 # Código do impedimento → valor de `decisao_impedida` na lista (tela de Aprovações).
@@ -141,7 +142,7 @@ def mensagem_impedida(code: str, acao: str) -> str:
             "Outra pessoa aprovadora precisa decidir."
         )
     return (
-        "Você mudou data, horário, município, projeto ou formadores desta solicitação. "
+        "Você mudou data, horário, município, projeto, formadores ou coordenadores desta solicitação. "
         "Outra pessoa aprovadora precisa decidir."
     )
 

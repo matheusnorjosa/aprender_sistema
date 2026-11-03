@@ -45,6 +45,7 @@ import {
 } from '../../api/lookup';
 import DateTimeRange from '../../components/DateTimeRange';
 import ComboBox from '../../components/ComboBox';
+import CoordenadoresPicker, { type CoordenadorItem } from '../../components/CoordenadoresPicker';
 import FormadoresPicker from '../../components/FormadoresPicker';
 import logger from '../../utils/logger';
 import type { ID, Solicitacao, GCalStatus, Participation } from '../../types';
@@ -96,7 +97,10 @@ interface FormDataType {
   local: string;
   is_online: boolean;
   formadores: FormadorType[];
-  coordenadorAcompanha: boolean;
+  /** A caixa "Coordenador(es)" (decisões do dono, 03/11/2026): o 1º é o responsável, os demais são COORD_ACOMPANHA. */
+  coordenadores: CoordenadorItem[];
+  /** null = o responsável mudou e ainda não respondeu. */
+  coordenadorAcompanha: boolean | null;
   /** null = não informado (eventos antigos) ou pergunta que não se aplica. */
   pretendeAvaliar: boolean | null;
   formadorAvaliado: ID | null;
@@ -120,6 +124,11 @@ interface ApiErrorResponse {
       errors?: Record<string, unknown>;
     };
   };
+}
+
+/** O responsável para o backend: `coordenador`; sem ele (evento antigo), quem criou. */
+function responsavelEfetivoDe(s: Solicitacao): ID {
+  return s.coordenador ?? s.usuario;
 }
 
 export default function EditSolicitacaoPage(): JSX.Element {
@@ -146,6 +155,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
     local: '',
     is_online: false,
     formadores: [],
+    coordenadores: [],
     coordenadorAcompanha: false,
     pretendeAvaliar: null,
     formadorAvaliado: null,
@@ -159,17 +169,40 @@ export default function EditSolicitacaoPage(): JSX.Element {
         const data = await getSolicitacao(Number(id));
         setSolicitacao(data);
 
-        // Extrair formadores das participations (avaliável = está em `avaliaveis_ids` do detalhe)
+        // Extrair formadores e os coordenadores além do responsável das participations
+        // (avaliável = está em `avaliaveis_ids` do detalhe)
         const avaliaveis = new Set(data.avaliaveis_ids ?? []);
-        const formadores: FormadorType[] = (data.participations || [])
-          .filter((p: Participation) => p.role === 'FORMADOR' && p.usuario)
-          .map((p: Participation) => ({
-            id: p.usuario!.id,
-            label: p.usuario!.first_name && p.usuario!.last_name
-              ? `${p.usuario!.first_name} ${p.usuario!.last_name}`.trim()
-              : p.usuario!.username,
-            avaliavel: avaliaveis.has(p.usuario!.id),
-          }));
+        const pessoasDoPapel = (papel: Participation['role']): FormadorType[] =>
+          (data.participations || [])
+            .filter((p: Participation) => p.role === papel && p.usuario)
+            .map((p: Participation) => ({
+              id: p.usuario!.id,
+              label: p.usuario!.first_name && p.usuario!.last_name
+                ? `${p.usuario!.first_name} ${p.usuario!.last_name}`.trim()
+                : p.usuario!.username,
+              avaliavel: avaliaveis.has(p.usuario!.id),
+            }));
+        const formadores = pessoasDoPapel('FORMADOR');
+        // A caixa "Coordenador(es)": o responsável EFETIVO em 1º e os demais depois. Sem `coordenador`
+        // gravado (evento antigo), o responsável para o backend é quem criou (`coordenador_id or
+        // usuario_id`); o nome vem de `coordenador_nome`, que o detalhe já preenche com quem criou
+        // quando não há `coordenador` (sem o login, que é o CPF), ou da linha COORDENADOR dele. A linha
+        // COORD_ACOMPANHA que repete o responsável não vira outra tag (nem vai em `coord_acompanha_ids`).
+        const efetivoId = responsavelEfetivoDe(data);
+        const linhaDoResponsavel = (data.participations || []).find(
+          (p: Participation) => p.role === 'COORDENADOR' && p.usuario?.id === efetivoId,
+        );
+        const nomeDaLinha = linhaDoResponsavel?.usuario
+          ? `${linhaDoResponsavel.usuario.first_name} ${linhaDoResponsavel.usuario.last_name}`.trim()
+          : '';
+        const responsavelEfetivo: CoordenadorItem = {
+          id: efetivoId,
+          label: data.coordenador_nome || nomeDaLinha || `#${efetivoId}`,
+        };
+        const coordenadores: CoordenadorItem[] = [
+          responsavelEfetivo,
+          ...pessoasDoPapel('COORD_ACOMPANHA').filter(c => c.id !== efetivoId),
+        ];
 
         // Preencher o formData com os dados existentes
         setFormData({
@@ -191,6 +224,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
           local: data.local || '',
           is_online: data.is_online || false,
           formadores,
+          coordenadores,
           coordenadorAcompanha: data.coordenador_acompanha,
           pretendeAvaliar: data.pretende_avaliar_formador ?? null,
           formadorAvaliado: data.formador_avaliado ?? null,
@@ -288,6 +322,15 @@ export default function EditSolicitacaoPage(): JSX.Element {
   const avaliarObrigatoria =
     perguntaAvaliar && (solicitacao?.pretende_avaliar_formador != null || !avaliarAplicavaAoCarregar);
 
+  // Trocar o 1º coordenador troca o responsável: a resposta de acompanhar era do anterior e é apagada.
+  const handleCoordenadoresChange = (value: CoordenadorItem[]): void => {
+    setFormData(prev => ({
+      ...prev,
+      coordenadores: value,
+      coordenadorAcompanha: value[0]?.id === prev.coordenadores[0]?.id ? prev.coordenadorAcompanha : null,
+    }));
+  };
+
   // Trocar a lista de formadores: se o escolhido para avaliação saiu, a escolha é limpa.
   const handleFormadoresChange = (value: FormadorType[]): void => {
     setFormData(prev => ({
@@ -335,6 +378,20 @@ export default function EditSolicitacaoPage(): JSX.Element {
         return;
       }
 
+      // A API não deixa esvaziar o responsável (no evento antigo sem `coordenador`, é quem criou).
+      const [responsavel, ...demaisCoordenadores] = formData.coordenadores;
+      if (!responsavel) {
+        message.error('Escolha o coordenador responsável pelo evento.');
+        setSaving(false);
+        return;
+      }
+
+      if (formData.coordenadorAcompanha === null) {
+        message.error('Responda se o coordenador responsável vai acompanhar o evento.');
+        setSaving(false);
+        return;
+      }
+
       if (avaliarObrigatoria && formData.pretendeAvaliar === null) {
         message.error('Informe se você pretende avaliar o formador neste evento.');
         setSaving(false);
@@ -359,6 +416,11 @@ export default function EditSolicitacaoPage(): JSX.Element {
         observacoes: optionalText(formData.observacoes),
         local: formData.local || '',
         is_online: !!formData.is_online,
+        // O 1º da caixa é o responsável (trocar o 1º troca o responsável; a API confere a gerência). O
+        // evento antigo sem `coordenador` salvo sem trocar o 1º segue sem (o backend já usa quem criou).
+        ...((solicitacao?.coordenador || (solicitacao && responsavel.id !== responsavelEfetivoDe(solicitacao))) && {
+          coordenador: responsavel.id,
+        }),
         coordenador_acompanha: formData.coordenadorAcompanha,
         // Pergunta que não se aplica: a resposta não vai (a gravada fica; o backend recusa
         // apagá-la e recusa tirar da lista o formador escolhido).
@@ -368,15 +430,17 @@ export default function EditSolicitacaoPage(): JSX.Element {
         }),
         extra_participants: {
           formador_ids: formadores.map(f => f.id),
+          coord_acompanha_ids: demaisCoordenadores.map(c => c.id),
         },
       };
 
       const atualizada = await updateSolicitacao(Number(id), payload);
       // Decisão do dono (14/10/2026): o backend devolve a SUPER aprovada para pendente quando
-      // muda data, horário, município, projeto ou formadores. A tela só avisa o que a API fez.
+      // muda data, horário, município, projeto, formadores ou coordenadores (03/11/2026). A tela só
+      // avisa o que a API fez.
       if (solicitacao?.status === 'aprovado' && atualizada.status === 'pendente') {
         message.warning(
-          'Solicitação atualizada. A mudança de data, horário, município, projeto ou formadores voltou o evento para aprovação.',
+          'Solicitação atualizada. A mudança de data, horário, município, projeto, formadores ou coordenadores voltou o evento para aprovação.',
         );
       } else {
         message.success('Solicitação atualizada com sucesso!');
@@ -543,8 +607,20 @@ export default function EditSolicitacaoPage(): JSX.Element {
             />
           </Form.Item>
 
-          <Form.Item label="Coordenador responsável">
-            <Text>{solicitacao?.coordenador_nome || 'Não informado'}</Text>
+          {/* Decisões do dono (03/11/2026): a caixa única da criação. O 1º é o responsável; os demais ocupam
+              a agenda e recebem o convite. */}
+          <Form.Item
+            label="Coordenador(es)"
+            htmlFor="edit-coordenadores"
+            extra={<span id="edit-coordenadores-explica">O 1º escolhido é o coordenador responsável.</span>}
+          >
+            <CoordenadoresPicker
+              id="edit-coordenadores"
+              aria-describedby="edit-coordenadores-explica"
+              value={formData.coordenadores}
+              onChange={handleCoordenadoresChange}
+              projetoId={projetoId}
+            />
           </Form.Item>
 
           <Form.Item

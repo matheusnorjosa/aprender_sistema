@@ -33,11 +33,18 @@ describe('FormadoresPicker — projeto do evento no lookup (PR 9)', () => {
         onChange={onChange}
       />
     );
-    const remover = screen.getByRole('button', { name: 'Remover Bruno Formador' });
+    // "dos formadores": a mesma pessoa pode estar também na caixa de coordenadores do horário.
+    const remover = screen.getByRole('button', { name: 'Remover Bruno Formador dos formadores' });
     remover.focus();
     expect(remover).toHaveFocus();
     fireEvent.click(remover);
     expect(onChange).toHaveBeenCalledWith([{ id: 2, label: 'Gil Formador' }]);
+  });
+
+  test('formador não tem responsável: a 1ª tag fica sem marca', () => {
+    render(<FormadoresPicker value={[{ id: 1, label: 'Bruno Formador' }]} onChange={vi.fn()} />);
+    expect(screen.getByText('Bruno Formador')).toBeInTheDocument();
+    expect(screen.queryByText(/responsável/)).not.toBeInTheDocument();
   });
 
   test('o id e os aria-* do Form.Item chegam ao campo de busca', () => {

@@ -421,3 +421,20 @@ def test_reconcile_segmento_norm_scoped(tmp_path):
     assert sol.segmento == "Fund I", "segmento cru do existente NÃO muda (create-only fora do norm)"
     assert sol.status == status_antes, "status intocado"
     assert sol.segmento_norm == "Fundamental I"
+
+
+def test_participation_coord_acompanha_do_csv_e_recusado_com_motivo(tmp_path):
+    """Desde 03/11/2026 o COORD_ACOMPANHA ocupa a agenda e conta horas, e só entra pela tela (gerência e
+    agenda conferidas). O contrato v13 não traz esse papel: vindo do CSV, é recusado com motivo, nunca gravado."""
+    mun, proj, tipo, _coord = _masters()
+    UsuarioFactory(username="p3", cpf="52998224725", email="p3@x.com", first_name="Pessoa", last_name="Tres")
+    eh = _hash(mun, proj, tipo)
+    part = f"{PART_HEADER}\n{eh},Pessoa Tres,PESSOA TRES,52998224725,p3@x.com,Coord Acompanha\n"
+    path = _write_export(tmp_path, {"solicitacao": _sol_row(ehash=eh), "participation": part})
+    seco = ExportContractImporter(path=path, apply=False).run()["por_entidade"]["participation"]
+    assert seco["would_reject"] == 1
+    assert seco["would_create"] == 0
+    assert seco["reject_reasons"]["coord_acompanha_do_csv"] == 1
+    ExportContractImporter(path=path, apply=True, allow=("solicitacao", "participation")).run()
+    assert Solicitacao.objects.filter(external_hash=eh).exists()
+    assert not Participation.objects.filter(role="COORD_ACOMPANHA").exists()

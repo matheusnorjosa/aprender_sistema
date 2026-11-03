@@ -129,6 +129,29 @@ function getTimelineColor(action: string): string {
   return 'gray';
 }
 
+// Cópia Google → sistema (GCAL_COPIA_GOOGLE): o que mudou, em português, e o choque (D3: copia e avisa).
+const COPIA_GOOGLE = 'GCAL_COPIA_GOOGLE';
+
+function intervalo(valor: unknown): string {
+  const v = (valor ?? {}) as { inicio?: string; fim?: string };
+  if (!v.inicio || !v.fim) return '?';
+  return `${formatFortaleza(v.inicio, 'DD/MM HH:mm')}–${formatFortaleza(v.fim, 'HH:mm')}`;
+}
+
+function resumoDaCopia(details: Record<string, unknown>): { texto: string; choque: string | null } {
+  if (details['campo'] === 'status') {
+    return { texto: 'Cancelado no Google: o evento foi reprovado', choque: null };
+  }
+  const bruto = details['choque'];
+  const choques = Array.isArray(bruto) ? (bruto as { usuario_id: number; codigo: string }[]) : [];
+  const pessoas = new Set(choques.map((c) => c.usuario_id)).size;
+  const codigos = [...new Set(choques.map((c) => c.codigo))].sort().join(', ');
+  return {
+    texto: `Horário: ${intervalo(details['antes'])} → ${intervalo(details['depois'])}`,
+    choque: pessoas ? `Choque de agenda: ${pessoas} ${pessoas === 1 ? 'pessoa' : 'pessoas'} (${codigos})` : null,
+  };
+}
+
 export default function GCalDashboardPage(): JSX.Element {
   const [metrics, setMetrics] = useState<MetricsData | null>(null);
   const [events, setEvents] = useState<EventRecord[]>([]);
@@ -819,25 +842,43 @@ export default function GCalDashboardPage(): JSX.Element {
             <Divider orientation="left">Timeline de Auditoria</Divider>
             {eventDetail.timeline && eventDetail.timeline.length > 0 ? (
               <Timeline
-                items={eventDetail.timeline.map((log) => ({
-                  color: getTimelineColor(log.action),
-                  children: (
-                    <div>
-                      <Text strong>{log.action}</Text>
-                      <br />
-                      <Text type="secondary">
-                        {log.usuario_nome} - {formatFortaleza(log.created_at, 'DD/MM/YYYY HH:mm:ss')}
-                      </Text>
-                      {log.details && Object.keys(log.details).length > 0 && (
-                        <div className="mt-1">
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            {JSON.stringify(log.details, null, 2)}
-                          </Text>
+                items={eventDetail.timeline.map((log) => {
+                  if (log.action === COPIA_GOOGLE) {
+                    const { texto, choque } = resumoDaCopia(log.details ?? {});
+                    return {
+                      color: choque ? 'red' : 'blue',
+                      children: (
+                        <div>
+                          <Text strong>Mudança feita no Google</Text>
+                          <br />
+                          <Text>{texto}</Text>
+                          {choque && <Alert className="mt-1" type="warning" showIcon message={choque} />}
+                          <br />
+                          <Text type="secondary">{formatFortaleza(log.created_at, 'DD/MM/YYYY HH:mm:ss')}</Text>
                         </div>
-                      )}
-                    </div>
-                  ),
-                }))}
+                      ),
+                    };
+                  }
+                  return {
+                    color: getTimelineColor(log.action),
+                    children: (
+                      <div>
+                        <Text strong>{log.action}</Text>
+                        <br />
+                        <Text type="secondary">
+                          {log.usuario_nome} - {formatFortaleza(log.created_at, 'DD/MM/YYYY HH:mm:ss')}
+                        </Text>
+                        {log.details && Object.keys(log.details).length > 0 && (
+                          <div className="mt-1">
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              {JSON.stringify(log.details, null, 2)}
+                            </Text>
+                          </div>
+                        )}
+                      </div>
+                    ),
+                  };
+                })}
               />
             ) : (
               <Alert message="Nenhum log de auditoria encontrado" type="info" />

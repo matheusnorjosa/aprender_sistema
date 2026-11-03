@@ -438,6 +438,28 @@ class TestRecusaPorEvento:
         assert "errors" not in itens[1]
         assert _contagens() == antes
 
+    def test_evento_barrado_pela_agenda_vai_para_o_log(self, coordenador, formador, nao_super, cidade_a, tipo_evento):
+        """Como na criação avulsa (`enforce_solicitacao_availability`), o bloqueio sai no log `availability_blocked`."""
+        aprovado = SolicitacaoFactory(
+            usuario=formador, municipio=cidade_a, inicio=_utc(12), fim=_utc(14), status="aprovado"
+        )
+        Participation.objects.create(solicitacao=aprovado, usuario=formador, role="FORMADOR")
+
+        with patch("apps.core.views_solicitacao.logger") as log:
+            response = _client(coordenador).post(
+                URL,
+                {"eventos": [_item(nao_super, cidade_a, tipo_evento, _utc(13), _utc(15), formadores=[formador])]},
+                format="json",
+            )
+
+        assert response.status_code == 400
+        barrados = [c for c in log.info.call_args_list if c.args and c.args[0] == "availability_blocked"]
+        assert len(barrados) == 1
+        extra = barrados[0].kwargs["extra"]
+        assert extra["event"] == "availability_blocked"
+        assert extra["action"] == "lote"
+        assert extra["blocked_usuario_ids"] == [formador.pk]
+
     def test_super_mais_super_com_a_mesma_pessoa_marca_os_dois(
         self, coordenador, formador, super_, cidade_a, tipo_evento
     ):

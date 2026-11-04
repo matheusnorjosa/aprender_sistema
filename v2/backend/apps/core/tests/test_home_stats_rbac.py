@@ -392,8 +392,10 @@ def _make_aprovadora() -> Usuario:
 
 class TestParityWithLegacyBehavior:
     """M11-16 (PR B1): `pending_approvals` segue a policy real de aprovação
-    (`access_solicitation_approvals`), conta só pendentes SUPER e, para quem não é
-    superuser, exclui as próprias (que ela não pode decidir)."""
+    (`access_solicitation_approvals`), conta as pendentes que ela decide e, para quem não é
+    superuser, exclui as próprias (que ela não pode decidir). Desde 03/11/2026 o NAO_SUPER pendente
+    (o evento sem compra vai para aprovação) entra para quem decide qualquer projeto; a aprovadora por
+    vínculo segue só no SUPER da g1."""
 
     def test_aprovadora_conta_apenas_pendentes_super(self, world):
         """Aprovadora (vínculo GERENTE em g1) conta só as pendentes SUPER."""
@@ -420,15 +422,16 @@ class TestParityWithLegacyBehavior:
         assert response.status_code == 200
         assert response.json()["pending_approvals"] is None
 
-    def test_asst_admin_controle_conta_pendentes_super(self, world):
-        """Quem trabalha no Controle aprova (PR 11: pelo vínculo EQUIPE na gerência CONTROLE) → conta."""
+    def test_asst_admin_controle_conta_pendentes_dos_dois_fluxos(self, world):
+        """Quem trabalha no Controle aprova (PR 11: pelo vínculo EQUIPE na gerência CONTROLE) qualquer
+        projeto → conta a SUPER e a NAO_SUPER pendente (sem compra, 03/11/2026)."""
         _pendentes_nao_super_e_super(world, world["autor"])
         user = _make_user("asst_ctrl", ["Controle", "Assistente Administrativo"])
         com_pacote_do_controle(user)
 
         response = _get_home_stats(user)
         assert response.status_code == 200
-        assert response.json()["pending_approvals"] == 1
+        assert response.json()["pending_approvals"] == 2
 
     def test_par_controle_sem_vinculo_recebe_null(self, world):
         """PR 11: o par Controle + Assistente Administrativo sem o vínculo não aprova → null."""
@@ -449,14 +452,14 @@ class TestParityWithLegacyBehavior:
         assert response.json()["pending_approvals"] == 1
 
     def test_superuser_conta_inclusive_as_proprias(self, world):
-        """Superuser pode decidir a própria (marcada no AuditLog) → conta todas as SUPER."""
+        """Superuser pode decidir a própria (marcada no AuditLog) → conta todas as pendentes."""
         superuser = _make_user("su_pa", [], is_superuser=True)
         _pendentes_nao_super_e_super(world, world["autor"])
         _pendentes_nao_super_e_super(world, superuser)
 
         response = _get_home_stats(superuser)
         assert response.status_code == 200
-        assert response.json()["pending_approvals"] == 2
+        assert response.json()["pending_approvals"] == 4
 
     def test_formador_nao_pode_aprovar_nem_criar(self, world):
         """Formador puro: pending_approvals e my_requests retornam None."""

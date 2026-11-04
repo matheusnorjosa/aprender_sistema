@@ -1029,19 +1029,24 @@ class TestSolicitacaoEditCompraEligibility:
     Compra contornava a regra. Estes testes garantem que a checagem roda também
     no update quando o par é alterado, e SOMENTE quando é alterado (não quebra
     a edição de solicitações antigas cujo par não tem Compra registrada).
+    Desde 03/11/2026 o par sem compra não é recusado: o evento fica marcado `sem_compra` e
+    vai para aprovação (`test_sem_compra_com_aprovacao.py`).
     """
 
     def _make_compra(self, municipio, projeto):
         return liberar_par(municipio, projeto)
 
-    def test_patch_changing_projeto_to_pair_without_compra_is_rejected(
+    def test_patch_changing_projeto_to_pair_without_compra_is_flagged(
         self, api_client, usuario_owner, solicitacao_editavel
     ):
-        """PATCH que troca o projeto para um par município+projeto SEM Compra é rejeitado (400)."""
+        """PATCH que troca o projeto para um par município+projeto SEM Compra: aceito, marcado, pendente."""
         api_client.force_authenticate(user=usuario_owner)
         projeto_sem_compra = ProjetoFactory(
             nome=f"Projeto sem compra {uuid4().hex[:8]}", fluxo="SUPER", gerencia=solicitacao_editavel.projeto.gerencia
         )
+        liberar_par(
+            MunicipioFactory(nome=f"Município {uuid4().hex[:8]}", uf="CE"), projeto_sem_compra
+        )  # compra em outro município: não "em espera" (que segue recusado)
 
         response = api_client.patch(
             f"/api/solicitacoes/{solicitacao_editavel.id}/",
@@ -1049,12 +1054,11 @@ class TestSolicitacaoEditCompraEligibility:
             format="json",
         )
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        # A API embrulha erros de validação em {code, detail, errors}.
-        errors = response.data.get("errors", response.data)
-        assert "municipio" in errors
+        assert response.status_code == status.HTTP_200_OK, response.data
+        assert response.data["sem_compra"] is True
         solicitacao_editavel.refresh_from_db()
-        assert solicitacao_editavel.projeto_id != projeto_sem_compra.id
+        assert solicitacao_editavel.projeto_id == projeto_sem_compra.id
+        assert solicitacao_editavel.status == "pendente"
 
     def test_patch_changing_projeto_to_pair_with_compra_is_allowed(
         self, api_client, usuario_owner, solicitacao_editavel, municipio
@@ -1180,12 +1184,13 @@ class TestSolicitacaoEditCompraEligibility:
 
         assert response.status_code == status.HTTP_200_OK, response.data
 
-    def test_patch_payload_da_tela_trocando_municipio_para_par_sem_compra_e_rejeitado(
+    def test_patch_payload_da_tela_trocando_municipio_para_par_sem_compra_e_marcado(
         self, api_client, usuario_owner, municipio, projeto, tipo_evento
     ):
-        """Guarda: o payload completo trocando o MUNICÍPIO para par sem Compra continua barrado."""
+        """Guarda: o payload completo trocando o MUNICÍPIO para par sem Compra é conferido e marcado."""
         sol = self._solicitacao_com_data_fixa(usuario_owner, municipio, projeto, tipo_evento)
         outro_municipio = MunicipioFactory(nome=f"Município {uuid4().hex[:8]}", uf="CE")
+        self._make_compra(municipio, projeto)  # o projeto tem compra no par de hoje: não "em espera"
         api_client.force_authenticate(user=usuario_owner)
 
         response = api_client.patch(
@@ -1194,20 +1199,22 @@ class TestSolicitacaoEditCompraEligibility:
             format="json",
         )
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        errors = response.data.get("errors", response.data)
-        assert "municipio" in errors
+        assert response.status_code == status.HTTP_200_OK, response.data
+        assert response.data["sem_compra"] is True
         sol.refresh_from_db()
-        assert sol.municipio_id == municipio.id
+        assert sol.municipio_id == outro_municipio.id
 
-    def test_patch_payload_da_tela_trocando_so_o_projeto_para_par_sem_compra_e_rejeitado(
+    def test_patch_payload_da_tela_trocando_so_o_projeto_para_par_sem_compra_e_marcado(
         self, api_client, usuario_owner, municipio, projeto, tipo_evento
     ):
-        """Guarda: o payload completo trocando só o PROJETO para par sem Compra continua barrado."""
+        """Guarda: o payload completo trocando só o PROJETO para par sem Compra é conferido e marcado."""
         sol = self._solicitacao_com_data_fixa(usuario_owner, municipio, projeto, tipo_evento)
         outro_projeto = ProjetoFactory(
             nome=f"Projeto sem compra {uuid4().hex[:8]}", fluxo="SUPER", gerencia=projeto.gerencia
         )
+        liberar_par(
+            MunicipioFactory(nome=f"Município {uuid4().hex[:8]}", uf="CE"), outro_projeto
+        )  # compra em outro município: não "em espera" (que segue recusado)
         api_client.force_authenticate(user=usuario_owner)
 
         response = api_client.patch(
@@ -1216,8 +1223,7 @@ class TestSolicitacaoEditCompraEligibility:
             format="json",
         )
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        errors = response.data.get("errors", response.data)
-        assert "municipio" in errors
+        assert response.status_code == status.HTTP_200_OK, response.data
+        assert response.data["sem_compra"] is True
         sol.refresh_from_db()
-        assert sol.projeto_id == projeto.id
+        assert sol.projeto_id == outro_projeto.id

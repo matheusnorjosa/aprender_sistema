@@ -114,11 +114,12 @@ class HomeStatsView(APIView):
 
         # === APROVAÇÕES PENDENTES ===
         # M11-16 (PR B1): mesmo gate dos endpoints de aprovação e mesmo recorte da
-        # ApprovalsPage (`flow=SUPER&status=pendente`). Não-superuser não decide as
-        # próprias (PA-02 segregação) → não entram na contagem.
+        # ApprovalsPage (`flow=SUPER,NAO_SUPER&status=pendente`; o NAO_SUPER pendente é o sem compra,
+        # pedido do dono de 03/11/2026). Não-superuser não decide as próprias (PA-02 segregação) →
+        # não entram na contagem.
         pending_approvals = None
         if user_has_policy(user, "access_solicitation_approvals"):
-            pending_qs = Solicitacao.objects.filter(status="pendente", projeto__fluxo="SUPER")
+            pending_qs = Solicitacao.objects.filter(status="pendente", projeto__fluxo__in=("SUPER", "NAO_SUPER"))
             if not user.is_superuser:
                 pending_qs = pending_qs.exclude(usuario=user)
             # Regra do dono (30/09): conta só o que ela decide (não restringe o que ela vê).

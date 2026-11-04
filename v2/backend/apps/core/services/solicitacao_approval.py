@@ -24,6 +24,7 @@ from apps.core.exceptions import APIError, ValidationAPIError
 from apps.core.models import AuditLog, Participation, Solicitacao, Usuario
 from apps.core.rbac.policies import (
     ESCOPO_SUPERINTENDENCIA_Q,
+    aprovadora_restrita_a_superintendencia,
     solicitation_approval_basis,
     solicitation_approval_basis_for,
 )
@@ -112,6 +113,8 @@ CAMPOS_MATERIAIS_NO_AUDITLOG: dict[str, str] = {
     "coord_acompanha_ids": "coordenadores",
 }
 
+OUT_OF_SCOPE_CODE = "out_of_approval_scope"
+
 # Código do impedimento → valor de `decisao_impedida` na lista (tela de Aprovações).
 DECISAO_IMPEDIDA: dict[str, str] = {
     SELF_APPROVAL_CODE: "propria",
@@ -119,6 +122,7 @@ DECISAO_IMPEDIDA: dict[str, str] = {
     ALTERED_BY_AUTHOR_CODE: "conta_alterada_pelo_autor",
     SAME_ALTERER_CODE: "contas_alteradas_pela_mesma_pessoa",
     EDITED_BY_APPROVER_CODE: "editada_pelo_ator",
+    OUT_OF_SCOPE_CODE: "fora_do_escopo",
 }
 
 
@@ -359,6 +363,22 @@ def decisoes_impedidas(user: Usuario, solicitacoes: QuerySet[Solicitacao]) -> di
     return impedimentos(user, solicitacoes)
 
 
+def decisoes_impedidas_na_lista(user: Usuario, solicitacoes: QuerySet[Solicitacao]) -> dict[int, str]:
+    """`decisoes_impedidas` mais o escopo da aprovadora por vínculo (regra do dono, 30/09: ver não muda).
+
+    Para quem só aprova pelo vínculo GERENTE na Superintendência, a linha fora de
+    `ESCOPO_SUPERINTENDENCIA_Q` (ex.: o NAO_SUPER sem compra, 03/11/2026) leva `OUT_OF_SCOPE_CODE`, que o
+    `approve`/`reject` recusaria com 403. A segregação vem antes, como no individual. Duas consultas a mais.
+    """
+    impedidas = decisoes_impedidas(user, solicitacoes)
+    if aprovadora_restrita_a_superintendencia(user):
+        no_escopo = set(solicitacoes.filter(ESCOPO_SUPERINTENDENCIA_Q).values_list("pk", flat=True))
+        for sol_id in solicitacoes.values_list("pk", flat=True):
+            if sol_id not in no_escopo:
+                impedidas.setdefault(sol_id, OUT_OF_SCOPE_CODE)
+    return impedidas
+
+
 def _log_decisao_impedida(solicitacao: Solicitacao, user: Usuario, code: str) -> None:
     """Loga o bloqueio sem username (username é o CPF em produção)."""
     # O bloqueio da própria mantém o nome do evento do PR B1 (alertas e testes o leem).
@@ -394,9 +414,6 @@ def _bloquear_decisao_impedida(solicitacao: Solicitacao, user: Usuario, acao: st
         _log_decisao_impedida(solicitacao, user, code)
         raise APIError(code=code, message=mensagem_impedida(code, acao), status_code=403)
     return _marcas(code)
-
-
-OUT_OF_SCOPE_CODE = "out_of_approval_scope"
 
 
 def _mensagem_fora_do_escopo(acao: str) -> str:

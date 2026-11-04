@@ -61,8 +61,10 @@ import logger from '../../utils/logger';
 import type { ErroDoEventoNoLote } from '../../api/solicitacoes';
 import HorarioDoEvento, { type ErrosDoHorario, type HorarioDoEventoHandle, type Problema } from './HorarioDoEvento';
 import {
+  AVISO_SEM_COMPRA,
   estaEmBranco,
   eventoDoHorario,
+  opcaoDoMunicipio,
   ORDEM_DO_CARTAO,
   ORDEM_DO_HORARIO,
   perguntaAvaliarDo,
@@ -207,21 +209,22 @@ export default function CartaoEvento({
 
   const projetoId = dados.projeto?.id;
   const lookupMunicipiosElegiveis = useCallback(async (q: string): Promise<LookupItem[]> => {
-    // Para usuário comum, exige projeto para aplicar filtro município+projeto.
+    // Para usuário comum, exige projeto: a lista marca os municípios sem compra para ele.
     if (!dispensaCompra && !projetoId) {
       setMunicipioLookupHasResults(false);
       return [];
     }
-    const results = await lookupMunicipiosWithFilters({
-      q,
-      com_compra: dispensaCompra ? undefined : true,
-      projeto_id: !dispensaCompra ? projetoId : undefined,
-    });
+    // Pedido do dono (03/11/2026): o município sem compra também vem (com compra primeiro), marcado.
+    const results = await lookupMunicipiosWithFilters(
+      dispensaCompra ? { q } : { q, marcar_sem_compra: true, projeto_id: projetoId },
+    );
     if (!q.trim()) {
-      setMunicipioLookupHasResults(results.length > 0);
+      // Com compra primeiro: se nenhum da lista sem busca tem compra, nenhum tem.
+      setMunicipioLookupHasResults(results.some((r) => r['sem_compra'] !== true));
     }
     return results;
   }, [projetoId, dispensaCompra]);
+  const semCompra = !dispensaCompra && dados.municipio?.sem_compra === true;
 
   // Regra da compra: projeto sem compra que o libere ("em espera") some da lista.
   const lookupProjetosElegiveis = useCallback(
@@ -332,9 +335,10 @@ export default function CartaoEvento({
   }));
 
   // Situação do evento, em texto fixo (sem região viva por cartão): o fluxo de aprovação e a compra.
+  // Sem compra no município, vai para aprovação em qualquer fluxo (pedido do dono, 03/11/2026).
   const situacao: string[] = [
-    ...(dados.projeto?.fluxo === 'SUPER' ? ['Vai para aprovação'] : []),
-    ...(dados.projeto?.fluxo === 'NAO_SUPER' ? ['Aprovado na hora'] : []),
+    ...(dados.projeto?.fluxo === 'SUPER' || semCompra ? ['Vai para aprovação'] : []),
+    ...(dados.projeto?.fluxo === 'NAO_SUPER' && !semCompra ? ['Aprovado na hora'] : []),
     ...(!dispensaCompra && dados.projeto && municipioLookupHasResults === false
       ? ['Sem municípios com compra para este projeto']
       : []),
@@ -457,25 +461,28 @@ export default function CartaoEvento({
             </Form.Item>
           </div>
           <div className="min-w-0">
+            {/* O aviso vai no `extra`: o antd o liga ao campo por aria-describedby. Sem região viva por cartão. */}
             <Form.Item
               label="Município"
               name="municipio"
               rules={[{ required: true, message: 'Por favor selecione um município' }]}
+              extra={semCompra ? <Alert type="warning" showIcon role="none" message={AVISO_SEM_COMPRA} /> : undefined}
             >
               <ComboBox
                 lookupFunction={lookupMunicipiosElegiveis}
+                renderOption={dispensaCompra ? undefined : opcaoDoMunicipio}
                 onChange={(value: ComboBoxValue | null) => mudar({ municipio: value })}
                 value={dados.municipio}
                 placeholder={
                   !dispensaCompra && !dados.projeto
-                    ? 'Selecione um projeto para carregar municípios elegíveis'
+                    ? 'Selecione um projeto para carregar os municípios'
                     : 'Busque ou selecione um município'
                 }
                 disabled={!dispensaCompra && !dados.projeto}
                 oQueCarrega="os municípios"
                 notFoundContent={
                   !dispensaCompra && dados.projeto
-                    ? 'Nenhum município elegível para o projeto selecionado'
+                    ? 'Nenhum município encontrado'
                     : 'Nenhum resultado encontrado'
                 }
               />

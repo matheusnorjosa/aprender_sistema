@@ -274,15 +274,18 @@ class TestSolicitacaoRBAC:
         # Assert
         assert response.status_code == status.HTTP_201_CREATED
 
-    def test_coordenador_sem_compra_para_projeto_recebe_400(self):
-        """Coordenador não pode criar solicitação quando município+projeto não têm compra."""
+    def test_coordenador_sem_compra_para_projeto_vai_para_aprovacao(self):
+        """Município+projeto sem compra: o coordenador cria e o evento vai para aprovação (03/11/2026)."""
         client = APIClient()
         coord = UsuarioFactory(username="coord2", password="pass", cpf="22222222222")
-        com_papel(coord, "COORDENADOR")
+        vinculo = com_papel(coord, "COORDENADOR")
 
         tipo_evento = TipoEventoFactory(nome="Acompanhamento")
         municipio = MunicipioFactory(nome="Sobral", uf="CE")
-        projeto = ProjetoFactory(nome="Projeto Y", fluxo="SUPER")
+        projeto = ProjetoFactory(nome="Projeto Y", gerencia=vinculo.gerencia)  # NAO_SUPER: aprovado se tivesse compra
+        liberar_par(
+            MunicipioFactory(nome="Crato", uf="CE"), projeto
+        )  # compra em outro município: sem compra aqui, mas não "em espera" (que segue recusado)
 
         client.force_authenticate(user=coord)
 
@@ -303,6 +306,5 @@ class TestSolicitacaoRBAC:
             format="json",
         )
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "errors" in response.data
-        assert "municipio" in response.data["errors"]
+        assert response.status_code == status.HTTP_201_CREATED, response.data
+        assert response.data["status"] == "pendente"

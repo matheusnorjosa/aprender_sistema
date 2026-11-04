@@ -28,7 +28,9 @@ from apps.core.pii import busca_por_nome
 from apps.core.rbac.helpers import filtrar_formadores_avaliaveis, user_has_any_perm
 from apps.core.services.compra_elegibilidade import (
     isento_da_regra_da_compra,
+    municipios_com_marca_sem_compra,
     municipios_liberados,
+    projeto_em_espera,
     projetos_liberados,
 )
 from apps.core.services.normalize import norm_text
@@ -79,10 +81,16 @@ class MunicipioLookup(APIView):
       `services/compra_elegibilidade`)
     - projeto_id=<id>: só municípios liberados para o projeto (mesmo projeto, coleção ou, se o
       projeto é nome geral, gerência); projeto inexistente devolve lista vazia
+    - marcar_sem_compra=true (com projeto_id; Nova Solicitação e edição): em vez de filtrar, devolve
+      também os municípios sem compra para o projeto, com compra primeiro, e cada item leva
+      `sem_compra` (o evento ali vai para aprovação; pedido do dono, 03/11/2026) e `projeto_em_espera`
+      (o projeto não tem compra em município nenhum: a criação e a edição o recusam)
+    - municipio_id=<id>: só esse município (a edição reconfere a marca do par ao trocar o projeto)
 
-    Os filtros de compra não valem para quem é isento da regra (superuser ou a capacidade).
+    Os filtros de compra não valem para quem é isento da regra (superuser ou a capacidade); com
+    `marcar_sem_compra`, o isento recebe `sem_compra: false` em tudo (ele cria sem aprovação).
 
-    Retorna: [{id, label, kind: "municipio"}]
+    Retorna: [{id, label, kind: "municipio", sem_compra?}]
     """
 
     permission_classes = [IsAuthenticated]
@@ -92,6 +100,7 @@ class MunicipioLookup(APIView):
         com_compra = request.GET.get("com_compra", "false").lower() in {"1", "true", "t", "yes", "y"}
         include_hubs = request.GET.get("include_hubs", "false").lower() in {"1", "true", "t", "yes", "y"}
         projeto_id_raw = request.GET.get("projeto_id", "").strip()
+        marcar_sem_compra = request.GET.get("marcar_sem_compra", "false").lower() in {"1", "true", "t", "yes", "y"}
 
         projeto_id: int | None = None
         try:
@@ -105,7 +114,23 @@ class MunicipioLookup(APIView):
         # dropdown de solicitação por padrão; `include_hubs=true` reexpõe (fluxo de deslocamento).
         if not include_hubs:
             qs = qs.exclude(uf="")
-        if (com_compra or projeto_id is not None) and not isento_da_regra_da_compra(request.user):
+        # Reconferir um município (o do evento gravado pode estar inativo ou ser hub): ele vem com a
+        # marca mesmo fora da lista normal, porque o servidor confere o par do mesmo jeito no salvar.
+        municipio_id_raw = request.GET.get("municipio_id", "").strip()
+        if municipio_id_raw:
+            qs = Municipio.objects.filter(pk=int(municipio_id_raw)) if municipio_id_raw.isdecimal() else qs.none()
+        ordem: tuple[str, ...] = ("nome",)
+        em_espera = False  # o projeto não recebe evento (sem compra em município nenhum): a tela avisa
+        if marcar_sem_compra and projeto_id is not None:
+            projeto = Projeto.objects.filter(pk=projeto_id).first()
+            if projeto is None:
+                qs = qs.none()
+            elif not isento_da_regra_da_compra(request.user):
+                # Com compra primeiro: o teto da lista sem busca não esconde o município com compra.
+                qs = municipios_com_marca_sem_compra(qs, projeto)
+                ordem = ("sem_compra", "nome")
+                em_espera = projeto_em_espera(projeto)
+        elif (com_compra or projeto_id is not None) and not isento_da_regra_da_compra(request.user):
             if projeto_id is None:
                 qs = municipios_liberados(qs, None)
             else:
@@ -114,25 +139,23 @@ class MunicipioLookup(APIView):
 
         if not q:
             # Retornar municípios (max 100)
-            qs = qs.order_by("nome")[:100]
+            qs = qs.order_by(*ordem)[:100]
         else:
             # Normalizar query
             _q_norm = norm_text(q)  # noqa: F841 - reserved for future normalized search
 
             # Buscar por nome ou UF
-            qs = qs.filter(Q(nome__icontains=q) | Q(uf__icontains=q)).order_by("nome")[:50]
+            qs = qs.filter(Q(nome__icontains=q) | Q(uf__icontains=q)).order_by(*ordem)[:50]
 
         results = []
         for mun in qs:
             # Sem traço sobrando quando a UF é vazia (hub de viagem): "Fortaleza", não "Fortaleza-".
             label = f"{mun.nome}-{mun.uf}" if mun.uf else mun.nome
-            results.append(
-                {
-                    "id": mun.id,
-                    "label": label,
-                    "kind": "municipio",
-                }
-            )
+            item: dict[str, Any] = {"id": mun.id, "label": label, "kind": "municipio"}
+            if marcar_sem_compra and projeto_id is not None:
+                item["sem_compra"] = bool(getattr(mun, "sem_compra", False))
+                item["projeto_em_espera"] = em_espera
+            results.append(item)
 
         return Response(dedup_by_id(results))
 

@@ -384,18 +384,24 @@ class TestRecusaPorEvento:
             assert itens[indice]["errors"]["projeto"] == ["Informe o projeto do evento."]
         assert _contagens() == antes
 
-    def test_compra_faltando_recusa_e_o_isento_passa(self, coordenador, gerencia, cidade_a, tipo_evento):
+    def test_compra_faltando_vai_para_aprovacao_e_o_isento_nao(self, coordenador, gerencia, cidade_a, tipo_evento):
+        """Pedido do dono (03/11/2026): sem compra cria, pendente; o isento cria como antes (aprovado)."""
         sem_compra = ProjetoFactory(nome="Projeto sem compra", gerencia=gerencia)
+        liberar_par(
+            MunicipioFactory(nome="Cidade C Lote", uf="CE"), sem_compra
+        )  # compra em outro município: sem compra aqui, mas não "em espera" (que segue recusado)
         payload = {"eventos": [_item(sem_compra, cidade_a, tipo_evento, _utc(12), _utc(14))]}
 
-        itens = _itens(_client(coordenador).post(URL, payload, format="json"))
-        assert "municipio" in itens[0]["errors"]
-        assert Solicitacao.objects.count() == 0
+        response = _client(coordenador).post(URL, payload, format="json")
+        assert response.status_code == 201, response.data
+        assert [e["status"] for e in response.data["eventos"]] == ["pendente"]
+        Solicitacao.objects.all().delete()
 
         isento = UsuarioFactory(superuser=True)
         payload["eventos"][0]["coordenador"] = coordenador.pk
         response = _client(isento).post(URL, payload, format="json")
         assert response.status_code == 201, response.data
+        assert [e["status"] for e in response.data["eventos"]] == ["aprovado"]
 
     def test_coordenador_acompanha_faltando_so_no_segundo(self, coordenador, nao_super, cidade_a, tipo_evento):
         """Pega a regressão de `many=True`: a Regra 5 lê o `initial_data` de CADA evento."""

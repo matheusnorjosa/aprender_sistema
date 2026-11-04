@@ -133,6 +133,43 @@ describe('MySolicitacoesPage — item 36', { timeout: 20000 }, () => {
     expect(screen.getByText('Crato')).toBeInTheDocument();
   });
 
+  // Revisão de 03/11 (sem compra): o NAO_SUPER também passa por decisão, e a decidida não se exclui.
+  // Quem sabe é o servidor (`pode_excluir`); a tela não deduz pelo fluxo.
+  test.each([
+    ['aprovado', 'Já houve decisão sobre esta solicitação e ela não pode ser excluída. Para tirá-la, fale com a administração do sistema.'],
+    ['reprovado', 'Já houve decisão sobre esta solicitação e ela não pode ser excluída. Para tirá-la, fale com a administração do sistema.'],
+    ['pendente', 'Já houve decisão sobre esta solicitação e ela não pode ser excluída. Para tirá-la, peça a reprovação a quem aprova.'],
+  ] as const)('NAO_SUPER %s com pode_excluir=false e sem motivo do servidor: o texto genérico', async (status, motivo) => {
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([makeSolic({ id: 7, municipio_nome: 'Crato', status, pode_excluir: false })]),
+    );
+    renderPage();
+    await screen.findByText('Crato');
+    expect(screen.queryByRole('button', { name: 'Excluir: 10/05/2026 · Crato' })).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /^Por que não dá para/ }));
+    expect(String(informar.mock.calls[0]![0].content)).toContain(motivo);
+    informar.mockRestore();
+  });
+
+  test('com o motivo do servidor (ex.: sincronização com o Google), a tela mostra esse motivo', async () => {
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    const motivo = 'Não é possível excluir enquanto a sincronização com o Google Calendar está em andamento. Aguarde a conclusão.';
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([makeSolic({ id: 7, municipio_nome: 'Crato', status: 'aprovado', pode_excluir: false, motivo_de_nao_excluir: motivo })]),
+    );
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: /^Por que não dá para/ }));
+    const conteudo = String(informar.mock.calls[0]![0].content);
+    expect(conteudo).toContain(motivo);
+    expect(conteudo).not.toContain('Já houve decisão');
+    informar.mockRestore();
+  });
+
   test('Excluir cita a solicitação e começa no Cancelar', async () => {
     const confirmar = vi
       .spyOn(Modal, 'confirm')

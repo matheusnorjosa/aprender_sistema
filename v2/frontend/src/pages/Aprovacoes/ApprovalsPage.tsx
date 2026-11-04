@@ -2,7 +2,8 @@
  * ApprovalsPage - Página de aprovação/reprovação de solicitações (Superintendência, DAT e Controle)
  *
  * Features:
- * - Filtra solicitações pendentes do fluxo SUPER
+ * - Filtra solicitações pendentes dos fluxos SUPER e NAO_SUPER (o NAO_SUPER pendente é o evento sem
+ *   compra, que vai para aprovação; pedido do dono, 03/11/2026). A linha sem compra leva a Tag "Sem compra"
  * - Paginação no servidor (20, 50 ou 100 por página), do evento mais próximo de hoje
  *   para o mais distante e depois os passados (`ordering=proximidade`); a seleção em
  *   lote vale para a página visível
@@ -97,6 +98,7 @@ const TAG_DA_DECISAO_IMPEDIDA: Record<DecisaoImpedida, string> = {
   conta_alterada_pelo_autor: 'Quem pediu alterou a sua conta',
   contas_alteradas_pela_mesma_pessoa: 'A mesma pessoa alterou a sua conta e a de quem pediu',
   editada_pelo_ator: 'Você editou esta solicitação',
+  fora_do_escopo: 'Fora do que você aprova',
 };
 
 /** Status colors */
@@ -241,7 +243,11 @@ export default function ApprovalsPage(): JSX.Element {
     try {
       if (!silencioso) setLoading(true);
       const data = await listSolicitacoes({
-        flow: 'SUPER',
+        // O NAO_SUPER pendente é o sem compra (vai para aprovação). Aprovadas e Reprovadas: o SUPER e o que
+        // teve decisão de pessoa, sem o NAO_SUPER auto-aprovado, que não é decisão de ninguém.
+        ...((statusFilter || 'pendente') === 'pendente'
+          ? { flow: 'SUPER,NAO_SUPER' as const }
+          : { com_decisao: true }),
         status: (statusFilter || 'pendente') as SolicitacaoStatus,
         q: searchTerm,
         ordering: 'proximidade',
@@ -547,6 +553,10 @@ export default function ApprovalsPage(): JSX.Element {
             <small className="text-gray-500" style={{ ...UMA_LINHA, display: 'block' }} title={record.projeto_nome || undefined}>
               {record.projeto_nome || '-'}
             </small>
+            {/* Pedido do dono (03/11/2026): sem compra no município para o projeto, o evento veio para aprovação */}
+            {record.sem_compra === true && (
+              <Tag color="orange" className="mt-1" style={{ color: TEXTO_DA_TAG['orange'] }}>Sem compra</Tag>
+            )}
             {/* PA-02: quem lê não decide esta; outra pessoa aprovadora decide */}
             {motivo !== null && (
               <Tooltip title="Outra pessoa aprovadora precisa decidir">

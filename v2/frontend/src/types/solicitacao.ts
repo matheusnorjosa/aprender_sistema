@@ -62,7 +62,9 @@ export type DecisaoImpedida =
   | 'conta_alterada'
   | 'conta_alterada_pelo_autor'
   | 'contas_alteradas_pela_mesma_pessoa'
-  | 'editada_pelo_ator';
+  | 'editada_pelo_ator'
+  /** A aprovadora por vínculo (Superintendência) só decide o SUPER da g1 (regra do dono, 30/09). */
+  | 'fora_do_escopo';
 
 export interface Solicitacao {
   id: ID;
@@ -118,6 +120,10 @@ export interface Solicitacao {
    * Google). A Apoio exclui o evento de outra pessoa da gerência dela só quando ele está no Google.
    */
   pode_excluir?: boolean;
+  /** O par município+projeto não tem compra que o libere: o evento vai para aprovação (pedido do dono, 03/11/2026). */
+  sem_compra?: boolean;
+  /** Por que esta linha não se exclui (texto do servidor, `motivo_que_impede_excluir`); null sem recusa. */
+  motivo_de_nao_excluir?: string | null;
   meet_link: string | null;
 }
 
@@ -156,7 +162,10 @@ export interface SolicitacaoPayload {
 export interface SolicitacaoFilters {
   status?: SolicitacaoStatus | 'pending' | 'approved' | 'rejected';
   mine?: string;
-  flow?: FluxoType;
+  /** Um fluxo, ou os dois separados por vírgula (a fila de Aprovações pede `SUPER,NAO_SUPER`). */
+  flow?: FluxoType | `${FluxoType},${FluxoType}`;
+  /** Histórico de Aprovações: o SUPER ou o que teve decisão de pessoa (sem o NAO_SUPER auto-aprovado). */
+  com_decisao?: boolean;
   q?: string;
   sector?: string;
   /** PR A: filtra por `projeto.gerencia_id` (o mesmo filtro do resumo GCal). */

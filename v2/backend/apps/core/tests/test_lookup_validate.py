@@ -399,13 +399,14 @@ class TestSolicitationValidate:
         assert data["ok"] is False
         assert any("término" in err.lower() or "posterior" in err.lower() for err in data["errors"])
 
-    def test_validate_rejeita_sem_compra_municipio_projeto(self, api_client, authenticated_user, sample_data):
-        """Validação canônica deve reprovar quando par município+projeto não tem compra."""
+    def test_validate_avisa_sem_compra_municipio_projeto(self, api_client, authenticated_user, sample_data):
+        """Par município+projeto sem compra: aviso, não erro (o evento vai para aprovação; 03/11/2026)."""
         api_client.force_authenticate(user=authenticated_user)
 
         municipio = sample_data["municipios"][0]
         projeto = sample_data["projetos"][0]
         tipo_evento = sample_data["tipos_evento"][0]
+        liberar_par(sample_data["municipios"][1], projeto)  # compra em outro município: não "em espera"
 
         payload = {
             "municipio": {"id": municipio.id},
@@ -424,8 +425,8 @@ class TestSolicitationValidate:
         response = api_client.post("/api/solicitacoes/validate/", payload, format="json")
         assert response.status_code == 200
         data = response.json()
-        assert data["ok"] is False
-        assert any("sem compra que os libere" in err.lower() for err in data["errors"])
+        assert data["ok"] is True, data
+        assert any("sem compra neste município" in w.lower() for w in data["warnings"])
 
     def test_validate_aceita_com_compra_municipio_projeto(self, api_client, authenticated_user, sample_data):
         """Validação canônica deve aprovar quando existe compra para município+projeto."""

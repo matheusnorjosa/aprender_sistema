@@ -12,7 +12,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from django.db.models import Case, F, IntegerField, Max, QuerySet, Value, When
+from django.db.models import Case, F, IntegerField, Max, Q, QuerySet, Value, When
 from django.db.models.functions import Lower
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
@@ -58,7 +58,12 @@ from .services.solicitacao_approval import (
     reject_solicitacao,
 )
 from .services.solicitacao_create import resolve_initial_status
-from .services.solicitacao_exclusao import esta_no_google, ids_ja_aprovadas, motivo_que_impede_excluir
+from .services.solicitacao_exclusao import (
+    esta_no_google,
+    ids_ja_decididas,
+    motivo_que_impede_excluir,
+    tem_decisao_humana,
+)
 from .services.solicitacao_publish import cancel_from_gcal
 from .services.solicitacao_publish import preview_gcal as preview_gcal_service
 from .services.solicitacao_publish import publish_to_gcal, remover_do_google_agora, resync_to_gcal
@@ -137,15 +142,20 @@ def _ids_no_papel(solicitacao: Solicitacao, papel: str) -> set[int | None]:
     return set(Participation.objects.filter(solicitacao=solicitacao, role=papel).values_list("usuario_id", flat=True))
 
 
-def _rebaixar_se_mudou_campo_material(solicitacao: Solicitacao, antes: dict[str, Any]) -> list[str]:
+def _rebaixar_se_mudou_campo_material(
+    solicitacao: Solicitacao, antes: dict[str, Any], *, sem_compra: bool = False
+) -> list[str]:
     """Regra única de reaprovação (adendo da PA-04; sem ela a edição lavaria a aprovação, CP-02):
     aprovada cujo fluxo exige aprovação (`resolve_initial_status` → pendente) e que teve campo
     material mudado volta para `pendente`.
-    NAO_SUPER e quem não está aprovada não mudam. Só troca o status: não toca no Google Agenda
-    (publicada nem chega aqui, o serializer recusa editar). Devolve os campos que mudaram."""
+    NAO_SUPER e quem não está aprovada não mudam, salvo `sem_compra` (a edição levou o par a um sem
+    compra; pedido do dono, 03/11/2026): aí o fluxo exige aprovação. Só troca o status: não toca no
+    Google Agenda. `PUBLISHED` e `PENDING` nem chegam aqui (o serializer recusa editar); a que pode estar
+    no Google (`ERROR`, ou com `external_event_id`) e iria para aprovação por falta de compra o
+    `perform_update` recusa antes de gravar. Devolve os campos que mudaram."""
     if solicitacao.status != "aprovado":
         return []
-    if resolve_initial_status(projeto=solicitacao.projeto).status != "pendente":
+    if resolve_initial_status(projeto=solicitacao.projeto, sem_compra=sem_compra).status != "pendente":
         return []
     depois = _campos_materiais(
         solicitacao, _ids_no_papel(solicitacao, "FORMADOR"), _ids_no_papel(solicitacao, "COORD_ACOMPANHA")
@@ -509,9 +519,15 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             mapped_status = STATUS_MAP.get(status_filter, status_filter)
             qs = qs.filter(status=mapped_status)
 
-        # PR15: Filtro por fluxo do projeto
+        # PR15: Filtro por fluxo do projeto. Aceita vários, separados por vírgula: a tela de Aprovações
+        # pede `SUPER,NAO_SUPER` (o NAO_SUPER pendente é o sem compra; pedido do dono, 03/11/2026).
         if flow:
-            qs = qs.filter(projeto__fluxo=flow)
+            qs = qs.filter(projeto__fluxo__in=flow.split(","))
+
+        # Histórico da fila de Aprovações (Aprovadas e Reprovadas): o SUPER, ou o que teve decisão de pessoa
+        # (o NAO_SUPER sem compra que foi para aprovação), sem o NAO_SUPER auto-aprovado (03/11/2026).
+        if self.request.query_params.get("com_decisao") == "true":
+            qs = qs.filter(Q(projeto__fluxo="SUPER") | tem_decisao_humana())
 
         if sector:
             # #1164: filtra por SETOR REAL (projeto.gerencia.nome_setor), não por
@@ -543,8 +559,6 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 pass  # Ignore invalid date format
 
         if q:
-            from django.db.models import Q
-
             qs = qs.filter(
                 Q(municipio__nome__icontains=q)
                 | Q(projeto__nome__icontains=q)
@@ -561,6 +575,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         Cria solicitação e define status baseado no fluxo do projeto:
         - SUPER: status='pendente' (requer aprovação manual)
         - NAO_SUPER: status='aprovado' (auto-aprovado)
+        - par sem compra, quem cria não é isento (pedido do dono, 03/11/2026): 'pendente' em qualquer fluxo
 
         PR15: Suporta extra_participants para criar Participation automaticamente.
 
@@ -607,7 +622,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         self._assert_projeto_na_gerencia(projeto)
         self._assert_projeto_no_alcance_da_aprovadora(projeto)
         coordenador = self._resolver_coordenador_responsavel(serializer.validated_data.get("coordenador"), projeto)
-        return coordenador, resolve_initial_status(projeto=projeto)
+        sem_compra = getattr(serializer, "par_sem_compra", False)
+        return coordenador, resolve_initial_status(projeto=projeto, sem_compra=sem_compra)
 
     def _gravar_evento(self, serializer, extra_participants, coordenador, initial_status):
         """Grava o evento e as Participation. Requer transação aberta (a checagem de agenda vem depois).
@@ -636,19 +652,26 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         return instance
 
     def _fechar_evento(self, instance, initial_status, *, lote: bool = False):
-        """Depois da checagem de agenda: o AuditLog de quem nasce aprovado.
+        """Depois da checagem de agenda: o AuditLog de quem nasce aprovado e de quem nasce sem compra.
 
         PA-04 (PR 10, decisão do dono de 16/10): quem tem o cadastro de projetos troca o fluxo, com
         registro. O evento que nasce aprovado porque o projeto estava NAO_SUPER fica marcado aqui; com
         o AuditLog da troca de fluxo (`ProjetoSerializer.update`) dá para achar o criado na janela.
+        O evento criado num par sem compra (pendente em qualquer fluxo; pedido do dono, 03/11/2026)
+        leva `sem_compra: true`; o que nasce aprovado, `sem_compra: false` (a marca da lista lê o último).
         `lote=True` (POST do lote) marca `details.lote`, como o `batch` do batch-approve.
         """
-        if initial_status.status == "aprovado":
+        details: dict[str, Any] | None = None
+        if initial_status.reason == "sem_compra":
+            details = {"solicitacao_id": instance.id, "projeto_id": instance.projeto_id, "sem_compra": True}
+        elif initial_status.status == "aprovado":
             details = {
                 "solicitacao_id": instance.id,
                 "projeto_id": instance.projeto_id,
                 "auto_aprovada_por_fluxo": initial_status.fluxo,
+                "sem_compra": False,
             }
+        if details is not None:
             if lote:
                 details["lote"] = True
             AuditLog.objects.create(
@@ -859,6 +882,11 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         for usuario in coordenadores_extras:
             Participation.objects.get_or_create(solicitacao=solicitacao, usuario=usuario, role="COORD_ACOMPANHA")
 
+    _MSG_SEM_COMPRA_NO_GOOGLE = (
+        "Este evento pode estar no Google Agenda: sem compra neste município, ele voltaria para aprovação "
+        "e seguiria confirmado lá. Tire o evento do Google antes de mudar o município ou o projeto."
+    )
+
     def perform_update(self, serializer):
         """
         Registra edição de solicitação no AuditLog.
@@ -874,7 +902,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         Reaprovação: SUPER aprovada com projeto, data, horário, município, formadores ou coordenadores
         além do responsável mudados volta para pendente (`_rebaixar_se_mudou_campo_material`; o
-        AuditLog leva `reaprovacao`).
+        AuditLog leva `reaprovacao`). A edição que leva o par a um sem compra (quem edita não é isento)
+        faz o mesmo em qualquer fluxo, e o AuditLog leva também `sem_compra` (pedido do dono, 03/11/2026).
         Aprovada que não volta porque o projeto de origem ou o de destino saiu do SUPER depois da
         aprovação (troca de fluxo) fica marcada: o AuditLog leva `editada_com_fluxo_nao_super`.
         """
@@ -945,6 +974,12 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # com ou sem APPROVE (carga antiga, admin Django, data-fix) e mesmo se ela sair do SUPER.
         aprovada_como_super = instance.status == "aprovado" and getattr(instance.projeto, "fluxo", None) == "SUPER"
 
+        # Sem compra com o evento talvez ainda no Google (resync que falhou): voltar para aprovação o
+        # deixaria confirmado lá. Como na regra do publicado, tira do Google antes (revisão de 03/11/2026).
+        sem_compra = getattr(serializer, "par_sem_compra", False)
+        if sem_compra and instance.status == "aprovado" and esta_no_google(instance):
+            raise serializers.ValidationError({"non_field_errors": [self._MSG_SEM_COMPRA_NO_GOOGLE]})
+
         with transaction.atomic():
             # Salva as alterações
             serializer.save()
@@ -973,7 +1008,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 self._trocar_convite_do_responsavel(instance, coordenador_antigo_id)
             self._assert_responsavel_fora_dos_extras(instance)
 
-            campos_reaprovacao = _rebaixar_se_mudou_campo_material(instance, materiais_antes)
+            campos_reaprovacao = _rebaixar_se_mudou_campo_material(instance, materiais_antes, sem_compra=sem_compra)
 
             validar_avaliacao_formador(
                 instance,
@@ -1030,6 +1065,11 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 }
                 if campos_reaprovacao:
                     details["reaprovacao"] = {"campos": campos_reaprovacao}
+                # A marca `sem_compra` da lista lê o último CREATE/UPDATE que a grava: toda edição que
+                # muda o par grava se ela foi para aprovação por falta de compra (true ou false). O
+                # isento não tem o par conferido (`par_conferido`): não grava, e vale a marca anterior.
+                if getattr(serializer, "par_conferido", False):
+                    details["sem_compra"] = bool(sem_compra)
                 if aprovada_como_super:
                     details["aprovada_como_super"] = True
                 # PA-04 (decisão 5 do dono): SUPER → NAO_SUPER → edição → SUPER deixaria a aprovada com
@@ -1194,7 +1234,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         no_google = esta_no_google(instance)
         motivo = motivo_que_impede_excluir(
             instance,
-            ja_aprovada=instance.pk in ids_ja_aprovadas([instance.pk]),
+            ja_decidida=instance.pk in ids_ja_decididas([instance.pk]),
             pode_tirar_do_google=no_google and can_publish_solicitacao(self.request.user, instance),
         )
         if motivo:

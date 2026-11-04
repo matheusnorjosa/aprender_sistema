@@ -18,7 +18,22 @@ export type ComboBoxValue = LookupItem & {
   pergunta_avaliar_formador?: boolean;
   /** Projeto: com o responsável vazio, quem cria é a responsável (lookup de projetos; regra do backend, PR 9). */
   responsavel_padrao?: boolean;
+  /** Município: sem compra para o projeto (lookup com `marcar_sem_compra`); o evento vai para aprovação. */
+  sem_compra?: boolean;
+  /** Município (lookup com `marcar_sem_compra`): o projeto não tem compra em município nenhum e não recebe evento. */
+  projeto_em_espera?: boolean;
 };
+
+/** Pedido do dono (03/11/2026): município sem compra pode, e o evento vai para aprovação. */
+export const AVISO_SEM_COMPRA = 'Sem compra neste município para este projeto. O evento vai para aprovação.';
+
+/** O mesmo texto do servidor (`compra_elegibilidade.MSG_PROJETO_EM_ESPERA`): esse par ele recusa. */
+export const MSG_PROJETO_EM_ESPERA = 'Este projeto não tem compra em município nenhum: fica em espera até a compra entrar.';
+
+/** A opção do município sem compra leva a marca na lista; o campo, depois de escolher, mostra só o nome. */
+export function opcaoDoMunicipio(item: LookupItem): string {
+  return item['sem_compra'] === true ? `${item.label} · sem compra` : item.label;
+}
 
 /** Formador escolhido (o `avaliavel` vem do lookup: função Formador sem a função Coordenador). */
 export type ParticipantType = FormadorItem;

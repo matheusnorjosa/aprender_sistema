@@ -18,8 +18,12 @@ Armadilha do NULL: `Q(projeto__projeto_geral_id=None)` vira `IS NULL` no Django 
 sem coleção pela compra de qualquer outro projeto sem coleção. Por isso a coleção e a gerência só
 entram quando não são nulas. Do lado do `OuterRef`, NULL nunca casa no SQL, que é o certo.
 
-Só leitura. Quem chama: `serializers/solicitacao.py` (criação e edição), `views_validate.py`,
-`views_lookup.py` (municípios e projetos) e `views_options.py` (Plano Anual).
+Par sem compra (pedido do dono, 03/11/2026): quem não é isento pode criar o evento mesmo assim, e ele
+vai para aprovação (`solicitacao_create.resolve_initial_status(sem_compra=True)`). A regra aqui só diz
+se o par está liberado; quem decide o que fazer com isso é quem chama.
+
+Só leitura. Quem chama: `serializers/solicitacao.py` (criação, edição e a marca `sem_compra` da lista),
+`views_validate.py`, `views_lookup.py` (municípios e projetos) e `views_options.py` (Plano Anual).
 """
 
 from __future__ import annotations
@@ -28,10 +32,11 @@ from typing import Any
 
 from django.db.models import Exists, OuterRef, Q, QuerySet
 
-from apps.core.models import DATCompra, Municipio, Projeto
+from apps.core.models import DATCompra, Municipio, Projeto, Solicitacao
 from apps.core.rbac.helpers import user_has_any_perm
 
 CAPACIDADE_ISENTA = "create_solicitation_without_purchase"
+MSG_PROJETO_EM_ESPERA = "Este projeto não tem compra em município nenhum: fica em espera até a compra entrar."
 
 # Combo: kit vendido como um produto só que atravessa coleções (decisão do dono de 20/10/2026). Coleção do
 # combo -> coleções que a compra dele libera, sempre no mesmo município. Por `ProjetoGeral.nome` (único).
@@ -76,6 +81,34 @@ def municipios_liberados(qs: QuerySet[Municipio], projeto: Projeto | None) -> Qu
     if projeto is not None:
         compras = compras.filter(_q_libera(projeto))
     return qs.filter(Exists(compras))
+
+
+def municipios_com_marca_sem_compra(qs: QuerySet[Municipio], projeto: Projeto) -> QuerySet[Municipio]:
+    """`qs` inteiro, com `sem_compra` anotado: True no município sem compra que libere `projeto`."""
+    compras = _compras_validas().filter(_q_libera(projeto), municipio_id=OuterRef("pk"))
+    return qs.annotate(sem_compra=~Exists(compras))
+
+
+def solicitacoes_com_par_liberado(qs: QuerySet[Solicitacao]) -> QuerySet[Solicitacao]:
+    """Solicitações de `qs` cujo par (município, projeto) está liberado, numa consulta (a lista inteira).
+
+    A regra de `par_liberado` do lado da solicitação; sem município ou sem projeto, nada casa (NULL).
+    """
+    compras = _compras_validas().filter(municipio_id=OuterRef("municipio_id"))
+    mesmo_projeto = Exists(compras.filter(projeto_id=OuterRef("projeto_id")))
+    mesma_colecao = Exists(compras.filter(projeto__projeto_geral_id=OuterRef("projeto__projeto_geral_id")))
+    mesma_gerencia = Exists(compras.filter(projeto__gerencia_id=OuterRef("projeto__gerencia_id")))
+    libera = mesmo_projeto | mesma_colecao | (Q(projeto__eh_nome_geral=True) & mesma_gerencia)
+    for combo, colecoes in COMBOS.items():
+        libera |= Q(projeto__projeto_geral__nome__in=colecoes) & Exists(
+            compras.filter(projeto__projeto_geral__nome=combo)
+        )
+    return qs.filter(libera)
+
+
+def projeto_em_espera(projeto: Projeto) -> bool:
+    """O projeto não tem compra que o libere em município nenhum: segue sem receber evento."""
+    return not projetos_liberados(Projeto.objects.filter(pk=projeto.pk)).exists()
 
 
 def projetos_liberados(qs: QuerySet[Projeto], municipio_id: int | None = None) -> QuerySet[Projeto]:

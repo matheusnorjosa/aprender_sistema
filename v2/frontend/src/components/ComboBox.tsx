@@ -26,7 +26,7 @@ export interface LookupItem {
  */
 interface AutoCompleteOption {
   value: string;
-  label: string;
+  label: ReactNode;
   data: LookupItem;
 }
 
@@ -42,9 +42,11 @@ export interface ComboBoxProps {
   notFoundContent?: ReactNode;
   /** O que a lista carrega, com artigo ("os municípios"): vai na mensagem de falha ao carregar. */
   oQueCarrega?: string;
+  /** Desenha a opção na lista (ex.: uma marca ao lado do nome); o campo segue mostrando o `label`. */
+  renderOption?: ((item: LookupItem) => ReactNode) | undefined;
   /** Do Form.Item: liga o rótulo ao campo e o erro ao leitor de tela. */
   id?: string;
-  'aria-describedby'?: string;
+  'aria-describedby'?: string | undefined;
   'aria-invalid'?: boolean | 'true' | 'false';
 }
 
@@ -56,6 +58,7 @@ export default function ComboBox({
   disabled = false,
   notFoundContent = 'Nenhum resultado encontrado',
   oQueCarrega = 'as opções',
+  renderOption,
   ...doFormItem
 }: ComboBoxProps): JSX.Element {
   const [options, setOptions] = useState<AutoCompleteOption[]>([]);
@@ -86,8 +89,10 @@ export default function ComboBox({
     }
   }, [lookupFunction]);
 
-  // Carregar opções iniciais
+  // Carregar opções iniciais. Função de busca nova (ex.: outro projeto): as opções antigas saem antes,
+  // para não ficar à vista o que era da busca anterior (como a marca "sem compra" de outro projeto).
   useEffect(() => {
+    setOptions([]);
     void carregar('');
   }, [carregar]);
 
@@ -132,7 +137,7 @@ export default function ComboBox({
         ref={campoRef}
         {...doFormItem}
         value={searchValue}
-        options={options}
+        options={renderOption ? options.map((o) => ({ ...o, label: renderOption(o.data) })) : options}
         onSearch={handleSearch}
         onSelect={handleSelect}
         onChange={handleChange}

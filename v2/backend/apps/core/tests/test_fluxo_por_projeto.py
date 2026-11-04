@@ -429,8 +429,8 @@ class TestFluxoPorProjeto(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_criar_sem_compra_registrada_400(self):
-        """Adversarial: par (municipio, projeto) sem Compra registrada → 400 keyed em 'municipio'."""
+    def test_criar_sem_compra_registrada_vai_para_aprovacao(self):
+        """Par (municipio, projeto) sem Compra registrada: NAO_SUPER nasce pendente (pedido do dono, 03/11/2026)."""
         projeto_sem_compra = ProjetoFactory(
             nome="Projeto Sem Compra",
             codigo="",
@@ -438,6 +438,9 @@ class TestFluxoPorProjeto(TestCase):
             ativo=True,
             gerencia=self.gerencia,  # da gerência: só a falta de Compra o barra
         )
+        liberar_par(
+            MunicipioFactory(nome="Outro Municipio Fluxo", uf="CE"), projeto_sem_compra
+        )  # compra em outro município: sem compra aqui, mas não "em espera" (que segue recusado)
         self.client.force_authenticate(user=self.coordenador)
         response = self.client.post(
             "/api/solicitacoes/",
@@ -453,9 +456,8 @@ class TestFluxoPorProjeto(TestCase):
             },
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        # O handler de exceção aninha os erros de campo em data["errors"].
-        self.assertIn("municipio", response.data["errors"])
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data["status"], "pendente")
 
 
 class TestMigrationFluxoProjeto(TestCase):

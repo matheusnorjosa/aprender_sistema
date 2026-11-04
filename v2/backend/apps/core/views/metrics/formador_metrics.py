@@ -21,6 +21,7 @@ from rest_framework.throttling import ScopedRateThrottle
 
 from apps.core.models import Participation
 from apps.core.permissions import HasPerm
+from apps.core.services.availability_service import ENFORCED_ROLES
 from apps.core.services.horas_formacao import horas_formacao
 
 
@@ -56,9 +57,12 @@ def formadores_metrics(request: Request) -> Response:
         }
 
     Calculations:
-        - Filter Participation by role=FORMADOR and solicitacao__status=aprovado, events
-          whose local start date is in the last `days` local days, today included
-        - Aggregate by usuario: count events, count distinct municipios
+        - Filter Participation by role in ENFORCED_ROLES (FORMADOR e, desde 03/11/2026, o
+          coordenador além do responsável, COORD_ACOMPANHA, que conta hora como o formador) and
+          solicitacao__status=aprovado, events whose local start date is in the last `days` local
+          days, today included
+        - Aggregate by usuario: count distinct events (formador e extra no mesmo evento = 1), count
+          distinct municipios
         - horas_trabalhadas: services/horas_formacao.py (teto por evento, mesma conta da
           Grade Mensal)
         - Order by -eventos, limit to top 10
@@ -74,9 +78,9 @@ def formadores_metrics(request: Request) -> Response:
     janela_inicio = datetime.combine(de, time.min, tzinfo=tz)
     janela_fim = datetime.combine(ate + timedelta(days=1), time.min, tzinfo=tz)
 
-    # Query participations (formador role only, approved events only, in date range)
+    # Papéis que contam hora sempre (formador e coordenador além do responsável), aprovados, no período
     participations = Participation.objects.filter(
-        role=Participation.Role.FORMADOR,
+        role__in=ENFORCED_ROLES,
         solicitacao__status="aprovado",
         solicitacao__inicio__gte=janela_inicio,
         solicitacao__inicio__lt=janela_fim,

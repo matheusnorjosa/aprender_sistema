@@ -25,6 +25,9 @@ from apps.core.permissions import HasPerm
 
 MAP_LIMIT_MAX = 1000
 VALID_STATUS_FILTERS = {"pendente", "aprovado", "reprovado"}
+# Coordenadores do evento no mapa: os do convite (COORDENADOR: quem criou e o responsável) e os além
+# do responsável (COORD_ACOMPANHA, 03/11/2026). A mesma pessoa conta uma vez por evento.
+PAPEIS_COORDENADOR_DO_EVENTO = (Participation.Role.COORDENADOR, Participation.Role.COORD_ACOMPANHA)
 
 
 @dataclass
@@ -250,7 +253,7 @@ def metrics_map(request: Request) -> Response:
 
     participations = (
         Participation.objects.filter(
-            role=Participation.Role.COORDENADOR,
+            role__in=PAPEIS_COORDENADOR_DO_EVENTO,
             solicitacao__in=queryset,
             solicitacao__municipio__isnull=False,
         )
@@ -301,7 +304,7 @@ def metrics_map(request: Request) -> Response:
     coordenadores_por_uf: dict[str, int] = {}
     for item in (
         Participation.objects.filter(
-            role=Participation.Role.COORDENADOR,
+            role__in=PAPEIS_COORDENADOR_DO_EVENTO,
             solicitacao__in=queryset,
             solicitacao__municipio__isnull=False,
         )
@@ -409,15 +412,19 @@ def metrics_map_coordinators(request: Request) -> Response:
 
     # Buscar participações de coordenadores para o estado especificado
     participations = Participation.objects.filter(
-        role=Participation.Role.COORDENADOR,
+        role__in=PAPEIS_COORDENADOR_DO_EVENTO,
         solicitacao__in=solicitacoes_filtradas,
         usuario__isnull=False,
     ).select_related("usuario", "solicitacao", "solicitacao__projeto", "solicitacao__municipio")
 
     # Agregar por coordenador com contagem detalhada
     coordenadores_data: dict[int, dict] = {}
+    vistos: set[tuple[int, int]] = set()  # (pessoa, evento): quem criou e também é extra conta uma vez
     for p in participations:
         user_id = p.usuario_id
+        if (user_id, p.solicitacao_id) in vistos:
+            continue
+        vistos.add((user_id, p.solicitacao_id))
         if user_id not in coordenadores_data:
             nome = str(p.usuario)  # nome, ou "Usuario #id": nunca o login (CPF)
             coordenadores_data[user_id] = {

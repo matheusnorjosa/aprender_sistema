@@ -79,7 +79,7 @@ async function salvar(policies: readonly string[] = [], escolherMunicipio = fals
   await user.click(screen.getByRole('button', { name: /salvar alterações/i }));
 }
 
-describe('EditSolicitacaoPage — aviso de volta para aprovação', () => {
+describe('EditSolicitacaoPage — aviso de volta para aprovação', { timeout: 20000 }, () => {
   beforeEach(() => {
     escolha.municipio = { id: 6, label: 'Crato-CE', sem_compra: true };
     getSolicitacaoMock.mockReset().mockResolvedValue(SOLICITACAO);

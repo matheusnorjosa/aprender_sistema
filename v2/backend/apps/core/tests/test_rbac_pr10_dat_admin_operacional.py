@@ -841,6 +841,26 @@ class TestQuemEditouNaoDecide:
         resp = _approve(dat, sol)
         assert resp.status_code == 403 and resp.data["code"] == EDITED
 
+    def test_mudou_so_a_resposta_acompanha_nao_decide(self, g19, g1):
+        """04/11/2026: o responsável que acompanha é campo material (muda quem fica ocupado)."""
+        dat = _dat(g19)
+        sol = _pendente_super(g1, coordenador_acompanha=False)
+        resp = _editar(dat, sol, {"coordenador_acompanha": True})
+        assert resp.status_code == 200, resp.content
+        resp = _approve(dat, sol)
+        assert resp.status_code == 403 and resp.data["code"] == EDITED
+
+    def test_mudou_so_o_responsavel_nao_decide(self, g19, g1):
+        """04/11/2026, conservador: trocar o responsável conta como edição mesmo se ele não acompanha."""
+        dat = _dat(g19)
+        sol = _pendente_super(g1)
+        coordenadora = UsuarioFactory()
+        com_papel(coordenadora, "COORDENADOR", g1)
+        resp = _editar(dat, sol, {"coordenador": coordenadora.id})
+        assert resp.status_code == 200, resp.content
+        resp = _approve(dat, sol)
+        assert resp.status_code == 403 and resp.data["code"] == EDITED
+
     def test_editou_campo_material_nao_decide(self, g19, g1):
         dat = _dat(g19)
         sol = _pendente_super(g1)

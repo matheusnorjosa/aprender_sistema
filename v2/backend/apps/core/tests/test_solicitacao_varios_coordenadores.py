@@ -606,3 +606,62 @@ class TestEdicao:
         resp = self._patch(c, sol_id, [c["c2"].id])
         assert resp.status_code == 200, resp.data
         assert Solicitacao.objects.get(pk=sol_id).status == "aprovado"
+
+
+# ---------------------------------------------------------------- responsável que acompanha (dono, 04/11/2026)
+
+
+class TestResponsavelQueAcompanhaPedeReaprovacao:
+    """Trocar quem fica ocupado pelo responsável numa SUPER aprovada volta para aprovação, como os extras."""
+
+    def _super_aprovada(self, c, *, acompanha: bool) -> int:
+        r = _post(c["coord"], _payload(c, projeto=c["super"], coordenador_acompanha=acompanha))
+        assert r.status_code == 201, r.data
+        Solicitacao.objects.filter(pk=r.data["id"]).update(status="aprovado")
+        return r.data["id"]
+
+    def _patch(self, c, sol_id, dados):
+        return _client(c["coord"]).patch(f"/api/solicitacoes/{sol_id}/", dados, format="json")
+
+    def _campos(self, sol_id) -> list[str]:
+        log = AuditLog.objects.filter(action="UPDATE", details__solicitacao_id=sol_id).latest("created_at")
+        return log.details.get("reaprovacao", {}).get("campos", [])
+
+    def test_trocar_o_responsavel_que_acompanha_volta_para_aprovacao(self, c):
+        sol_id = self._super_aprovada(c, acompanha=True)
+        resp = self._patch(c, sol_id, {"coordenador": c["c2"].id})
+        assert resp.status_code == 200, resp.data
+        assert Solicitacao.objects.get(pk=sol_id).status == "pendente"
+        assert "responsavel_que_acompanha" in self._campos(sol_id)
+
+    def test_passar_a_acompanhar_volta_para_aprovacao(self, c):
+        sol_id = self._super_aprovada(c, acompanha=False)
+        resp = self._patch(c, sol_id, {"coordenador_acompanha": True})
+        assert resp.status_code == 200, resp.data
+        assert Solicitacao.objects.get(pk=sol_id).status == "pendente"
+
+    def test_deixar_de_acompanhar_volta_para_aprovacao(self, c):
+        sol_id = self._super_aprovada(c, acompanha=True)
+        resp = self._patch(c, sol_id, {"coordenador_acompanha": False})
+        assert resp.status_code == 200, resp.data
+        assert Solicitacao.objects.get(pk=sol_id).status == "pendente"
+
+    def test_trocar_o_responsavel_que_nao_acompanha_nao_volta(self, c):
+        sol_id = self._super_aprovada(c, acompanha=False)
+        resp = self._patch(c, sol_id, {"coordenador": c["c2"].id})
+        assert resp.status_code == 200, resp.data
+        assert Solicitacao.objects.get(pk=sol_id).status == "aprovado"
+
+    def test_salvar_com_o_mesmo_responsavel_nao_volta(self, c):
+        sol_id = self._super_aprovada(c, acompanha=True)
+        resp = self._patch(c, sol_id, {"coordenador": c["coord"].id, "coordenador_acompanha": True})
+        assert resp.status_code == 200, resp.data
+        assert Solicitacao.objects.get(pk=sol_id).status == "aprovado"
+
+    def test_nao_super_nao_volta(self, c):
+        r = _post(c["coord"], _payload(c, coordenador_acompanha=True))
+        assert r.status_code == 201, r.data
+        assert r.data["status"] == "aprovado"
+        resp = self._patch(c, r.data["id"], {"coordenador": c["c2"].id})
+        assert resp.status_code == 200, resp.data
+        assert Solicitacao.objects.get(pk=r.data["id"]).status == "aprovado"

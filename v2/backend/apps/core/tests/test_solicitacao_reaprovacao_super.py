@@ -200,10 +200,13 @@ class TestEdicaoQueNaoRebaixa:
 
     @pytest.mark.parametrize(
         "campo",
-        ["coordenador", "tipo_evento", "coordenador_acompanha", "encontro", "segmento"],
+        # "coordenador_acompanha" saiu (decisão do dono, 04/11/2026): mudar quem o responsável ocupa é material;
+        # ver TestResponsavelQueAcompanhaPedeReaprovacao em test_solicitacao_varios_coordenadores.py.
+        ["coordenador", "tipo_evento", "encontro", "segmento"],
     )
     def test_outros_campos_mantem_aprovada(self, campo, coordenador, municipio, projeto_super, formadores):
-        """Decisão do dono: só projeto, data, horário, município e formadores são materiais."""
+        """Decisão do dono: projeto, data, horário, município, formadores, coordenadores além do responsável e o
+        responsável que acompanha são materiais. Trocar o responsável que NÃO acompanha não muda a agenda."""
         sol = _solicitacao(coordenador, municipio, projeto_super, [formadores[0]])
         if campo == "coordenador":
             valor = UsuarioFactory(groups=["Coordenador"], groups__gerencia=projeto_super.gerencia).id

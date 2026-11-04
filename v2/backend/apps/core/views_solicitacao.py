@@ -51,6 +51,7 @@ from .rbac.policies import (
 )
 from .serializers import SolicitacaoSerializer
 from .serializers.campos import ListaComTeto
+from .services.availability_service import coordenador_ocupante
 from .services.solicitacao_approval import (
     approve_solicitacao,
     batch_approve_solicitacoes,
@@ -124,8 +125,10 @@ def _campos_materiais(
 ) -> dict[str, Any]:
     """O que a aprovação SUPER aprovou: projeto (M10-02/#1624) mais data, horário, município e
     formadores (decisão do dono, 14/10/2026) e os coordenadores além do responsável (ocupam a agenda;
-    decisão do dono, 03/11/2026). Observação, local e evento online ficam de fora.
-    Datas comparadas como instante (o mesmo horário em outro fuso não é mudança)."""
+    decisão do dono, 03/11/2026) e o responsável que acompanha (quem ele ocupa na agenda; trocar ou
+    passar a acompanhar ou não muda a agenda, decisão do dono de 04/11/2026). Observação, local e evento
+    online ficam de fora. Datas comparadas como instante (o mesmo horário em outro fuso não é mudança)."""
+    ocupante = coordenador_ocupante(solicitacao)
     return {
         "projeto": solicitacao.projeto_id,
         "municipio": solicitacao.municipio_id,
@@ -133,6 +136,7 @@ def _campos_materiais(
         "fim": solicitacao.fim,
         "formadores": frozenset(formador_ids),
         "coordenadores": frozenset(coordenador_ids),
+        "responsavel_que_acompanha": ocupante.pk if ocupante is not None else None,
     }
 
 

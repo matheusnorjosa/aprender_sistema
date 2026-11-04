@@ -47,6 +47,40 @@ describe('ComboBox', () => {
     expect(selectElement).toBeInTheDocument()
   })
 
+  // Pedido do dono (03/11/2026): a opção pode levar uma marca ("sem compra") sem mudar o texto escolhido.
+  test('renderOption desenha a opção; o campo mostra só o label do escolhido', async () => {
+    const onChange = vi.fn()
+    mockLookupFunction.mockResolvedValue([{ id: 9, label: 'Crato', sem_compra: true }])
+    render(
+      <ComboBox
+        lookupFunction={mockLookupFunction}
+        onChange={onChange}
+        renderOption={(item) => (item.sem_compra ? <span>{item.label} <span>sem compra</span></span> : item.label)}
+      />
+    )
+    await waitFor(() => expect(mockLookupFunction).toHaveBeenCalled())
+
+    fireEvent.mouseDown(screen.getByRole('combobox'))
+    fireEvent.click(await screen.findByText('sem compra'))
+
+    expect(onChange).toHaveBeenCalledWith({ id: 9, label: 'Crato', sem_compra: true })
+  })
+
+  // Revisão de 03/11: trocar o projeto troca a função de busca; a marca "sem compra" do projeto
+  // anterior não pode ficar na lista enquanto a busca nova não responde.
+  test('trocar a função de busca tira as opções antigas antes de a nova responder', async () => {
+    const antiga = vi.fn().mockResolvedValue([{ id: 1, label: 'Crato · sem compra' }])
+    const { rerender } = render(<ComboBox lookupFunction={antiga} />)
+    fireEvent.mouseDown(screen.getByRole('combobox'))
+    expect(await screen.findByText('Crato · sem compra')).toBeInTheDocument()
+
+    const nova = vi.fn().mockReturnValue(new Promise(() => {}))
+    rerender(<ComboBox lookupFunction={nova} />)
+
+    await waitFor(() => expect(nova).toHaveBeenCalled())
+    expect(screen.queryByText('Crato · sem compra')).not.toBeInTheDocument()
+  })
+
   test('deve exibir placeholder', async () => {
     render(
       <ComboBox

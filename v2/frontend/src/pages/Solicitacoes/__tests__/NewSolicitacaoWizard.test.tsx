@@ -125,15 +125,16 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', { timeo
       <NewSolicitacaoWizard />
     );
 
-    const municipioDisabledButton = await waitFor(() => botaoDoTexto('Selecione um projeto para carregar municípios elegíveis'));
+    const municipioDisabledButton = await waitFor(() => botaoDoTexto('Selecione um projeto para carregar os municípios'));
     expect(municipioDisabledButton).toBeDisabled();
 
     fireEvent.click(botaoDoTexto('Busque ou selecione um projeto'));
 
+    // Os sem compra vêm marcados (pedido do dono, 03/11/2026): o evento neles vai para aprovação.
     await waitFor(() => {
       expect(lookupMunicipiosWithFiltersMock).toHaveBeenCalledWith({
         q: '',
-        com_compra: true,
+        marcar_sem_compra: true,
         projeto_id: 123,
       });
     });
@@ -256,7 +257,7 @@ describe('NewSolicitacaoWizard - página única com um cartão de evento (28/10/
     for (const campo of [
       'Busque ou selecione um projeto',
       'Busque ou selecione um tipo de evento',
-      'Selecione um projeto para carregar municípios elegíveis',
+      'Selecione um projeto para carregar os municípios',
     ]) {
       expect(within(cartao).getByRole('button', { name: campo })).toBeInTheDocument();
     }

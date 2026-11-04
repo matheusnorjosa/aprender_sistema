@@ -171,6 +171,25 @@ describe('ApprovalsPage', () => {
     ).not.toBeInTheDocument();
   });
 
+  // Pedido do dono (03/11/2026): o evento sem compra vai para aprovação e a linha diz isso.
+  test('linha sem compra leva a Tag "Sem compra"; a com compra não', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue({
+      count: 2,
+      next: null,
+      previous: null,
+      results: [
+        pendingRow({ id: 1, municipio_nome: 'MunicipioSemCompra', sem_compra: true }),
+        pendingRow({ id: 2, municipio_nome: 'MunicipioComCompra', sem_compra: false }),
+      ],
+    });
+    renderPage(APROVA);
+
+    const semCompra = (await screen.findByText('MunicipioSemCompra')).closest('tr') as HTMLElement;
+    expect(within(semCompra).getByText('Sem compra')).toBeInTheDocument();
+    const comCompra = screen.getByText('MunicipioComCompra').closest('tr') as HTMLElement;
+    expect(within(comCompra).queryByText('Sem compra')).not.toBeInTheDocument();
+  });
+
   test('sem permissão: não exibe "Aprovar" mesmo com solicitação pendente', async () => {
     vi.mocked(listSolicitacoes).mockResolvedValue({
       count: 1,
@@ -324,6 +343,8 @@ describe('ApprovalsPage', () => {
     ['conta_alterada_pelo_autor', 'Quem pediu alterou a sua conta'],
     ['contas_alteradas_pela_mesma_pessoa', 'A mesma pessoa alterou a sua conta e a de quem pediu'],
     ['editada_pelo_ator', 'Você editou esta solicitação'],
+    // Revisão de 03/11: a aprovadora por vínculo vê o NAO_SUPER sem compra, que ela não decide.
+    ['fora_do_escopo', 'Fora do que você aprova'],
   ] as const)('PR 10: decisao_impedida=%s sai sem checkbox e sem ações, com a Tag', async (motivo, tag) => {
     vi.mocked(listSolicitacoes).mockResolvedValue({
       count: 2,
@@ -394,12 +415,25 @@ describe('ApprovalsPage', () => {
 
     await waitFor(() => expect(listSolicitacoes).toHaveBeenCalled());
     expect(listSolicitacoes).toHaveBeenCalledWith(expect.objectContaining({
-      flow: 'SUPER',
+      // O NAO_SUPER pendente é o sem compra (03/11/2026): entra na fila.
+      flow: 'SUPER,NAO_SUPER',
       status: 'pendente',
       ordering: 'proximidade',
       page: 1,
       page_size: 20,
     }));
+  });
+
+  test('Aprovadas e Reprovadas pedem o SUPER e o que teve decisão de pessoa (sem o auto-aprovado)', async () => {
+    renderPage();
+    await waitFor(() => expect(ultimoFiltro()).toMatchObject({ flow: 'SUPER,NAO_SUPER', status: 'pendente' }));
+
+    for (const [rotulo, status] of [['Aprovadas', 'aprovado'], ['Reprovadas', 'reprovado']] as const) {
+      fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Filtrar por status' }));
+      fireEvent.click(await screen.findByTitle(rotulo));
+      await waitFor(() => expect(ultimoFiltro()).toMatchObject({ com_decisao: true, status }));
+      expect(ultimoFiltro().flow).toBeUndefined();
+    }
   });
 
   test('trocar de página busca a página no servidor e limpa a seleção', async () => {

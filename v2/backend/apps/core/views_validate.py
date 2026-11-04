@@ -56,7 +56,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.pii import email_sem_cpf
-from apps.core.services.compra_elegibilidade import isento_da_regra_da_compra, par_liberado
+from apps.core.services.compra_elegibilidade import (
+    MSG_PROJETO_EM_ESPERA,
+    isento_da_regra_da_compra,
+    par_liberado,
+    projeto_em_espera,
+)
 from apps.core.services.resolvers import resolve_municipio, resolve_projeto, resolve_tipo_evento
 from apps.core.services.solicitacao_scope import scope_usuarios_por_gerencia
 
@@ -140,6 +145,7 @@ class SolicitationValidateView(APIView):
         corpo.is_valid(raise_exception=True)
         data = request.data
         errors = []
+        warnings: list[str] = []
         canonical = {}
 
         # 1. Validar e resolver município
@@ -176,14 +182,19 @@ class SolicitationValidateView(APIView):
             else:
                 errors.append(f"Tipo de evento não encontrado: {tipo_input}")
 
-        # 3.1 Regra da compra (SSOT `compra_elegibilidade`); isentos: superuser e a capacidade.
-        if (
-            not isento_da_regra_da_compra(request.user)
+        # 3.1 Regra da compra (SSOT `compra_elegibilidade`); isentos: superuser e a capacidade. Sem
+        # compra não bloqueia: o evento vai para aprovação (pedido do dono, 03/11/2026). O projeto em
+        # espera (sem compra em município nenhum) a criação recusa (Regra 4), e a prévia também.
+        isento = isento_da_regra_da_compra(request.user)
+        if not isento and projeto_obj is not None and projeto_em_espera(projeto_obj):
+            errors.append(MSG_PROJETO_EM_ESPERA)
+        elif (
+            not isento
             and canonical.get("municipio_id") is not None
             and projeto_obj is not None
             and not par_liberado(canonical["municipio_id"], projeto_obj)
         ):
-            errors.append("Município e projeto sem compra que os libere para a solicitação")
+            warnings.append("Sem compra neste município para este projeto: o evento vai para aprovação.")
 
         # 4. Validar data/hora
         date_str = data.get("date")
@@ -270,6 +281,7 @@ class SolicitationValidateView(APIView):
             {
                 "ok": ok,
                 "errors": errors,
+                "warnings": warnings,
                 "canonical": canonical if ok else None,
             }
         )

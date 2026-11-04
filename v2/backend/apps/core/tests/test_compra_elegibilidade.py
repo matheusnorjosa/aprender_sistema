@@ -8,6 +8,8 @@ Decisões do dono (02/10 e 14/10/2026):
   (sempre no mesmo município);
 - projeto sem compra que o libere fica "em espera": some das listas de operação (Nova Solicitação,
   edição e Plano Anual) e volta sozinho quando a compra entra;
+- par sem compra (03/11/2026): quem não é isento cria mesmo assim e o evento vai para aprovação
+  (`test_sem_compra_com_aprovacao.py`); as guardas abaixo provam que o par NÃO está liberado;
 - superusuário isento; a capacidade `create_solicitation_without_purchase` também isenta, mas nasce
   sem grupo nenhum (entra no pacote do DAT num PR próprio);
 - combo (20/10/2026): a compra de um projeto da coleção `NL E AMMA PORT E MAT` libera, no mesmo
@@ -37,7 +39,7 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core.models import EquipeGerencia, Gerencia, Municipio, PermissaoFuncional, Projeto, ProjetoGeral, Solicitacao
-from apps.core.tests.conftest import get_field_errors
+from apps.core.services.compra_elegibilidade import par_liberado
 from apps.core.tests.factories import (
     MunicipioFactory,
     ProjetoFactory,
@@ -153,7 +155,20 @@ def _validate(c, user, municipio, projeto):
     return _client(user).post("/api/solicitacoes/validate/", payload, format="json")
 
 
-_ERRO_VALIDATE = "Município e projeto sem compra que os libere"
+_AVISO_VALIDATE = "Sem compra neste município para este projeto"
+
+
+def _vai_para_aprovacao(resp) -> None:
+    """Par sem compra (pedido do dono, 03/11/2026): cria, mas o evento vai para aprovação."""
+    assert resp.status_code == 201, resp.data
+    assert resp.data["status"] == "pendente"
+    assert resp.data["sem_compra"] is True
+
+
+def _fica_em_espera(resp) -> None:
+    """Projeto sem compra que o libere em município nenhum: segue sem receber evento (400 em `projeto`)."""
+    assert resp.status_code == 400, resp.data
+    assert "projeto" in resp.data["errors"]
 
 
 def _solicitacao(c, municipio, projeto) -> Solicitacao:
@@ -234,9 +249,10 @@ class TestRegraUnica:
         liberar_par(c["m1"], c["serie_x3"])
         ok = _validate(c, c["coord"], c["m1"], c["familia_x"]).json()
         assert ok["ok"] is True, ok
-        recusado = _validate(c, c["coord"], c["m2"], c["familia_x"]).json()
-        assert recusado["ok"] is False
-        assert any(_ERRO_VALIDATE in e for e in recusado["errors"])
+        assert ok["warnings"] == []
+        avisado = _validate(c, c["coord"], c["m2"], c["familia_x"]).json()
+        assert avisado["ok"] is True
+        assert any(_AVISO_VALIDATE in w for w in avisado["warnings"])
 
     def test_as_tres_consultas_concordam(self, c):
         """Grade 3 municípios × 7 projetos: par_liberado = pertencer às duas listas."""
@@ -269,6 +285,32 @@ class TestRegraUnica:
         # "em espera" (sem município): só quem não tem compra que libere em lugar nenhum
         em_operacao = set(projetos_liberados(todos_p).values_list("pk", flat=True))
         assert em_operacao == {c[n].pk for n in ("familia_x", "serie_x3", "geral_a", "geral_b", "solto_2")}
+
+    def test_a_marca_sem_compra_da_lista_concorda_com_par_liberado(self, c, combo):
+        """`solicitacoes_com_par_liberado` (a marca `sem_compra` da lista, numa consulta) = `par_liberado`."""
+        from apps.core.services.compra_elegibilidade import par_liberado, solicitacoes_com_par_liberado
+
+        _marcar_nome_geral(c["geral_a"], c["geral_b"])
+        liberar_par(c["m1"], c["serie_x3"])
+        liberar_par(c["m2"], c["solto_2"])
+        liberar_par(c["m2"], c["geral_b"])
+        liberar_par(c["m3"], combo["combo_1"])
+        nomes = ("familia_x", "serie_x3", "outro_y", "geral_a", "geral_b", "solto_1", "solto_2")
+        projetos = [c[n] for n in nomes] + list(combo.values())
+        esperado: dict[int, bool] = {}
+        for m in (c["m1"], c["m2"], c["m3"]):
+            for p in projetos:
+                s = _solicitacao(c, m, p)
+                esperado[s.pk] = par_liberado(m.id, p)
+        sem_par = _solicitacao(c, c["m1"], c["familia_x"])
+        Solicitacao.objects.filter(pk=sem_par.pk).update(projeto=None)
+        liberados = set(
+            solicitacoes_com_par_liberado(Solicitacao.objects.filter(pk__in=[*esperado, sem_par.pk])).values_list(
+                "pk", flat=True
+            )
+        )
+        assert {pk for pk, ok in esperado.items() if ok} == liberados
+        assert any(esperado.values()) and not all(esperado.values())
 
     def test_eh_serie_e_eh_nome_geral_juntos_violam_constraint(self, c):
         with pytest.raises(IntegrityError), transaction.atomic():
@@ -337,6 +379,9 @@ class TestRegraUnica:
 
 
 class TestGuardas:
+    """Desde 03/11/2026 o par sem compra cria pendente (`_vai_para_aprovacao`), e o projeto sem compra em
+    município nenhum segue recusado (`_fica_em_espera`): a guarda é o par não liberar."""
+
     def test_lookup_municipios_projeto_inexistente_devolve_vazio(self, c):
         liberar_par(c["m1"], c["familia_x"])
         assert _municipios(c["coord"], com_compra="true", projeto_id=999_999) == set()
@@ -344,51 +389,47 @@ class TestGuardas:
     def test_datcompra_inativa_nao_libera(self, c):
         liberar_par(c["m1"], c["familia_x"], ativo=False)
         r = _post(c, c["coord"], c["m1"], c["familia_x"])
-        assert r.status_code == 400, r.data
-        assert "municipio" in get_field_errors(r)
+        _fica_em_espera(r)
 
     def test_datcompra_quantidade_zero_nao_libera(self, c):
         liberar_par(c["m1"], c["familia_x"], quantidade=0)
         r = _post(c, c["coord"], c["m1"], c["familia_x"])
-        assert r.status_code == 400, r.data
-        assert "municipio" in get_field_errors(r)
+        _fica_em_espera(r)
 
     def test_compra_de_outra_colecao_da_mesma_gerencia_nao_libera_projeto_sem_marca(self, c):
         liberar_par(c["m1"], c["outro_y"])
         r = _post(c, c["coord"], c["m1"], c["familia_x"])
-        assert r.status_code == 400, r.data
-        assert "municipio" in get_field_errors(r)
+        _fica_em_espera(r)
         assert c["m1"].id not in _municipios(c["coord"], com_compra="true", projeto_id=c["familia_x"].id)
 
     def test_nome_geral_nao_libera_por_compra_de_outra_gerencia(self, c):
         Projeto.objects.filter(pk=c["geral_a"].pk).update(**_marca_se_existir())
         liberar_par(c["m1"], c["geral_b"])  # gerência B
         r = _post(c, c["coord"], c["m1"], c["geral_a"])
-        assert r.status_code == 400, r.data
-        assert "municipio" in get_field_errors(r)
+        _fica_em_espera(r)
 
     def test_projeto_sem_colecao_nao_e_liberado_por_compra_de_outro_projeto_sem_colecao(self, c):
         liberar_par(c["m1"], c["solto_2"])
-        r = _post(c, c["coord"], c["m1"], c["solto_1"])
-        assert r.status_code == 400, r.data
-        assert "municipio" in get_field_errors(r)
+        # projeto sem gerência: o POST pararia no escopo de gerência (PR 9) antes; a regra vai direto
+        assert par_liberado(c["m1"].id, c["solto_1"]) is False
         assert c["m1"].id not in _municipios(c["coord"], com_compra="true", projeto_id=c["solto_1"].id)
         assert c["solto_1"].id not in _projetos(c["coord"], com_compra="true")
 
     def test_nome_geral_sem_gerencia_nao_libera_por_compra_de_projeto_sem_gerencia(self, c):
         Projeto.objects.filter(pk=c["solto_1"].pk).update(**_marca_se_existir())
         liberar_par(c["m1"], c["solto_2"])
-        r = _post(c, c["coord"], c["m1"], c["solto_1"])
-        assert r.status_code == 400, r.data
-        assert "municipio" in get_field_errors(r)
+        # projeto sem gerência: o POST pararia no escopo de gerência (PR 9) antes; a regra vai direto
+        assert par_liberado(c["m1"].id, c["solto_1"]) is False
         assert c["solto_1"].id not in _projetos(c["coord"], com_compra="true")
 
-    def test_edicao_trocando_para_par_sem_compra_400(self, c):
+    def test_edicao_trocando_para_par_sem_compra_segue_pendente(self, c):
         liberar_par(c["m1"], c["familia_x"])
+        liberar_par(c["m2"], c["outro_y"])  # compra em outro município: não "em espera"
         s = _solicitacao(c, c["m1"], c["familia_x"])
         r = _client(c["coord"]).patch(f"/api/solicitacoes/{s.id}/", {"projeto": c["outro_y"].id}, format="json")
-        assert r.status_code == 400, r.data
-        assert "municipio" in get_field_errors(r)
+        assert r.status_code == 200, r.data
+        assert r.data["status"] == "pendente"
+        assert r.data["sem_compra"] is True
 
     def test_edicao_mesmo_par_sem_compra_200(self, c):
         s = _solicitacao(c, c["m1"], c["outro_y"])
@@ -449,14 +490,13 @@ class TestCombo:
     def test_compra_do_combo_nao_libera_outro_municipio(self, c, combo):
         liberar_par(c["m1"], combo["combo_1"])
         r = _post(c, c["coord"], c["m2"], combo["novo_lendo"])
-        assert r.status_code == 400, r.data
-        assert "municipio" in get_field_errors(r)
+        _vai_para_aprovacao(r)
         assert _municipios(c["coord"], com_compra="true", projeto_id=combo["amma"].id) == {c["m1"].id}
 
     def test_compra_do_combo_nao_libera_outros_projetos(self, c, combo):
         liberar_par(c["m1"], combo["combo_1"])
         r = _post(c, c["coord"], c["m1"], c["familia_x"])
-        assert r.status_code == 400, r.data
+        _fica_em_espera(r)
         ids = _projetos(c["coord"], municipio_id=c["m1"].id)
         assert {combo["novo_lendo"].id, combo["amma"].id} <= ids
         assert not ids & {c[n].id for n in ("familia_x", "outro_y", "geral_a", "solto_1", "solto_2")}

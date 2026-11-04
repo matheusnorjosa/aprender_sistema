@@ -20,9 +20,15 @@ from apps.core.rbac.permissions import PodeExcluirSolicitacao
 from apps.core.rbac.policies import user_has_policy
 from apps.core.serializers.usuario import UserSlimSerializer
 from apps.core.services.avaliacao_formador import formadores_avaliaveis_ids, gerencia_pergunta
-from apps.core.services.compra_elegibilidade import isento_da_regra_da_compra, par_liberado
-from apps.core.services.solicitacao_approval import DECISAO_IMPEDIDA, decisoes_impedidas
-from apps.core.services.solicitacao_exclusao import ids_ja_aprovadas, motivo_que_impede_excluir
+from apps.core.services.compra_elegibilidade import (
+    MSG_PROJETO_EM_ESPERA,
+    isento_da_regra_da_compra,
+    par_liberado,
+    projeto_em_espera,
+    solicitacoes_com_par_liberado,
+)
+from apps.core.services.solicitacao_approval import DECISAO_IMPEDIDA, decisoes_impedidas_na_lista
+from apps.core.services.solicitacao_exclusao import ids_ja_decididas, motivo_que_impede_excluir
 from apps.core.services.solicitacao_scope import EscritaEmSolicitacao, scope_publishable_solicitacoes
 
 
@@ -86,6 +92,12 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
     # evento de outra pessoa que está no Google) e as recusas que se sabem sem o Google
     # (`motivo_que_impede_excluir`). Publicar na agenda só mostra Excluir com ele.
     pode_excluir = serializers.SerializerMethodField()
+    # Por que esta linha não se exclui, quando a recusa se sabe sem o Google (`motivo_que_impede_excluir`,
+    # texto fixo, sem dado pessoal); null quando não há recusa. Minhas Solicitações mostra o motivo.
+    motivo_de_nao_excluir = serializers.SerializerMethodField()
+    # O par (município, projeto) não tem compra que o libere (`compra_elegibilidade`); a tela de
+    # Aprovações marca a linha "Sem compra" (pedido do dono, 03/11/2026). Uma consulta para a página.
+    sem_compra = serializers.SerializerMethodField()
 
     class Meta:
         model = Solicitacao
@@ -115,6 +127,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "decisao_impedida",
             "pode_tirar_do_google",
             "pode_excluir",
+            "motivo_de_nao_excluir",
+            "sem_compra",
             "inicio",
             "fim",
             "status",
@@ -215,7 +229,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         """Impedimento de decisão de quem lê (PA-02), calculado uma vez para a página inteira.
 
         Só para quem aprova e não é superusuário, e só em pendente. A lista calcula todos os ids da
-        página de uma vez (`decisoes_impedidas`, número de consultas constante), guardados no contexto.
+        página de uma vez (`decisoes_impedidas_na_lista`: a segregação e, para a aprovadora por vínculo,
+        o que está fora do escopo dela; número de consultas constante), guardados no contexto.
         """
         if obj.status != Solicitacao.Status.PENDENTE:
             return None
@@ -229,7 +244,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             ids = self._ids_da_pagina(obj)
             impedidos: dict[int, str] = {}
             if user_has_policy(user, "access_solicitation_approvals"):
-                impedidos = decisoes_impedidas(user, Solicitacao.objects.filter(id__in=ids))
+                impedidos = decisoes_impedidas_na_lista(user, Solicitacao.objects.filter(id__in=ids))
             calculados.update({sol_id: DECISAO_IMPEDIDA.get(impedidos.get(sol_id, "")) for sol_id in ids})
             self.context["_decisao_impedida"] = calculados
         return calculados[obj.pk]
@@ -271,7 +286,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
 
         Mesma regra do `destroy`: `PodeExcluirSolicitacao.permite` com uma `EscritaEmSolicitacao` só (os
         fatos de quem lê saem uma vez) e `motivo_que_impede_excluir`, com a aprovação da página numa
-        consulta (`ids_ja_aprovadas`) e o `pode_tirar_do_google` já calculado.
+        consulta (`ids_ja_decididas`) e o `pode_tirar_do_google` já calculado.
         """
         calculados: dict[int, bool] | None = cast(Any, self.context.get("_pode_excluir"))
         if calculados is None or obj.pk not in calculados:
@@ -279,18 +294,58 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             request: Any = self.context.get("request")
             user: Any = getattr(request, "user", None)
             pagina = self._pagina(obj)
+            motivos: dict[int, str | None] = cast(Any, self.context.setdefault("_motivo_de_nao_excluir", {}))
             if user is None or not getattr(user, "is_authenticated", False):
                 calculados.update({o.pk: False for o in pagina})
+                motivos.update({o.pk: None for o in pagina})
             else:
                 permissao = PodeExcluirSolicitacao()
                 escrita = EscritaEmSolicitacao(user)
-                aprovadas = ids_ja_aprovadas(o.pk for o in pagina)
+                decididas = ids_ja_decididas(o.pk for o in pagina)
                 for o in pagina:
                     motivo = motivo_que_impede_excluir(
-                        o, ja_aprovada=o.pk in aprovadas, pode_tirar_do_google=self.get_pode_tirar_do_google(o)
+                        o, ja_decidida=o.pk in decididas, pode_tirar_do_google=self.get_pode_tirar_do_google(o)
                     )
                     calculados[o.pk] = motivo is None and permissao.permite(user, o, escrita)
+                    motivos[o.pk] = motivo
             self.context["_pode_excluir"] = calculados
+        return calculados[obj.pk]
+
+    def get_motivo_de_nao_excluir(self, obj: Solicitacao) -> str | None:
+        """Calculado junto com `pode_excluir`, para a página inteira."""
+        self.get_pode_excluir(obj)
+        return cast(dict[int, str | None], self.context["_motivo_de_nao_excluir"])[obj.pk]
+
+    def get_sem_compra(self, obj: Solicitacao) -> bool:
+        """O evento foi para aprovação por falta de compra (pela última marca) ou, sem marca, o par de hoje.
+
+        A marca é o último `AuditLog` `CREATE`/`UPDATE` com `details.sem_compra` (true ou false: a criação e
+        toda edição que muda o par a gravam). A compra que entra antes da decisão não apaga a explicação da
+        fila, e a edição para um par com compra a apaga. Sem marca (evento antigo), vale o par de hoje
+        (`solicitacoes_com_par_liberado`; sem município ou sem projeto não há par). Duas consultas por página.
+        """
+        calculados: dict[int, bool] | None = cast(Any, self.context.get("_sem_compra"))
+        if calculados is None or obj.pk not in calculados:
+            calculados = calculados or {}
+            pagina = self._pagina(obj)
+            com_par = {o.pk for o in pagina if o.municipio_id is not None and o.projeto_id is not None}
+            liberados: set[int] = set(
+                solicitacoes_com_par_liberado(Solicitacao.objects.filter(pk__in=com_par)).values_list("pk", flat=True)
+            )
+            marcas: dict[int, bool] = {}
+            for sol_id, marca in (
+                AuditLog.objects.filter(
+                    model_name="Solicitacao",
+                    action__in=(AuditLog.Action.CREATE, AuditLog.Action.UPDATE),
+                    details__solicitacao_id__in=[o.pk for o in pagina],
+                    details__has_key="sem_compra",
+                )
+                .order_by("created_at", "pk")
+                .values_list("details__solicitacao_id", "details__sem_compra")
+            ):
+                marcas[int(sol_id)] = marca is True  # a última vence
+            calculados.update({o.pk: marcas.get(o.pk, o.pk in com_par and o.pk not in liberados) for o in pagina})
+            self.context["_sem_compra"] = calculados
         return calculados[obj.pk]
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
@@ -304,9 +359,12 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
            (gcal_status == 'PUBLISHED') para evitar drift, e das que estão lá pela planilha
            (`publicado_fora_do_sistema`, mesma regra).
         3. Bloqueia edição de solicitações reprovadas.
-        4. Exige compra que libere o par município+projeto (regra única em
+        4. Confere a compra que libera o par município+projeto (regra única em
            `services/compra_elegibilidade`) na criação e quando o VALOR de município ou de
-           projeto muda na edição. Isentos: superuser e a capacidade de isenção. Para quem não é
+           projeto muda na edição. Par sem compra não é mais recusado (pedido do dono, 03/11/2026):
+           fica marcado em `self.par_sem_compra`, e a view manda o evento para aprovação. O projeto
+           "em espera" (sem compra em município nenhum) segue sem receber evento: 400 em `projeto`. Isentos
+           (superuser e a capacidade de isenção) não são conferidos nem marcados. Para quem não é
            isento, município vazio não pula a regra: o campo é obrigatório na escrita (Meta) e o
            evento antigo sem município não troca de projeto sem informar o município.
         5. Na criação, `coordenador_acompanha` é obrigatório (decisão do dono, 05/10/2026):
@@ -368,7 +426,10 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         # chave: a tela de edição manda os dois campos em todo salvamento, e salvar
         # com o mesmo par não é reatribuição — preserva a edição de solicitações
         # antigas cujo par não tem compra. A regra (DATCompra, coleção, nome geral) e a isenção
-        # (superuser ou capacidade) moram em `compra_elegibilidade`.
+        # (superuser ou capacidade) moram em `compra_elegibilidade`. Sem compra não recusa: marca
+        # (`par_sem_compra`) para a view mandar o evento para aprovação (pedido do dono, 03/11/2026).
+        self.par_sem_compra = False
+        self.par_conferido = False  # o par foi conferido (quem não é isento, par novo): a view grava a marca
         request = cast(Any, self.context.get("request"))
         user = getattr(request, "user", None)
         if not isento_da_regra_da_compra(user):
@@ -384,15 +445,10 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
                 # sem o par não há o que conferir, então não pula a regra.
                 if municipio is None:
                     raise serializers.ValidationError({"municipio": "Informe o município do evento."})
-                if not par_liberado(municipio.pk, projeto):
-                    raise serializers.ValidationError(
-                        {
-                            "municipio": (
-                                f"O município '{municipio.nome} - {municipio.uf}' não tem compra que libere "
-                                f"o projeto '{projeto.nome}'. Registre a compra antes de vincular esse par."
-                            )
-                        }
-                    )
+                if projeto_em_espera(projeto):
+                    raise serializers.ValidationError({"projeto": MSG_PROJETO_EM_ESPERA})
+                self.par_sem_compra = not par_liberado(municipio.pk, projeto)
+                self.par_conferido = True
 
         # Regra 1: Validação de intervalo (fim > inicio)
         inicio = attrs.get("inicio", getattr(instance, "inicio", None))

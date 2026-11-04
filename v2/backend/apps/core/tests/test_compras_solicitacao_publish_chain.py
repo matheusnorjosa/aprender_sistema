@@ -143,14 +143,13 @@ def test_happy_path_import_compra_create_solicitacao_approve_and_publish():
     assert any((log.details or {}).get("solicitacao_id") == solicitacao_id for log in logs)
 
 
-def test_invalid_path_blocks_solicitacao_when_pair_municipio_projeto_has_no_compra():
+def test_pair_municipio_projeto_without_compra_goes_to_approval():
     """
-    Fluxo invalido esperado:
-    municipio/projeto sem compra elegivel deve retornar 400 com erro claro.
+    Município/projeto sem compra elegível: cria, mas vai para aprovação (pedido do dono, 03/11/2026).
     """
     client = APIClient()
 
-    # Tudo na mesma gerência: o 400 vem só da falta de compra, não do escopo de gerência (PR 9).
+    # Tudo na mesma gerência: o escopo de gerência (PR 9) não interfere.
     gerencia = GerenciaFactory()
     user_controle = _create_user_in_group(prefix="controle_invalid", group_name="Controle")
     user_coordenador = _create_user_in_group(prefix="coord_invalid", group_name="Coordenador", gerencia=gerencia)
@@ -163,10 +162,13 @@ def test_invalid_path_blocks_solicitacao_when_pair_municipio_projeto_has_no_comp
     # Compra lançada somente para "Novo Lendo".
     client.force_authenticate(user=user_controle)
     _lancar_compra(client, municipio=municipio, projeto=projeto_com_compra, descricao="LIVRO NOVO LENDO")
+    # compra em outro município: sem compra aqui, mas não "em espera" (que segue recusado)
+    outro = MunicipioFactory(nome="Crato", uf="CE", ativo=True)
+    _lancar_compra(client, municipio=outro, projeto=projeto_sem_compra, descricao="LIVRO ACERTA")
     assert DATCompra.objects.filter(municipio=municipio, projeto=projeto_com_compra).exists()
     assert not DATCompra.objects.filter(municipio=municipio, projeto=projeto_sem_compra).exists()
 
-    # Tenta criar solicitacao para projeto sem compra => bloqueio.
+    # Cria solicitacao para projeto sem compra => pendente, marcada sem compra.
     client.force_authenticate(user=user_coordenador)
     inicio = timezone.now() + timedelta(days=3)
     fim = inicio + timedelta(hours=2)
@@ -185,8 +187,6 @@ def test_invalid_path_blocks_solicitacao_when_pair_municipio_projeto_has_no_comp
         secure=True,
     )
 
-    assert create_response.status_code == 400
-    assert "errors" in create_response.data
-    assert "municipio" in create_response.data["errors"]
-    assert "projeto" not in create_response.data["errors"]
-    assert "compra que libere" in str(create_response.data["errors"]["municipio"]).lower()
+    assert create_response.status_code == 201, create_response.data
+    assert create_response.data["status"] == "pendente"
+    assert create_response.data["sem_compra"] is True

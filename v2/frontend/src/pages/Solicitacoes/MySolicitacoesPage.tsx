@@ -90,7 +90,9 @@ function nomeDaSolicitacao(record: Solicitacao): string {
  * conta como publicado: mudar aqui deixaria a agenda com o dado antigo, e ele não se exclui.
  * Evento que o sistema pôs (ou pode ter posto) no Google (`estaNoGoogle`) se exclui só por quem
  * também pode tirá-lo de lá (`pode_tirar_do_google`): a exclusão tira dos dois lados. Em ERROR a
- * edição continua aberta; o motivo, então, fala só da exclusão.
+ * edição continua aberta; o motivo, então, fala só da exclusão. O resto quem sabe é o servidor
+ * (`pode_excluir`): a solicitação que já teve decisão registrada não se exclui, em qualquer fluxo (o
+ * NAO_SUPER sem compra também vai para aprovação, 03/11/2026).
  */
 function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcluir: boolean; motivos: string[] } {
   const naPlanilha = record.publicado_fora_do_sistema === true;
@@ -100,7 +102,8 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
   const isSuper = record.fluxo === ('SUPER' as FluxoType);
   const superForaDePendente = isSuper && record.status !== 'pendente';
   const podeEditar = !isPublished && record.status !== 'reprovado';
-  const podeExcluir = !naPlanilha && (!noGoogle || podeTirarDoGoogle) && !superForaDePendente;
+  const deduzido = !naPlanilha && (!noGoogle || podeTirarDoGoogle) && !superForaDePendente;
+  const podeExcluir = deduzido && record.pode_excluir !== false;
   const motivos: string[] = [];
   if (naPlanilha) {
     // Não foi o sistema que publicou: não há publicação para cancelar aqui.
@@ -163,6 +166,16 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
     motivos.push(`Este evento pode estar no Google Agenda, e excluir aqui também o tiraria de lá. ${saida}`);
   } else if (record.status === 'reprovado') {
     motivos.push('Solicitações reprovadas não podem ser editadas.');
+  }
+  // O servidor recusa o que a tela não deduz (decisão registrada, sincronização com o Google em
+  // andamento): o motivo vem dele; sem motivo, o texto da decisão registrada.
+  if (deduzido && !podeExcluir) {
+    motivos.push(
+      record.motivo_de_nao_excluir ??
+        `Já houve decisão sobre esta solicitação e ela não pode ser excluída. Para tirá-la, ${
+          record.status === 'pendente' ? 'peça a reprovação a quem aprova' : 'fale com a administração do sistema'
+        }.`
+    );
   }
   // Cancelar a publicação não devolve a exclusão a uma SUPER que já saiu de pendente.
   if (superForaDePendente) {

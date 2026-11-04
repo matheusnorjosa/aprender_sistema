@@ -13,7 +13,8 @@ Regras que governam o fluxo de aprovação de solicitações.
 Uma `Solicitacao` **nunca** muda para "Aprovada" automaticamente, mesmo se não houver conflitos.
 
 !!! warning "Exceção"
-    Projetos com `fluxo='NAO_SUPER'` são auto-aprovados na criação.
+    Projetos com `fluxo='NAO_SUPER'` são auto-aprovados na criação, salvo o evento num município
+    sem compra para o projeto (pedido do dono, 03/11/2026): esse vai para aprovação.
 
 ## PA-02: Perfil Exigido
 
@@ -61,8 +62,9 @@ Integrações externas (Google Calendar, Meet) só executam **após** aprovaçã
 ## PA-04: Estado Inicial
 
 Solicitação de projeto com `fluxo='SUPER'` nasce com `status='pendente'`.
-Projeto com `fluxo='NAO_SUPER'` nasce `'aprovado'`
-(`apps/core/services/solicitacao_create.py:23-44`, `resolve_initial_status`).
+Projeto com `fluxo='NAO_SUPER'` nasce `'aprovado'`, salvo num município sem compra para o projeto
+(nasce `'pendente'`; pedido do dono, 03/11/2026)
+(`apps/core/services/solicitacao_create.py:23-51`, `resolve_initial_status`).
 
 !!! success "Editar a SUPER aprovada pede nova aprovação (#1624, resolvido; estendido em 2026-10-15)"
     Trocar o **projeto** para um de fluxo `SUPER` (#1624), ou mudar **data, horário, município ou
@@ -122,5 +124,7 @@ de ser aprovado.
 
 ### NAO_SUPER (Auto-aprovado)
 
-1. Coordenador cria solicitação → `status='aprovado'`
+1. Coordenador cria solicitação → `status='aprovado'` (num município sem compra para o projeto,
+   `status='pendente'` e o evento segue o fluxo de aprovação; quem é isento da regra da compra
+   segue auto-aprovado)
 2. Vai direto para Pré-Agenda

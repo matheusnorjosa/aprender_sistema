@@ -30,6 +30,13 @@ export type LookupMunicipiosParams = QueryParams & {
   q?: string;
   com_compra?: boolean | undefined;
   projeto_id?: ID | undefined;
+  /**
+   * Com `projeto_id`: em vez de filtrar, traz também os municípios sem compra para o projeto, com compra
+   * primeiro, e cada item leva `sem_compra` (o evento ali vai para aprovação; pedido do dono, 03/11/2026).
+   */
+  marcar_sem_compra?: boolean | undefined;
+  /** Só esse município (a edição reconfere a marca do par ao trocar o projeto). */
+  municipio_id?: ID | undefined;
 };
 
 /**

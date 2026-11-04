@@ -36,7 +36,9 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 
 import { getSolicitacao, updateSolicitacao } from '../../api/solicitacoes';
+import { useAcesso } from '../../contexts/AcessoContext';
 import { optionalText } from './optionalText';
+import { AVISO_SEM_COMPRA, MSG_PROJETO_EM_ESPERA, opcaoDoMunicipio } from './evento';
 import {
   lookupMunicipiosWithFilters,
   lookupProjetos,
@@ -72,6 +74,10 @@ interface ComboBoxValue {
   fluxo?: string;
   /** Projeto: a gerência usa a pergunta "pretende avaliar o formador?". */
   pergunta_avaliar_formador?: boolean;
+  /** Município escolhido na lista: sem compra para o projeto (o evento vai para aprovação). */
+  sem_compra?: boolean;
+  /** Município escolhido na lista: o projeto está em espera (sem compra em município nenhum). */
+  projeto_em_espera?: boolean;
 }
 
 /** Formador type */
@@ -296,18 +302,63 @@ export default function EditSolicitacaoPage(): JSX.Element {
     };
   }, [formData.inicio, formData.fim]);
 
-  // Regra da compra: as listas oferecem só o que a compra libera (o projeto "em espera" some e o
-  // município segue o projeto escolhido). Quem é isento (superusuário ou a capacidade) recebe tudo
-  // do servidor. O par já gravado continua como valor, e salvar com o mesmo par segue livre.
+  // Regra da compra: o projeto "em espera" some da lista. A de municípios traz também os sem compra
+  // para o projeto, marcados (pedido do dono, 03/11/2026: o evento ali vai para aprovação). Quem é
+  // isento (superusuário ou a capacidade) recebe tudo do servidor, sem marca. O par já gravado
+  // continua como valor, e salvar com o mesmo par segue livre.
   const lookupProjetosElegiveis = useCallback(
     (q: string): Promise<LookupItem[]> => lookupProjetos(q, { com_compra: true }),
     [],
   );
   const projetoId = formData.projeto?.id;
   const lookupMunicipiosElegiveis = useCallback(
-    (q: string): Promise<LookupItem[]> => lookupMunicipiosWithFilters({ q, com_compra: true, projeto_id: projetoId }),
+    (q: string): Promise<LookupItem[]> =>
+      lookupMunicipiosWithFilters({ q, com_compra: true, marcar_sem_compra: true, projeto_id: projetoId }),
     [projetoId],
   );
+  // A marca vem do município escolhido na lista, ou da reconferência ao trocar o projeto. Só avisa
+  // quando o par difere do gravado: salvar com o mesmo par não muda o status.
+  const dispensaCompra = useAcesso().caps.canCreateSolicitationWithoutPurchase;
+  const parDiferente =
+    solicitacao !== null &&
+    (formData.municipio?.id !== solicitacao.municipio || formData.projeto?.id !== solicitacao.projeto);
+  // Projeto em espera: o servidor recusa o par novo (não vai para aprovação), e a tela diz isso.
+  const emEspera = parDiferente && formData.municipio?.projeto_em_espera === true;
+  const semCompra = parDiferente && !emEspera && formData.municipio?.sem_compra === true;
+
+  // Trocar o projeto: a marca era do par antigo. Com município escolhido, reconfere o par novo pelo
+  // mesmo lookup (só esse município); a resposta só vale se o par ainda é o mesmo.
+  const handleProjetoChange = (value: ComboBoxValue | null): void => {
+    const municipioId = formData.municipio?.id;
+    setFormData({
+      ...formData,
+      projeto: value,
+      municipio: formData.municipio && { ...formData.municipio, sem_compra: false, projeto_em_espera: false },
+    });
+    if (!value || municipioId == null) return;
+    lookupMunicipiosWithFilters({
+      q: '',
+      com_compra: true,
+      marcar_sem_compra: true,
+      projeto_id: value.id,
+      municipio_id: municipioId,
+    })
+      .then(([item]) => {
+        setFormData(prev =>
+          prev.projeto?.id === value.id && prev.municipio?.id === municipioId
+            ? {
+                ...prev,
+                municipio: {
+                  ...prev.municipio,
+                  sem_compra: item?.['sem_compra'] === true,
+                  projeto_em_espera: item?.['projeto_em_espera'] === true,
+                },
+              }
+            : prev,
+        );
+      })
+      .catch((err: unknown) => logger.warn('Não foi possível reconferir a compra do par:', err));
+  };
 
   // "Você pretende avaliar o formador?" só quando a gerência do projeto pergunta e há formador
   // avaliável na lista (mesma regra do backend, decisão do dono de 05/10/2026).
@@ -438,9 +489,13 @@ export default function EditSolicitacaoPage(): JSX.Element {
       // Decisão do dono (14/10/2026): o backend devolve a SUPER aprovada para pendente quando
       // muda data, horário, município, projeto, formadores ou coordenadores (03/11/2026). A tela só
       // avisa o que a API fez.
+      // Par novo sem compra (pedido do dono, 03/11/2026): volta para aprovação em qualquer fluxo. A
+      // mensagem segue a marca do par escolhido na tela (`semCompra`: par diferente do gravado e marcado).
       if (solicitacao?.status === 'aprovado' && atualizada.status === 'pendente') {
         message.warning(
-          'Solicitação atualizada. A mudança de data, horário, município, projeto, formadores ou coordenadores voltou o evento para aprovação.',
+          !dispensaCompra && semCompra
+            ? 'Solicitação atualizada. Sem compra neste município para este projeto: o evento voltou para aprovação.'
+            : 'Solicitação atualizada. A mudança de data, horário, município, projeto, formadores ou coordenadores voltou o evento para aprovação.',
         );
       } else {
         message.success('Solicitação atualizada com sucesso!');
@@ -566,7 +621,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
           >
             <ComboBox
               lookupFunction={lookupProjetosElegiveis}
-              onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, projeto: value })}
+              onChange={handleProjetoChange}
               value={formData.projeto as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um projeto"
             />
@@ -587,9 +642,18 @@ export default function EditSolicitacaoPage(): JSX.Element {
           <Form.Item
             label="Município"
             rules={[{ required: true, message: 'Por favor selecione um município' }]}
+            extra={
+              emEspera ? (
+                <Alert id="edit-municipio-sem-compra" type="error" showIcon role="none" message={MSG_PROJETO_EM_ESPERA} />
+              ) : semCompra ? (
+                <Alert id="edit-municipio-sem-compra" type="warning" showIcon role="none" message={AVISO_SEM_COMPRA} />
+              ) : undefined
+            }
           >
             <ComboBox
               lookupFunction={lookupMunicipiosElegiveis}
+              renderOption={opcaoDoMunicipio}
+              aria-describedby={semCompra || emEspera ? 'edit-municipio-sem-compra' : undefined}
               onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, municipio: value })}
               value={formData.municipio as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um município"

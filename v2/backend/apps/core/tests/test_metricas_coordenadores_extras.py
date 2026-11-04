@@ -4,13 +4,12 @@ Métricas com vários coordenadores no evento (decisão do dono, 03/11/2026).
 Os coordenadores além do responsável (`Participation(role=COORD_ACOMPANHA)`) ocupam a agenda e
 contam horas como o formador. Nas métricas:
 
-- Ranking de formadores (`/api/metrics/team/formadores/`): "eventos" conta os mesmos papéis que as
-  horas contam sempre (`ENFORCED_ROLES`), um por evento.
-- Mapa (`/api/metrics/map/` e `/api/metrics/map/coordinators/`): os coordenadores do evento são os
-  do convite (papel COORDENADOR: quem criou e o responsável) mais os COORD_ACOMPANHA, sem repetir
-  pessoa no evento.
-
-Sem COORD_ACOMPANHA os números são os de antes (em produção, 04/11/2026, há 0 dessas linhas).
+- Ranking de formadores (`/api/metrics/team/formadores/`): "eventos" e municípios contam a mesma
+  população das horas (`horas_formacao`): `ENFORCED_ROLES` sempre e o coordenador responsável
+  (`coordenador`; sem ele, quem criou) só quando acompanha. Um por evento (decisão do dono, 04/11).
+- Mapa (`/api/metrics/map/` e `/api/metrics/map/coordinators/`): os coordenadores do evento são o
+  responsável (`Solicitacao.coordenador`; sem ele, quem criou) mais os COORD_ACOMPANHA, sem repetir
+  pessoa no evento. Quem só criou o evento para outro responsável não conta (decisão do dono, 04/11).
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportOptionalMemberAccess=false, reportIndexIssue=false
@@ -22,6 +21,8 @@ from itertools import count
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework.test import APIClient
 
@@ -103,23 +104,77 @@ def _ranking(client) -> dict[int, dict[str, Any]]:
 
 
 class TestRankingDeFormadores:
-    def test_sem_extra_numeros_de_antes(self, client):
-        """Sem COORD_ACOMPANHA: formador, responsável que acompanha e convidado como antes."""
+    def test_formador_e_convidado(self, client):
+        """Formador conta; convidado não; quem só criou o evento (sem acompanhar) não."""
         bia = _pessoa("Bia")
         caio = _pessoa("Caio")
-        for dia in (10, 11):
+        for dia in (10, 11, 12):
             _papel(_evento(dia), bia, FORMADOR)
-        # Caio é responsável que acompanha (conta hora, não entra no ranking por evento) e convidado.
-        sol = _evento(12, coordenador=caio, acompanha=True)
-        _papel(sol, bia, FORMADOR)
         _papel(_evento(13), caio, Participation.Role.CONVIDADO)
 
         ranking = _ranking(client)
 
         assert set(ranking) == {bia.id}
-        assert ranking[bia.id]["eventos"] == 3
-        assert ranking[bia.id]["horas_trabalhadas"] == 12.0
+        assert (ranking[bia.id]["eventos"], ranking[bia.id]["horas_trabalhadas"]) == (3, 12.0)
         assert ranking[bia.id]["municipios_atendidos"] == 3
+
+    def test_responsavel_que_acompanha_entra(self, client):
+        """Decisão do dono (04/11): o responsável que acompanha conta evento e município, como conta hora."""
+        bia = _pessoa("Bia")
+        caio = _pessoa("Caio")
+        mun = MunicipioFactory()
+        _papel(_evento(10, coordenador=caio, acompanha=True, municipio=mun), bia, FORMADOR)
+        _evento(11, coordenador=caio, acompanha=True, municipio=mun)
+
+        ranking = _ranking(client)
+
+        assert (ranking[caio.id]["eventos"], ranking[caio.id]["horas_trabalhadas"]) == (2, 8.0)
+        assert ranking[caio.id]["municipios_atendidos"] == 1
+        assert ranking[bia.id]["eventos"] == 1
+
+    def test_responsavel_que_nao_acompanha_nao_entra(self, client):
+        caio = _pessoa("Caio")
+        criadora = _pessoa("Criadora")
+        _evento(10, coordenador=caio, acompanha=False)
+        _evento(11, criador=criadora, acompanha=False)
+
+        assert _ranking(client) == {}
+
+    def test_sem_fk_coordenador_quem_criou_e_o_responsavel(self, client):
+        criadora = _pessoa("Criadora")
+        apoio = _pessoa("Apoio")
+        caio = _pessoa("Caio")
+        _evento(10, criador=criadora, acompanha=True)
+        # Apoio criou para Caio, que acompanha: conta Caio, não o Apoio.
+        _evento(11, criador=apoio, coordenador=caio, acompanha=True)
+
+        ranking = _ranking(client)
+
+        assert set(ranking) == {criadora.id, caio.id}
+        assert ranking[criadora.id]["eventos"] == 1
+
+    def test_responsavel_que_acompanha_e_formador_no_mesmo_evento_conta_uma_vez(self, client):
+        caio = _pessoa("Caio")
+        sol = _evento(10, coordenador=caio, acompanha=True)
+        _papel(sol, caio, FORMADOR)
+        _papel(sol, caio, EXTRA)
+
+        linha = _ranking(client)[caio.id]
+
+        assert (linha["eventos"], linha["horas_trabalhadas"], linha["municipios_atendidos"]) == (1, 4.0, 1)
+
+    def test_top_10_ve_o_responsavel_que_acompanha(self, client):
+        """O corte do top 10 vê o responsável que acompanha: com mais eventos, ele entra no lugar de um formador."""
+        for _ in range(10):
+            _papel(_evento(10), _pessoa("Formador"), FORMADOR)
+        caio = _pessoa("Caio")
+        for dia in (11, 12):
+            _evento(dia, coordenador=caio, acompanha=True)
+
+        ranking = _ranking(client)
+
+        assert len(ranking) == 10
+        assert ranking[caio.id]["eventos"] == 2
 
     def test_extra_conta_evento_como_conta_hora(self, client):
         bia = _pessoa("Bia")
@@ -175,21 +230,62 @@ def _coordenadores_da_uf(client, uf: str = "CE") -> dict[int, dict[str, Any]]:
 
 
 class TestMapa:
-    def test_sem_extra_numeros_de_antes(self, client):
-        """Sem COORD_ACOMPANHA: quem criou e o responsável (papel COORDENADOR) contam; formador não."""
+    def test_responsavel_conta_quem_so_criou_nao(self, client):
+        """Decisão do dono (04/11): o Apoio que criou para outro responsável não conta; formador não."""
         mun = _municipio("Aracati")
-        criador = _pessoa("Criadora")
+        apoio = _pessoa("Apoio")
         responsavel = _pessoa("Responsável")
-        sol = _evento(10, municipio=mun, criador=criador, coordenador=responsavel)
+        sol = _evento(10, municipio=mun, criador=apoio, coordenador=responsavel)
         _papel(sol, _pessoa("Formadora"), FORMADOR)
-        _evento(11, municipio=mun, criador=criador)
+        _evento(11, municipio=mun, criador=apoio, coordenador=responsavel)
 
         por_mun, por_uf = _mapa(client)
         detalhe = _coordenadores_da_uf(client)
 
-        assert por_mun["Aracati"]["coordenadores"] == 2
+        assert por_mun["Aracati"]["coordenadores"] == 1
+        assert por_uf["CE"]["coordenadores"] == 1
+        assert {k: v["eventos"] for k, v in detalhe.items()} == {responsavel.id: 2}
+
+    def test_sem_fk_coordenador_quem_criou_conta(self, client):
+        mun = _municipio("Sobral")
+        criadora = _pessoa("Criadora")
+        apoio = _pessoa("Apoio")
+        responsavel = _pessoa("Responsável")
+        _evento(10, municipio=mun, criador=criadora)
+        _evento(11, municipio=mun, criador=apoio, coordenador=responsavel)
+
+        por_mun, por_uf = _mapa(client)
+        detalhe = _coordenadores_da_uf(client)
+
+        assert por_mun["Sobral"]["coordenadores"] == 2
         assert por_uf["CE"]["coordenadores"] == 2
-        assert {k: v["eventos"] for k, v in detalhe.items()} == {criador.id: 2, responsavel.id: 1}
+        assert {k: v["eventos"] for k, v in detalhe.items()} == {criadora.id: 1, responsavel.id: 1}
+
+    def test_responsavel_que_tambem_e_extra_conta_uma_vez(self, client):
+        mun = _municipio("Quixadá")
+        criadora = _pessoa("Criadora")
+        sol = _evento(10, municipio=mun, criador=criadora)
+        _papel(sol, criadora, EXTRA)
+
+        por_mun, por_uf = _mapa(client)
+        detalhe = _coordenadores_da_uf(client)
+
+        assert (por_mun["Quixadá"]["coordenadores"], por_uf["CE"]["coordenadores"]) == (1, 1)
+        assert detalhe[criadora.id]["eventos"] == 1
+
+    def test_por_uf_e_detalhe_respeitam_a_uf(self, client):
+        responsavel = _pessoa("Responsável")
+        _evento(10, municipio=_municipio("Fortaleza", "CE"), coordenador=responsavel)
+        _evento(11, municipio=_municipio("Natal", "RN"), coordenador=responsavel)
+        _evento(12, municipio=_municipio("Mossoró", "RN"))
+
+        _, por_uf = _mapa(client)
+        detalhe_rn = _coordenadores_da_uf(client, "RN")
+
+        assert (por_uf["CE"]["coordenadores"], por_uf["RN"]["coordenadores"]) == (1, 2)
+        assert detalhe_rn[responsavel.id]["eventos"] == 1
+        assert detalhe_rn[responsavel.id]["municipios"] == [{"nome": "Natal", "eventos": 1}]
+        assert len(detalhe_rn) == 2
 
     def test_extra_conta_como_coordenador_do_evento(self, client):
         mun = _municipio("Iguatu")
@@ -227,3 +323,60 @@ class TestMapa:
         assert {k: v["eventos"] for k, v in detalhe.items()} == {criador.id: 1, responsavel.id: 1, formadora.id: 1}
         assert detalhe[criador.id]["projetos"] == [{"nome": "Projeto Extras", "eventos": 1}]
         assert detalhe[criador.id]["municipios"] == [{"nome": "Crato", "eventos": 1}]
+
+    def test_detalhe_ignora_evento_que_sai_do_filtro_entre_as_leituras(self, client, monkeypatch):
+        """Os pares e os eventos vêm de consultas separadas: um evento reprovado no meio não dá 500."""
+        from apps.core.views.metrics import map_metrics
+
+        mun = _municipio("Canindé")
+        fica = _pessoa("Fica")
+        sai = _pessoa("Sai")
+        _evento(10, municipio=mun, coordenador=fica)
+        reprovado_no_meio = _evento(11, municipio=mun, coordenador=sai)
+        original = map_metrics.coordenadores_do_evento
+
+        def reprova_depois_de_ler(solicitacoes):
+            pares = original(solicitacoes)
+            Solicitacao.objects.filter(pk=reprovado_no_meio.pk).update(status=Solicitacao.Status.REPROVADO)
+            return pares
+
+        monkeypatch.setattr(map_metrics, "coordenadores_do_evento", reprova_depois_de_ler)
+        resposta = client.get(reverse("core:metrics-map-coordinators"), {"uf": "CE", "status": "aprovado"})
+
+        assert resposta.status_code == 200
+        assert [c["id"] for c in resposta.json()["coordenadores"]] == [fica.id]
+
+
+# ============================================================================
+# Sem N+1: o número de consultas não cresce com eventos e pessoas
+# ============================================================================
+
+
+def _consultas(client, url: str, params: dict[str, Any]) -> int:
+    with CaptureQueriesContext(connection) as ctx:
+        assert client.get(url, params).status_code == 200
+    return len(ctx.captured_queries)
+
+
+def _eventos_variados(n: int, mun):
+    for i in range(n):
+        sol = _evento(10 + i, municipio=mun, criador=_pessoa("Apoio"), coordenador=_pessoa("Resp"), acompanha=True)
+        _papel(sol, _pessoa("Formadora"), FORMADOR)
+        _papel(sol, _pessoa("Extra"), EXTRA)
+
+
+@pytest.mark.parametrize(
+    ("url", "params"),
+    [
+        ("/api/metrics/team/formadores/", {"days": 30}),
+        ("/api/metrics/map/", {}),
+        ("/api/metrics/map/coordinators/", {"uf": "CE"}),
+    ],
+)
+def test_consultas_nao_crescem_com_os_eventos(client, url, params):
+    _eventos_variados(1, _municipio("Pacatuba"))
+    _consultas(client, url, params)  # aquece o cache de Configurações
+    poucas = _consultas(client, url, params)
+    _eventos_variados(5, _municipio("Maranguape"))
+
+    assert _consultas(client, url, params) == poucas

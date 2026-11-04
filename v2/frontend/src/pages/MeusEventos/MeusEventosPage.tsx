@@ -21,7 +21,7 @@ import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../
 
 import { formatFortaleza } from '../../utils/datetime';
 import { getMyEvents, type MeEvent } from '../../api/me';
-import { formadoresNomes } from '../../utils/participants';
+import { coordenadoresTexto, extrasNomes, formadoresNomes } from '../../utils/participants';
 import { MeetLink } from '../../components/MeetLink';
 
 const { Title, Text } = Typography;
@@ -129,6 +129,16 @@ export default function MeusEventosPage(): JSX.Element {
       // do `formadores` legado (só usuário). Mesmo padrão das outras telas. Ver utils/participants.
       render: (_, record: MeEvent) =>
         formadoresNomes(record.participantes) || <Text type="secondary">—</Text>,
+      ellipsis: true,
+    },
+    {
+      title: 'Coordenador(es)',
+      dataIndex: 'coordenador_nome',
+      key: 'coordenadores',
+      responsive: VISIVEL_A_PARTIR.xl,
+      // 03/11/2026: o responsável e os extras (COORD_ACOMPANHA). Ver utils/participants.
+      render: (_, record: MeEvent) =>
+        coordenadoresTexto(record.coordenador_nome, extrasNomes(record.participantes)) || <Text type="secondary">—</Text>,
       ellipsis: true,
     },
     {

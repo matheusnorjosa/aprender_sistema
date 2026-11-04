@@ -33,6 +33,9 @@ export interface MeEvent {
   // #1945: TODAS as participations [{role, nome}] — inclui quem saiu (guest_nome), ao contrário
   // de `formadores` (só usuario). O FE filtra o papel (ex.: FORMADOR).
   participantes: MeEventParticipante[];
+  // Vários coordenadores (03/11/2026): o responsável (nome, ou "Usuario #id"; nunca o login). Os
+  // extras vêm em `participantes` com o papel COORD_ACOMPANHA.
+  coordenador_nome: string | null;
   is_online: boolean;
   meet_link: string | null;
   status: 'aprovado' | 'pendente' | 'reprovado';

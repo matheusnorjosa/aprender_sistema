@@ -20,7 +20,7 @@ from typing import cast
 
 from rest_framework import serializers
 
-from apps.core.models import Solicitacao
+from apps.core.models import Solicitacao, Usuario
 from apps.core.pii import email_sem_cpf
 
 
@@ -37,6 +37,10 @@ class MeEventSerializer(serializers.ModelSerializer):
     tipo_evento_nome = serializers.CharField(source="tipo_evento.nome", read_only=True, default=None)
     formadores = serializers.SerializerMethodField()
     participantes = serializers.SerializerMethodField()
+    # Vários coordenadores (03/11/2026): o responsável (`coordenador`; nulo, quem criou), como o
+    # `coordenador_nome` das listas de solicitação. `str(Usuario)` = nome ou "Usuario #id", nunca o
+    # login (CPF). Os extras vêm em `participantes` (papel COORD_ACOMPANHA).
+    coordenador_nome = serializers.SerializerMethodField()
 
     class Meta:
         model = Solicitacao
@@ -50,6 +54,7 @@ class MeEventSerializer(serializers.ModelSerializer):
             "local",
             "formadores",
             "participantes",
+            "coordenador_nome",
             "is_online",
             "meet_link",
             "status",
@@ -66,6 +71,10 @@ class MeEventSerializer(serializers.ModelSerializer):
             .order_by("usuario__first_name", "usuario__last_name")
         )
         return [f"{p.usuario.first_name} {p.usuario.last_name}".strip() for p in formadores]
+
+    def get_coordenador_nome(self, obj: Solicitacao) -> str | None:
+        user = cast("Usuario | None", obj.coordenador or obj.usuario)
+        return str(user) if user else None
 
     def get_participantes(self, obj: Solicitacao) -> list[dict[str, str]]:
         """[{role, nome}] de TODAS as participations (todos os papéis). `nome` na cascata

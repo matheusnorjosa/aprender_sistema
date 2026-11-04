@@ -80,7 +80,7 @@ import type {
   Participation,
 } from '../../types';
 import { ListaDeBloqueados } from '../../components/AvailabilityConflictAlert';
-import { formadoresLabel } from '../../utils/participants';
+import { coordenadoresTexto, extrasLabels, formadoresLabel } from '../../utils/participants';
 import { mesmosDados } from '../../utils/mesmosDados';
 import { pausaDo429Ms } from '../../utils/retryAfter';
 import AvisoAtualizacaoPausada from '../../components/AvisoAtualizacaoPausada';
@@ -558,17 +558,22 @@ export default function ApprovalsPage(): JSX.Element {
       },
     },
     {
-      title: 'Coordenador',
+      title: 'Coordenador(es)',
       dataIndex: 'coordenador_nome',
       key: 'coordenador_nome',
       responsive: VISIVEL_A_PARTIR.md,
       // 05/10/2026: a resposta "acompanha?" vai numa 2ª linha da mesma célula, sem coluna nova.
+      // 03/11/2026: na 1ª linha, o responsável e os extras (COORD_ACOMPANHA); a resposta continua
+      // sendo do responsável, e com extras a 2ª linha diz isso.
       render: (valor, record) => {
         const nome = valor as string | null;
+        const texto = coordenadoresTexto(nome, extrasLabels(record.participations));
+        const temExtras = texto !== coordenadoresTexto(nome, []);
+        const acompanha = record.coordenador_acompanha ? 'Acompanha' : 'Não acompanha';
         return (
           <div style={{ lineHeight: 1.3 }}>
-            <div style={UMA_LINHA} title={nome || undefined}>{nome || '-'}</div>
-            <small className="text-gray-500">{record.coordenador_acompanha ? 'Acompanha' : 'Não acompanha'}</small>
+            <div style={UMA_LINHA} title={texto || undefined}>{texto || '-'}</div>
+            <small className="text-gray-500">{temExtras ? `Responsável ${acompanha.toLowerCase()}` : acompanha}</small>
           </div>
         );
       },

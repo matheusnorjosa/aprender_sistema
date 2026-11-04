@@ -118,7 +118,7 @@ describe('ApprovalsPage responsiva', () => {
     const { container } = renderPage();
     const linha = await linhaDoEvento('Aprovar');
 
-    expect(cabecalhos()).toEqual(['Evento', 'Coordenador', 'Tipo/Enc./Seg.', 'Formadores', 'Status', 'Ações']);
+    expect(cabecalhos()).toEqual(['Evento', 'Coordenador(es)', 'Tipo/Enc./Seg.', 'Formadores', 'Status', 'Ações']);
     for (const texto of ['25/08/2026', 'MunicipioTeste', 'ProjetoTeste']) {
       expect(within(linha).getByText(texto, { exact: false })).toBeInTheDocument();
     }

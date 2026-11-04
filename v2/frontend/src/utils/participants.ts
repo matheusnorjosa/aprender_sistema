@@ -47,3 +47,31 @@ export function formadoresNomes(participantes: ParticipanteSlim[] | undefined | 
     .filter((nome) => nome.length > 0)
     .join(', ');
 }
+
+// Vários coordenadores (03/11/2026): o 1º é o responsável (`coordenador_nome` do serializer); os
+// demais são as participações COORD_ACOMPANHA ("extras"). A participação COORDENADOR é quem criou,
+// não um extra.
+
+/** Nomes dos coordenadores extras (COORD_ACOMPANHA) de uma lista de participações, sem vazios. */
+export function extrasLabels(participations: Participation[] | undefined | null): string[] {
+  if (!Array.isArray(participations)) return [];
+  return participations
+    .filter((p) => p.role === 'COORD_ACOMPANHA')
+    .map(participantLabel)
+    .filter((nome) => nome.length > 0);
+}
+
+/** Nomes dos coordenadores extras (COORD_ACOMPANHA) a partir de [{role, nome}] (MeusEventos). */
+export function extrasNomes(participantes: ParticipanteSlim[] | undefined | null): string[] {
+  if (!Array.isArray(participantes)) return [];
+  return participantes
+    .filter((p) => p.role === 'COORD_ACOMPANHA')
+    .map((p) => p.nome)
+    .filter((nome) => nome.length > 0);
+}
+
+/** "Responsável, Extra1, Extra2": responsável primeiro, sem repetir nome e sem vazios. */
+export function coordenadoresTexto(responsavel: string | null | undefined, extras: string[]): string {
+  const nomes = [responsavel ?? '', ...extras].map((nome) => nome.trim()).filter((nome) => nome.length > 0);
+  return [...new Set(nomes)].join(', ');
+}

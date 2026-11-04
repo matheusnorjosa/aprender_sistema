@@ -211,6 +211,7 @@ def solicitacoes_ce(municipios, projeto, tipo_evento, coordenador_user, formador
             municipio=municipios["fortaleza"],
             projeto=projeto,
             tipo_evento=tipo_evento,
+            coordenador=coordenador_user,
         )
         sol.formadores.add(formador_com_nome)
 
@@ -239,6 +240,7 @@ def solicitacoes_ce(municipios, projeto, tipo_evento, coordenador_user, formador
         municipio=municipios["caucaia"],
         projeto=projeto,
         tipo_evento=tipo_evento,
+        coordenador=coordenador_user,
     )
     sol.formadores.add(formador_com_nome)
 
@@ -580,9 +582,9 @@ class TestMetricsMapCoordinators:
             for i in range(len(coords) - 1):
                 assert coords[i]["eventos"] >= coords[i + 1]["eventos"]
 
-    def test_uf_without_coordinators_returns_empty(self, user_controle, solicitacao_sp):
+    def test_uf_sem_coordenador_gravado_mostra_quem_criou(self, user_controle, solicitacao_sp):
         """
-        Test: UF without any coordinator participations returns empty list.
+        Test: evento sem `coordenador` gravado: o responsável é quem criou (decisão do dono, 04/11/2026).
         """
         client = APIClient()
         client.force_authenticate(user=user_controle)
@@ -594,7 +596,16 @@ class TestMetricsMapCoordinators:
         data = response.json()
 
         assert data["uf"] == "SP"
-        assert data["coordenadores"] == []
+        assert [c["id"] for c in data["coordenadores"]] == [solicitacao_sp.usuario_id]
+
+    def test_uf_sem_evento_devolve_lista_vazia(self, user_controle, solicitacao_sp):
+        client = APIClient()
+        client.force_authenticate(user=user_controle)
+
+        response = client.get(reverse("core:metrics-map-coordinators"), {"uf": "RJ"})
+
+        assert response.status_code == 200
+        assert response.json()["coordenadores"] == []
 
     def test_coordinator_sem_nome_mostra_usuario_id(self, user_controle, municipios, projeto, tipo_evento, grupos):
         """
@@ -633,6 +644,7 @@ class TestMetricsMapCoordinators:
             municipio=municipios["fortaleza"],
             projeto=projeto,
             tipo_evento=tipo_evento,
+            coordenador=coord_sem_nome,
         )
 
         Participation.objects.create(

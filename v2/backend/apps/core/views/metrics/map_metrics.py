@@ -9,8 +9,10 @@ Extracted from views_metrics.py.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
+from typing import Any
 
 from django.db.models import Count, QuerySet
 from django.utils import timezone
@@ -20,14 +22,30 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
 from apps.core.exceptions import ValidationAPIError
-from apps.core.models import Compra, Participation, Solicitacao
+from apps.core.models import Compra, Participation, Solicitacao, Usuario
 from apps.core.permissions import HasPerm
 
 MAP_LIMIT_MAX = 1000
 VALID_STATUS_FILTERS = {"pendente", "aprovado", "reprovado"}
-# Coordenadores do evento no mapa: os do convite (COORDENADOR: quem criou e o responsável) e os além
-# do responsável (COORD_ACOMPANHA, 03/11/2026). A mesma pessoa conta uma vez por evento.
-PAPEIS_COORDENADOR_DO_EVENTO = (Participation.Role.COORDENADOR, Participation.Role.COORD_ACOMPANHA)
+
+
+def coordenadores_do_evento(solicitacoes: QuerySet[Solicitacao]) -> set[tuple[int, int]]:
+    """(pessoa, evento) dos coordenadores de cada evento de `solicitacoes`, para o Mapa.
+
+    Decisão do dono (04/11/2026): o responsável (`Solicitacao.coordenador`; sem ele, quem criou)
+    mais os coordenadores além dele (COORD_ACOMPANHA). Quem só criou o evento para outro responsável
+    não conta. O conjunto deduplica a mesma pessoa em dois papéis no evento. Duas consultas.
+    """
+    pares = {
+        (coordenador_id if coordenador_id is not None else criador_id, sol_id)
+        for sol_id, coordenador_id, criador_id in solicitacoes.values_list("id", "coordenador_id", "usuario_id")
+    }
+    pares.update(
+        Participation.objects.filter(
+            role=Participation.Role.COORD_ACOMPANHA, solicitacao__in=solicitacoes, usuario__isnull=False
+        ).values_list("usuario_id", "solicitacao_id")
+    )
+    return pares
 
 
 @dataclass
@@ -248,23 +266,24 @@ def metrics_map(request: Request) -> Response:
     if limit is not None:
         by_municipio_queryset = by_municipio_queryset[:limit]
 
-    # Contagem de coordenadores por município
-    coordenadores_por_municipio: dict[int, int] = {}
-
-    participations = (
-        Participation.objects.filter(
-            role__in=PAPEIS_COORDENADOR_DO_EVENTO,
-            solicitacao__in=queryset,
-            solicitacao__municipio__isnull=False,
+    # Coordenadores distintos por município e por UF, de uma só leitura dos pares (pessoa, evento)
+    local_do_evento = {
+        sol_id: (municipio_id, uf)
+        for sol_id, municipio_id, uf in queryset.exclude(municipio__isnull=True).values_list(
+            "id", "municipio_id", "municipio__uf"
         )
-        .values("solicitacao__municipio_id")
-        .annotate(coordenadores=Count("usuario_id", distinct=True))
-    )
-
-    for item in participations:
-        municipio_id = item["solicitacao__municipio_id"]
-        if municipio_id is not None:
-            coordenadores_por_municipio[int(municipio_id)] = int(item["coordenadores"])
+    }
+    pessoas_por_municipio: dict[int, set[int]] = defaultdict(set)
+    pessoas_por_uf: dict[str, set[int]] = defaultdict(set)
+    for pessoa_id, sol_id in coordenadores_do_evento(queryset):
+        if sol_id not in local_do_evento:
+            continue
+        municipio_id, uf = local_do_evento[sol_id]
+        pessoas_por_municipio[int(municipio_id)].add(pessoa_id)
+        if uf:
+            pessoas_por_uf[str(uf)].add(pessoa_id)
+    coordenadores_por_municipio = {mid: len(p) for mid, p in pessoas_por_municipio.items()}
+    coordenadores_por_uf = {uf: len(p) for uf, p in pessoas_por_uf.items()}
 
     compras_por_municipio: dict[int, int] = {}
     for item in compras_queryset.exclude(municipio__isnull=True).values("municipio_id").annotate(compras=Count("id")):
@@ -300,20 +319,6 @@ def metrics_map(request: Request) -> Response:
         )
         .order_by("-eventos", "municipio__uf")
     )
-
-    coordenadores_por_uf: dict[str, int] = {}
-    for item in (
-        Participation.objects.filter(
-            role__in=PAPEIS_COORDENADOR_DO_EVENTO,
-            solicitacao__in=queryset,
-            solicitacao__municipio__isnull=False,
-        )
-        .values("solicitacao__municipio__uf")
-        .annotate(coordenadores=Count("usuario_id", distinct=True))
-    ):
-        uf = item["solicitacao__municipio__uf"]
-        if uf:
-            coordenadores_por_uf[str(uf)] = int(item["coordenadores"])
 
     compras_por_uf: dict[str, int] = {}
     for item in compras_queryset.exclude(municipio__isnull=True).values("municipio__uf").annotate(compras=Count("id")):
@@ -410,23 +415,20 @@ def metrics_map_coordinators(request: Request) -> Response:
     filters, filters_applied = _parse_map_filter_values(request, require_uf=True)
     solicitacoes_filtradas = _apply_filters_to_solicitacoes(Solicitacao.objects.all(), filters)
 
-    # Buscar participações de coordenadores para o estado especificado
-    participations = Participation.objects.filter(
-        role__in=PAPEIS_COORDENADOR_DO_EVENTO,
-        solicitacao__in=solicitacoes_filtradas,
-        usuario__isnull=False,
-    ).select_related("usuario", "solicitacao", "solicitacao__projeto", "solicitacao__municipio")
+    # Coordenadores do evento (responsável + COORD_ACOMPANHA, uma vez por evento) no estado especificado;
+    # eventos e pessoas em consultas fixas, sem N+1
+    pares = sorted(coordenadores_do_evento(solicitacoes_filtradas))
+    eventos = solicitacoes_filtradas.select_related("projeto", "municipio").in_bulk({sol_id for _, sol_id in pares})
+    pessoas = Usuario.objects.in_bulk({user_id for user_id, _ in pares})
 
     # Agregar por coordenador com contagem detalhada
-    coordenadores_data: dict[int, dict] = {}
-    vistos: set[tuple[int, int]] = set()  # (pessoa, evento): quem criou e também é extra conta uma vez
-    for p in participations:
-        user_id = p.usuario_id
-        if (user_id, p.solicitacao_id) in vistos:
-            continue
-        vistos.add((user_id, p.solicitacao_id))
+    coordenadores_data: dict[int, dict[str, Any]] = {}
+    for user_id, sol_id in pares:
+        solicitacao, pessoa = eventos.get(sol_id), pessoas.get(user_id)
+        if solicitacao is None or pessoa is None:
+            continue  # o evento saiu do filtro (ou a pessoa foi apagada) entre as leituras
         if user_id not in coordenadores_data:
-            nome = str(p.usuario)  # nome, ou "Usuario #id": nunca o login (CPF)
+            nome = str(pessoa)  # nome, ou "Usuario #id": nunca o login (CPF)
             coordenadores_data[user_id] = {
                 "id": user_id,
                 "nome": nome,
@@ -438,15 +440,15 @@ def metrics_map_coordinators(request: Request) -> Response:
         coordenadores_data[user_id]["eventos"] += 1
 
         # Contagem por projeto
-        if p.solicitacao.projeto:
-            proj_nome = p.solicitacao.projeto.nome
+        if solicitacao.projeto:
+            proj_nome = solicitacao.projeto.nome
             coordenadores_data[user_id]["projetos"][proj_nome] = (
                 coordenadores_data[user_id]["projetos"].get(proj_nome, 0) + 1
             )
 
         # Contagem por município
-        if p.solicitacao.municipio:
-            mun_nome = p.solicitacao.municipio.nome
+        if solicitacao.municipio:
+            mun_nome = solicitacao.municipio.nome
             coordenadores_data[user_id]["municipios"][mun_nome] = (
                 coordenadores_data[user_id]["municipios"].get(mun_nome, 0) + 1
             )

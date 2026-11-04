@@ -9,9 +9,9 @@ Extracted from views_metrics.py.
 
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta
+from collections import defaultdict
+from datetime import date, timedelta
 
-from django.db.models import Count
 from django.utils import timezone
 from rest_framework import status as http_status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -19,10 +19,24 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
-from apps.core.models import Participation
+from apps.core.models import Usuario
 from apps.core.permissions import HasPerm
-from apps.core.services.availability_service import ENFORCED_ROLES
-from apps.core.services.horas_formacao import horas_formacao
+from apps.core.services.horas_formacao import horas_formacao, ocupacoes_aprovadas
+
+
+def eventos_e_municipios_por_pessoa(*, de: date, ate: date) -> dict[int, tuple[int, int]]:
+    """pessoa → (eventos, municípios distintos) aprovados no período, com a população da CH.
+
+    Formador e COORD_ACOMPANHA sempre; o responsável (`coordenador`; sem ele, quem criou) só quando
+    acompanha (decisão do dono, 04/11/2026). A mesma pessoa conta uma vez por evento.
+    """
+    eventos: dict[int, int] = defaultdict(int)
+    municipios: dict[int, set[int]] = defaultdict(set)
+    for (uid, _sol_id), ocupacao in ocupacoes_aprovadas(de=de, ate=ate).items():
+        eventos[uid] += 1
+        if ocupacao.municipio_id is not None:
+            municipios[uid].add(ocupacao.municipio_id)
+    return {uid: (n, len(municipios[uid])) for uid, n in eventos.items()}
 
 
 @api_view(["GET"])
@@ -57,11 +71,10 @@ def formadores_metrics(request: Request) -> Response:
         }
 
     Calculations:
-        - Filter Participation by role in ENFORCED_ROLES (FORMADOR e, desde 03/11/2026, o
-          coordenador além do responsável, COORD_ACOMPANHA, que conta hora como o formador) and
-          solicitacao__status=aprovado, events whose local start date is in the last `days` local
-          days, today included
-        - Aggregate by usuario: count distinct events (formador e extra no mesmo evento = 1), count
+        - Pessoas e eventos = a população da CH (`ocupacoes_aprovadas`): FORMADOR e COORD_ACOMPANHA
+          sempre, o coordenador responsável só quando acompanha (04/11/2026); eventos aprovados com
+          início nos últimos `days` dias locais, hoje incluído
+        - Aggregate by pessoa: count distinct events (dois papéis no mesmo evento = 1), count
           distinct municipios
         - horas_trabalhadas: services/horas_formacao.py (teto por evento, mesma conta da
           Grade Mensal)
@@ -74,55 +87,33 @@ def formadores_metrics(request: Request) -> Response:
     # `created_at`, e um evento antigo importado hoje entrava como hora do período).
     ate = timezone.localdate()
     de = ate - timedelta(days=days - 1)
-    tz = timezone.get_current_timezone()
-    janela_inicio = datetime.combine(de, time.min, tzinfo=tz)
-    janela_fim = datetime.combine(ate + timedelta(days=1), time.min, tzinfo=tz)
 
-    # Papéis que contam hora sempre (formador e coordenador além do responsável), aprovados, no período
-    participations = Participation.objects.filter(
-        role__in=ENFORCED_ROLES,
-        solicitacao__status="aprovado",
-        solicitacao__inicio__gte=janela_inicio,
-        solicitacao__inicio__lt=janela_fim,
-        usuario__isnull=False,  # Exclude guest participations
-    )
+    contagens = eventos_e_municipios_por_pessoa(de=de, ate=ate)
+    top = sorted(contagens, key=lambda uid: (-contagens[uid][0], uid))[:10]
 
-    # Aggregate by usuario — o nome vem na mesma consulta, sem N+1 (#781)
-    formadores_stats = (
-        participations.values(
-            "usuario_id",
-            "usuario__first_name",
-            "usuario__last_name",
-        )
-        .annotate(
-            eventos=Count("solicitacao_id", distinct=True),
-            municipios_atendidos=Count("solicitacao__municipio_id", distinct=True),
-        )
-        .order_by("-eventos")[:10]
-    )
-
-    # Horas = a contagem única de horas de formação (teto por evento), a mesma da Grade
-    # Mensal: duas consultas para os 10, sem N+1.
-    formadores_stats = list(formadores_stats)
-    horas_por_pessoa = horas_formacao([stat["usuario_id"] for stat in formadores_stats], de=de, ate=ate)
+    # Nome e horas dos 10 em consultas fixas, sem N+1 (#781). Horas = a contagem única de horas de
+    # formação (teto por evento), a mesma da Grade Mensal.
+    nomes = {u.pk: u for u in Usuario.objects.filter(pk__in=top).only("id", "first_name", "last_name")}
+    horas_por_pessoa = horas_formacao(top, de=de, ate=ate)
 
     formadores_list = []
-    for stat in formadores_stats:
+    for uid in top:
+        eventos, municipios_atendidos = contagens[uid]
         # 2 casas, como `ch_month`/`ch_year` da Grade Mensal: os dois mostram o mesmo número.
-        horas = round(horas_por_pessoa[stat["usuario_id"]].total, 2)
+        horas = round(horas_por_pessoa[uid].total, 2)
 
         # Nome, ou "Usuario #id" como `str(usuario)`: nunca o login (CPF)
-        nome = f"{stat['usuario__first_name']} {stat['usuario__last_name']}".strip()
+        nome = f"{nomes[uid].first_name} {nomes[uid].last_name}".strip()
         if not nome:
-            nome = f"Usuario #{stat['usuario_id']}"
+            nome = f"Usuario #{uid}"
 
         formadores_list.append(
             {
-                "id": stat["usuario_id"],
+                "id": uid,
                 "nome": nome,
-                "eventos": stat["eventos"],
+                "eventos": eventos,
                 "horas_trabalhadas": horas,
-                "municipios_atendidos": stat["municipios_atendidos"],
+                "municipios_atendidos": municipios_atendidos,
             }
         )
 

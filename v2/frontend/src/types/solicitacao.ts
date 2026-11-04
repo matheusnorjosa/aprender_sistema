@@ -94,7 +94,7 @@ export interface Solicitacao {
    * `propria`: pediu; `conta_alterada`: alterou a conta de quem pediu nos 30 dias;
    * `conta_alterada_pelo_autor`: quem pediu alterou a conta de quem lê nos 30 dias;
    * `contas_alteradas_pela_mesma_pessoa`: a mesma pessoa alterou a conta de quem lê e a de quem pediu;
-   * `editada_pelo_ator`: mudou data, horário, município, projeto, formadores ou coordenadores.
+   * `editada_pelo_ator`: mudou data, horário, município, projeto, formadores, coordenadores ou se o responsável acompanha.
    */
   decisao_impedida?: DecisaoImpedida | null;
   inicio: ISODateTime;

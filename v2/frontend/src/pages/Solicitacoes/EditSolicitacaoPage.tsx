@@ -487,7 +487,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
 
       const atualizada = await updateSolicitacao(Number(id), payload);
       // Decisão do dono (14/10/2026): o backend devolve a SUPER aprovada para pendente quando
-      // muda data, horário, município, projeto, formadores ou coordenadores (03/11/2026). A tela só
+      // muda data, horário, município, projeto, formadores, coordenadores (03/11/2026) ou o responsável que acompanha (04/11/2026). A tela só
       // avisa o que a API fez.
       // Par novo sem compra (pedido do dono, 03/11/2026): volta para aprovação em qualquer fluxo. A
       // mensagem segue a marca do par escolhido na tela (`semCompra`: par diferente do gravado e marcado).
@@ -495,7 +495,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
         message.warning(
           !dispensaCompra && semCompra
             ? 'Solicitação atualizada. Sem compra neste município para este projeto: o evento voltou para aprovação.'
-            : 'Solicitação atualizada. A mudança de data, horário, município, projeto, formadores ou coordenadores voltou o evento para aprovação.',
+            : 'Solicitação atualizada. A mudança de data, horário, município, projeto, formadores, coordenadores ou da resposta "vai acompanhar?" voltou o evento para aprovação.',
         );
       } else {
         message.success('Solicitação atualizada com sucesso!');

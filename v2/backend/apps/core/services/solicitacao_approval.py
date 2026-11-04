@@ -111,6 +111,10 @@ CAMPOS_MATERIAIS_NO_AUDITLOG: dict[str, str] = {
     "fim": "fim",
     "formador_ids": "formadores",
     "coord_acompanha_ids": "coordenadores",
+    # O responsável que acompanha (04/11/2026): trocar o responsável ou a resposta "acompanha?" pode mudar
+    # quem fica ocupado. Conservador: a troca do responsável que não acompanha também conta como edição.
+    "coordenador_id": "responsavel_que_acompanha",
+    "coordenador_acompanha": "responsavel_que_acompanha",
 }
 
 OUT_OF_SCOPE_CODE = "out_of_approval_scope"
@@ -146,7 +150,7 @@ def mensagem_impedida(code: str, acao: str) -> str:
             "Outra pessoa aprovadora precisa decidir."
         )
     return (
-        "Você mudou data, horário, município, projeto, formadores ou coordenadores desta solicitação. "
+        "Você mudou data, horário, município, projeto, formadores, coordenadores ou se o responsável acompanha nesta solicitação. "
         "Outra pessoa aprovadora precisa decidir."
     )
 

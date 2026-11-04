@@ -88,6 +88,8 @@ pylint==4.0.9
 # Testing
 # ================================================================
 locust==2.44.3
+# brotli vem do locust (geventhttpclient); 1.2.1 corrige o CVE-2026-111497 (HTTP2Shell), só dev
+brotli==1.2.1
 pytest==9.1.0
 pytest-cov==5.0.0
 pytest-django==4.12.0

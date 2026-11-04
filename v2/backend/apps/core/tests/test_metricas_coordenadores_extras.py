@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from itertools import count
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from django.urls import reverse
@@ -95,7 +96,7 @@ def _papel(sol, usuario, role):
 # ============================================================================
 
 
-def _ranking(client) -> dict[int, dict]:
+def _ranking(client) -> dict[int, dict[str, Any]]:
     resposta = client.get("/api/metrics/team/formadores/", {"days": 30})
     assert resposta.status_code == 200, resposta.data
     return {f["id"]: f for f in resposta.json()["formadores"]}
@@ -160,14 +161,14 @@ def _municipio(nome: str, uf: str = "CE"):
     return MunicipioFactory(nome=nome, uf=uf, ibge_code=f"29{n:05d}", latitude=-3.7, longitude=-38.5)
 
 
-def _mapa(client) -> tuple[dict[str, dict], dict[str, dict]]:
+def _mapa(client) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
     resposta = client.get(reverse("core:metrics-map"))
     assert resposta.status_code == 200, resposta.data
     dados = resposta.json()
     return {m["municipio"]: m for m in dados["by_municipio"]}, {u["uf"]: u for u in dados["by_uf"]}
 
 
-def _coordenadores_da_uf(client, uf: str = "CE") -> dict[int, dict]:
+def _coordenadores_da_uf(client, uf: str = "CE") -> dict[int, dict[str, Any]]:
     resposta = client.get(reverse("core:metrics-map-coordinators"), {"uf": uf})
     assert resposta.status_code == 200, resposta.data
     return {c["id"]: c for c in resposta.json()["coordenadores"]}

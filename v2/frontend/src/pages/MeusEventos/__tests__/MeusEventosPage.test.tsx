@@ -66,6 +66,13 @@ describe('MeusEventosPage', () => {
     expect(await screen.findByRole('heading', { name: /meus eventos/i })).toBeInTheDocument();
   });
 
+  // Decisão do dono (05/11/2026): quem só cadastrou o evento para outra pessoa não o vê aqui.
+  test('explica que a lista é dos eventos em que a pessoa é formador ou coordenador', async () => {
+    getMyEventsMock.mockResolvedValueOnce(makePage([]));
+    renderPage();
+    expect(await screen.findByText('Eventos aprovados em que você é formador ou coordenador.')).toBeInTheDocument();
+  });
+
   test('exibe eventos retornados pela API com municipio, projeto e formadores', async () => {
     getMyEventsMock.mockResolvedValueOnce(
       makePage([

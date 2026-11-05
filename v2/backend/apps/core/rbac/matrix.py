@@ -221,17 +221,17 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
         FORMADOR: DENY,
     },
     #
-    # Metrics team productivity: composition (Onda 2 A3 β).
-    # `run_daily_operations | supervise_operations | manage_admin_registries`.
-    # Controle + Diretoria + DAT (representa Dashboard Equipe).
+    # Metrics team (representa os 3 de /api/metrics/team/*): `CanViewTeamDashboard`, a mesma
+    # policy da tela /dashboards/equipe (`supervise_operations | manage_admin_registries`).
+    # O Controle saiu (decisão do dono, 05/11/2026): lia o ranking pela API sem ter a tela.
     "metrics_team_productivity": {
         SUPERUSER: ALLOW,
         DAT: ALLOW,  # manage_admin_registries
-        CONTROLE: ALLOW,  # run_daily_operations
+        CONTROLE: DENY,
         DIRETORIA: ALLOW,  # supervise_operations
         GERENTE: DENY,
         GERENTE_SUPER: DENY,
-        ASST_ADMIN_CONTROLE: ALLOW,  # herda Controle (run_daily_operations)
+        ASST_ADMIN_CONTROLE: DENY,
         COORDENADOR: DENY,
         APOIO: DENY,
         FORMADOR: DENY,
@@ -306,18 +306,17 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
         FORMADOR: DENY,
     },
     #
-    # ProdutoViewSet list (PR 4 #1309): list/retrieve restrito a operação/admin.
-    # Composition: `manage_admin_registries | manage_purchases_and_materials | run_daily_operations`.
-    # DAT (admin) + Controle (operação). Dropdowns/selects de Coord/Apoio
-    # consomem `/api/options/produtos/` (IsAuthenticated, intocado).
+    # ProdutoViewSet (leitura e escrita): `HasPerm("manage_admin_registries")`, como a tela
+    # /dat/admin/produtos. O Controle saiu (decisão do dono, 05/11/2026). Dropdowns/selects de
+    # Coord/Apoio consomem `/api/options/produtos/` (IsAuthenticated, intocado).
     "produtos_list": {
         SUPERUSER: ALLOW,
         DAT: ALLOW,  # manage_admin_registries
-        CONTROLE: ALLOW,  # run_daily_operations + manage_purchases_and_materials
+        CONTROLE: DENY,
         DIRETORIA: DENY,
         GERENTE: DENY,
         GERENTE_SUPER: DENY,
-        ASST_ADMIN_CONTROLE: ALLOW,  # herda Controle
+        ASST_ADMIN_CONTROLE: DENY,
         COORDENADOR: DENY,
         APOIO: DENY,
         FORMADOR: DENY,

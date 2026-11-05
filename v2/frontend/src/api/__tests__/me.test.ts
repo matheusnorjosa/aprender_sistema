@@ -160,6 +160,6 @@ describe('me API (MSW)', () => {
       ),
     );
 
-    await expect(exportMyData()).rejects.toThrow('Export failed: HTTP 500');
+    await expect(exportMyData()).rejects.toThrow('Não foi possível exportar o arquivo (erro 500).');
   });
 });

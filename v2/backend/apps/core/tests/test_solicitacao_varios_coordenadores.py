@@ -665,3 +665,87 @@ class TestResponsavelQueAcompanhaPedeReaprovacao:
         resp = self._patch(c, r.data["id"], {"coordenador": c["c2"].id})
         assert resp.status_code == 200, resp.data
         assert Solicitacao.objects.get(pk=r.data["id"]).status == "aprovado"
+
+
+# ---------------------------------------------------------------- quem só cadastrou para outra pessoa (dono, 05/11/2026)
+
+
+def _papeis(sol_id, usuario) -> set[str]:
+    return set(Participation.objects.filter(solicitacao_id=sol_id, usuario=usuario).values_list("role", flat=True))
+
+
+def _meus_eventos(usuario) -> list[int]:
+    resp = _client(usuario).get("/api/me/events/")
+    assert resp.status_code == 200, resp.data
+    return [e["id"] for e in resp.data["results"]]
+
+
+class TestQuemCadastrouParaOutraPessoa:
+    """Decisão do dono (05/11/2026): quem só cadastrou o evento para outro responsável não é coordenador
+    dele. A criação não grava a linha COORDENADOR de quem cria quando o responsável é outro; a troca de
+    responsável apaga a do antigo, mesmo que tenha sido ele quem criou."""
+
+    def _apoio(self, c):
+        return _pessoa("APOIO", c["projeto"].gerencia, "Apoio")
+
+    def test_apoio_que_cria_para_outro_responsavel_nao_vira_coordenador(self, c):
+        apoio = self._apoio(c)
+        r = _post(apoio, _payload(c, coordenador=c["coord"].id))
+        assert r.status_code == 201, r.data
+        assert _papeis(r.data["id"], apoio) == set()
+        assert _papeis(r.data["id"], c["coord"]) == {"COORDENADOR"}
+
+    def test_apoio_criou_com_outro_responsavel_nao_ve_em_meus_eventos_nem_e_convidado(self, c):
+        apoio = self._apoio(c)
+        r = _post(apoio, _payload(c, coordenador=c["coord"].id))
+        assert r.status_code == 201, r.data
+        assert r.data["status"] == "aprovado"
+        assert r.data["id"] not in _meus_eventos(apoio)
+        assert r.data["id"] in _meus_eventos(c["coord"])
+        assert r.data["id"] in _meus_eventos(c["formador"])
+        emails = {a["email"] for a in build_attendees_for_solicitacao(Solicitacao.objects.get(pk=r.data["id"]))}
+        assert apoio.email.lower() not in emails
+        assert c["coord"].email.lower() in emails
+
+    def test_lote_do_apoio_para_outro_responsavel_nao_grava_a_linha_dele(self, c):
+        apoio = self._apoio(c)
+        eventos = [
+            _payload(c, coordenador=c["coord"].id),
+            _payload(c, coordenador=c["c2"].id, inicio=_hora(14), fim=_hora(16)),
+        ]
+        r = _client(apoio).post("/api/solicitacoes/lote/", {"eventos": eventos}, format="json")
+        assert r.status_code == 201, r.data
+        for item in r.data["eventos"]:
+            assert _papeis(item["id"], apoio) == set()
+
+    def test_coordenador_que_cria_para_si_continua_com_a_linha(self, c):
+        r = _post(c["coord"], _payload(c))
+        assert r.status_code == 201, r.data
+        assert _papeis(r.data["id"], c["coord"]) == {"COORDENADOR"}
+        assert r.data["id"] in _meus_eventos(c["coord"])
+
+    def test_trocar_o_responsavel_tira_a_linha_de_quem_criou(self, c):
+        r = _post(c["coord"], _payload(c))
+        assert r.status_code == 201, r.data
+        sol_id = r.data["id"]
+        resp = _client(c["coord"]).patch(f"/api/solicitacoes/{sol_id}/", {"coordenador": c["c2"].id}, format="json")
+        assert resp.status_code == 200, resp.data
+        assert _papeis(sol_id, c["coord"]) == set()
+        assert _papeis(sol_id, c["c2"]) == {"COORDENADOR"}
+        assert sol_id not in _meus_eventos(c["coord"])
+
+    def test_evento_antigo_sem_responsavel_trocar_tira_a_linha_de_quem_criou(self, c):
+        """Sem `coordenador` gravado, o responsável era quem criou: a troca apaga a linha dele."""
+        sol = _evento_aprovado(criador=c["coord"], projeto=c["projeto"], formadores=[c["formador"]])
+        Solicitacao.objects.filter(pk=sol.pk).update(coordenador=None, municipio=c["municipio"])
+        resp = _client(c["coord"]).patch(f"/api/solicitacoes/{sol.pk}/", {"coordenador": c["c2"].id}, format="json")
+        assert resp.status_code == 200, resp.data
+        assert _papeis(sol.pk, c["coord"]) == set()
+        assert _papeis(sol.pk, c["c2"]) == {"COORDENADOR"}
+
+    def test_evento_antigo_sem_responsavel_gravar_quem_criou_mantem_a_linha(self, c):
+        sol = _evento_aprovado(criador=c["coord"], projeto=c["projeto"], formadores=[c["formador"]])
+        Solicitacao.objects.filter(pk=sol.pk).update(coordenador=None, municipio=c["municipio"])
+        resp = _client(c["coord"]).patch(f"/api/solicitacoes/{sol.pk}/", {"coordenador": c["coord"].id}, format="json")
+        assert resp.status_code == 200, resp.data
+        assert _papeis(sol.pk, c["coord"]) == {"COORDENADOR"}

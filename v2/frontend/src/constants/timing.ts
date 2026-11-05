@@ -31,8 +31,8 @@ export const TIMING = {
   // oculta o polling para (hooks/usePolling.ts).
   LIST_POLL_INTERVAL_MS: 20_000, // listas: Aprovações e Pré-agenda
   GRADE_POLL_INTERVAL_MS: 30_000, // Grade Mensal (duas grades = 2 pedidos por tick)
-  // Publicação por setor: só enquanto há publicação em voo (PENDING), 1 pedido por tick.
-  PUBLICACAO_PENDENTE_POLL_MS: 5_000,
+  // Publicação por setor: só enquanto há publicação em voo (PENDING), 1 pedido por tick. D75: 20 a 30 s.
+  PUBLICACAO_PENDENTE_POLL_MS: 20_000,
   // Pausa do polling depois de um 429 que veio sem o cabeçalho Retry-After.
   POLL_PAUSA_429_PADRAO_MS: 60_000,
 } as const;

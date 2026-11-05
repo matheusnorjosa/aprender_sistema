@@ -722,8 +722,8 @@ def test_plano_de_formacoes_nao_leva_cpf_de_coordenador_sem_nome():
 
 
 def test_metricas_de_formadores_e_coordenadores_nao_levam_cpf_de_quem_nao_tem_nome():
-    # Quem vê não administra contas: Controle (ranking de formadores) e Diretoria (mapa).
-    controle = _conta(nome="Operadora", groups=["Controle", "Assistente Administrativo"])
+    # Quem vê não administra contas: a Diretoria (ranking de formadores e mapa). O Controle não vê o
+    # ranking desde a decisão do dono de 05/11/2026 (`CanViewTeamDashboard`).
     diretoria = _conta(nome="Diretora", groups=["Diretoria"])
     formador, coordenador = _conta(groups=["Formador"]), _conta(groups=["Coordenador"])
     inicio = timezone.now() - timedelta(days=1)
@@ -731,7 +731,7 @@ def test_metricas_de_formadores_e_coordenadores_nao_levam_cpf_de_quem_nao_tem_no
     Participation.objects.create(solicitacao=s, usuario=formador, role=Participation.Role.FORMADOR)
     Participation.objects.create(solicitacao=s, usuario=coordenador, role=Participation.Role.COORDENADOR)
     for quem, rota in (
-        (controle, "/api/metrics/team/formadores/"),
+        (diretoria, "/api/metrics/team/formadores/"),
         (diretoria, f"/api/metrics/map/coordinators/?uf={s.municipio.uf}"),
     ):
         resp = _client(quem).get(rota)

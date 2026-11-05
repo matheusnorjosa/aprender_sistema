@@ -170,7 +170,7 @@ def test_serializer_exposes_expected_fields(make_user, make_solicitacao):
     """Serializer minimal expõe campos para listagem (sem dados internos)."""
     user = make_user(username="participante")
     formador = make_user(username="formador_alpha", first_name="Alpha", last_name="Formador")
-    solic = make_solicitacao(local="Escola Municipal X", is_online=False)
+    solic = make_solicitacao(local="Escola Municipal X", is_online=False, coordenador=user)
     _add_participation(solic, user, role="COORDENADOR")
     _add_participation(solic, formador, role="FORMADOR")
 
@@ -219,3 +219,86 @@ def test_distinct_when_user_has_multiple_participations(make_user, make_solicita
     results = res.json()["results"] if isinstance(res.json(), dict) else res.json()
     assert len(results) == 1
     assert results[0]["id"] == solic.id
+
+
+# ---------------------------------------------------------------- quem conta como coordenador (dono, 05/11/2026)
+
+
+def _ids_meus_eventos(user) -> list[int]:
+    client = APIClient()
+    client.force_authenticate(user=user)
+    res = client.get(reverse("core:me-events"))
+    assert res.status_code == 200, res.content
+    return [item["id"] for item in res.json()["results"]]
+
+
+def test_apoio_criou_com_outro_responsavel_nao_aparece(make_user, make_solicitacao):
+    """Só COORDENADOR e não é o responsável (cadastrou para outra pessoa) → não é evento dela."""
+    apoio = make_user()
+    responsavel = make_user()
+    solic = make_solicitacao(usuario=apoio, coordenador=responsavel)
+    _add_participation(solic, apoio, role="COORDENADOR")
+    _add_participation(solic, responsavel, role="COORDENADOR")
+
+    assert _ids_meus_eventos(apoio) == []
+    assert _ids_meus_eventos(responsavel) == [solic.id]
+
+
+def test_coordenador_que_nao_e_o_responsavel_de_evento_de_outro_nao_aparece(make_user, make_solicitacao):
+    user = make_user()
+    solic = make_solicitacao(coordenador=make_user())
+    _add_participation(solic, user, role="COORDENADOR")
+
+    assert _ids_meus_eventos(user) == []
+
+
+def test_evento_antigo_sem_responsavel_aparece_para_quem_criou(make_user, make_solicitacao):
+    """FK `coordenador` nula: o responsável é quem criou."""
+    criador = make_user()
+    solic = make_solicitacao(usuario=criador, coordenador=None)
+    _add_participation(solic, criador, role="COORDENADOR")
+
+    assert _ids_meus_eventos(criador) == [solic.id]
+
+
+def test_evento_antigo_sem_responsavel_nao_aparece_para_outro_coordenador(make_user, make_solicitacao):
+    user = make_user()
+    solic = make_solicitacao(coordenador=None)
+    _add_participation(solic, user, role="COORDENADOR")
+
+    assert _ids_meus_eventos(user) == []
+
+
+@pytest.mark.parametrize("papel", ["FORMADOR", "COORD_ACOMPANHA", "CONVIDADO"])
+def test_formador_coordenador_extra_e_convidado_continuam_aparecendo(make_user, make_solicitacao, papel):
+    user = make_user()
+    solic = make_solicitacao(coordenador=make_user())
+    _add_participation(solic, user, role=papel)
+
+    assert _ids_meus_eventos(user) == [solic.id]
+
+
+def test_coordenador_nao_responsavel_que_tambem_e_formador_aparece(make_user, make_solicitacao):
+    user = make_user()
+    solic = make_solicitacao(coordenador=make_user())
+    _add_participation(solic, user, role="COORDENADOR")
+    _add_participation(solic, user, role="FORMADOR")
+
+    assert _ids_meus_eventos(user) == [solic.id]
+
+
+def test_responsavel_sem_participacao_nao_passa_a_aparecer(make_user, make_solicitacao):
+    """A regra só tira: o responsável sem linha nenhuma no evento continua fora (ninguém ganha)."""
+    user = make_user()
+    make_solicitacao(coordenador=user)
+
+    assert _ids_meus_eventos(user) == []
+
+
+def test_mesmo_inicio_desempata_pelo_id(make_user, make_solicitacao):
+    """Paginação estável: eventos com o mesmo início não repetem nem somem entre páginas."""
+    from apps.core.views.me import MeEventsListView
+
+    view = MeEventsListView()
+    view.request = type("R", (), {"user": make_user()})()
+    assert tuple(view.get_queryset().query.order_by) == ("-inicio", "id")

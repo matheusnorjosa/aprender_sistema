@@ -154,4 +154,6 @@ class DATCompraListSerializer(serializers.ModelSerializer["DATCompra"]):
             "data_compra",
             "status_uso",
             "ativo",
+            # G17/P#27: o modal de edição é semeado da linha; sem isto a observação abria vazia e era apagada.
+            "observacoes",
         ]

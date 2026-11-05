@@ -13,7 +13,8 @@ from typing import Any, cast
 
 from rest_framework import serializers  # type: ignore[attr-defined]
 
-from apps.core.models import AcaoDAT, Deslocamento, Usuario
+from apps.core.models import AcaoDAT, Deslocamento, EquipeGerencia, Usuario
+from apps.core.rbac.policies import gerencias_que_delegam_deslocamento, user_delega_deslocamento_de_qualquer_um
 
 
 class AcaoDATSerializer(serializers.ModelSerializer):
@@ -75,11 +76,13 @@ class DeslocamentoSerializer(serializers.ModelSerializer):
     Fields:
         - id, usuario, origem, destino, start_date, end_date, observacao
         - usuario_nome (read-only): Nome do usuário, ou "Usuario #id" (nunca o login, que é o CPF)
+        - pode_editar (read-only): se quem pede pode editar e excluir a linha (a tela só mostra os
+          botões aí). Mesma regra de `DeslocamentoViewSet._ensure_owner_or_delegate`.
         - external_hash (read-only): ETL idempotence hash
         - created_at, updated_at (read-only)
 
     Validation:
-        - start_date < end_date (error: "Data fim deve ser posterior à data início")
+        - start_date <= end_date: ida e volta no mesmo dia vale (error: "Data fim não pode ser anterior à data início.")
         - origem != destino (error: "Origem e destino devem ser diferentes")
 
     Escrita owner-forced (#1454): `usuario` opcional; omitido → self-service.
@@ -87,6 +90,7 @@ class DeslocamentoSerializer(serializers.ModelSerializer):
     """
 
     usuario_nome = serializers.SerializerMethodField()
+    pode_editar = serializers.SerializerMethodField()
 
     class Meta:
         model = Deslocamento
@@ -94,6 +98,7 @@ class DeslocamentoSerializer(serializers.ModelSerializer):
             "id",
             "usuario",
             "usuario_nome",
+            "pode_editar",
             "origem",
             "destino",
             "start_date",
@@ -118,10 +123,43 @@ class DeslocamentoSerializer(serializers.ModelSerializer):
             return str(usuario)
         return ""
 
+    def get_pode_editar(self, obj: Deslocamento) -> bool:
+        """Dono, ou quem delega para o dono da linha (`user_can_delegate_deslocamento`)."""
+        request: Any = cast("dict[str, Any]", self.context).get("request")
+        user: Any = getattr(request, "user", None)
+        if user is None or not user.is_authenticated:
+            return False
+        if obj.usuario_id == user.pk:
+            return True
+        alvos = self._alvos_que_delega(user)
+        return alvos is None or obj.usuario_id in alvos
+
+    def _alvos_que_delega(self, user: Any) -> set[int] | None:
+        """Ids dos formadores que `user` delega (None = qualquer um), calculado uma vez por requisição.
+
+        Na lista, o `child` do ListSerializer é uma instância só: o cache no `self` vale para a página toda.
+        """
+        if not hasattr(self, "_cache_alvos_que_delega"):
+            if user_delega_deslocamento_de_qualquer_um(user):
+                alvos: set[int] | None = None
+            else:
+                gerencias = gerencias_que_delegam_deslocamento(user)
+                alvos = (
+                    set(
+                        EquipeGerencia.vigentes_em()
+                        .filter(papel="FORMADOR", gerencia_id__in=gerencias, gerencia__ativo=True)
+                        .values_list("usuario_id", flat=True)
+                    )
+                    if gerencias
+                    else set()
+                )
+            self._cache_alvos_que_delega = alvos
+        return self._cache_alvos_que_delega
+
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """
         Valida regras de negócio:
-        - start_date < end_date
+        - start_date <= end_date (mesmo dia vale: ida e volta)
         - origem != destino
 
         Suporta PATCH parcial: se apenas um campo vier no payload,
@@ -135,10 +173,10 @@ class DeslocamentoSerializer(serializers.ModelSerializer):
         origem = attrs.get("origem", getattr(instance, "origem", None))
         destino = attrs.get("destino", getattr(instance, "destino", None))
 
-        # Validação 1: start_date < end_date
+        # Validação 1: start_date <= end_date (decisão do dono, 05/11: ida e volta no mesmo dia vale)
         if start_date is not None and end_date is not None:
-            if end_date <= start_date:
-                raise serializers.ValidationError({"end_date": "Data fim deve ser posterior à data início"})
+            if end_date < start_date:
+                raise serializers.ValidationError({"end_date": "Data fim não pode ser anterior à data início."})
 
         # Validação 2: origem != destino
         if origem is not None and destino is not None:

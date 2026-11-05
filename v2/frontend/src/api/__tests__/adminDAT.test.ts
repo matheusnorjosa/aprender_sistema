@@ -217,7 +217,7 @@ describe('adminDAT API wrappers (MSW)', () => {
   test('fetchWithErrorMapping maps 403 to friendly error', async () => {
     server.use(
       http.get(apiUrl('/usuarios-admin/'), () =>
-        HttpResponse.json({ detail: 'Forbidden' }, { status: 403 }),
+        HttpResponse.json({}, { status: 403 }), // sem detail: vale o mapa
       ),
     );
 
@@ -227,7 +227,7 @@ describe('adminDAT API wrappers (MSW)', () => {
   test('fetchWithErrorMapping maps 404 to friendly error', async () => {
     server.use(
       http.get(apiUrl('/usuarios-admin/'), () =>
-        HttpResponse.json({ detail: 'Not found' }, { status: 404 }),
+        HttpResponse.json({}, { status: 404 }), // sem detail: vale o mapa
       ),
     );
 

@@ -47,10 +47,10 @@ export interface FilterParams {
   [key: string]: string | number | boolean | undefined;
 }
 
-// Common error mapping for DAT endpoints
+// Reserva para a resposta sem mensagem do servidor (o `detail` do servidor vence).
 const DAT_ERROR_MAP: Record<number, string> = {
-  403: 'Acesso restrito ao setor DAT.',
-  404: 'Registro nao encontrado.',
+  403: 'Você não tem permissão para esta ação.',
+  404: 'Registro não encontrado.',
 };
 
 // ========== DAT REGISTROS ==========
@@ -258,7 +258,18 @@ export async function updateCadastroEtapa(id: ID, etapa: string, status: string)
   }, DAT_ERROR_MAP);
 }
 
-export async function getCadastrosStats(params: FilterParams = {}): Promise<GenericStats> {
+/** Contrato de GET /dat/cadastros/stats/ (DATCadastroViewSet.stats). */
+export interface CadastrosStats {
+  total: number;
+  por_plataforma: Partial<Record<'FORMAR' | 'AVALIAR', number>>;
+  /** Cadastros com as 4 etapas FORMAR concluídas. */
+  formar_completos: number;
+  /** Cadastros com as 3 etapas AVALIAR concluídas. */
+  avaliar_completos: number;
+  por_projeto: Array<{ projeto_geral__nome: string | null; count: number }>;
+}
+
+export async function getCadastrosStats(params: FilterParams = {}): Promise<CadastrosStats> {
   return fetchAPI(buildUrl('/dat/cadastros/stats/', params as QueryParams));
 }
 

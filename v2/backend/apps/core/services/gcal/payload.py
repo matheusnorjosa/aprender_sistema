@@ -13,6 +13,7 @@ import unicodedata
 from datetime import timezone as dt_timezone
 
 from django.conf import settings
+from django.db.models import Q
 
 from apps.core.models import Solicitacao
 from apps.core.pii import email_de_reserva
@@ -29,7 +30,9 @@ def build_attendees_for_solicitacao(s: Solicitacao) -> list[JsonDict]:
     """
     Extrai attendees (participantes) de uma Solicitacao.
 
-    Inclui apenas roles: COORDENADOR, FORMADOR, COORD_ACOMPANHA.
+    Inclui FORMADOR, COORD_ACOMPANHA e o COORDENADOR só quando é o responsável
+    (`Solicitacao.coordenador`; sem a FK, quem criou). Decisão do dono (05/11/2026): quem só
+    cadastrou o evento para outra pessoa não é convidado, nem pela linha COORDENADOR antiga.
     Para cada participação:
     - Se usuario existe, usa usuario.email
     - Se guest_email existe, usa guest_email
@@ -41,11 +44,10 @@ def build_attendees_for_solicitacao(s: Solicitacao) -> list[JsonDict]:
         list[dict]: Lista de attendees no formato Google Calendar
                     [{"email": "..."}, ...]
     """
-    # Roles que devem ser incluídos como attendees
-    attendee_roles = ["COORDENADOR", "FORMADOR", "COORD_ACOMPANHA"]
-
-    # Buscar participações com prefetch do usuário
-    participations = s.participations.filter(role__in=attendee_roles).select_related("usuario")
+    responsavel_id = s.coordenador_id or s.usuario_id
+    participations = s.participations.filter(
+        Q(role__in=["FORMADOR", "COORD_ACOMPANHA"]) | Q(role="COORDENADOR", usuario_id=responsavel_id)
+    ).select_related("usuario")
 
     emails = set()
     for p in participations:

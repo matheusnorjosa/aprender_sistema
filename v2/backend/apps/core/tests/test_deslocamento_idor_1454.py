@@ -279,6 +279,22 @@ class TestDeslocamentoWriteOwnerForced:
         desloc.refresh_from_db()
         assert desloc.origem == "Juazeiro"
 
+    def test_pode_editar_e_o_que_a_escrita_decide(self):
+        """G07 (P#12): `pode_editar` da linha diz o mesmo que o PATCH (dono True; colega False → 403)."""
+        coord, _victim, do_colega = self._colleague_setup("coord_pode", "victim_pode")
+        meu = _own_deslocamento(coord)
+        client = APIClient()
+        client.force_authenticate(user=coord)
+
+        linhas = {d["id"]: d["pode_editar"] for d in client.get("/api/deslocamentos/").data["results"]}
+
+        assert linhas == {meu.id: True, do_colega.id: False}
+        assert client.patch(f"/api/deslocamentos/{meu.id}/", {"origem": "Crato"}, format="json").status_code == 200
+        assert (
+            client.patch(f"/api/deslocamentos/{do_colega.id}/", {"origem": "Crato"}, format="json").status_code
+            == status.HTTP_403_FORBIDDEN
+        )
+
     def test_delegate_can_delete_colleague(self):
         """Controle (operate_preagenda | view_all_availability) remove viagem de outro."""
         gerencia = Gerencia.objects.create(nome="GERENCIA 2", nome_setor="Vidas")
@@ -292,3 +308,45 @@ class TestDeslocamentoWriteOwnerForced:
 
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert not Deslocamento.objects.filter(id=desloc.id).exists()
+
+
+class TestDeslocamentoMesmoDia:
+    """G07 (decisão do dono, 05/11): ida e volta no mesmo dia vale (fim igual ou depois do início)."""
+
+    def test_fim_igual_ao_inicio_e_aceito(self):
+        coord = _make_user("coord_mesmo_dia", ["Coordenador"])
+        client = APIClient()
+        client.force_authenticate(user=coord)
+
+        response = client.post(
+            "/api/deslocamentos/", _payload(start_date="2025-03-10", end_date="2025-03-10"), format="json"
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED, response.data
+        assert response.data["end_date"] == "2025-03-10"
+
+    def test_fim_antes_do_inicio_segue_recusado_com_o_motivo(self):
+        coord = _make_user("coord_fim_antes", ["Coordenador"])
+        client = APIClient()
+        client.force_authenticate(user=coord)
+
+        response = client.post(
+            "/api/deslocamentos/", _payload(start_date="2025-03-10", end_date="2025-03-09"), format="json"
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "end_date" in response.data["errors"]
+
+    def test_patch_parcial_para_o_mesmo_dia_e_aceito(self):
+        coord = _make_user("coord_patch_dia", ["Coordenador"])
+        desloc = _own_deslocamento(coord)
+        client = APIClient()
+        client.force_authenticate(user=coord)
+
+        response = client.patch(
+            f"/api/deslocamentos/{desloc.id}/", {"end_date": desloc.start_date.isoformat()}, format="json"
+        )
+
+        assert response.status_code == status.HTTP_200_OK, response.data
+        desloc.refresh_from_db()
+        assert desloc.end_date == desloc.start_date

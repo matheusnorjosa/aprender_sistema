@@ -309,8 +309,9 @@ class TestResyncEndpoint:
         assert "aprovadas" in response.data["detail"]
 
     @patch("apps.core.tasks.task_publish_solicitacao_to_gcal")
-    def test_resync_endpoint_success(self, mock_task, api_client, usuario_controle, solicitacao_aprovada):
-        """Endpoint retorna 202 + task_id + cria AuditLog."""
+    def test_resync_endpoint_success(self, mock_task, api_client, usuario_controle, solicitacao_publicada):
+        """Endpoint retorna 202 + task_id + cria AuditLog (Reenviar exige evento já publicado, D64)."""
+        solicitacao_aprovada = solicitacao_publicada
         api_client.force_authenticate(user=usuario_controle)
 
         # Configurar mock task

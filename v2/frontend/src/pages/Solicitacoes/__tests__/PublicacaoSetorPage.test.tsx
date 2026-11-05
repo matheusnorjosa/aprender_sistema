@@ -89,8 +89,9 @@ function makeSolic(overrides: Partial<Solicitacao> = {}): Solicitacao {
     coordenador_acompanha: false,
     coordenador: null,
     coordenador_nome: 'Maria Coordenadora',
-    inicio: '2026-10-10T12:00:00Z', // 09:00 em Fortaleza (UTC-3)
-    fim: '2026-10-10T15:00:00Z',
+    // Evento futuro: no que já terminou, Publicar, Tentar de novo e Atualizar ficam desabilitados.
+    inicio: '2099-10-10T12:00:00Z', // 09:00 em Fortaleza (UTC-3)
+    fim: '2099-10-10T15:00:00Z',
     status: 'aprovado',
     observacoes: null,
     local: null,
@@ -228,7 +229,7 @@ describe('PublicacaoSetorPage — estrutura e lista', () => {
     ]);
     renderPage();
 
-    expect(await screen.findByText('10/10/2026 09:00')).toBeInTheDocument();
+    expect(await screen.findByText('10/10/2099 09:00')).toBeInTheDocument();
     expect(screen.getByText('Vidas Em Rede')).toBeInTheDocument();
     expect(screen.getByText('Sobral')).toBeInTheDocument();
     expect(screen.getByText('Formação')).toBeInTheDocument();
@@ -516,7 +517,7 @@ describe('PublicacaoSetorPage — ações', () => {
     listResponse = pageOf([makeSolic()]);
     renderPage();
 
-    await confirmAction(/^Publicar: Vidas Em Rede, 10\/10\/2026 09:00/, 'Publicar na agenda da organização', 'Publicar');
+    await confirmAction(/^Publicar: Vidas Em Rede, 10\/10\/2099 09:00/, 'Publicar na agenda da organização', 'Publicar');
 
     await waitFor(() => expect(actionCalls()).toHaveLength(1));
     const [url, options] = actionCalls()[0] ?? [];
@@ -573,13 +574,13 @@ describe('PublicacaoSetorPage — ações', () => {
     {
       acao: 'Publicar',
       row: {},
-      titulo: 'Publicar na agenda da organização: Vidas Em Rede, 10/10/2026 09:00?',
+      titulo: 'Publicar na agenda da organização: Vidas Em Rede, 10/10/2099 09:00?',
       texto: 'O evento é criado no calendário oficial da organização.',
     },
     {
       acao: 'Tirar só do Google',
       row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' },
-      titulo: 'Tirar do Google Agenda: Vidas Em Rede, 10/10/2026 09:00?',
+      titulo: 'Tirar do Google Agenda: Vidas Em Rede, 10/10/2099 09:00?',
       // Tirar do Google não apaga: diz que o evento fica no sistema (sem mandar a Apoio procurar
       // em Minhas Solicitações, que só lista os eventos de quem está logado).
       texto: 'O evento sai só da agenda da organização e continua no sistema.',
@@ -729,6 +730,37 @@ describe('PublicacaoSetorPage — ações', () => {
   });
 });
 
+// B#16: o evento de hoje que já terminou vem na lista; o servidor recusa Publicar e Reenviar dele.
+describe('PublicacaoSetorPage — evento que já terminou', () => {
+  const PASSADO = { inicio: '2020-01-10T12:00:00Z', fim: '2020-01-10T15:00:00Z' };
+
+  test('Publicar, Tentar de novo e Atualizar ficam desabilitados, com o motivo no nome e no title', async () => {
+    listResponse = pageOf([
+      makeSolic({ id: 1, projeto_nome: 'Nunca', ...PASSADO }),
+      makeSolic({ id: 2, projeto_nome: 'Falhou', gcal_status: 'ERROR', ...PASSADO }),
+      makeSolic({ id: 3, projeto_nome: 'Publicado', gcal_status: 'PUBLISHED', external_event_id: 'asv3', ...PASSADO }),
+    ]);
+    renderPage();
+
+    for (const nome of [/^Publicar: Nunca/, /^Tentar de novo: Falhou/, /^Atualizar no Google: Publicado/]) {
+      const botao = await screen.findByLabelText(nome);
+      expect(botao).toBeDisabled();
+      expect(botao).toHaveAccessibleName(expect.stringContaining('o evento já terminou'));
+      expect(botao).toHaveAttribute('title', 'o evento já terminou');
+    }
+    // Tirar do Google segue: o servidor aceita tirar o evento passado.
+    expect(screen.getByLabelText(/^Tirar só do Google: Publicado/)).not.toBeDisabled();
+  });
+
+  test('no evento futuro, Publicar segue habilitado e sem o motivo', async () => {
+    listResponse = pageOf([makeSolic()]);
+    renderPage();
+    const botao = await screen.findByLabelText(/^Publicar: Vidas Em Rede/);
+    expect(botao).not.toBeDisabled();
+    expect(botao).not.toHaveAttribute('title');
+  });
+});
+
 describe('PublicacaoSetorPage — excluir evento que está no Google (decisão do dono, 27/10)', () => {
   const NO_GOOGLE = { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' };
 
@@ -743,7 +775,7 @@ describe('PublicacaoSetorPage — excluir evento que está no Google (decisão d
     renderPage();
     await screen.findByText('Pode Excluir');
 
-    expect(screen.getByLabelText(/^Excluir: Pode Excluir, 10\/10\/2026 09:00/)).toHaveTextContent(/^Excluir$/);
+    expect(screen.getByLabelText(/^Excluir: Pode Excluir, 10\/10\/2099 09:00/)).toHaveTextContent(/^Excluir$/);
     expect(screen.getByLabelText(/^Excluir: Erro Com Id/)).toBeInTheDocument();
     expect(screen.queryByLabelText(/^Excluir: Sem Poder/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^Excluir: Fora do Google/)).not.toBeInTheDocument();
@@ -765,12 +797,12 @@ describe('PublicacaoSetorPage — excluir evento que está no Google (decisão d
       caso: 'publicado com Meet',
       row: { ...NO_GOOGLE, meet_link: 'https://meet.google.com/abc-defg-hij' },
       texto:
-        '10/10/2026 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e do Google Agenda, junto com o link do Meet. Não dá para desfazer.',
+        '10/10/2099 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e do Google Agenda, junto com o link do Meet. Não dá para desfazer.',
     },
     {
       caso: 'erro (pode não estar lá)',
       row: { gcal_status: 'ERROR' as const, external_event_id: 'asv27' },
-      texto: '10/10/2026 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e do Google Agenda, se estiver lá. Não dá para desfazer.',
+      texto: '10/10/2099 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e do Google Agenda, se estiver lá. Não dá para desfazer.',
     },
   ])('$caso: a confirmação é a de Minhas Solicitações, abre no Cancelar e Cancelar não exclui', async ({ row, texto }) => {
     listResponse = pageOf([makeSolic({ ...row, pode_excluir: true })]);
@@ -868,6 +900,52 @@ describe('PublicacaoSetorPage — excluir evento que está no Google (decisão d
 });
 
 describe('PublicacaoSetorPage — polling (d)', () => {
+  // D75: as telas que se atualizam sozinhas consultam a cada 20 a 30 s (5 s fazia a tabela piscar).
+  test('o intervalo enquanto há publicação em voo fica entre 20 e 30 s', () => {
+    expect(TIMING.PUBLICACAO_PENDENTE_POLL_MS).toBeGreaterThanOrEqual(20_000);
+    expect(TIMING.PUBLICACAO_PENDENTE_POLL_MS).toBeLessThanOrEqual(30_000);
+  });
+
+  test('o tick do polling é silencioso: a tabela não liga o carregando', async () => {
+    vi.useFakeTimers();
+    listResponse = pageOf([makeSolic({ gcal_status: 'PENDING' })]);
+    const { container } = renderPage();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(screen.getByText('Vidas Em Rede')).toBeInTheDocument();
+
+    // A carga do tick fica em voo: se ligasse o carregando, o spinner cobriria a tabela.
+    fetchAPIMock.mockImplementation((url: string) =>
+      isList(url) ? new Promise(() => {}) : Promise.reject(new Error(url)),
+    );
+    await act(() => vi.advanceTimersByTimeAsync(TIMING.PUBLICACAO_PENDENTE_POLL_MS));
+    expect(listCalls()).toHaveLength(2);
+    // O Spin do AntD liga num setTimeout (debounce do `delay`): avança para ele aparecer, se fosse ligar.
+    await act(() => vi.advanceTimersByTimeAsync(500));
+    expect(container.querySelector('.ant-spin-spinning')).toBeNull();
+  });
+
+  test('429 no tick: o polling pausa, com o aviso de atualização pausada no lugar do toast', async () => {
+    vi.useFakeTimers();
+    listResponse = pageOf([makeSolic({ gcal_status: 'PENDING' })]);
+    renderPage();
+    await vi.advanceTimersByTimeAsync(0);
+
+    fetchAPIMock.mockImplementation((url: string) =>
+      isList(url)
+        ? Promise.reject(Object.assign(apiError(429, { detail: 'Muitas requisições.' }), { retryAfter: 120 }))
+        : Promise.reject(new Error(url)),
+    );
+    await act(() => vi.advanceTimersByTimeAsync(TIMING.PUBLICACAO_PENDENTE_POLL_MS));
+    expect(listCalls()).toHaveLength(2);
+    expect(screen.getByText('Atualização automática pausada por alguns instantes.')).toBeInTheDocument();
+    expect(message.error).not.toHaveBeenCalled();
+    expect(screen.getByText('Vidas Em Rede')).toBeInTheDocument();
+
+    // Pausado pelos 120 s do Retry-After: os ticks desse prazo não pedem a lista.
+    await act(() => vi.advanceTimersByTimeAsync(TIMING.PUBLICACAO_PENDENTE_POLL_MS * 2));
+    expect(listCalls()).toHaveLength(2);
+  });
+
   test('sem linha PENDING não há polling', async () => {
     vi.useFakeTimers();
     listResponse = pageOf([makeSolic({ gcal_status: 'NONE' })]);
@@ -896,7 +974,7 @@ describe('PublicacaoSetorPage — polling (d)', () => {
     expect(listCalls()).toHaveLength(2);
   });
 
-  // Revisão do item 36: uma falha passageira do polling (429, rede do celular) trocava a lista certa
+  // Revisão do item 36: uma falha passageira do polling (rede do celular) trocava a lista certa
   // pelo erro, tirava os botões da linha (o foco caía no body) e a tabela piscava no tick seguinte.
   test('falha de um tick do polling: a lista que estava na tela fica, com um aviso só', async () => {
     vi.useFakeTimers();
@@ -906,7 +984,7 @@ describe('PublicacaoSetorPage — polling (d)', () => {
     expect(screen.getByText('Vidas Em Rede')).toBeInTheDocument();
 
     fetchAPIMock.mockImplementation((url: string) =>
-      isList(url) ? Promise.reject(apiError(429, { detail: 'Muitas requisições.' })) : Promise.reject(new Error(url)),
+      isList(url) ? Promise.reject(apiError(503, { detail: 'Serviço indisponível.' })) : Promise.reject(new Error(url)),
     );
     await act(() => vi.advanceTimersByTimeAsync(TIMING.PUBLICACAO_PENDENTE_POLL_MS));
     expect(listCalls()).toHaveLength(2);
@@ -936,7 +1014,7 @@ describe('PublicacaoSetorPage — sem rolagem horizontal', () => {
 
     expect(cabecalhos()).toEqual(['Evento', 'Tipo', 'Coordenador', 'Meet', 'Ações']);
     const linha = screen.getByText('Vidas Em Rede').closest('tr') as HTMLElement;
-    expect(within(linha).getByText('10/10/2026 09:00')).toBeInTheDocument();
+    expect(within(linha).getByText('10/10/2099 09:00')).toBeInTheDocument();
     expect(within(linha).getByText('Sobral')).toBeInTheDocument();
     expect(within(linha).getByText('Não publicado')).toBeInTheDocument();
     expect(container.querySelector('.ant-table-content')?.getAttribute('style') ?? '').not.toMatch(/overflow/);

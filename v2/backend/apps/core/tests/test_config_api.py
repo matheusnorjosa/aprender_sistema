@@ -26,6 +26,7 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core.models import AuditLog, Config, Participation
+from apps.core.rbac import user_has_any_perm
 from apps.core.services.availability_service import check_conflicts_uncached
 from apps.core.services.horas_formacao import horas_formacao
 from apps.core.tests.factories import (
@@ -33,6 +34,7 @@ from apps.core.tests.factories import (
     MunicipioFactory,
     SolicitacaoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
     com_pacote_do_dat,
 )
 
@@ -221,6 +223,58 @@ def test_config_rbac_super(client: APIClient, super_user: Any) -> None:
     response = client.get(url)
 
     assert response.status_code == 200
+
+
+# Decisão do dono (05/11, G15): GET e PUT /api/config/ só com `manage_admin_registries`, a mesma
+# capacidade da tela /dat/admin/configuracoes. Antes aceitava `manage_purchases_and_materials` ou
+# `approve_solicitation`, e o Controle mudava pela API o buffer (RD-04) e o teto de horas sem ver a tela.
+
+
+@pytest.fixture
+def controle_user(db: Any) -> Any:
+    """Pacote CONTROLE: tem as duas capacidades que o gate antigo aceitava, não a do DAT."""
+    user = UsuarioFactory()
+    com_pacote_do_controle(user)
+    # Sem isto o 403 viria por falta de poder, não pela regra nova.
+    assert user_has_any_perm(user, "manage_purchases_and_materials")
+    assert user_has_any_perm(user, "approve_solicitation")
+    assert not user_has_any_perm(user, "manage_admin_registries")
+    return user
+
+
+@pytest.mark.django_db
+def test_config_get_controle_recebe_403(client: APIClient, controle_user: Any) -> None:
+    client.force_authenticate(user=controle_user)
+
+    assert client.get(reverse("core:config")).status_code == 403
+
+
+@pytest.mark.django_db
+def test_config_put_controle_recebe_403_e_nada_muda(client: APIClient, controle_user: Any) -> None:
+    Config.objects.update_or_create(key="availability", defaults={"value": {"TRAVEL_BUFFER_MINUTES": 90}})
+    client.force_authenticate(user=controle_user)
+    logs = AuditLog.objects.filter(action=AuditLog.Action.UPDATE_CONFIG).count()
+
+    resposta = client.put(
+        reverse("core:config"),
+        {"TRAVEL_BUFFER_MINUTES": 15, "AVAILABILITY_DAILY_LIMIT_HOURS": 12},
+        format="json",
+    )
+
+    assert resposta.status_code == 403
+    assert Config.objects.get(key="availability").value == {"TRAVEL_BUFFER_MINUTES": 90}
+    assert AuditLog.objects.filter(action=AuditLog.Action.UPDATE_CONFIG).count() == logs
+
+
+@pytest.mark.django_db
+def test_config_dat_e_superusuario_leem_e_gravam(client: APIClient, dat_user: Any) -> None:
+    superusuario = UsuarioFactory(is_superuser=True, is_staff=True)
+    for user in (dat_user, superusuario):
+        client.force_authenticate(user=user)
+        assert client.get(reverse("core:config")).status_code == 200
+        resposta = client.put(reverse("core:config"), {"TRAVEL_BUFFER_MINUTES": 45}, format="json")
+        assert resposta.status_code == 200, resposta.content
+        assert resposta.json()["TRAVEL_BUFFER_MINUTES"] == 45
 
 
 @pytest.mark.django_db

@@ -7,7 +7,8 @@ Coverage:
 - Productivity metrics: events created/approved/rejected, approval rate, avg time, gcal stats
 - Formadores metrics: top 10 ranking by events, hours worked, municipalities attended
 - Quality metrics: rejection/conflict/rework rates, avg approval/publish times
-- RBAC: 403 for unauthorized users (Formador, Coordenador)
+- RBAC: 403 for unauthorized users (Controle, Formador, Coordenador); quem vê é a policy da tela
+  /dashboards/equipe (`CanViewTeamDashboard`: Diretoria e DAT; decisão do dono, 05/11/2026)
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
@@ -31,6 +32,7 @@ from apps.core.tests.factories import (
     TipoEventoFactory,
     UsuarioFactory,
     com_pacote_do_controle,
+    com_pacote_do_dat,
 )
 
 
@@ -38,11 +40,13 @@ from apps.core.tests.factories import (
 def grupos(db):
     """Create necessary groups (Controle, Gerência, Formador, Coordenador)"""
     controle = GroupFactory(name="Controle")
+    dat = GroupFactory(name="DAT")
     gerencia = GroupFactory(name="Gerência")
     formador = GroupFactory(name="Formador")
     coordenador = GroupFactory(name="Coordenador")
     return {
         "controle": controle,
+        "dat": dat,
         "gerencia": gerencia,
         "formador": formador,
         "coordenador": coordenador,
@@ -50,13 +54,29 @@ def grupos(db):
 
 
 @pytest.fixture
+def painel_user(db, grupos):
+    """Quem vê o painel da equipe: o DAT pelo pacote (`view_team_dashboard`)."""
+    user = UsuarioFactory(
+        username="painel1",
+        email="painel1@test.com",
+        password="testpass123",
+        cpf="11111111111",
+        first_name="Painel",
+        last_name="User",
+    )
+    user.groups.add(grupos["dat"])
+    com_pacote_do_dat(user)
+    return user
+
+
+@pytest.fixture
 def controle_user(db, grupos):
-    """User in Controle group"""
+    """User in Controle group (pacote do Controle): não vê o painel da equipe."""
     user = UsuarioFactory(
         username="controle1",
         email="controle1@test.com",
         password="testpass123",
-        cpf="11111111111",
+        cpf="11111111112",
         first_name="Controle",
         last_name="User",
     )
@@ -140,7 +160,7 @@ class TestProductivityMetrics:
     Endpoint: GET /api/metrics/team/productivity/?days=N
     """
 
-    def test_metrics_productivity(self, controle_user, tipo_evento, projeto, municipio_a):
+    def test_metrics_productivity(self, painel_user, tipo_evento, projeto, municipio_a):
         """
         Test productivity metrics with mixed statuses.
 
@@ -154,7 +174,7 @@ class TestProductivityMetrics:
         - gcal_error_rate = (1 / 6) * 100 = 16.67
         """
         client = APIClient()
-        client.force_authenticate(user=controle_user)
+        client.force_authenticate(user=painel_user)
 
         now = timezone.now()
         base_time = now - timedelta(days=3)
@@ -165,7 +185,7 @@ class TestProductivityMetrics:
         # 6 approved
         for i in range(6):
             sol = SolicitacaoFactory(
-                usuario=controle_user,
+                usuario=painel_user,
                 tipo_evento=tipo_evento,
                 projeto=projeto,
                 municipio=municipio_a,
@@ -192,7 +212,7 @@ class TestProductivityMetrics:
         # 3 rejected
         for i in range(3):
             sol = SolicitacaoFactory(
-                usuario=controle_user,
+                usuario=painel_user,
                 tipo_evento=tipo_evento,
                 projeto=projeto,
                 municipio=municipio_a,
@@ -206,7 +226,7 @@ class TestProductivityMetrics:
 
         # 1 pending
         sol = SolicitacaoFactory(
-            usuario=controle_user,
+            usuario=painel_user,
             tipo_evento=tipo_evento,
             projeto=projeto,
             municipio=municipio_a,
@@ -246,10 +266,10 @@ class TestProductivityMetrics:
         # gcal_error_rate = (1 / 6) * 100 = 16.67
         assert round(data["gcal_error_rate"], 2) == 16.67
 
-    def test_productivity_metrics_empty_dataset(self, controle_user):
+    def test_productivity_metrics_empty_dataset(self, painel_user):
         """Test productivity metrics with no data (division by zero handling)"""
         client = APIClient()
-        client.force_authenticate(user=controle_user)
+        client.force_authenticate(user=painel_user)
 
         response = client.get("/api/metrics/team/productivity/?days=7")
 
@@ -266,16 +286,16 @@ class TestProductivityMetrics:
         assert data["gcal_published"] == 0
         assert data["gcal_error_rate"] == 0.0
 
-    def test_productivity_metrics_custom_days(self, controle_user, tipo_evento, projeto, municipio_a):
+    def test_productivity_metrics_custom_days(self, painel_user, tipo_evento, projeto, municipio_a):
         """Test productivity metrics with custom days parameter"""
         client = APIClient()
-        client.force_authenticate(user=controle_user)
+        client.force_authenticate(user=painel_user)
 
         now = timezone.now()
 
         # Create event 2 days ago (should be included in days=7)
         SolicitacaoFactory(
-            usuario=controle_user,
+            usuario=painel_user,
             tipo_evento=tipo_evento,
             projeto=projeto,
             municipio=municipio_a,
@@ -287,7 +307,7 @@ class TestProductivityMetrics:
 
         # Create event 10 days ago (should NOT be included in days=7)
         SolicitacaoFactory(
-            usuario=controle_user,
+            usuario=painel_user,
             tipo_evento=tipo_evento,
             projeto=projeto,
             municipio=municipio_a,
@@ -332,17 +352,17 @@ class TestFormadoresMetrics:
         """
         client = APIClient()
 
-        # Create Controle user for authentication
-        controle_user = UsuarioFactory(
-            username="controle_test",
-            email="controle@test.com",
+        # Quem vê o painel (DAT pelo pacote)
+        painel_user = UsuarioFactory(
+            username="painel_test",
+            email="painel@test.com",
             password="testpass123",
             cpf="99999999999",
         )
-        controle_user.groups.add(grupos["controle"])
-        com_pacote_do_controle(controle_user)
+        painel_user.groups.add(grupos["dat"])
+        com_pacote_do_dat(painel_user)
 
-        client.force_authenticate(user=controle_user)
+        client.force_authenticate(user=painel_user)
 
         now = timezone.now()
         base_time = now - timedelta(days=5)
@@ -370,7 +390,7 @@ class TestFormadoresMetrics:
             for i in range(count):
                 # Create solicitacao (approved, in date range)
                 sol = SolicitacaoFactory(
-                    usuario=controle_user,
+                    usuario=painel_user,
                     tipo_evento=tipo_evento,
                     projeto=projeto,
                     # Alternate between municipio_a and municipio_b
@@ -430,16 +450,16 @@ class TestFormadoresMetrics:
         """Test that formadores ranking is limited to top 10"""
         client = APIClient()
 
-        controle_user = UsuarioFactory(
-            username="controle_top10",
-            email="controle_top10@test.com",
+        painel_user = UsuarioFactory(
+            username="painel_top10",
+            email="painel_top10@test.com",
             password="testpass123",
             cpf="98765432109",
         )
-        controle_user.groups.add(grupos["controle"])
-        com_pacote_do_controle(controle_user)
+        painel_user.groups.add(grupos["dat"])
+        com_pacote_do_dat(painel_user)
 
-        client.force_authenticate(user=controle_user)
+        client.force_authenticate(user=painel_user)
 
         now = timezone.now()
         base_time = now - timedelta(days=5)
@@ -458,7 +478,7 @@ class TestFormadoresMetrics:
 
             # Create 1 event
             sol = SolicitacaoFactory(
-                usuario=controle_user,
+                usuario=painel_user,
                 tipo_evento=tipo_evento,
                 projeto=projeto,
                 municipio=municipio_a,
@@ -488,23 +508,23 @@ class TestFormadoresMetrics:
         """Test that guest participations (no usuario) are excluded"""
         client = APIClient()
 
-        controle_user = UsuarioFactory(
-            username="controle_guest",
-            email="controle_guest@test.com",
+        painel_user = UsuarioFactory(
+            username="painel_guest",
+            email="painel_guest@test.com",
             password="testpass123",
             cpf="11122233344",
         )
-        controle_user.groups.add(grupos["controle"])
-        com_pacote_do_controle(controle_user)
+        painel_user.groups.add(grupos["dat"])
+        com_pacote_do_dat(painel_user)
 
-        client.force_authenticate(user=controle_user)
+        client.force_authenticate(user=painel_user)
 
         now = timezone.now()
         base_time = now - timedelta(days=5)
 
         # Create event with guest participation (should be excluded)
         sol = SolicitacaoFactory(
-            usuario=controle_user,
+            usuario=painel_user,
             tipo_evento=tipo_evento,
             projeto=projeto,
             municipio=municipio_a,
@@ -540,7 +560,7 @@ class TestQualityMetrics:
     Endpoint: GET /api/metrics/team/quality/?days=N
     """
 
-    def test_metrics_quality(self, controle_user, tipo_evento, projeto, municipio_a):
+    def test_metrics_quality(self, painel_user, tipo_evento, projeto, municipio_a):
         """
         Test quality metrics with conflicts and rework.
 
@@ -553,7 +573,7 @@ class TestQualityMetrics:
         Validates all KPIs.
         """
         client = APIClient()
-        client.force_authenticate(user=controle_user)
+        client.force_authenticate(user=painel_user)
 
         now = timezone.now()
         base_time = now - timedelta(days=5)
@@ -564,7 +584,7 @@ class TestQualityMetrics:
         # 7 approved (no conflicts)
         for i in range(7):
             sol = SolicitacaoFactory(
-                usuario=controle_user,
+                usuario=painel_user,
                 tipo_evento=tipo_evento,
                 projeto=projeto,
                 municipio=municipio_a,
@@ -587,7 +607,7 @@ class TestQualityMetrics:
 
         # 1 approved with conflict in observacoes
         sol_conflict = SolicitacaoFactory(
-            usuario=controle_user,
+            usuario=painel_user,
             tipo_evento=tipo_evento,
             projeto=projeto,
             municipio=municipio_a,
@@ -603,7 +623,7 @@ class TestQualityMetrics:
         # 2 rejected
         for i in range(2):
             sol = SolicitacaoFactory(
-                usuario=controle_user,
+                usuario=painel_user,
                 tipo_evento=tipo_evento,
                 projeto=projeto,
                 municipio=municipio_a,
@@ -617,7 +637,7 @@ class TestQualityMetrics:
 
         # Create UPDATE audit log for first solicitacao (rework)
         AuditLog.objects.create(
-            usuario=controle_user,
+            usuario=painel_user,
             action="UPDATE",
             model_name="Solicitacao",
             details={"solicitacao_id": solicitacoes[0].id, "changes": "edited"},
@@ -652,10 +672,10 @@ class TestQualityMetrics:
         assert data["avg_publish_time_minutes"] > 0
         assert data["avg_publish_time_minutes"] < 60  # Less than 1 hour is reasonable
 
-    def test_quality_metrics_empty_dataset(self, controle_user):
+    def test_quality_metrics_empty_dataset(self, painel_user):
         """Test quality metrics with no data (division by zero handling)"""
         client = APIClient()
-        client.force_authenticate(user=controle_user)
+        client.force_authenticate(user=painel_user)
 
         response = client.get("/api/metrics/team/quality/?days=30")
 
@@ -676,15 +696,14 @@ class TestMetricsRBAC:
     """
     Test RBAC for metrics endpoints (Issue #189).
 
-    All endpoints require HasPerm("run_daily_operations") | HasPerm("supervise_operations") |
-    HasPerm("manage_admin_registries") permission.
-    Unauthorized users (Formador, Coordenador) should get 403.
+    All endpoints require `CanViewTeamDashboard` (a policy da tela /dashboards/equipe).
+    Unauthorized users (Controle, Formador, Coordenador) should get 403.
     """
 
-    def test_metrics_rbac_controle_allowed(self, controle_user):
-        """Test that Controle users can access metrics"""
+    def test_metrics_rbac_painel_allowed(self, painel_user):
+        """Quem vê a tela (DAT pelo pacote) acessa os 3 endpoints."""
         client = APIClient()
-        client.force_authenticate(user=controle_user)
+        client.force_authenticate(user=painel_user)
 
         # Test all 3 endpoints
         endpoints = [
@@ -695,19 +714,33 @@ class TestMetricsRBAC:
 
         for endpoint in endpoints:
             response = client.get(endpoint)
-            assert response.status_code == http_status.HTTP_200_OK, f"Controle user should access {endpoint}"
+            assert response.status_code == http_status.HTTP_200_OK, f"DAT user should access {endpoint}"
 
     @pytest.mark.skip(
         reason=(
             "Issue #1222 (Epic 1 RBAC Access Policy Realignment): grupo "
             "'Gerência' (legacy) foi descontinuado em favor de 'Gerente' "
-            "(função). Endpoints metrics/team/* exigem `run_daily_operations | "
-            "supervise_operations | manage_admin_registries` (Controle, Diretoria "
-            "e DAT pelo pacote)."
+            "(função). Endpoints metrics/team/* exigem `CanViewTeamDashboard` "
+            "(Diretoria e DAT pelo pacote; o Controle saiu em 05/11/2026)."
         )
     )
     def test_metrics_rbac_gerencia_allowed(self, gerencia_user):
         """OBSOLETO após Issue #1222 — ver docstring do skip."""
+
+    def test_metrics_rbac_controle_forbidden(self, controle_user):
+        """O Controle (pacote CONTROLE, `run_daily_operations`) não vê a tela → 403 (decisão do dono, 05/11/2026)."""
+        client = APIClient()
+        client.force_authenticate(user=controle_user)
+
+        for endpoint in (
+            "/api/metrics/team/productivity/",
+            "/api/metrics/team/formadores/",
+            "/api/metrics/team/quality/",
+        ):
+            response = client.get(endpoint)
+            assert (
+                response.status_code == http_status.HTTP_403_FORBIDDEN
+            ), f"Controle user should be forbidden from {endpoint}"
 
     def test_metrics_rbac_formador_forbidden(self, formador_user):
         """Test that Formador users get 403 (forbidden)"""

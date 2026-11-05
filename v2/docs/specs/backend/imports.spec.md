@@ -1,7 +1,7 @@
 ---
 title: Importação de Dados (export-contract)
 status: canonical
-last_verified: 2026-11-03
+last_verified: 2026-11-05
 sources_of_truth:
   - v2/backend/apps/core/imports/__init__.py
   - v2/backend/apps/core/imports/hashing.py
@@ -175,6 +175,7 @@ Entidades classificadas no importer (`IMPLEMENTED`): `municipio`, `projeto_geral
 - **Participação só em evento criado na mesma execução.** O apply de `participation` vincula pessoa só aos `external_hash` que o apply de `solicitacao` criou nesta execução. Evento que já existia, ou que foi re-chaveado por `evento_ids_anteriores`, não ganha nem perde participante. No dry-run, `would_create` só conta participação de evento que seria criado; a de evento existente ou re-chaveado vai para `would_skip_same` com `skip_reasons.evento_existente`, a de evento novo no passado com `skip_reasons.evento_passado_novo`, e a sem evento continua `would_reject`.
 - **Trava no command:** `--allow-entity participation` sem `--allow-entity solicitacao` dá `CommandError` antes de ler arquivo.
 - **`COORD_ACOMPANHA` vindo do CSV é recusado** (03/11/2026): desde que esse papel ocupa a agenda e conta horas, ele só entra pela tela (gerência e agenda conferidas). O contrato v13 não traz esse papel; se vier, o dry-run de `participation` conta `would_reject` com `reject_reasons.coord_acompanha_do_csv` e o `--apply` não grava a linha.
+- **`COORDENADOR` de quem não é o dono do evento: grava, mas não convida nem aparece em Meus Eventos** (05/11/2026, efeito da regra do convite em [gcal.spec](./gcal.spec.md)). O convite do Google e `GET /api/me/events/` só contam a linha `COORDENADOR` do responsável (`Solicitacao.coordenador`, que o importer grava com o solicitante). Uma linha `COORDENADOR` da planilha de outra pessoa, de co-coordenador, nasce no banco, mas essa pessoa não é convidada nem vê o evento em Meus Eventos. Medido no CSV da entrega v40 (28/10/2026): 2 das 3.535 linhas `COORDENADOR`, 1 pessoa, 2 eventos futuros; na virada só o evento novo ganha participante. Para convidar essa pessoa, a linha teria de virar `COORD_ACOMPANHA`, que ocupa a agenda e hoje é recusada (item acima).
 - **`rekey_contraditorio`** (dry-run de `solicitacao`): conta as linhas com um id em `evento_ids_anteriores` que também é `evento_id` de outra linha do arquivo e já está em prod (caso Filadélfia). É só aviso: a regra de entrada contraditória acima segue igual, e o importador não junta eventos por semelhança. A correção é na planilha.
 - **Ordem antes de carregar o v35:** (1) deploy deste importador; (2) script de dados que apaga o projeto antigo `ESCREVER COMUNICAR E SER` (o nome exato vence o apelido enquanto ele existir); (3) dry-run do v35 contra prod; (4) carga com autorização.
 

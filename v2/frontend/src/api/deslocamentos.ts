@@ -8,8 +8,9 @@
  * CSRF nos métodos mutantes, faz retry em 403 de CSRF e respeita `VITE_API_URL`.
  *
  * Backend: `DeslocamentoViewSet` (`apps/core/views_deslocamento.py`).
- * Escrita é owner-forced (`usuario=request.user`) desde #1454/PR #1542 — o
- * campo `usuario` no payload de create é ignorado pelo backend.
+ * Escrita é owner-forced desde #1454/PR #1542: sem `usuario`, grava para quem está
+ * logado; com `usuario` de outra pessoa, exige delegação (403 sem ela). Editar e
+ * excluir seguem a mesma regra, e `pode_editar` de cada linha a antecipa.
  */
 
 import { fetchAPI, buildUrl, type QueryParams } from './config';
@@ -19,12 +20,14 @@ import type { ID, PaginatedResponse } from '../types';
  * Deslocamento como retornado pelo backend.
  *
  * Espelha `DeslocamentoSerializer` (`apps/core/serializers/workflow.py`).
- * `usuario_nome` é derivado (read-only).
+ * `usuario_nome` é derivado (read-only). `pode_editar`: quem pede pode editar e excluir a linha
+ * (dono ou quem delega para o dono; G07).
  */
 export interface DeslocamentoRecord {
   id: ID;
   usuario: ID;
   usuario_nome: string;
+  pode_editar: boolean;
   origem: string;
   destino: string;
   start_date: string; // ISO 8601 date

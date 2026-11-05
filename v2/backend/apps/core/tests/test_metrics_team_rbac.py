@@ -18,6 +18,10 @@ Capabilities envolvidas (motivos legítimos):
 
 Doc §3 da matriz canônica:
    Dashboard Equipe: Diretoria + DAT + super
+
+Decisão do dono (05/11/2026): os três endpoints usam `CanViewTeamDashboard`, a mesma policy da tela
+/dashboards/equipe (`supervise_operations | manage_admin_registries`). O Controle
+(`run_daily_operations`) lia o ranking com nomes e horas pela API sem ter a tela e agora recebe 403.
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false, reportPrivateUsage=false
@@ -98,15 +102,6 @@ class TestDATAccessTeamMetrics:
 
 class TestExistingAccessPreserved:
     @pytest.mark.parametrize("endpoint", ENDPOINTS)
-    def test_controle_continues_to_access(self, endpoint):
-        """Controle tem `run_daily_operations` → mantém acesso."""
-        user = _make_user("controle_metrics", ["Controle"])
-        client = APIClient()
-        client.force_authenticate(user=user)
-        res = client.get(endpoint)
-        assert res.status_code == 200
-
-    @pytest.mark.parametrize("endpoint", ENDPOINTS)
     def test_diretoria_continues_to_access(self, endpoint):
         """Diretoria tem `supervise_operations` → mantém acesso."""
         user = _make_user("diretoria_metrics", ["Diretoria"])
@@ -130,6 +125,24 @@ class TestExistingAccessPreserved:
 
 
 class TestBlockingPreserved:
+    @pytest.mark.parametrize("endpoint", ENDPOINTS)
+    def test_controle_recebe_403(self, endpoint):
+        """Controle tem `run_daily_operations`, que não abre a tela → 403 (decisão do dono, 05/11/2026)."""
+        user = _make_user("controle_metrics", ["Controle"])
+        client = APIClient()
+        client.force_authenticate(user=user)
+        res = client.get(endpoint)
+        assert res.status_code == 403
+
+    @pytest.mark.parametrize("endpoint", ENDPOINTS)
+    def test_assistente_administrativo_do_controle_recebe_403(self, endpoint):
+        """Mesmo com o vínculo EQUIPE na gerência CONTROLE (pacote CONTROLE, como a u7) → 403."""
+        user = _make_user("asst_controle_metrics", ["Controle", "Assistente Administrativo"])
+        client = APIClient()
+        client.force_authenticate(user=user)
+        res = client.get(endpoint)
+        assert res.status_code == 403
+
     @pytest.mark.parametrize("endpoint", ENDPOINTS)
     def test_coordenador_blocked(self, endpoint):
         """Coordenador não tem nenhuma das 3 capabilities → 403."""

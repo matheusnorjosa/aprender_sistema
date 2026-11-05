@@ -185,13 +185,16 @@ A grade mensal é cacheada no Redis por 5 minutos + jitter de até 30 s
 Chave real (`chave_cache_grade` em `views_availability_monthly.py`, a SSOT):
 
 ```
-monthly:v8:{monthly_ver}:{sha256 do JSON [year, month, role, cache_scope, setor, busca, teto]}
+monthly:v9:{monthly_ver}:{sha256 do JSON [year, month, role, cache_scope, setor, busca, teto]}
 ```
 
 - `v8` (F8, scan de 16/10/2026): os parâmetros entram num JSON e a chave usa o hash dele. O setor
   ausente é `null` (não mais `'*'`), então `sector=*` não colide com a grade sem filtro, e um `:` no
   setor ou na busca não desloca os campos. Setor sem espaço nas pontas (vazio = sem filtro), busca
   sem caixa.
+- `v9` (item 38, 20/10/2026): a aba Coordenadores passou a marcar só quem ocupa a agenda
+  (`ocupa_agenda_q`). Com o prefixo novo, a grade antiga do cache, que marcava quem não acompanha,
+  deixa de ser servida.
 
 - `teto` = o teto de horas por evento vigente (`parametros_disponibilidade()`); salvar um teto
   novo em Configurações vale na consulta seguinte. `v6` entrou em 05/10/2026 com a CH com teto;
@@ -210,7 +213,7 @@ versões atrás.)*
 
 ## Endpoints relacionados não cobertos aqui
 
-- `POST /api/availability/check/` e `/check-many/` (rotas `availability-check` / `availability-check-many` em `apps/core/urls.py`) — autorização
+- `GET /api/availability/check/` e `POST /api/availability/check-many/` (rotas `availability-check` / `availability-check-many` em `apps/core/urls.py`) — autorização
   por `can_check_availability_for_others` (`views_availability.py`), distinta da regra
   de leitura acima. A resposta separa `conflicts` (barra: sobreposição, bloqueio, deslocamento)
   de `warnings` (só avisa; hoje sempre vazio). O limite diário (M) não impede nada desde

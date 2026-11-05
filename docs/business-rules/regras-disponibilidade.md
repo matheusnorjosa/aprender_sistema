@@ -82,10 +82,12 @@ Mensagens devem incluir:
 
 ## Quem é checado
 
-Desde a decisão do dono de 05/10/2026, só ocupa a agenda quem tem papel `FORMADOR` no evento
-(`ENFORCED_ROLES` em `apps/core/services/availability_service.py`) e, quando o evento tem
-`coordenador_acompanha=True`, o coordenador responsável (`coordenador_ocupante`). Quem criou
-não entra por ter criado; `COORDENADOR`, `COORD_ACOMPANHA` e `CONVIDADO` não ocupam (servem ao
+Desde a decisão do dono de 05/10/2026, ocupa a agenda quem tem papel `FORMADOR` no evento e,
+quando o evento tem `coordenador_acompanha=True`, o coordenador responsável
+(`coordenador_ocupante`). Desde 03/11/2026 também ocupam, sempre, os coordenadores além do
+responsável (`COORD_ACOMPANHA`, da caixa "Coordenador(es)"). Os papéis ocupantes ficam em
+`ENFORCED_ROLES` = `FORMADOR` + `COORD_ACOMPANHA` (`apps/core/services/availability_service.py`).
+Quem criou não entra por ter criado; `COORDENADOR` e `CONVIDADO` não ocupam (servem ao
 convite do Google).
 
 As duas pontas usam a mesma regra: o enforcement (`collect_participants`) decide **quem** é

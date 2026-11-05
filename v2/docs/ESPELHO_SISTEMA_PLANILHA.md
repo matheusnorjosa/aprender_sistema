@@ -1,7 +1,7 @@
 ---
 title: Espelho Sistema × Planilha
 status: living
-last_verified: 2026-10-19
+last_verified: 2026-11-04
 owner: backend
 sources_of_truth:
   - v2/backend/apps/core/models/organizacao.py
@@ -129,8 +129,10 @@ Registro durável da verificação adversarial de 2026-08-26 (11 afirmações de
 - **`_update_formadores` (`views_solicitacao.py`)** não filtrava `is_active` (o create
   filtra em `:378/:384`) e reconciliava só `FORMADOR`, nunca `COORD_ACOMPANHA`.
   **Corrigido no PR #1886** (filtra ativos + reconcilia os dois papéis; guests por
-  e-mail seguem só no create — D6c em revisão pelo dono). Desde 05/10/2026 reconcilia só
-  `FORMADOR`: `COORD_ACOMPANHA` saiu da tela e as linhas antigas ficam como estão.
+  e-mail seguem só no create — D6c em revisão pelo dono). Desde 05/10/2026 reconciliava só
+  `FORMADOR`; desde 03/11/2026 (#2164) reconcilia também `COORD_ACOMPANHA` (os coordenadores
+  além do responsável voltaram à tela e ocupam a agenda; quem entra passa pela regra do
+  responsável, `_coordenadores_extras`).
 
 ### 3.2 🟡 RECLASSIFICADO — o núcleo sobrevive, refatorar (não apagar)
 
@@ -256,7 +258,7 @@ SSOT: `services/solicitacao_scope.py` e [`rbac.spec.md`](specs/backend/rbac.spec
 
 | # | tarefa | estado |
 |---|---|---|
-| 1 | `_update_formadores` (`is_active` + COORD_ACOMPANHA) | ✅ **PR #1886** (gate 8/8); desde 05/10/2026 só `FORMADOR` |
+| 1 | `_update_formadores` (`is_active` + COORD_ACOMPANHA) | ✅ **PR #1886** (gate 8/8); de 05/10 a 03/11/2026 só `FORMADOR`; desde #2164 os dois papéis |
 | 2 | remover os 6 scripts de raspagem | pronto (§3.3: seguro) |
 | 3 | migrations: `setor_canonico` ✅ (0099), `desativado_localmente` ✅ (0098); papel `EQUIPE` ✅ (05/10/2026); falta `projeto_geral` | parcial |
 | 4 | import real (dry-run → apply, autorização) | depois de 3 |

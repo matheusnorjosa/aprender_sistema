@@ -109,16 +109,16 @@ Caminho feliz / deteccao (`check_conflicts`):
 
 1. Valida `fim > inicio` (senao retorna `X` "Intervalo invalido").
 2. Carrega `buffer_min` por `parametros_disponibilidade()`: a chave gravada no Config `availability` vale (inclusive Buffer 0); sem ela, o settings (env; default 120 min). O teto de horas (default 8 h) vem da mesma funcao, mas so a contagem de horas o le. É a mesma fonte do `GET /api/config/`, então o valor que a tela mostra é o aplicado (auditoria UX 30/09).
-3. Monta `events_qs` = `Solicitacao` APROVADO filtrada por `ocupa_agenda_q(usuario)`: a pessoa e FORMADORA, ou e a responsavel de evento com `coordenador_acompanha=True`.
+3. Monta `events_qs` = `Solicitacao` APROVADO filtrada por `ocupa_agenda_q(usuario)`: a pessoa e FORMADORA ou coordenadora alem da responsavel (`COORD_ACOMPANHA`, 03/11/2026), ou e a responsavel de evento com `coordenador_acompanha=True`. Com `lote` (`POST /api/solicitacoes/lote/`), os irmaos do lote tambem entram, mesmo pendentes (28/10/2026).
 4. RD-02/RD-03: itera blocos aprovados que intersectam → emite `T` ou `P`.
-5. RD-01: itera eventos aprovados que intersectam → emite `X`.
+5. RD-01: itera os eventos de `events_qs` que intersectam (aprovados; com `lote`, tambem os irmaos) → emite `X`.
 6. RD-04: pega evento imediatamente anterior (`fim__lte=inicio`) e posterior (`inicio__gte=fim`); se cidade difere e gap `< buffer_min`, emite `D`.
 7. (RD-05 nao roda aqui desde 05/10/2026.)
 8. Retorna `CheckResult(ok=(len(conflicts)==0), conflicts=..., warnings=...)`.
 
 Caminho de enforcement (`enforce_solicitacao_availability`, dentro de `transaction.atomic()`):
 
-1. `collect_participants` le `Participation` gravada (`role__in=ENFORCED_ROLES`, so FORMADOR) + o responsavel se acompanha (`coordenador_ocupante`), dedup por id.
+1. `collect_participants` le `Participation` gravada (`role__in=ENFORCED_ROLES` = FORMADOR e COORD_ACOMPANHA) + o responsavel se acompanha (`coordenador_ocupante`), dedup por id.
 2. `lock_participants` toma `pg_advisory_xact_lock(1452, usuario_id)` em ordem ASC.
 3. Para cada participante, `check_conflicts_uncached(..., exclude_solicitacao_id=solicitacao.pk)`.
 4. `skipped_guests` nao vazio → `logger.warning("availability_guest_check_skipped")` (nao bloqueia).

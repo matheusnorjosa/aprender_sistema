@@ -1,8 +1,8 @@
 ---
 title: Princípios de UX
 status: canonical
-last_verified: 2026-10-19
-verified_at_commit: 37bc7afd586dd304aa7d0b376a0272906862cdac
+last_verified: 2026-11-04
+verified_at_commit: 563ec1c36c140292129e985073c29d198d7316e2
 sources_of_truth:
   - v2/frontend/e2e/checklist/accessibility.spec.ts
   - v2/frontend/e2e/checklist/performance.spec.ts
@@ -24,7 +24,8 @@ flexibilidade é um trade-off real: telas de operação frequente pedem **densid
 no C1) e poucos cliques; tarefas raras ou de quem está começando pedem guia. A Nova Solicitação
 deixou de ser wizard em 28/10/2026 (decisão do dono): é uma página só, com o evento num cartão de campos lado a
 lado e "Mais detalhes" recolhido, porque quem cria evento faz isso todo dia. Na mesma página se criam até 10 eventos
-de uma vez, um cartão por evento, num envio só (tudo ou nada).
+de uma vez, num envio só (tudo ou nada): cada cartão tem um ou mais horários ("+ horário"), e cada horário vira um
+evento separado no Google; o limite de 10 conta os horários de todos os cartões.
 
 ## O que buscar
 

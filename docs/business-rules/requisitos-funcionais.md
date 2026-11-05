@@ -30,7 +30,10 @@ Requisitos funcionais do sistema Aprender Sistema v2.
   - Modalidade (presencial/online)
   - Descrição
 - Validação de campos obrigatórios
-- Criação com status `pendente` (SUPER) ou `aprovado` (NAO_SUPER)
+- Criação com status `pendente` (SUPER) ou `aprovado` (NAO_SUPER); em município sem compra para
+  o projeto, `pendente` em qualquer fluxo (03/11/2026), exceto para quem é isento da regra da compra
+  (superusuário ou a capacidade `create_solicitation_without_purchase`). Ver
+  [Política de Aprovação](politica-aprovacao.md).
 
 ## RF03: Verificar Conflitos
 

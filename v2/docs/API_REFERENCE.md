@@ -162,8 +162,10 @@ vínculo de GERENTE dela (fora: 403), e só cria ou move para projeto desse alca
 `projeto`) — regra do dono, 2026-09-30.
 
 > **PA-01 / fluxo**: o status inicial **não é sempre `pendente`**. `perform_create`
-> delega a `resolve_initial_status(projeto=...)`: projeto com `fluxo=SUPER` nasce
-> `pendente`; `fluxo=NAO_SUPER` nasce `aprovado` (`SolicitacaoViewSet.perform_create`, `views_solicitacao.py`).
+> delega a `resolve_initial_status(projeto=..., sem_compra=...)` (`services/solicitacao_create.py`): se o
+> par município+projeto não tem compra que o libere e quem cria não é isento (superuser ou capacidade de
+> isenção), o evento nasce `pendente` em qualquer fluxo (pedido do dono, 03/11/2026). Fora desse caso,
+> `fluxo=SUPER` nasce `pendente` e `fluxo=NAO_SUPER` nasce `aprovado` (`SolicitacaoViewSet.perform_create`, `views_solicitacao.py`).
 
 > **Responsável e perguntas (decisão do dono, 05/10/2026)** — detalhe em
 > [`solicitacao-approval.spec.md`](specs/backend/solicitacao-approval.spec.md):
@@ -178,15 +180,19 @@ vínculo de GERENTE dela (fora: 403), e só cria ou move para projeto desse alca
 >   lista o formador escolhido → 400; pergunta que passa a valer exige resposta. Leitura em
 >   `GET` (lista e detalhe), com `formador_avaliado_nome`; `avaliaveis_ids` e
 >   `projeto_pergunta_avaliar_formador` só no detalhe (null na lista).
-> - `extra_participants.coord_acompanha_ids`/`coord_acompanha_emails` com itens → 400 (a lista saiu;
->   coordenador que atua vai em `formador_ids`).
+> - `extra_participants.coord_acompanha_ids` (03/11/2026): coordenadores além do responsável. Cada um
+>   precisa do papel COORDENADOR vigente na gerência do projeto (quem cria com alcance global: em alguma
+>   gerência ativa), de conta ativa, sem repetir e sem repetir o responsável; fora disso, 400 no campo
+>   `coord_acompanha_ids`. Gravados como `COORD_ACOMPANHA`, eles sempre ocupam a agenda (`ENFORCED_ROLES`).
+>   Na edição a lista é reconciliada, e chave ausente não mexe nela. `coord_acompanha_emails` com itens
+>   → 400 (coordenador só pelo cadastro).
 
 ### Ações de Aprovação (PA-01 a PA-07)
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
-| **PATCH** | `/api/solicitacoes/{id}/approve/` | ![Stable](https://img.shields.io/badge/-stable-green) | Aprovar solicitação SUPER | `CanAccessSolicitationApprovals` |
-| **PATCH** | `/api/solicitacoes/{id}/reject/` | ![Stable](https://img.shields.io/badge/-stable-green) | Reprovar solicitação SUPER | `CanAccessSolicitationApprovals` |
+| **PATCH** | `/api/solicitacoes/{id}/approve/` | ![Stable](https://img.shields.io/badge/-stable-green) | Aprovar solicitação pendente (SUPER, ou NAO_SUPER sem compra; a aprovadora da Superintendência só decide o SUPER dela) | `CanAccessSolicitationApprovals` |
+| **PATCH** | `/api/solicitacoes/{id}/reject/` | ![Stable](https://img.shields.io/badge/-stable-green) | Reprovar solicitação pendente (SUPER, ou NAO_SUPER sem compra; a aprovadora da Superintendência só decide o SUPER dela) | `CanAccessSolicitationApprovals` |
 | POST | `/api/solicitacoes/batch-approve/` | ![Stable](https://img.shields.io/badge/-stable-green) | Aprovar em lote (máx. 100 `ids`); item barrado por agenda vem em `errors[]` com `code: availability_conflict`, `detail` (quem e por quê) e `blocked_participants` | `CanAccessSolicitationApprovals` |
 | POST | `/api/solicitacoes/batch-reject/` | ![Stable](https://img.shields.io/badge/-stable-green) | Reprovar em lote (máx. 100 `ids`) | `CanAccessSolicitationApprovals` |
 
@@ -784,8 +790,13 @@ para o projeto (mesmo projeto, mesma coleção ou, se o projeto é nome geral, m
 inexistente = lista vazia). `/api/lookup/projetos/?com_compra=true` esconde o projeto "em espera";
 com `municipio_id`, só os liberados no município. `/api/options/projetos/?com_compra=true` faz o mesmo
 (Plano Anual). Os filtros não valem para quem é isento (superusuário ou a capacidade
-`create_solicitation_without_purchase`). `POST /api/solicitacoes/validate/` usa a mesma regra e devolve
-"Município e projeto sem compra que os libere para a solicitação".
+`create_solicitation_without_purchase`). `POST /api/solicitacoes/validate/` usa a mesma regra. Para quem
+não é isento, o par sem compra vira **aviso** em `warnings` ("Sem compra neste município para este
+projeto: o evento vai para aprovação.", desde 03/11/2026). Só o projeto em espera (sem compra em município
+nenhum) vai para `errors` ("Este projeto não tem compra em município nenhum: fica em espera até a compra
+entrar."). `/api/lookup/municipios/?projeto_id=..&marcar_sem_compra=true` não filtra pela compra: devolve
+também os sem compra (ativos, sem hubs; teto de 100 sem `q` e de 50 com `q`), os com compra primeiro, e
+cada um traz `sem_compra` e `projeto_em_espera`. O isento recebe `sem_compra: false`.
 
 ---
 

@@ -125,9 +125,11 @@ espelhado, nao como objetos aninhados:
 }
 ```
 
-> **`status` inicial depende do projeto**: `projeto.fluxo == "NAO_SUPER"` nasce
-> `"aprovado"`; qualquer outro caso nasce `"pendente"`
-> (`resolve_initial_status`, `services/solicitacao_create.py`). Nao assuma `"pendente"`.
+> **`status` inicial depende do projeto e da compra**: num par municipio+projeto sem compra que o
+> libere (quem cria nao e isento da regra da compra), nasce `"pendente"` em qualquer fluxo; fora disso
+> `projeto.fluxo == "NAO_SUPER"` nasce `"aprovado"` e o resto nasce `"pendente"`
+> (`resolve_initial_status`, `services/solicitacao_create.py`). Leia o `status` da resposta; nao o
+> deduza do `fluxo`.
 
 ### Criar Solicitacao Online
 

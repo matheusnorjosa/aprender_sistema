@@ -1,6 +1,6 @@
 ---
 status: canonical
-last_verified: 2026-10-19
+last_verified: 2026-11-04
 audit_baseline: 6be22fb7
 last_runtime_reverification: 8b6bd1fd (2026-07-20)
 last_v0_revalidation: cdc5730c (2026-08-19; revalidação por código+git dos 46 itens `aberto`)
@@ -207,9 +207,15 @@ linha da fila adjudicada; registram o que o mapa mediu e o que cada conserto fec
   payload. A tela de edição manda os dois em todo salvamento, então editar só o horário devolvia 400
   ("não possui compra registrada") em toda solicitação cujo par não tem `Compra`. Agora a comparação é
   por **valor** (`SolicitacaoSerializer.validate`): mesmo par não confere; trocar município ou projeto
-  para par sem compra continua barrado. Testes com o payload completo da tela em
+  para par sem compra era barrado até o #2166. Testes com o payload completo da tela em
   `test_solicitacao_edit.py` (`TestSolicitacaoEditCompraEligibility`). Depois do conserto a edição
   segue passando pelo escopo de setor do projeto e pela conferência de agenda, que não mudaram.
+  Desde 03/11/2026 (#2166, pedido do dono) o par sem compra não é mais barrado, nem na criação nem na
+  edição. A criação nasce `pendente` (`resolve_initial_status(sem_compra=True)`). A edição que troca o
+  par de uma aprovada para um par sem compra a devolve para `pendente`, em qualquer fluxo; ela só é
+  recusada quando o evento pode estar no Google (`perform_update`, `_MSG_SEM_COMPRA_NO_GOOGLE`). Seguem
+  recusados o projeto em espera (sem compra em município nenhum) e a troca de par sem município.
+  Isentos (superuser e a capacidade de isenção) não passam pela conferência.
 
 - **Aprovações mostrava só 100 pendentes**: a tela pedia a lista uma vez, sem página, e o servidor
   entrega 100 por vez em `-inicio`; o rodapé anunciava o total e as páginas além da quinta vinham

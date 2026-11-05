@@ -17,19 +17,13 @@ dayjs.extend(timezone);
 dayjs(solicitacao.inicio).tz('America/Fortaleza').format('DD/MM/YYYY HH:mm');
 ```
 
-## Solicitação wizard steps
+## Nova Solicitação (página única)
 
-`v2/frontend/src/pages/Solicitacoes/NewSolicitacaoWizard.tsx`:
-
-```tsx
-import { Steps } from 'antd';
-<Steps current={currentStep}>
-  <Steps.Step title="Projeto" />
-  <Steps.Step title="Data e Local" />
-  <Steps.Step title="Formadores" />
-  <Steps.Step title="Revisão" />
-</Steps>
-```
+`v2/frontend/src/pages/Solicitacoes/NewSolicitacaoWizard.tsx`: sem `Steps`. Um cartão por evento
+(`CartaoEvento.tsx`), "+ Adicionar outro evento" e, dentro do cartão, "+ horário"
+(`HorarioDoEvento.tsx`; cada horário vira um evento do lote). Limite de 10 eventos (`MAX_EVENTOS`).
+Um só botão envia o lote (`createSolicitacoesEmLote`, tudo ou nada); no 400 `lote_invalido` cada
+erro volta ao seu cartão e horário. Decisões do dono de 28/10 e 03/11; detalhe no docstring do arquivo.
 
 ## Approval flow (PA-01 a PA-07)
 

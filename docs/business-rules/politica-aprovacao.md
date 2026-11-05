@@ -44,8 +44,9 @@ Superintendência, Gerente e Assistente Administrativo sem o vínculo **não** a
   pessoa que alterou a conta do autor (`accounts_altered_by_same_person_forbidden`). Do lado de quem
   decide só a senha conta (corrigir o nome dela não dá a conta a ninguém). Alteração feita pelo
   superuser não conta nesses dois casos;
-- quem **editou** data, horário, município, projeto ou formadores de uma solicitação depois da
-  última aprovação dela não a decide (`edited_by_approver_forbidden`). Outra pessoa aprovadora decide.
+- quem **editou** data, horário, município, projeto, formadores, os coordenadores além do
+  responsável, o responsável ou a resposta "acompanha?" de uma solicitação depois da última
+  aprovação dela não a decide (`edited_by_approver_forbidden`). Outra pessoa aprovadora decide.
 
 **Contas** (S4, decisão do dono de 16/10): só o superusuário altera conta de superusuário. Quem tem
 `manage_admin_registries` (o DAT) altera as demais, com AuditLog; a senha redefinida por outra
@@ -67,9 +68,13 @@ Projeto com `fluxo='NAO_SUPER'` nasce `'aprovado'`, salvo num município sem com
 (`apps/core/services/solicitacao_create.py:23-51`, `resolve_initial_status`).
 
 !!! success "Editar a SUPER aprovada pede nova aprovação (#1624, resolvido; estendido em 2026-10-15)"
-    Trocar o **projeto** para um de fluxo `SUPER` (#1624), ou mudar **data, horário, município ou
-    formadores** de uma SUPER aprovada (decisão do dono, 14/10/2026), devolve a solicitação para
-    `pendente`. Observação, local e evento online não devolvem. Detalhe no adendo da PA-04 da spec.
+    Trocar o **projeto** para um de fluxo `SUPER` (#1624), ou mudar **data, horário, município,
+    formadores, os coordenadores além do responsável ou o responsável que acompanha** (trocar o
+    responsável quando ele acompanha, ou mudar a resposta "acompanha?") de uma SUPER aprovada
+    (decisões do dono de 14/10, 03/11 e 04/11/2026; #2164, #2167), devolve a solicitação para
+    `pendente`. A aprovada `NAO_SUPER` também volta quando a edição troca o município ou o projeto
+    para um par sem compra (03/11/2026, #2166). Observação, local e evento online não devolvem.
+    Detalhe no adendo da PA-04 da spec.
 
 ## PA-05: Auditoria
 

@@ -1,8 +1,8 @@
 ---
 title: Integração Google Calendar + Meet
 status: canonical
-last_verified: 2026-11-03
-verified_at_commit: 804df36a1741d1faa53586eafade5c4c74c0659d
+last_verified: 2026-11-04
+verified_at_commit: 563ec1c36c140292129e985073c29d198d7316e2
 sources_of_truth:
   - v2/backend/apps/core/services/gcal_client_factory.py
   - v2/backend/apps/core/services/gcal_google_client.py
@@ -108,7 +108,7 @@ Ações sobre `Solicitacao` (DRF `@action`, todas `CanUseGcal | CanPublishSetorS
 - `POST /api/solicitacoes/{id}/cancel-gcal/` → enfileira `task_cancel_solicitacao_from_gcal`; deleta evento e limpa campos (202); 409 se não publicado. Só tira do Google: o `status` não muda e a solicitação continua no sistema.
 - `DELETE /api/solicitacoes/{id}/` de evento no Google (`PUBLISHED`, `ERROR` ou com `external_event_id`; `ERROR` sem id usa o id determinístico do insert, porque a publicação que falhou pode ter criado o evento) → tira do Google **síncrono** (`remover_do_google_agora`: mesma checagem OAuth e cliente da task, linha relida com lock e `PENDING` recusado, `AuditLog` `CANCEL_GCAL` antes do Google, `cancel_solicitacao`) e só então apaga (204); exige `can_publish_solicitacao`, senão 400 sem chamar o Google; falha no Google → 400 que diz que nada foi apagado (sem acesso ao calendário: o motivo e o que fazer; 5xx ou rede: tentar de novo em alguns minutos, sem o erro cru do Google, que fica no log `excluir_cancel_gcal_failed`) (falha ao gravar depois do Google → 400 que avisa que o evento pode já ter saído de lá; tentar de novo resolve). O delete relê a linha com lock e recusa (400) se uma publicação ou reenvio concorrente a pôs no Google. Regra: [`politica-aprovacao.spec.md`](../domain/politica-aprovacao.spec.md) (adendo "excluir evento que está no Google").
 - Lista e detalhe de `Solicitacao` trazem `pode_tirar_do_google` (só leitura): `can_publish_solicitacao` de quem lê, calculado para a página numa consulta (`scope_publishable_solicitacoes`).
-- E `pode_excluir` (só leitura, 27/10/2026): o `DELETE` de quem lê passaria, salvo o Google recusar. É a permissão do `destroy` (`PodeExcluirSolicitacao`: quem edita e, no evento de outra pessoa que está no Google, a Apoio da gerência, adendo de 27/10 em [`politica-aprovacao.spec.md`](../domain/politica-aprovacao.spec.md)) com as recusas que se sabem sem o Google (`motivo_que_impede_excluir`, a mesma função do `perform_destroy`). Os fatos de quem lê saem uma vez por request (`EscritaEmSolicitacao`) e a aprovação da página numa consulta (`ids_ja_decididas`): número de consultas fixo, sem crescer com as linhas (`test_pode_excluir_nao_cresce_em_consultas_com_a_pagina`). Publicar na agenda mostra Excluir só com ele.
+- E `pode_excluir` (só leitura, 27/10/2026): o `DELETE` de quem lê passaria, salvo o Google recusar. É a permissão do `destroy` (`PodeExcluirSolicitacao`: quem edita e, no evento aprovado de outra pessoa que está no Google, a Apoio da gerência, adendo de 27/10 em [`politica-aprovacao.spec.md`](../domain/politica-aprovacao.spec.md)) com as recusas que se sabem sem o Google (`motivo_que_impede_excluir`, a mesma função do `perform_destroy`). Os fatos de quem lê saem uma vez por request (`EscritaEmSolicitacao`) e a aprovação da página numa consulta (`ids_ja_decididas`): número de consultas fixo, sem crescer com as linhas (`test_pode_excluir_nao_cresce_em_consultas_com_a_pagina`). Publicar na agenda mostra Excluir só com ele.
 - `meet_link` é exposto nos serializers de detalhe e lista de `Solicitacao`.
 - `GET /api/solicitacoes/?publishable=true` → só as solicitações que o usuário pode publicar (global: todo o escopo; Apoio: `projeto.gerencia_id` entre as gerências onde é APOIO vigente, desde o PR 9 das permissões; sem permissão ou sem gerência de APOIO: vazio). Sem o parâmetro, a lista não muda.
 
@@ -127,7 +127,7 @@ Comandos de gestão:
 - `python manage.py rotate_gcal_encryption_key --old-key … --new-key …` — rotação zero-downtime da chave Fernet.
 - `python manage.py gcal_copia [--apply] [--operador <id>] [--apply --liberar-freio <digest>]` — cópia Google → sistema, dry-run por padrão (seção «Cópia Google → sistema» abaixo).
 
-Beat automático: `preview_then_apply_gcal`, chave `gcal-sync-every-5-minutes`, `schedule=300.0`. **Não fica em `config/celery.py`** e sim em [`config/settings.py`](../../../backend/config/settings.py), atrás de `FEATURE_AUTO_APPLY_ENABLED` (default `"0"` → `CELERY_BEAT_SCHEDULE = {}`). O merge com o schedule fixo do `celery.py` acontece em `app.conf.update(CELERY_BEAT_SCHEDULE=…)`. **Desabilitado por default.**
+Beat automático: `preview_then_apply_gcal`, chave `gcal-sync-every-5-minutes`, `schedule=300.0`. **Não fica em `config/celery.py`** e sim em [`config/settings.py`](../../../backend/config/settings.py), atrás de `FEATURE_AUTO_APPLY_ENABLED` (default `"0"`: a entrada `gcal-sync-every-5-minutes` não é acrescentada; o `CELERY_BEAT_SCHEDULE` de settings.py fica só com as entradas fixas `purge-import-artifacts-daily`, `purge-audit-logs-weekly` e `gcal-copia-google`). O merge com o schedule fixo do `celery.py` acontece em `app.conf.update(CELERY_BEAT_SCHEDULE=…)`. **Desabilitado por default.**
 
 Beat sempre ativo: `probe_google_credentials`, chave `daily-google-credentials-probe`, `crontab(hour=5, minute=0)`, no schedule fixo de [`config/celery.py`](../../../backend/config/celery.py) — não depende de `FEATURE_AUTO_APPLY_ENABLED` (#2039).
 

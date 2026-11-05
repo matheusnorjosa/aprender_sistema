@@ -230,9 +230,15 @@ export default function MonthlyPage(): JSX.Element {
                   <p className="text-xs text-red-700">
                     {formadores.error}
                   </p>
-                  <p className="text-xs text-red-600 mt-3">
-                    Verifique se o backend está rodando (porta 8002) e se você está autenticado.
-                  </p>
+                  <button
+                    type="button"
+                    aria-label="Tentar de novo: carregar os formadores"
+                    aria-disabled={formadores.atualizando}
+                    onClick={() => !formadores.atualizando && void formadores.refetch()}
+                    className={`${BOTAO_SEMANA} mt-3`}
+                  >
+                    Tentar de novo
+                  </button>
                 </div>
               ) : formadores.data ? (
                 <Grid
@@ -278,9 +284,15 @@ export default function MonthlyPage(): JSX.Element {
                   <p className="text-xs text-red-700">
                     {coordenadores.error}
                   </p>
-                  <p className="text-xs text-red-600 mt-3">
-                    Verifique se o backend está rodando (porta 8002) e se você está autenticado.
-                  </p>
+                  <button
+                    type="button"
+                    aria-label="Tentar de novo: carregar os coordenadores"
+                    aria-disabled={coordenadores.atualizando}
+                    onClick={() => !coordenadores.atualizando && void coordenadores.refetch()}
+                    className={`${BOTAO_SEMANA} mt-3`}
+                  >
+                    Tentar de novo
+                  </button>
                 </div>
               ) : coordenadores.data ? (
                 <Grid

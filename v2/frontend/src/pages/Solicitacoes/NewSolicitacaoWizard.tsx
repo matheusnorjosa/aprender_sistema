@@ -449,7 +449,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       try {
         const me = await getMe();
         if (mounted) {
-          setMe({ id: me.id, nome: me.name || me.username || 'Você' });
+          setMe({ id: me.id, nome: me.name || 'Você' });
         }
       } catch (error) {
         logger.warn('Falha ao carregar perfil do usuário na Nova Solicitação:', error);

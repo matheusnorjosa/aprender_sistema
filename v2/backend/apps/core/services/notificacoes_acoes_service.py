@@ -200,7 +200,7 @@ class NotificationService:
     ) -> tuple[str, str]:
         ciclo = action_instance.ciclo
         due = action_instance.data_vencimento.isoformat() if action_instance.data_vencimento else "-"
-        titulo = f"[{rule.fase_disparo}] Acao {action_instance.ordem:02d} - {action_instance.template.nome}"
+        titulo = f"[{rule.fase_disparo}] Ação {action_instance.ordem:02d} - {action_instance.template.nome}"
         mensagem = (
             f"Ação {action_instance.ordem:02d} no ciclo "
             f"{ciclo.projeto.nome}/{ciclo.municipio.nome} ({ciclo.semestre}/{ciclo.ano}) "

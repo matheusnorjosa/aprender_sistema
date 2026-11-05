@@ -278,7 +278,7 @@ def test_dono_sem_can_publish_recebe_400_sem_chamar_o_google(formador, projeto, 
     response = _delete(formador, sol)
 
     assert response.status_code == 400
-    assert "Google Calendar" in response.data["detail"]
+    assert "peça ao Apoio de Coordenação da sua gerência" in response.data["detail"]
     google.delete.assert_not_called()
     assert Solicitacao.objects.filter(pk=sol.pk).exists()
 

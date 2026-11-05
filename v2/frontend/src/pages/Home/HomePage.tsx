@@ -7,10 +7,10 @@
  * - Links rápidos baseados em RBAC
  */
 
-import { useState, useEffect, ReactNode, JSX } from 'react';
+import { useState, useEffect, useCallback, ReactNode, JSX } from 'react';
 import { Link } from 'react-router';
 import { BRAND_COLORS } from '../../contexts/ThemeContext';
-import { Row, Col, Card, Typography, Badge, Space, Spin, Statistic } from 'antd';
+import { Row, Col, Card, Typography, Badge, Space, Spin, Statistic, Alert, Button } from 'antd';
 import {
   UserOutlined,
   BarChartOutlined,
@@ -31,15 +31,19 @@ const { Title, Text } = Typography;
 interface StatsType {
   pendingApprovals: number;
   myRequests: number;
-  upcomingEvents: number;
+  /** null: a pessoa não tem escopo de eventos (o backend devolve null); a tela esconde o número. */
+  upcomingEvents: number | null;
 }
 
 /** Home stats API response */
 interface HomeStatsResponse {
-  pending_approvals?: number;
-  my_requests?: number;
-  upcoming_events?: number;
+  pending_approvals?: number | null;
+  my_requests?: number | null;
+  upcoming_events?: number | null;
 }
+
+/** Valor de KPI quando os números não carregaram: nunca 0, que pareceria real. */
+const SEM_NUMERO = '—';
 
 /** Access card props */
 interface AccessCardProps {
@@ -47,7 +51,7 @@ interface AccessCardProps {
   title: string;
   description: string;
   link?: string;
-  badge?: number;
+  badge?: number | undefined;
   disabled?: boolean;
 }
 
@@ -92,31 +96,32 @@ export default function HomePage(): JSX.Element {
   // PR 7 das permissões: cada cartão segue a policy da rota para onde leva (E1/E2, dono 15/10).
   const { caps, ehSuperusuario } = useAcesso();
   const [loading, setLoading] = useState<boolean>(true);
-  const [stats, setStats] = useState<StatsType>({
-    pendingApprovals: 0,
-    myRequests: 0,
-    upcomingEvents: 0,
-  });
+  // null enquanto não carregou ou se a carga falhou: a tela mostra "—", nunca 0.
+  const [stats, setStats] = useState<StatsType | null>(null);
+  const [erroStats, setErroStats] = useState<boolean>(false);
+
+  const carregarStats = useCallback(async (): Promise<void> => {
+    try {
+      // Usuário e policies já vêm do App (AcessoContext); aqui só as estatísticas.
+      const statsData = (await getHomeStats()) as HomeStatsResponse;
+      setStats({
+        pendingApprovals: statsData.pending_approvals ?? 0,
+        myRequests: statsData.my_requests ?? 0,
+        upcomingEvents: statsData.upcoming_events ?? null,
+      });
+      setErroStats(false);
+    } catch (error) {
+      logger.error('Erro ao carregar dados:', error);
+      setStats(null);
+      setErroStats(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const loadUserAndStats = async (): Promise<void> => {
-      try {
-        // Usuário e policies já vêm do App (AcessoContext); aqui só as estatísticas.
-        const statsData = (await getHomeStats()) as HomeStatsResponse;
-        setStats({
-          pendingApprovals: statsData.pending_approvals ?? 0,
-          myRequests: statsData.my_requests ?? 0,
-          upcomingEvents: statsData.upcoming_events ?? 0,
-        });
-      } catch (error) {
-        logger.error('Erro ao carregar dados:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadUserAndStats();
-  }, []);
+    void carregarStats();
+  }, [carregarStats]);
 
   if (loading) {
     return (
@@ -143,6 +148,20 @@ export default function HomePage(): JSX.Element {
         </Text>
       </div>
 
+      {erroStats && (
+        <Alert
+          type="warning"
+          showIcon
+          className="mb-6"
+          message="Não foi possível carregar os números da Página Inicial. Os atalhos continuam funcionando."
+          action={
+            <Button size="small" onClick={() => void carregarStats()}>
+              Tentar de novo
+            </Button>
+          }
+        />
+      )}
+
       {/* Acesso Administrativo */}
       {isAdmin && (
         <>
@@ -154,7 +173,7 @@ export default function HomePage(): JSX.Element {
               <AccessCard
                 icon={<UserOutlined />}
                 title="Gerenciamento de Usuários"
-                description="Gerenciar usuários, grupos e permissões."
+                description="Gerenciar usuários e lotação."
                 link="/dat/admin/usuarios"
               />
             </Col>
@@ -183,7 +202,7 @@ export default function HomePage(): JSX.Element {
                 title="Solicitações de Aprovação"
                 description="Revisar e aprovar solicitações pendentes."
                 link="/aprovacoes"
-                badge={stats.pendingApprovals}
+                badge={stats?.pendingApprovals}
               />
             </Col>
           </Row>
@@ -238,7 +257,7 @@ export default function HomePage(): JSX.Element {
                 title="Minhas Solicitações"
                 description="Ver suas solicitações e itens submetidos."
                 link="/solicitacoes/minhas"
-                badge={stats.myRequests}
+                badge={stats?.myRequests}
               />
             </Col>
           </>
@@ -251,18 +270,20 @@ export default function HomePage(): JSX.Element {
           Resumo Rápido
         </Title>
         <Row gutter={16}>
-          <Col xs={24} sm={8}>
-            <Statistic
-              title="Eventos Futuros"
-              value={stats.upcomingEvents}
-              prefix={<SafetyOutlined />}
-            />
-          </Col>
+          {stats?.upcomingEvents !== null && (
+            <Col xs={24} sm={8}>
+              <Statistic
+                title="Eventos Futuros"
+                value={stats?.upcomingEvents ?? SEM_NUMERO}
+                prefix={<SafetyOutlined />}
+              />
+            </Col>
+          )}
           {podeCriarSolicitacao && (
             <Col xs={24} sm={8}>
               <Statistic
                 title="Minhas Solicitações"
-                value={stats.myRequests}
+                value={stats?.myRequests ?? SEM_NUMERO}
                 prefix={<FileTextOutlined />}
               />
             </Col>
@@ -271,7 +292,7 @@ export default function HomePage(): JSX.Element {
             <Col xs={24} sm={8}>
               <Statistic
                 title="Aprovações Pendentes"
-                value={stats.pendingApprovals}
+                value={stats?.pendingApprovals ?? SEM_NUMERO}
                 prefix={<CheckCircleOutlined />}
                 valueStyle={{ color: '#cf1322' }}
               />

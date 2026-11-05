@@ -389,8 +389,10 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {
                         "non_field_errors": [
-                            "Não é possível editar uma solicitação já publicada no Google Calendar. "
-                            "Cancele o evento primeiro se precisar fazer alterações."
+                            # D25: quem pediu não cancela o evento; o Apoio ou o Controle o tira só do Google.
+                            "Este evento já está no Google Agenda. Para editar, peça ao Apoio de Coordenação da "
+                            "sua gerência, na tela Publicar na agenda, ou ao Controle, na Pré-agenda, que tire o "
+                            "evento só do Google; depois disso, você consegue editar aqui."
                         ]
                     }
                 )

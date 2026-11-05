@@ -361,7 +361,7 @@ export function AppSidebar({
                 title="Ações Internas"
               >
                 <Menu.Item key="acoes-notificacao-ciclo"><Link to="/acoes-notificacao">Ciclos e Ações</Link></Menu.Item>
-                <Menu.Item key="acoes-notificacao-timeline"><Link to="/acoes-notificacao/timeline">Timeline</Link></Menu.Item>
+                <Menu.Item key="acoes-notificacao-timeline"><Link to="/acoes-notificacao/timeline">Linha do tempo</Link></Menu.Item>
                 <Menu.Item key="acoes-notificacao-inbox"><Link to="/notificacoes-internas">Notificações</Link></Menu.Item>
               </SubMenu>
             )}

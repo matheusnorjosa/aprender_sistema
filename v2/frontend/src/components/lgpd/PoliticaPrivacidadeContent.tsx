@@ -49,7 +49,7 @@ export default function PoliticaPrivacidadeContent(): JSX.Element {
       <Paragraph>Para operar a plataforma, tratamos:</Paragraph>
       <ul>
         <li><Text strong>Cadastro:</Text> CPF, nome, e-mail, telefone e cargo.</li>
-        <li><Text strong>Organização:</Text> setores e funções (perfil de acesso).</li>
+        <li><Text strong>Organização:</Text> gerência e papel (lotação), que definem o acesso.</li>
         <li>
           <Text strong>Operação:</Text> solicitações e eventos de formação, disponibilidade
           e bloqueios de agenda, aprovações.

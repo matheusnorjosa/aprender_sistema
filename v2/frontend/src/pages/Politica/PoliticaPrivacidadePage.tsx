@@ -10,12 +10,10 @@ import PoliticaPrivacidadeContent from '../../components/lgpd/PoliticaPrivacidad
 
 export default function PoliticaPrivacidadePage(): JSX.Element {
   return (
-    <section className="p-6 bg-gray-100 min-h-full" aria-labelledby="politica-title">
+    <section className="p-6 bg-gray-100 min-h-full" aria-label="Política de Privacidade">
       <Space direction="vertical" size="large" style={{ width: '100%', maxWidth: 820 }}>
         <Card>
-          <div id="politica-title">
-            <PoliticaPrivacidadeContent />
-          </div>
+          <PoliticaPrivacidadeContent />
         </Card>
       </Space>
     </section>

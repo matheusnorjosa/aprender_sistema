@@ -228,7 +228,7 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
       },
     ],
   },
-  { path: '/controle/plano-formacoes', perfil: 'controle', marco: 'Plano de Formacoes', dados: { em: LINHA, texto: T.municipio } },
+  { path: '/controle/plano-formacoes', perfil: 'controle', marco: 'Plano Anual', dados: { em: LINHA, texto: T.municipio } },
   { path: '/controle/pre-agenda', perfil: 'controle', marco: 'Pré-agenda', dados: { em: LINHA, texto: T.municipio } },
   { path: '/acoes-notificacao', perfil: 'superusuario', marco: 'Ações Internas', dados: { em: LINHA, texto: T.acao } },
   {
@@ -284,7 +284,7 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     marco: 'Grupos RBAC',
     dados: { em: LINHA, texto: T.grupo },
     // C2: Tipo (< 576), Usuários (< 768) e Permissões funcionais (< 992) vão para a linha expandida.
-    estados: [expandida(T.grupo, 'Permissões funcionais', [360, 768])],
+    estados: [expandida(T.grupo, 'Capacidades guardadas (não valem hoje)', [360, 768])],
   },
   // Setores e funções listam só os grupos classificados (seed_rbac): não há texto longo a semear.
   {
@@ -292,14 +292,14 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     perfil: 'dat',
     marco: 'Setores',
     dados: { em: LINHA, texto: 'Vidas' },
-    estados: [expandida('Vidas', 'Permissões funcionais', [360, 768])],
+    estados: [expandida('Vidas', 'Capacidades guardadas (não valem hoje)', [360, 768])],
   },
   {
     path: '/dat/admin/funcoes',
     perfil: 'dat',
     marco: 'Funções',
     dados: { em: LINHA, texto: 'Coordenador' },
-    estados: [expandida('Coordenador', 'Permissões funcionais', [360, 768])],
+    estados: [expandida('Coordenador', 'Capacidades guardadas (não valem hoje)', [360, 768])],
   },
   {
     path: '/dat/admin/gerencias',

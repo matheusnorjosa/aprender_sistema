@@ -47,6 +47,7 @@ function linhas(n: number): PaginatedResponse<Solicitacao> {
       projeto_nome: 'ProjetoTeste',
       coordenador_nome: 'Coordenadora Teste',
       coordenador_acompanha: true,
+      tipo_evento_nome: 'Formação Continuada',
       tipo: 'FORMACAO',
       encontro: null,
       segmento: null,
@@ -118,7 +119,7 @@ describe('ApprovalsPage responsiva', () => {
     const { container } = renderPage();
     const linha = await linhaDoEvento('Aprovar');
 
-    expect(cabecalhos()).toEqual(['Evento', 'Coordenador(es)', 'Tipo/Enc./Seg.', 'Formadores', 'Status', 'Ações']);
+    expect(cabecalhos()).toEqual(['Evento', 'Coordenador(es)', 'Tipo de Evento / Nº', 'Formadores', 'Status', 'Ações']);
     for (const texto of ['25/08/2026', 'MunicipioTeste', 'ProjetoTeste']) {
       expect(within(linha).getByText(texto, { exact: false })).toBeInTheDocument();
     }
@@ -142,7 +143,7 @@ describe('ApprovalsPage responsiva', () => {
     // fireEvent: o Spin da carga pode estar com pointer-events none (o userEvent recusa).
     fireEvent.click(within(linha).getByRole('button', { name: `Expandir linha de ${EVENTO}` }));
     const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
-    for (const texto of ['Coordenadora Teste', 'FORMACAO', 'Pendente']) {
+    for (const texto of ['Coordenadora Teste', 'Formação Continuada', 'Pendente']) {
       expect(expandida.getByText(texto)).toBeInTheDocument();
     }
   }, 20000);
@@ -200,7 +201,7 @@ describe('ApprovalsPage responsiva', () => {
     // fireEvent: o Spin da carga põe pointer-events none na tabela (o userEvent recusa).
     fireEvent.click(within(linha).getByRole('checkbox'));
 
-    const barra = screen.getByRole('navigation', { name: 'Acoes em lote' });
+    const barra = screen.getByRole('navigation', { name: 'Ações em lote' });
     expect(barra.firstElementChild).toHaveStyle({ flexWrap: 'wrap' });
   }, 20000);
 });

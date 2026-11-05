@@ -79,20 +79,31 @@ describe('EditSolicitacaoPage — rótulo GCal do cabeçalho', () => {
     getSolicitacaoMock.mockReset();
   });
 
-  test("gcal_status 'NONE' (não sincronizada) não exibe o bloco GCal", async () => {
+  test("gcal_status 'NONE' (não sincronizada) não exibe o bloco do Google Agenda", async () => {
     getSolicitacaoMock.mockResolvedValue(makeSolic('NONE'));
     renderPage();
 
     expect(await screen.findByText('Editar Solicitação #42')).toBeInTheDocument();
     expect(screen.queryByText(/GCal:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Google Agenda:/)).not.toBeInTheDocument();
   });
 
-  test("gcal_status 'ERROR' exibe o bloco GCal com o status", async () => {
+  test("gcal_status 'ERROR' exibe o Google Agenda com o rótulo do domínio, sem o código cru", async () => {
     getSolicitacaoMock.mockResolvedValue(makeSolic('ERROR'));
     renderPage();
 
     expect(await screen.findByText('Editar Solicitação #42')).toBeInTheDocument();
-    expect(screen.getByText(/GCal:/)).toBeInTheDocument();
-    expect(screen.getByText('ERROR')).toBeInTheDocument();
+    expect(screen.getByText(/Google Agenda:/)).toBeInTheDocument();
+    expect(screen.getByText('Erro ao publicar')).toBeInTheDocument();
+    expect(screen.queryByText('ERROR')).not.toBeInTheDocument();
+    expect(screen.queryByText(/GCal:/)).not.toBeInTheDocument();
+  });
+
+  test('o status aparece com o rótulo do domínio (Aprovado), não o código cru', async () => {
+    getSolicitacaoMock.mockResolvedValue(makeSolic('NONE'));
+    renderPage();
+
+    expect(await screen.findByText('Aprovado')).toBeInTheDocument();
+    expect(screen.queryByText('aprovado')).not.toBeInTheDocument();
   });
 });

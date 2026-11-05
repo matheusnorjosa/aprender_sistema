@@ -25,7 +25,7 @@ import { aplicacaoDoImport, validacaoDoImport } from '../../components/resultado
 import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
 import { TEXTO_DA_TAG } from '../../components/textoDaTag';
-import { DEFAULT_PAGE_SIZE, UF_NORDESTE_OPTIONS } from '../../constants';
+import { DEFAULT_PAGE_SIZE, UF_OPTIONS } from '../../constants';
 import { ehSuperusuario } from '../../contexts/AcessoContext';
 import type { ID } from '../../types';
 import { aposConfirmacaoFechar, dialogoDeExclusaoEmUso } from './excluirEmUso';
@@ -357,7 +357,7 @@ export default function MunicipiosPage(): JSX.Element {
   ) : searchText ? (
     `Nenhum município encontrado para "${searchText}".`
   ) : (
-    'Nenhum município cadastrado. Use "Novo Município" ou importe uma planilha abaixo.'
+    `Nenhum município cadastrado. Use "Novo Município"${podeImportar ? ' ou importe uma planilha abaixo' : ''}.`
   );
 
   // C2: lista enxuta, por prioridade de largura (VISIVEL_A_PARTIR). O que some da linha vai
@@ -457,7 +457,7 @@ export default function MunicipiosPage(): JSX.Element {
               style={{ width: 140 }}
               value={ufFilter}
               onChange={setUfFilter}
-              options={UF_NORDESTE_OPTIONS}
+              options={UF_OPTIONS}
             />
             <Button
               icon={<ReloadOutlined />}
@@ -535,7 +535,7 @@ export default function MunicipiosPage(): JSX.Element {
           >
             <Select
               placeholder="Selecione a UF"
-              options={UF_NORDESTE_OPTIONS}
+              options={UF_OPTIONS}
               onChange={() => {
                 setLookupOptions([]);
                 setIbgeLocked(false);

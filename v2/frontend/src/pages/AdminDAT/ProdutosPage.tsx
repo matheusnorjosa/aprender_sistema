@@ -197,7 +197,7 @@ export default function ProdutosPage(): JSX.Element {
       onOk: async () => {
         try {
           await deleteProduto(produto.id);
-          message.success('Produto excluido com sucesso');
+          message.success('Produto excluído com sucesso');
           void fetchProdutos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
         } catch (error) {
           const emUso = dialogoDeExclusaoEmUso({
@@ -312,7 +312,7 @@ export default function ProdutosPage(): JSX.Element {
 
   return (
     <section className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }} aria-labelledby="produtos-title">
-      <nav className="mb-4" aria-label="Navegacao">
+      <nav className="mb-4" aria-label="Navegação">
         <Link to="/dat/admin">&larr; Voltar para Admin DAT</Link>
       </nav>
 
@@ -325,7 +325,7 @@ export default function ProdutosPage(): JSX.Element {
           <div className="flex flex-wrap items-center gap-2">
             <Search
               ref={buscaRef}
-              placeholder="Buscar por nome ou codigo..."
+              placeholder="Buscar por nome ou código..."
               aria-label="Buscar produtos por nome ou código"
               allowClear
               style={{ width: 250, maxWidth: '100%' }}
@@ -411,8 +411,8 @@ export default function ProdutosPage(): JSX.Element {
         >
           <Form.Item
             name="codigo"
-            label="Codigo"
-            rules={[{ required: true, message: 'Codigo e obrigatorio' }]}
+            label="Código"
+            rules={[{ required: true, message: 'Código é obrigatório' }]}
           >
             <Input placeholder="Ex: PROD-001" />
           </Form.Item>
@@ -420,22 +420,22 @@ export default function ProdutosPage(): JSX.Element {
           <Form.Item
             name="nome"
             label="Nome do Produto"
-            rules={[{ required: true, message: 'Nome e obrigatorio' }]}
+            rules={[{ required: true, message: 'Nome é obrigatório' }]}
           >
-            <Input placeholder="Ex: Material Didatico" />
+            <Input placeholder="Ex: Material Didático" />
           </Form.Item>
 
           <Form.Item
             name="descricao"
-            label="Descricao"
+            label="Descrição"
           >
-            <Input.TextArea rows={3} placeholder="Descricao do produto" />
+            <Input.TextArea rows={3} placeholder="Descrição do produto" />
           </Form.Item>
 
           <Form.Item
             name="projeto"
             label="Projeto"
-            rules={[{ required: true, message: 'Projeto e obrigatorio' }]}
+            rules={[{ required: true, message: 'Projeto é obrigatório' }]}
             extra={
               erroProjetos ? (
                 <FalhaAoCarregar oque="os projetos" erro={erroProjetos} onTentarDeNovo={fetchProjetos} campo={projetoRef} />

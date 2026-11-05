@@ -191,32 +191,51 @@ class TestFailSafeScope:
     """Cenários que ANTES vazavam todos os eventos aprovados (P0)."""
 
     def test_apoio_sem_equipegerencia_nao_ve_eventos_globais(self, world):
-        """Apoio de Coordenação SEM EquipeGerencia → fail-safe → 0 eventos."""
+        """Apoio de Coordenação SEM EquipeGerencia com projeto → fail-safe → null (B#5), nunca os 4 globais."""
         user = _make_user("apoio", ["Apoio de Coordenação"])
         # NÃO vinculado a nenhuma EquipeGerencia → user_gerencias = []
         response = _get_home_stats(user)
         assert response.status_code == 200
         assert (
-            response.json()["upcoming_events"] == 0
+            response.json()["upcoming_events"] is None
         ), "Apoio sem EquipeGerencia NÃO pode ver eventos globais — fail-safe."
 
     def test_gerente_sem_equipegerencia_nao_ve_eventos_globais(self, world):
-        """Gerente SEM EquipeGerencia → fail-safe → 0 eventos."""
+        """Gerente SEM EquipeGerencia com projeto → fail-safe → null (B#5), nunca os 4 globais."""
         user = _make_user("gerente", ["Gerente"])
         response = _get_home_stats(user)
         assert response.status_code == 200
         assert (
-            response.json()["upcoming_events"] == 0
+            response.json()["upcoming_events"] is None
         ), "Gerente sem EquipeGerencia NÃO pode ver eventos globais — fail-safe."
 
     def test_coordenador_sem_equipegerencia_nao_ve_eventos_globais(self, world):
-        """Coordenador SEM EquipeGerencia → fail-safe → 0 eventos."""
+        """Coordenador SEM EquipeGerencia com projeto → fail-safe → null (B#5), nunca os 4 globais."""
         user = _make_user("coord", ["Coordenador"])
         response = _get_home_stats(user)
         assert response.status_code == 200
         assert (
-            response.json()["upcoming_events"] == 0
+            response.json()["upcoming_events"] is None
         ), "Coordenador sem EquipeGerencia NÃO pode ver eventos globais — fail-safe."
+
+    def test_so_papel_equipe_recebe_null_e_nao_zero(self, world):
+        """B#5: papel EQUIPE (Diretoria, equipe administrativa) não tem escopo de eventos.
+
+        O 0 de segurança parecia número real; agora vem null e a Home esconde o número."""
+        user = _make_user("equipe", [], vinculo=False)
+        _link_to_gerencia(user, world["g1"], "EQUIPE")
+        response = _get_home_stats(user)
+        assert response.status_code == 200
+        assert response.json()["upcoming_events"] is None
+
+    def test_gerente_da_diretoria_recebe_null_e_nao_zero(self, world):
+        """B#5: a Diretoria não tem projeto, então o GERENTE dela não tem escopo de eventos → null."""
+        diretoria = _make_gerencia("Diretoria", "Diretoria")
+        user = _make_user("gerente_dir", [], vinculo=False)
+        _link_to_gerencia(user, diretoria, "GERENTE")
+        response = _get_home_stats(user)
+        assert response.status_code == 200
+        assert response.json()["upcoming_events"] is None
 
 
 # ============================================================================

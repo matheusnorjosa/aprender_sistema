@@ -376,7 +376,7 @@ export default function ProjetosGeraisPage(): JSX.Element {
             <Checkbox>Usa AVALIAR</Checkbox>
           </Form.Item>
           <Form.Item name="ativo" valuePropName="checked" initialValue={true}>
-            <Checkbox>Projeto ativo</Checkbox>
+            <Checkbox>Coleção ativa</Checkbox>
           </Form.Item>
           <Form.Item name="descricao" label="Descrição">
             <Input.TextArea rows={3} />

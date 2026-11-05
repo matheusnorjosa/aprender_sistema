@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import {
   Button,
   Card,
@@ -14,12 +14,24 @@ import {
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import type { Dayjs } from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 
 import { concluirAcao, listAcoesByCiclo, listCiclosAcoes, registrarAncora } from '../../api/acoesNotificacao';
 import type { AcaoInstancia, CicloAcoes } from '../../types/acoesNotificacao';
 
 const { Title, Text } = Typography;
+
+const ESTADO_LABELS: Record<string, string> = {
+  AGUARDANDO_ANCORA: 'Aguardando âncora',
+  EM_ANDAMENTO: 'Em andamento',
+  CONCLUIDA: 'Concluída',
+  ATRASADA: 'Atrasada',
+};
+
+const formatarData = (value: string | null): string => (value ? dayjs(value).format('DD/MM/YYYY') : '-');
+
+const cycleLabel = (cycle: CicloAcoes): string =>
+  `${cycle.projeto_nome} / ${cycle.municipio_nome} (${cycle.semestre}/${cycle.ano})`;
 
 type ModalMode = 'ancora' | 'conclusao';
 
@@ -31,7 +43,10 @@ interface AcaoNotificacaoFormValues {
 
 export default function AcoesNotificacaoPage(): JSX.Element {
   const [cycles, setCycles] = useState<CicloAcoes[]>([]);
-  const [selectedCycleId, setSelectedCycleId] = useState<number | null>(null);
+  const [cycleSearch, setCycleSearch] = useState<string>('');
+  // Guarda o ciclo escolhido inteiro: a busca troca a lista e ele pode sair dela.
+  const [selectedCycle, setSelectedCycle] = useState<CicloAcoes | null>(null);
+  const selectedCycleId = selectedCycle?.id ?? null;
   const [actions, setActions] = useState<AcaoInstancia[]>([]);
   const [loadingCycles, setLoadingCycles] = useState<boolean>(false);
   const [loadingActions, setLoadingActions] = useState<boolean>(false);
@@ -41,22 +56,6 @@ export default function AcoesNotificacaoPage(): JSX.Element {
   const [modalMode, setModalMode] = useState<ModalMode>('ancora');
   const [selectedAction, setSelectedAction] = useState<AcaoInstancia | null>(null);
   const [form] = Form.useForm<AcaoNotificacaoFormValues>();
-
-  const loadCycles = async () => {
-    setLoadingCycles(true);
-    try {
-      const data = await listCiclosAcoes({ page_size: 100, ordering: '-ano' });
-      setCycles(data.results);
-      const firstCycle = data.results[0];
-      if (!selectedCycleId && firstCycle) {
-        setSelectedCycleId(firstCycle.id);
-      }
-    } catch (error) {
-      message.error(`Erro ao carregar ciclos: ${(error as Error).message}`);
-    } finally {
-      setLoadingCycles(false);
-    }
-  };
 
   const loadActions = async (cycleId: number) => {
     setLoadingActions(true);
@@ -70,9 +69,35 @@ export default function AcoesNotificacaoPage(): JSX.Element {
     }
   };
 
+  // Busca no servidor (projeto e município): a lista traz até 100 ciclos por vez.
   useEffect(() => {
-    void loadCycles();
-  }, []);
+    let ignore = false;
+    const timer = window.setTimeout(
+      () => {
+        setLoadingCycles(true);
+        listCiclosAcoes({ page_size: 100, ordering: '-ano', search: cycleSearch })
+          .then((data) => {
+            if (ignore) return;
+            setCycles(data.results);
+            const firstCycle = data.results[0];
+            if (firstCycle) {
+              setSelectedCycle((current) => current ?? firstCycle);
+            }
+          })
+          .catch((error: unknown) => {
+            if (!ignore) message.error(`Erro ao carregar ciclos: ${(error as Error).message}`);
+          })
+          .finally(() => {
+            if (!ignore) setLoadingCycles(false);
+          });
+      },
+      cycleSearch ? 300 : 0,
+    );
+    return () => {
+      ignore = true;
+      window.clearTimeout(timer);
+    };
+  }, [cycleSearch]);
 
   useEffect(() => {
     if (selectedCycleId) {
@@ -80,13 +105,9 @@ export default function AcoesNotificacaoPage(): JSX.Element {
     }
   }, [selectedCycleId]);
 
-  const selectedCycleLabel = useMemo(() => {
-    const cycle = cycles.find((item) => item.id === selectedCycleId);
-    if (!cycle) {
-      return '';
-    }
-    return `${cycle.projeto_nome} / ${cycle.municipio_nome} (${cycle.semestre}/${cycle.ano})`;
-  }, [cycles, selectedCycleId]);
+  const selectedCycleLabel = selectedCycle ? cycleLabel(selectedCycle) : '';
+  const cycleOptions =
+    selectedCycle && !cycles.some((cycle) => cycle.id === selectedCycle.id) ? [selectedCycle, ...cycles] : cycles;
 
   const openActionModal = (mode: ModalMode, action: AcaoInstancia) => {
     setModalMode(mode);
@@ -152,26 +173,26 @@ export default function AcoesNotificacaoPage(): JSX.Element {
       render: (value: string) => {
         const color =
           value === 'CONCLUIDA' ? 'green' : value === 'ATRASADA' ? 'red' : value === 'EM_ANDAMENTO' ? 'blue' : 'gold';
-        return <Tag color={color}>{value}</Tag>;
+        return <Tag color={color}>{ESTADO_LABELS[value] ?? value}</Tag>;
       },
     },
     {
       title: 'Âncora',
       dataIndex: 'data_ancora',
       width: 130,
-      render: (value: string | null) => value || '-',
+      render: formatarData,
     },
     {
       title: 'Vencimento',
       dataIndex: 'data_vencimento',
       width: 130,
-      render: (value: string | null) => value || '-',
+      render: formatarData,
     },
     {
       title: 'Realização',
       dataIndex: 'data_realizacao',
       width: 130,
-      render: (value: string | null) => value || '-',
+      render: formatarData,
     },
     {
       title: 'Ações',
@@ -209,14 +230,16 @@ export default function AcoesNotificacaoPage(): JSX.Element {
           <Space direction="vertical" size={8} style={{ width: '100%' }}>
             <Text strong>Selecione um ciclo</Text>
             <Select
+              aria-label="Ciclo"
               loading={loadingCycles}
               value={selectedCycleId ?? undefined}
-              onChange={(value) => setSelectedCycleId(value ?? null)}
-              placeholder="Selecione o ciclo"
-              options={cycles.map((cycle) => ({
-                value: cycle.id,
-                label: `${cycle.projeto_nome} / ${cycle.municipio_nome} (${cycle.semestre}/${cycle.ano})`,
-              }))}
+              onChange={(value) => setSelectedCycle(cycleOptions.find((cycle) => cycle.id === value) ?? null)}
+              placeholder="Busque por projeto ou município"
+              showSearch
+              filterOption={false}
+              onSearch={setCycleSearch}
+              notFoundContent={loadingCycles ? 'Buscando...' : 'Nenhum ciclo encontrado'}
+              options={cycleOptions.map((cycle) => ({ value: cycle.id, label: cycleLabel(cycle) }))}
               style={{ width: 520, maxWidth: '100%' }}
             />
             {selectedCycleLabel && <Text type="secondary">Ciclo ativo: {selectedCycleLabel}</Text>}

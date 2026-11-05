@@ -3,9 +3,14 @@ Stats API — Estatísticas para HomePage.
 
 GET /api/stats/home/ retorna métricas personalizadas por perfil:
 - pending_approvals: para quem tem a policy de aprovação (`access_solicitation_approvals`);
-  conta só pendentes SUPER e, para não-superuser, exclui as próprias (PR B1 / M11-16); a
-  aprovadora por vínculo conta só o escopo da Superintendência (regra do dono, 30/09)
-- upcoming_events: scope explícito por capability + ownership + EquipeGerencia (fail-safe)
+  conta as pendentes SUPER e NAO_SUPER (o NAO_SUPER pendente é o evento sem compra) e, para
+  não-superuser, exclui as próprias (PR B1 / M11-16) e as impedidas (PA-02); quem aprova vem da
+  regra `solicitation_approval_basis` (superuser, GERENTE vigente da Superintendência, pacote do
+  DAT ou do Controle). A aprovadora por vínculo conta só o escopo da Superintendência (regra do
+  dono, 30/09)
+- upcoming_events: scope explícito por capability + ownership + EquipeGerencia (fail-safe);
+  null para quem não tem escopo de eventos (só papel EQUIPE, gerente da Diretoria), como
+  my_requests: o 0 de segurança parecia número real
 - my_requests: solicitações do próprio usuário (owner-based)
 
 Onda 2A — refactor coeso (#1284 + #1260, 2026-04-27):
@@ -22,7 +27,7 @@ Onda 2A — refactor coeso (#1284 + #1260, 2026-04-27):
 
 Capability mapping aplicado:
 - `manage_admin_registries` → DAT (validar/suportar — ator transversal)
-- `approve_solicitation`     → Superintendência (decisão cross-org de aprovação)
+- `approve_solicitation`     → DAT e Controle (pacote do perfil; decisão cross-org de aprovação)
 - `create_solicitation`      → Coordenador / Apoio de Coordenação / Gerente
 """
 
@@ -42,7 +47,7 @@ from rest_framework.views import APIView
 
 from drf_spectacular.utils import extend_schema
 
-from apps.core.models import EquipeGerencia, Solicitacao, Usuario
+from apps.core.models import EquipeGerencia, Projeto, Solicitacao, Usuario
 from apps.core.rbac.constants import FORMADOR_ROLE_GROUPS
 from apps.core.rbac.helpers import user_has_any_perm
 from apps.core.rbac.policies import (
@@ -64,7 +69,7 @@ class HomeStatsView(APIView):
     Response (shape estável — contrato com frontend):
     {
         "pending_approvals": int | null,  // null se não pode aprovar
-        "upcoming_events": int,
+        "upcoming_events": int | null,    // null se não tem escopo de eventos
         "my_requests": int | null,        // null se não pode criar
     }
     """
@@ -131,6 +136,7 @@ class HomeStatsView(APIView):
 
         # === EVENTOS FUTUROS (com fail-safe explícito — fix #1284) ===
         upcoming_qs = Solicitacao.objects.filter(status="aprovado", inicio__gte=now)
+        upcoming_events: int | None = None
 
         if can_view_global_events:
             # Superuser, DAT e Controle: cross-org por capability legítima.
@@ -138,15 +144,18 @@ class HomeStatsView(APIView):
         elif is_formador_only:
             # Formador: ownership (organizador OU participante).
             upcoming_qs = upcoming_qs.filter(Q(usuario=user) | Q(participations__usuario=user)).distinct()
-        elif user_gerencias:
+        elif user_gerencias and Projeto.objects.filter(gerencia_id__in=user_gerencias).exists():
             # Coordenador / Apoio / Gerente: eventos da(s) gerência(s) vinculada(s).
             upcoming_qs = upcoming_qs.filter(projeto__gerencia_id__in=user_gerencias)
         else:
             # FAIL-SAFE: user sem capability global, sem Formador puro e sem
-            # EquipeGerencia → 0 eventos. Fix #1284 — antes vazava globalmente.
-            upcoming_qs = upcoming_qs.none()
+            # EquipeGerencia → nenhum evento. Fix #1284 — antes vazava globalmente. Devolve null
+            # (B#5): o 0 parecia número real para quem só tem papel EQUIPE e para quem atua só em
+            # gerência sem projeto (o gerente da Diretoria).
+            upcoming_qs = None
 
-        upcoming_events = upcoming_qs.count()
+        if upcoming_qs is not None:
+            upcoming_events = upcoming_qs.count()
 
         # === MINHAS SOLICITAÇÕES === (sempre owner-based; filtro de gerência
         # legacy era redundante e podia zerar indevidamente — removido).

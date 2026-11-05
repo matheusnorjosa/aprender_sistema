@@ -108,8 +108,10 @@ def motivo_que_impede_excluir(sol: Any, *, ja_decidida: bool, pode_tirar_do_goog
             )
         return f"Esta solicitação já foi aprovada e não pode ser excluída. {saida}"
     if esta_no_google(sol) and not pode_tirar_do_google:
+        # D25: o Apoio, em Publicar na agenda, exclui o evento ou o tira só do Google.
         return (
-            "Não é possível excluir uma solicitação já publicada no Google Calendar. "
-            "Cancele o evento primeiro se precisar excluir."
+            "Este evento está no Google Agenda, ou pode estar, e excluir aqui também o tiraria de lá. "
+            "Para excluir, peça ao Apoio de Coordenação da sua gerência, na tela Publicar na agenda. "
+            "Se lá também não der, fale com a administração do sistema."
         )
     return None

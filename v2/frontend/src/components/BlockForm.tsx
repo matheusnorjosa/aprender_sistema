@@ -77,14 +77,14 @@ export default function BlockForm({ onSubmit }: BlockFormProps): JSX.Element {
   };
 
   /**
-   * Valida que início < fim.
+   * Valida que início < fim. Fim igual ao início também não passa: o servidor recusa.
    */
   const validateDateRange = (): Promise<void> => {
     const inicio = form.getFieldValue('inicio') as Dayjs | undefined;
     const fim = form.getFieldValue('fim') as Dayjs | undefined;
 
-    if (inicio && fim && inicio.isAfter(fim)) {
-      return Promise.reject(new Error('Início deve ser anterior ao fim!'));
+    if (inicio && fim && !inicio.isBefore(fim)) {
+      return Promise.reject(new Error('O fim deve ser depois do início.'));
     }
 
     return Promise.resolve();

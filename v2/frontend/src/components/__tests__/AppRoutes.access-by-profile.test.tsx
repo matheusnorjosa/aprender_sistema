@@ -214,7 +214,7 @@ const ACTORS: ActorSnapshot[] = [
       '/dashboards/gcal': true,
       '/solicitacoes/aprovacoes': true,
       ...ESCOPO,
-      [EDITAR]: true,
+      // Sem create_solicitation: o servidor recusa o salvar (403), e a edição não abre.
       '/controle': true,
       ...COMPRAS,
     },
@@ -260,7 +260,7 @@ const ACTORS: ActorSnapshot[] = [
       '/dashboards/gcal': true,
       '/solicitacoes/aprovacoes': true,
       ...ESCOPO,
-      [EDITAR]: true,
+      // Sem create_solicitation: o servidor recusa o salvar (403), e a edição não abre.
       '/controle': true,
       ...COMPRAS,
     },
@@ -453,11 +453,12 @@ describe('AppRoutes — sanity da matriz', () => {
 // Gate de /solicitacoes/:id/editar (Issue #1169; PR 7 das permissões)
 // ============================================================================
 // Quem pode ser dono ou decidir: `create_solicitation` (quem cria é dono, e o servidor deixa o
-// dono editar), `access_solicitation_approvals` (aprovador) ou `manage_admin_registries` (DAT).
+// dono editar; a aprovadora da Superintendência entra por ela) ou `manage_admin_registries` (DAT).
+// Só aprovar (`access_solicitation_approvals`, o Controle) não abre: o servidor recusa o salvar (403).
 // Antes o gate lia o grupo (Coordenador/Apoio/DAT) e o `can_approve_super` do /me. O backend
 // segue autoritativo no salvar.
 describe('AppRoutes — gate de /solicitacoes/:id/editar', () => {
-  test.each(['create_solicitation', 'access_solicitation_approvals', 'manage_admin_registries'])(
+  test.each(['create_solicitation', 'manage_admin_registries'])(
     '%s → carrega a edição',
     async (policy) => {
       renderRoute(EDITAR, BASE_USER, [policy]);
@@ -466,7 +467,13 @@ describe('AppRoutes — gate de /solicitacoes/:id/editar', () => {
     },
   );
 
-  test('sem nenhuma das três → Forbidden', async () => {
+  test('só access_solicitation_approvals (Controle) → Forbidden: o servidor não deixa salvar', async () => {
+    renderRoute(EDITAR, BASE_USER, ['access_solicitation_approvals']);
+    expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
+    expect(screen.queryByText('EDIT_PAGE')).not.toBeInTheDocument();
+  });
+
+  test('sem nenhuma das duas → Forbidden', async () => {
     renderRoute(EDITAR, BASE_USER, ['view_all_availability', 'access_travel']);
     expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
   });

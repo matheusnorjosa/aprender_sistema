@@ -231,3 +231,17 @@ def test_run_skips_non_business_day_weekend(base_context, user_factory):
     audit = AuditLog.objects.filter(action="ACOES_NOTIFICACOES_DAILY").order_by("-created_at").first()
     assert audit is not None
     assert audit.details.get("skipped_non_business_day") is True
+
+
+@pytest.mark.django_db
+def test_notification_title_is_accented_in_portuguese(base_context, user_factory):
+    # B#2 (alinhamento das telas): o título gerado é "Ação 01", não "Acao 01".
+    ciclo = base_context["ciclo"]
+    action = _create_action(ciclo=ciclo, ordem=7, anchor=date(2026, 3, 12), executor_group="Comercial")
+    user_factory(prefix="coord", groups=["Comercial", "Coordenador"])
+
+    AcoesNotificacaoDailyService.run(reference_date=date(2026, 3, 10))
+
+    notification = NotificacaoInterna.objects.filter(acao_instancia=action).first()
+    assert notification is not None
+    assert notification.titulo == "[D-3] Ação 07 - Acao 7"

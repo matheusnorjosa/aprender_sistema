@@ -37,7 +37,6 @@ import {
   EditOutlined,
   PlusOutlined,
   DeleteOutlined,
-  DownloadOutlined,
   FilterOutlined,
   ClearOutlined,
   CheckCircleFilled,
@@ -65,6 +64,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import { UF_OPTIONS } from '../../constants';
 import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
+import { useAcesso } from '../../contexts/AcessoContext';
 
 const { Title, Text } = Typography;
 
@@ -183,6 +183,8 @@ const nomeDaAcao = (record: AcaoRecord): string =>
 export default function AcoesPage(): JSX.Element {
   // Celular (abaixo de sm): o projeto vai junto do município e as ações para o menu.
   const acoesCompactas = !Grid.useBreakpoint().sm;
+  // O destroy exige `execute_restricted_operations` (o Controle via Excluir e levava 403), como em Compras.
+  const podeExcluir = useAcesso().caps.canExecuteRestrictedOperations;
   const {
     data: acoes,
     stats,
@@ -261,7 +263,7 @@ export default function AcoesPage(): JSX.Element {
       setModalVisible(true);
     } catch (error) {
       // Nao abrir o modal com form vazio: recriaria o bug por outro caminho.
-      message.error(`Erro ao carregar a acao para edicao: ${(error as Error).message}`);
+      message.error(`Erro ao carregar a ação para edição: ${(error as Error).message}`);
     }
   }, [form]);
 
@@ -513,19 +515,21 @@ export default function AcoesPage(): JSX.Element {
     {
       title: 'Ações',
       key: 'acoes',
-      width: larguraAcoesLinha(2, acoesCompactas),
+      width: larguraAcoesLinha(podeExcluir ? 2 : 1, acoesCompactas),
       render: (_: unknown, record: AcaoRecord) => (
         <AcoesLinha
           compacto={acoesCompactas}
           alvo={nomeDaAcao(record)}
           acoes={[
             { chave: 'editar', rotulo: 'Editar', icone: <EditOutlined />, onClick: () => handleEdit(record) },
-            { chave: 'excluir', rotulo: 'Excluir', icone: <DeleteOutlined />, onClick: () => handleDelete(record), perigo: true },
+            ...(podeExcluir
+              ? [{ chave: 'excluir', rotulo: 'Excluir', icone: <DeleteOutlined />, onClick: () => handleDelete(record), perigo: true }]
+              : []),
           ]}
         />
       ),
     },
-  ], [acoesCompactas, handleEdit, handleDelete, renderStatusIcon, calculateProgress]);
+  ], [acoesCompactas, podeExcluir, handleEdit, handleDelete, renderStatusIcon, calculateProgress]);
 
   return (
     <section className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }} aria-labelledby="acoes-title">
@@ -542,7 +546,6 @@ export default function AcoesPage(): JSX.Element {
             </Text>
           </div>
           <Space>
-            <Button icon={<DownloadOutlined />}>Exportar</Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
               Nova Ação
             </Button>
@@ -796,7 +799,7 @@ export default function AcoesPage(): JSX.Element {
         footer={
           <div className="flex justify-between">
             <div>
-              {editingAcao && (
+              {editingAcao && podeExcluir && (
                 <Button
                   danger
                   type="text"

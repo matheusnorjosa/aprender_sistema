@@ -347,7 +347,7 @@ export default function DATRegistrosPage(): JSX.Element {
   const handleDelete = (record: DATRegistroRecord) => {
     Modal.confirm({
       title: 'Confirmar exclusão',
-      content: `Excluir registro de "${record.municipio_nome}"? Esta ação requer permissão de Superintendência.`,
+      content: `Excluir registro de "${record.municipio_nome}"? Esta ação não pode ser desfeita.`,
       okText: 'Sim, excluir',
       okType: 'danger',
       cancelText: 'Cancelar',

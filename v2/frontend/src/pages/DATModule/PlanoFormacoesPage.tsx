@@ -1,13 +1,11 @@
 /**
- * Plano de Formacoes - AS v2
+ * Plano Anual - AS v2
  *
  * Pagina de gestao do plano anual de formacoes por Municipio + Projeto.
  * Cada linha representa uma combinacao unica de municipio/projeto com ate 15 formacoes.
  *
- * Visualizacoes:
- * - Plano Anual (tabela com scroll horizontal)
- * - Calendario (FullCalendar)
- * - Resumo por Projeto
+ * Visualizacao: tabela (as abas Calendario e Resumo, que so diziam "em desenvolvimento",
+ * sairam em 05/11/2026; os endpoints `calendario` e `resumo-projeto` existem no backend).
  *
  * Ref: prompt-pagina-formacoes.md
  */
@@ -44,7 +42,6 @@ import {
   FilterOutlined,
   ClearOutlined,
   CalendarOutlined,
-  TableOutlined,
   ProjectOutlined,
   EditOutlined,
   DeleteOutlined,
@@ -66,9 +63,6 @@ import {
   updateFormacaoInline,
   updateAcompanhamentoInline,
   updateProvaInline,
-  // TODO: Implementar views de Calendario e Resumo por Projeto
-  // getPlanoFormacoesCalendario,
-  // getPlanoFormacoesResumoProjeto,
 } from '../../api/datModule';
 import { getMunicipiosOptions, getProjetosOptions } from '../../api/datModule';
 import { useAcesso } from '../../contexts/AcessoContext';
@@ -246,9 +240,6 @@ export default function PlanoFormacoesPage(): JSX.Element {
     showsStatsError: true, // aviso com o motivo e "Tentar de novo" acima dos cards
   });
 
-  // View mode
-  const [viewMode, setViewMode] = useState<'table' | 'calendar' | 'resumo'>('table'); // 'table' | 'calendar' | 'resumo'
-
   // Modal state
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [editingPlano, setEditingPlano] = useState<PlanoFormacaoRecord | null>(null);
@@ -294,7 +285,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
         setProjetos(projData);
         setProjetosComCompra(projComCompraData);
       } catch (error) {
-        message.error(`Erro ao carregar opcoes: ${(error as Error).message}`);
+        message.error(`Erro ao carregar opções: ${(error as Error).message}`);
       }
     };
     void loadOptions();
@@ -336,15 +327,16 @@ export default function PlanoFormacoesPage(): JSX.Element {
 
   const handleDelete = (record: PlanoFormacaoRecord) => {
     Modal.confirm({
-      title: 'Confirmar exclusao',
-      content: `Excluir plano de "${record.municipio_nome}" - "${record.projeto_nome}"? Esta acao ira remover todas as formacoes, acompanhamentos e provas associadas.`,
+      title: 'Confirmar exclusão',
+      // O servidor recusa (409) plano com formação concluída, para preservar o histórico.
+      content: `Excluir o plano de "${record.municipio_nome}" - "${record.projeto_nome}"? As formações, os acompanhamentos e as provas do plano também são excluídos. Plano com formação concluída não pode ser excluído, para preservar o histórico.`,
       okText: 'Sim, excluir',
       okType: 'danger',
       cancelText: 'Cancelar',
       onOk: async () => {
         try {
           await deletePlanoFormacoes(record.id);
-          message.success('Plano excluido com sucesso');
+          message.success('Plano excluído com sucesso');
           void refresh();
         } catch (error) {
           message.error(`Erro ao excluir: ${(error as Error).message}`);
@@ -395,7 +387,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
         data_formacao: values.data_formacao?.format('YYYY-MM-DD') || null,
       };
       await updateFormacaoInline(editingFormacao.plano.id, editingFormacao.formacao.numero, payload);
-      message.success('Formacao atualizada');
+      message.success('Formação atualizada');
       setFormacaoModalVisible(false);
       void refresh();
     } catch (error) {
@@ -573,7 +565,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
 
   const columns = useMemo<ColumnsType<PlanoFormacaoRecord>>(() => [
     {
-      title: 'Municipio',
+      title: 'Município',
       dataIndex: 'municipio_nome',
       key: 'municipio',
       width: 150,
@@ -678,7 +670,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
       render: (_: unknown, record: PlanoFormacaoRecord) => renderProvaCell(record, 2),
     },
     {
-      title: 'Acoes',
+      title: 'Ações',
       key: 'acoes',
       width: 100,
       fixed: 'right' as const,
@@ -728,33 +720,10 @@ export default function PlanoFormacoesPage(): JSX.Element {
       {/* Header */}
       <header className="mb-6 flex justify-between items-center">
         <div>
-          <Title level={3} className="m-0" id="plano-formacoes-title">Plano de Formacoes</Title>
-          <Text type="secondary">Gestao do plano anual de formacoes por municipio e projeto</Text>
+          <Title level={3} className="m-0" id="plano-formacoes-title">Plano Anual</Title>
+          <Text type="secondary">Gestão do plano anual de formações por município e projeto</Text>
         </div>
         <Space>
-          <Button.Group>
-            <Button
-              type={viewMode === 'table' ? 'primary' : 'default'}
-              icon={<TableOutlined />}
-              onClick={() => setViewMode('table')}
-            >
-              Tabela
-            </Button>
-            <Button
-              type={viewMode === 'calendar' ? 'primary' : 'default'}
-              icon={<CalendarOutlined />}
-              onClick={() => setViewMode('calendar')}
-            >
-              Calendario
-            </Button>
-            <Button
-              type={viewMode === 'resumo' ? 'primary' : 'default'}
-              icon={<ProjectOutlined />}
-              onClick={() => setViewMode('resumo')}
-            >
-              Resumo
-            </Button>
-          </Button.Group>
           <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
             Novo Plano
           </Button>
@@ -835,7 +804,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>Buscar</Text>
             </div>
             <Input.Search
-              placeholder="Municipio, projeto..."
+              placeholder="Município, projeto..."
               allowClear
               value={filters.search}
               onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
@@ -844,7 +813,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
           </Col>
           <Col xs={12} sm={6} md={4} lg={3}>
             <div className="mb-1">
-              <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>Municipio</Text>
+              <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>Município</Text>
             </div>
             <Select
               style={{ width: '100%' }}
@@ -899,8 +868,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
       </nav>
 
       {/* Main Content */}
-      <section aria-label="Conteudo principal">
-      {viewMode === 'table' && (
+      <section aria-label="Conteúdo principal">
         <Card>
           <Table
             columns={columns}
@@ -917,19 +885,6 @@ export default function PlanoFormacoesPage(): JSX.Element {
             size="small"
           />
         </Card>
-      )}
-
-      {viewMode === 'calendar' && (
-        <Card>
-          <Text type="secondary">Visualizacao de calendario em desenvolvimento...</Text>
-        </Card>
-      )}
-
-      {viewMode === 'resumo' && (
-        <Card>
-          <Text type="secondary">Resumo por projeto em desenvolvimento...</Text>
-        </Card>
-      )}
       </section>
 
       {/* Create/Edit Modal */}
@@ -950,8 +905,8 @@ export default function PlanoFormacoesPage(): JSX.Element {
             <Col span={12}>
               <Form.Item
                 name="municipio"
-                label="Municipio"
-                rules={[{ required: true, message: 'Selecione o municipio' }]}
+                label="Município"
+                rules={[{ required: true, message: 'Selecione o município' }]}
               >
                 <Select
                   placeholder="Selecione..."
@@ -996,7 +951,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item name="observacoes" label="Observacoes">
+          <Form.Item name="observacoes" label="Observações">
             <Input.TextArea rows={3} />
           </Form.Item>
         </Form>
@@ -1004,7 +959,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
 
       {/* Formacao Edit Modal */}
       <Modal
-        title={`Editar Formacao ${editingFormacao?.formacao?.numero || ''}`}
+        title={`Editar Formação ${editingFormacao?.formacao?.numero || ''}`}
         open={formacaoModalVisible}
         onCancel={() => setFormacaoModalVisible(false)}
         footer={
@@ -1019,7 +974,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
           <Form.Item name="data_formacao" label="Data">
             <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>
-          <Form.Item name="carga_horaria" label="Carga Horaria (horas)">
+          <Form.Item name="carga_horaria" label="Carga Horária (horas)">
             <InputNumber style={{ width: '100%' }} min={0.5} max={24} step={0.5} />
           </Form.Item>
           <Form.Item name="modalidade" label="Modalidade">
@@ -1092,7 +1047,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
             items={[
               {
                 key: 'formacoes',
-                label: 'Formacoes',
+                label: 'Formações',
                 children: (
                   <Table
                     scroll={{ x: "max-content" }}
@@ -1121,7 +1076,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
                     size="small"
                     pagination={false}
                     columns={[
-                      { title: 'Tipo', dataIndex: 'tipo', render: (t) => t === 'primeiro' ? '1o Acomp.' : '2o Acomp.' },
+                      { title: 'Tipo', dataIndex: 'tipo', render: (t) => t === 'primeiro' ? '1º Acomp.' : '2º Acomp.' },
                       { title: 'Data', dataIndex: 'data', render: (d: string | null) => d ? dayjs(d).format('DD/MM/YYYY') : '-' },
                       { title: 'Realizado', dataIndex: 'realizado', render: (v) => v ? <CheckCircleOutlined className="text-green-500" /> : '-' },
                     ]}

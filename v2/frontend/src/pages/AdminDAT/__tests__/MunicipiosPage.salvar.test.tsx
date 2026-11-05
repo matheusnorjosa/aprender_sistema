@@ -160,9 +160,9 @@ describe('MunicipiosPage: importar e salvar (C2)', () => {
     vi.mocked(listMunicipios).mockResolvedValue({ results: [], count: 0, next: null, previous: null });
 
     await user.click(screen.getByRole('combobox', { name: 'Filtrar por UF' }));
-    await user.click(await screen.findByTitle('PI'));
+    await user.click(await screen.findByTitle('BA'));
 
-    expect(await screen.findByText('Nenhum município para a UF PI.')).toBeInTheDocument();
+    expect(await screen.findByText('Nenhum município para a UF BA.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Limpar filtro de UF' }));
     await waitFor(() => expect(listMunicipios).toHaveBeenLastCalledWith(expect.objectContaining({ uf: undefined })));
   }, 40000);

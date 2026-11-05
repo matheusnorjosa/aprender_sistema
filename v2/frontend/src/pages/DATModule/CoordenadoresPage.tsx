@@ -39,7 +39,6 @@ import {
   EditOutlined,
   PlusOutlined,
   DeleteOutlined,
-  DownloadOutlined,
   FilterOutlined,
   ClearOutlined,
   TeamOutlined,
@@ -74,6 +73,7 @@ import {
 } from './Coordenadores/constants';
 import { getColumns, type CoordenadorRecord } from './Coordenadores/columns';
 import { getAreaColor, getInitials, groupByArea, type CoordenadorForGroup } from './Coordenadores/helpers';
+import { useAcesso } from '../../contexts/AcessoContext';
 
 const { Title, Text } = Typography;
 
@@ -126,6 +126,8 @@ const { Panel } = Collapse;
 
 export default function CoordenadoresPage(): JSX.Element {
   const [viewMode, setViewMode] = useState<string>(VIEW_MODES.CARDS);
+  // O destroy exige `execute_restricted_operations` (o Controle via Excluir e levava 403), como em Compras.
+  const podeExcluir = useAcesso().caps.canExecuteRestrictedOperations;
 
   const {
     data: coordenadores,
@@ -351,8 +353,9 @@ export default function CoordenadoresPage(): JSX.Element {
       onEdit: handleEdit,
       onDelete: handleDelete,
       onToggleAtivo: handleToggleAtivo,
+      podeExcluir,
     }),
-    [handleView, handleEdit, handleDelete, handleToggleAtivo]
+    [handleView, handleEdit, handleDelete, handleToggleAtivo, podeExcluir]
   );
 
   // Card view renderer
@@ -373,9 +376,13 @@ export default function CoordenadoresPage(): JSX.Element {
               <Tooltip key="edit" title="Editar">
                 <EditOutlined onClick={() => handleEdit(coord)} />
               </Tooltip>,
-              <Tooltip key="delete" title="Excluir">
-                <DeleteOutlined onClick={() => handleDelete(coord)} />
-              </Tooltip>,
+              ...(podeExcluir
+                ? [
+                    <Tooltip key="delete" title="Excluir">
+                      <DeleteOutlined onClick={() => handleDelete(coord)} />
+                    </Tooltip>,
+                  ]
+                : []),
             ]}
           >
             <Card.Meta
@@ -530,7 +537,6 @@ export default function CoordenadoresPage(): JSX.Element {
                 />
               </Tooltip>
             </Button.Group>
-            <Button icon={<DownloadOutlined />}>Exportar</Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
               Novo Coordenador
             </Button>
@@ -734,7 +740,7 @@ export default function CoordenadoresPage(): JSX.Element {
         footer={
           <div className="flex justify-between">
             <div>
-              {editingCoordenador && (
+              {editingCoordenador && podeExcluir && (
                 <Button
                   danger
                   type="text"

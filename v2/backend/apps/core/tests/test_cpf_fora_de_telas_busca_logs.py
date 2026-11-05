@@ -811,3 +811,26 @@ def test_grade_mensal_busca_sem_acento_acha_nome_acentuado_e_com_digito_nao_casa
     assert alvo.id in _grade("conceicao")
     assert _grade("lima7") == set()
     assert _grade("conceicao.lima7") == set()
+
+
+# =============================================================================
+# A#43 (alinhamento de telas): o nome de `/api/me/` de conta sem nome não é o CPF
+# =============================================================================
+
+
+def test_me_de_conta_sem_nome_com_email_de_reserva_nao_leva_cpf_no_nome():
+    cpf = _cpf()
+    sem_nome = UsuarioFactory(username=cpf, cpf=cpf, email=f"{cpf}@placeholder.local", first_name="", last_name="")
+
+    resp = _client(sem_nome).get("/api/me/")
+
+    assert resp.status_code == 200, resp.content
+    assert resp.json()["name"] == f"Usuario #{sem_nome.id}"
+    assert not _ONZE_DIGITOS.search(resp.json()["name"])
+
+
+def test_me_de_conta_sem_nome_com_email_de_verdade_mostra_o_email():
+    cpf = _cpf()
+    sem_nome = UsuarioFactory(username=cpf, cpf=cpf, email="ana.sem.nome@example.invalid", first_name="", last_name="")
+
+    assert _client(sem_nome).get("/api/me/").json()["name"] == "ana.sem.nome@example.invalid"

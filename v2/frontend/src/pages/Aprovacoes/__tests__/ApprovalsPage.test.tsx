@@ -55,7 +55,7 @@ vi.mock('../../../utils/participants', async (importOriginal) => {
 });
 
 import ApprovalsPage from '../ApprovalsPage';
-import { approveSolicitacao, approveSolicitacoesBatch, listSolicitacoes } from '../../../api/solicitacoes';
+import { approveSolicitacao, approveSolicitacoesBatch, listSolicitacoes, previewSolicitacao } from '../../../api/solicitacoes';
 import { getMyPolicies } from '../../../api/me';
 import { getMe } from '../../../api/availability';
 import { usePolling } from '../../../hooks/usePolling';
@@ -148,7 +148,7 @@ describe('ApprovalsPage', () => {
       screen.getByRole('heading', { level: 2, name: 'Aprovações' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('searchbox', { name: /Buscar solicitacoes/i }),
+      screen.getByRole('searchbox', { name: 'Buscar solicitações' }),
     ).toBeInTheDocument();
 
     // A carga inicial usa o cliente mockado (nenhum fetch real dispara).
@@ -463,7 +463,7 @@ describe('ApprovalsPage', () => {
     fireEvent.click(screen.getByTitle('2'));
     await screen.findByText('Municipio21');
 
-    fireEvent.change(screen.getByRole('searchbox', { name: /Buscar solicitacoes/i }), { target: { value: 'sobral' } });
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar solicitações' }), { target: { value: 'sobral' } });
 
     await waitFor(() => expect(ultimoFiltro()).toEqual(expect.objectContaining({ q: 'sobral', page: 1 })));
   }, 20000);
@@ -673,7 +673,7 @@ describe('ApprovalsPage', () => {
     expect(screen.queryByText(LISTA_NAO_CARREGOU)).not.toBeInTheDocument();
 
     vi.mocked(listSolicitacoes).mockRejectedValue(erro429());
-    fireEvent.change(screen.getByRole('searchbox', { name: /Buscar solicitacoes/i }), { target: { value: 'sobral' } });
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar solicitações' }), { target: { value: 'sobral' } });
     expect(await screen.findByText(LISTA_NAO_CARREGOU)).toBeInTheDocument();
 
     // Fim da pausa: o polling busca de novo e a carga atende o filtro pedido.
@@ -923,4 +923,98 @@ describe('ApprovalsPage', () => {
     renderPage();
     expect(await screen.findByText(texto)).toBeInTheDocument();
   });
+
+  // ------------------------------------------------------------------
+  // G06 (alinhamento das telas, 05/11/2026): o que a aprovadora vê na fila e na prévia.
+  // ------------------------------------------------------------------
+
+  // P#9/A#8 (D59): a coluna mostra o Tipo de Evento do cartão e diz que o número é o Nº da formação.
+  test('coluna Tipo de Evento / Nº: o tipo do cartão, o Nº da formação rotulado e o segmento', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue({
+      count: 2,
+      next: null,
+      previous: null,
+      results: [
+        pendingRow({ id: 1, municipio_nome: 'MunicipioComNumero', tipo_evento_nome: 'Formação Continuada', tipo: 'Texto livre de mais detalhes', encontro: '4', segmento: 'Anos Iniciais' }),
+        pendingRow({ id: 2, municipio_nome: 'MunicipioSemNumero', tipo_evento_nome: 'Visita Técnica', tipo: null, encontro: null, segmento: null }),
+      ],
+    });
+
+    renderPage();
+
+    const com = (await screen.findByText('MunicipioComNumero')).closest('tr') as HTMLElement;
+    expect(screen.getByRole('columnheader', { name: 'Tipo de Evento / Nº' })).toBeInTheDocument();
+    expect(within(com).getByText('Formação Continuada')).toHaveAttribute('title', 'Formação Continuada');
+    expect(within(com).getByText('Nº da formação: 4')).toBeInTheDocument();
+    expect(within(com).getByText('Anos Iniciais')).toBeInTheDocument();
+    expect(within(com).queryByText('Texto livre de mais detalhes')).not.toBeInTheDocument();
+    const sem = screen.getByText('MunicipioSemNumero').closest('tr') as HTMLElement;
+    expect(within(sem).getByText('Visita Técnica')).toBeInTheDocument();
+    expect(within(sem).queryByText(/Nº da formação/)).not.toBeInTheDocument();
+  }, 20000);
+
+  /** Abre a prévia do evento da 1ª linha. */
+  async function abrirPrevia(): Promise<void> {
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
+    renderPage();
+    const linha = (await screen.findByText('Municipio1')).closest('tr') as HTMLElement;
+    fireEvent.click(await within(linha).findByRole('button', { name: `Ver prévia do evento: ${EVENTO_1}` }, { timeout: 10000 }));
+  }
+
+  // A#10/B#13: título em português, sem Metadados (ID e hash) e sem o link do Meet que ainda não existe.
+  test('prévia: título em português, sem Metadados, e o Meet diz que o link nasce ao publicar', async () => {
+    vi.mocked(previewSolicitacao).mockResolvedValue({
+      preview: {
+        payload: { summary: 'Formação em Sobral', location: 'Escola Teste' },
+        event_id: 'as2026evt1',
+        payload_hash: 'abcdef1234567890',
+        meet_link: 'https://meet.google.com/fake-1',
+      },
+    } as unknown as Awaited<ReturnType<typeof previewSolicitacao>>);
+
+    await abrirPrevia();
+
+    expect(await screen.findByText('Prévia do evento no Google Agenda')).toBeInTheDocument();
+    expect(screen.getByText('Formação em Sobral')).toBeInTheDocument();
+    expect(screen.getByText('O link do Meet é criado ao publicar')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /meet\.google\.com/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/fake-1/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Metadados')).not.toBeInTheDocument();
+    expect(screen.queryByText('ID Evento')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hash Payload')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Preview do Evento/)).not.toBeInTheDocument();
+  }, 20000);
+
+  test('prévia sem payload: diz que não montou a prévia em vez de mostrar o JSON cru', async () => {
+    vi.mocked(previewSolicitacao).mockResolvedValue({
+      preview: { event_id: 'as2026evt1' },
+    } as unknown as Awaited<ReturnType<typeof previewSolicitacao>>);
+
+    await abrirPrevia();
+
+    expect(await screen.findByText('Não foi possível montar a prévia deste evento.')).toBeInTheDocument();
+    expect(screen.queryByText(/as2026evt1/)).not.toBeInTheDocument();
+  }, 20000);
+
+  test('prévia que falha: "Não foi possível carregar a prévia" com o motivo', async () => {
+    const erro = vi.spyOn(message, 'error');
+    vi.mocked(previewSolicitacao).mockRejectedValue(new Error('Erro interno do servidor.'));
+
+    await abrirPrevia();
+
+    await waitFor(() => expect(erro).toHaveBeenCalledWith('Não foi possível carregar a prévia: Erro interno do servidor.'));
+    erro.mockRestore();
+  }, 20000);
+
+  // B#15: o leitor de tela pronuncia o nome acentuado.
+  test('nomes acessíveis com acento: busca, lote e lista', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
+    renderPage(APROVA);
+
+    const linha = (await screen.findByText('Municipio1')).closest('tr') as HTMLElement;
+    expect(screen.getByRole('searchbox', { name: 'Buscar solicitações' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Lista de solicitações para aprovação' })).toBeInTheDocument();
+    fireEvent.click(await within(linha).findByRole('checkbox', {}, { timeout: 10000 }));
+    expect(await screen.findByRole('navigation', { name: 'Ações em lote' })).toBeInTheDocument();
+  }, 20000);
 });

@@ -81,7 +81,7 @@ export function computeIdentity(user: CurrentUser | null): Identity {
   const inControle = setores.includes('Controle');
   const inDiretoria = setores.includes('Diretoria');
 
-  const displayName = user.name || user.username || '';
+  const displayName = user.name || '';
   const badge = computeBadge(user, { isAdmin, isGerente, isCoordenador, isFormador });
 
   return {

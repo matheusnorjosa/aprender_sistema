@@ -164,3 +164,52 @@ def test_caracterizacao_grupo_vidas_com_vinculo_em_fluir():
     assert client.get("/api/availability/monthly/", {**params, "gerencia_id": vidas.id}).status_code == 403
     assert client.get("/api/availability/monthly/", {**params, "gerencia_id": fluir.id}).status_code == 200
     assert [g["id"] for g in _me(user)["gerencias"]] == [fluir.id]
+
+
+# =============================================================================
+# P#2 (alinhamento de telas): `setores_da_lotacao` é o setor que o Perfil mostra
+# =============================================================================
+
+
+def test_setores_da_lotacao_inclui_o_vinculo_equipe_que_gerencias_exclui():
+    """DAT e Controle ficam lotados como EQUIPE: o Perfil mostra a gerência, e `gerencias` (escopo) segue sem ela."""
+    dat = _gerencia(nome_setor="DAT")
+    user = UsuarioFactory()
+    user.groups.add(GroupFactory(name="DAT"))
+    EquipeGerencia.objects.create(usuario=user, gerencia=dat, papel="EQUIPE")
+
+    data = _me(user)
+
+    assert data["setores_da_lotacao"] == ["DAT"]
+    assert data["gerencias"] == []
+
+
+def test_setores_da_lotacao_sem_vinculo_vem_vazio_e_nunca_traz_o_grupo():
+    user = UsuarioFactory()
+    user.groups.add(GroupFactory(name="Controle"))
+
+    data = _me(user)
+
+    assert data["setores_da_lotacao"] == []
+    assert data["setores"] == ["Controle"]
+
+
+def test_setores_da_lotacao_so_vigente_em_gerencia_ativa_sem_repetir_e_pelo_rotulo():
+    hoje = timezone.localdate()
+    fluir = _gerencia(nome_exibicao="Fluir")
+    user = UsuarioFactory()
+    EquipeGerencia.objects.create(usuario=user, gerencia=fluir, papel="GERENTE")
+    EquipeGerencia.objects.create(usuario=user, gerencia=fluir, papel="EQUIPE")
+    EquipeGerencia.objects.create(usuario=user, gerencia=_gerencia(nome_exibicao="ACerta"), papel="EQUIPE")
+    EquipeGerencia.objects.create(
+        usuario=user, gerencia=_gerencia(nome_exibicao="Inativa", ativo=False), papel="EQUIPE"
+    )
+    EquipeGerencia.objects.create(
+        usuario=user,
+        gerencia=_gerencia(nome_exibicao="Expirado"),
+        papel="EQUIPE",
+        valid_from=hoje - timedelta(days=30),
+        valid_to=hoje - timedelta(days=1),
+    )
+
+    assert _me(user)["setores_da_lotacao"] == ["ACerta", "Fluir"]

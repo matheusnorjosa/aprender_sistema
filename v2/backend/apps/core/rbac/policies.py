@@ -180,9 +180,10 @@ ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
     # Visualização ampla de disponibilidades — Controle/Gerente/Coord/Apoio.
     "view_all_availability": frozenset({"view_all_availability"}),
     # --- Imports operacionais ---
-    # Import de bloqueios: DAT importa, Controle/Gerente/Coord operam.
+    # As três policies abaixo saem no contrato `/api/me/policies/`, mas nenhuma tela nem view as usa:
+    # importar pela tela é só do superusuário (`SuperuserOnly` nas views de import; decisão do dono
+    # de 02/10/2026). Ser verdadeira para DAT ou Controle não dá a eles nenhuma importação.
     "import_availability_blocks": frozenset({"import_spreadsheet", "view_all_availability"}),
-    # Import de compras: DAT importa, Compras/Controle operam.
     "import_compras": frozenset(
         {
             "import_spreadsheet",
@@ -190,11 +191,6 @@ ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
             "run_daily_operations",
         }
     ),
-    # Imports operacionais genéricos (eventos, produtos, deslocamentos): DAT + Controle.
-    # Nota: as 6 views síncronas migram para `HasPerm("import_spreadsheet")` direto
-    # em PR-A1 DAT-Imports (2026-04-29). Esta policy continua usada por views
-    # async (ASQ-005, /api/imports/*) e pelo contrato `/api/me/policies/` —
-    # PR-D do plano DAT-Imports limpa botões antigos no frontend.
     "import_generic_spreadsheet": frozenset({"import_spreadsheet", "run_daily_operations"}),
     # --- Admin registries (single-cap, mas vira policy pra estabilizar contrato) ---
     "manage_admin_registries": frozenset({"manage_admin_registries"}),

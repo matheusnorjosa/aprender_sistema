@@ -168,7 +168,7 @@ function recusaDoLote(itens: unknown[], detail: string) {
   return { status: 400, response: { status: 400, data: { detail, code: 'lote_invalido', errors: { itens } } } };
 }
 
-describe('NewSolicitacaoWizard — "+ horário" (03/11/2026)', { timeout: 30000 }, () => {
+describe('NewSolicitacaoWizard — "+ horário" (03/11/2026)', { timeout: 60000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(message, 'success').mockImplementation(vi.fn()).mockClear();

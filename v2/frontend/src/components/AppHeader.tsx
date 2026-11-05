@@ -121,7 +121,7 @@ export function AppHeader({
           title="Meu perfil"
         >
           <UserOutlined />
-          <Text strong>{user.name || user.username || 'Usuário'}</Text>
+          <Text strong>{user.name || 'Usuário'}</Text>
         </Link>
         {canManageInternalActions && (
           <Popover

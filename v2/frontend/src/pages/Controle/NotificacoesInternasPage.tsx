@@ -1,11 +1,36 @@
 import { useEffect, useState, type JSX } from 'react';
 import { Button, Card, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import dayjs from 'dayjs';
 
 import { listNotificacoesInternas, marcarNotificacaoLida, marcarTodasNotificacoesLidas } from '../../api/acoesNotificacao';
 import type { NotificacaoInterna } from '../../types/acoesNotificacao';
 
 const { Title, Text } = Typography;
+
+// Fases do disparo diário (prazos em dias úteis até o vencimento), ver notificacoes_acoes_service.py.
+const FASE_LABELS: Record<string, string> = {
+  'D-7': '7 dias úteis antes',
+  'D-3': '3 dias úteis antes',
+  'D-1': '1 dia útil antes',
+  D0: 'No vencimento',
+  'D+1': '1 dia útil depois',
+  'D+3': '3 dias úteis depois',
+};
+
+const TIPO_LABELS: Record<string, string> = {
+  LEMBRETE: 'Lembrete',
+  VENCIMENTO: 'Vencimento',
+  ATRASO: 'Atraso',
+  ESCALONAMENTO: 'Escalonamento',
+};
+
+const PRIORIDADE_LABELS: Record<string, string> = {
+  BAIXA: 'Baixa',
+  MEDIA: 'Média',
+  ALTA: 'Alta',
+  CRITICA: 'Crítica',
+};
 
 export default function NotificacoesInternasPage(): JSX.Element {
   const [notifications, setNotifications] = useState<NotificacaoInterna[]>([]);
@@ -65,8 +90,8 @@ export default function NotificacoesInternasPage(): JSX.Element {
     {
       title: 'Fase',
       dataIndex: 'fase_disparo',
-      width: 90,
-      render: (value: string) => <Tag color="purple">{value}</Tag>,
+      width: 150,
+      render: (value: string) => <Tag color="purple">{FASE_LABELS[value] ?? value}</Tag>,
     },
     {
       title: 'Título',
@@ -77,6 +102,7 @@ export default function NotificacoesInternasPage(): JSX.Element {
       title: 'Tipo',
       dataIndex: 'tipo',
       width: 130,
+      render: (value: string) => TIPO_LABELS[value] ?? value,
     },
     {
       title: 'Prioridade',
@@ -84,13 +110,14 @@ export default function NotificacoesInternasPage(): JSX.Element {
       width: 110,
       render: (value: string) => {
         const color = value === 'CRITICA' ? 'red' : value === 'ALTA' ? 'orange' : 'default';
-        return <Tag color={color}>{value}</Tag>;
+        return <Tag color={color}>{PRIORIDADE_LABELS[value] ?? value}</Tag>;
       },
     },
     {
       title: 'Referência',
       dataIndex: 'referencia_data',
       width: 120,
+      render: (value: string) => dayjs(value).format('DD/MM/YYYY'),
     },
     {
       title: 'Ações',
@@ -112,13 +139,13 @@ export default function NotificacoesInternasPage(): JSX.Element {
   const unreadCount = notifications.filter((item) => !item.lida).length;
 
   return (
-    <main style={{ padding: 24 }}>
+    <section aria-labelledby="notificacoes-internas-titulo" style={{ padding: 24 }}>
       <Space direction="vertical" size={16} style={{ width: '100%' }}>
         <div>
-          <Title level={3} style={{ marginBottom: 0 }}>
+          <Title id="notificacoes-internas-titulo" level={3} style={{ marginBottom: 0 }}>
             Notificações Internas
           </Title>
-          <Text type="secondary">Inbox in-app para lembretes e escalonamentos das ações.</Text>
+          <Text type="secondary">Lembretes e escalonamentos das ações.</Text>
         </div>
 
         <Card>
@@ -154,6 +181,6 @@ export default function NotificacoesInternasPage(): JSX.Element {
           />
         </Card>
       </Space>
-    </main>
+    </section>
   );
 }

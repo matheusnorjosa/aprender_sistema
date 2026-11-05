@@ -171,6 +171,22 @@ describe('MonthlyPage — grade mensal', () => {
     expect(screen.getAllByText('Nome')).toHaveLength(2);
   });
 
+  // B#19: o erro da carga mostrava a todos uma dica de desenvolvedor (porta 8002), até junto do 403.
+  test('falha na primeira carga: a mensagem do servidor e "Tentar de novo" em cada grade, sem dica de desenvolvedor', async () => {
+    vi.mocked(getMonthlyAvailability).mockRejectedValue(new Error('Você não tem acesso a este setor.'));
+    render(<MonthlyPage />);
+
+    expect(await screen.findAllByText('Você não tem acesso a este setor.', undefined, ESPERA)).toHaveLength(2);
+    expect(screen.queryByText(/porta 8002|backend/i)).not.toBeInTheDocument();
+
+    vi.mocked(getMonthlyAvailability).mockResolvedValue(GRADE_VAZIA);
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo: carregar os formadores' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo: carregar os coordenadores' }));
+
+    await waitFor(() => expect(screen.getAllByText('Nome')).toHaveLength(2), ESPERA);
+    expect(screen.queryByText(/Erro ao carregar/)).not.toBeInTheDocument();
+  });
+
   test('botão de atualizar: o ícone gira enquanto busca e as grades continuam na tela', async () => {
     const { container } = render(<MonthlyPage />);
     await waitFor(() => expect(screen.getAllByText('Nome')).toHaveLength(2), ESPERA);

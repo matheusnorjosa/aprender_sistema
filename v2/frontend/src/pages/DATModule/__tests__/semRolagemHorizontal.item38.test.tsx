@@ -12,6 +12,8 @@ import { describe, expect, test, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 
 import { definirLarguraTela } from '../../../test/larguraTela';
+import { ComAcesso } from '../../../test/comAcesso';
+import { atorRbac } from '../../../test/atoresRbac';
 
 const { acaoRow, registroRow } = vi.hoisted(() => ({
   acaoRow: {
@@ -70,7 +72,14 @@ const ACAO = 'Fortaleza - CE · Sub X';
 const REGISTRO = 'Sobral - CE · Projeto Y · 2026';
 
 function renderPagina(pagina: 'acoes' | 'registros'): ReturnType<typeof render> {
-  return render(<MemoryRouter>{pagina === 'acoes' ? <AcoesPage /> : <DATRegistrosPage />}</MemoryRouter>);
+  // Como o DAT: Excluir só aparece com `execute_restricted_operations`.
+  return render(
+    <MemoryRouter>
+      <ComAcesso policies={atorRbac('DAT').policies}>
+        {pagina === 'acoes' ? <AcoesPage /> : <DATRegistrosPage />}
+      </ComAcesso>
+    </MemoryRouter>,
+  );
 }
 
 /** Títulos das colunas de dados (sem a do botão de expandir). */

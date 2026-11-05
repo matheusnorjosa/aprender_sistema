@@ -506,6 +506,7 @@ def _build_batch_status_errors(ids: list[int], found_ids: set[int]) -> list[dict
     - Pending/locked IDs are in `found_ids` and will be processed.
     - For the remaining IDs, fetch status in a single query and emit:
       - \"Status já é 'X'\" when record exists but is not pending
+      - code `busy` when still pending but locked by another decision (`skip_locked` skipped it)
       - \"Solicitação não encontrada\" when record does not exist
     """
     status_by_id: dict[int, str] = dict(Solicitacao.objects.filter(id__in=ids).values_list("id", "status"))
@@ -518,6 +519,15 @@ def _build_batch_status_errors(ids: list[int], found_ids: set[int]) -> list[dict
         existing_status = status_by_id.get(sol_id)
         if existing_status is None:
             errors.append({"id": sol_id, "detail": "Solicitação não encontrada"})
+        elif existing_status == "pendente":
+            # A#9: pendente e fora dos travados = outra decisão em curso segura a linha.
+            errors.append(
+                {
+                    "id": sol_id,
+                    "code": "busy",
+                    "detail": "Outra pessoa está decidindo esta solicitação agora; atualize a lista e tente de novo.",
+                }
+            )
         else:
             errors.append({"id": sol_id, "detail": f"Status já é '{existing_status}'"})
 

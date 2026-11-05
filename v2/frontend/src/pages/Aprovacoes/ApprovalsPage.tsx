@@ -8,7 +8,7 @@
  *   para o mais distante e depois os passados (`ordering=proximidade`); a seleção em
  *   lote vale para a página visível
  * - Botões para preview, aprovar e reprovar
- * - Modal para preview de payload JSON
+ * - Modal com a prévia do evento no Google Agenda
  * - Confirmação simples para reprovação (sem justificativa obrigatória)
  * - Erro ao aprovar diz quem está bloqueado e por quê; no lote, a tela lista o evento e o
  *   motivo de cada item que não foi decidido
@@ -48,7 +48,6 @@ import {
   EnvironmentOutlined,
   TeamOutlined,
   MailOutlined,
-  LinkOutlined,
   VideoCameraOutlined,
 } from '@ant-design/icons';
 import { CheckOutlined, CloseOutlined, EyeOutlined } from '@ant-design/icons';
@@ -351,7 +350,7 @@ export default function ApprovalsPage(): JSX.Element {
       setPreviewData(data);
       setPreviewVisible(true);
     } catch (error) {
-      message.error('Erro ao visualizar payload: ' + (error as Error).message);
+      message.error('Não foi possível carregar a prévia: ' + (error as Error).message);
     }
   }, []);
 
@@ -589,16 +588,24 @@ export default function ApprovalsPage(): JSX.Element {
       },
     },
     {
-      title: 'Tipo/Enc./Seg.',
+      // D59: o Tipo de Evento escolhido no cartão e o Nº da formação rotulado (o texto livre de
+      // "Mais detalhes" não entra: não é o tipo). Cada linha corta a si mesma, sem rolagem lateral.
+      title: 'Tipo de Evento / Nº',
       key: 'tipo_encontro_segmento',
       responsive: VISIVEL_A_PARTIR.lg,
       width: 110,
       render: (_, record) => (
         <div style={{ lineHeight: 1.3 }}>
-          {record.tipo && <div style={UMA_LINHA} title={record.tipo}>{record.tipo}</div>}
-          {record.encontro && <small className="text-gray-500">{record.encontro}</small>}
-          {record.segmento && <div><small className="text-gray-500">{record.segmento}</small></div>}
-          {!record.tipo && !record.encontro && !record.segmento && '-'}
+          {record.tipo_evento_nome && <div style={UMA_LINHA} title={record.tipo_evento_nome}>{record.tipo_evento_nome}</div>}
+          {record.encontro && (
+            <small className="text-gray-500" style={{ ...UMA_LINHA, display: 'block' }} title={`Nº da formação: ${record.encontro}`}>
+              Nº da formação: {record.encontro}
+            </small>
+          )}
+          {record.segmento && (
+            <small className="text-gray-500" style={{ ...UMA_LINHA, display: 'block' }} title={record.segmento}>{record.segmento}</small>
+          )}
+          {!record.tipo_evento_nome && !record.encontro && !record.segmento && '-'}
         </div>
       ),
     },
@@ -689,7 +696,7 @@ export default function ApprovalsPage(): JSX.Element {
                 onSearch={() => { void loadData(); }}
                 style={{ width: '100%', maxWidth: 400 }}
                 allowClear
-                aria-label="Buscar solicitacoes"
+                aria-label="Buscar solicitações"
               />
             </Space>
           </nav>
@@ -707,7 +714,7 @@ export default function ApprovalsPage(): JSX.Element {
 
           {/* Toolbar de ações em lote (PA-06: apenas para usuários com permissão) */}
           {selectedRowKeys.length > 0 && canApprove && (
-            <nav aria-label="Acoes em lote" className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
+            <nav aria-label="Ações em lote" className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
               <Space wrap>
                 <Text strong aria-live="polite">
                   {selectedRowKeys.length} solicitação(ões) selecionada(s)
@@ -757,7 +764,7 @@ export default function ApprovalsPage(): JSX.Element {
           )}
 
           {/* Tabela */}
-          <section aria-label="Lista de solicitacoes para aprovacao">
+          <section aria-label="Lista de solicitações para aprovação">
             <ConfigProvider {...(!temaEscuro && { theme: TEMA_DA_TABELA })}>
               <ResponsiveTable<Solicitacao>
                 {...(rowSelection !== undefined && { rowSelection })}
@@ -789,7 +796,7 @@ export default function ApprovalsPage(): JSX.Element {
         title={
           <Space>
             <CalendarOutlined />
-            <span>Preview do Evento no Google Calendar</span>
+            <span>Prévia do evento no Google Agenda</span>
           </Space>
         }
         open={previewVisible}
@@ -836,13 +843,12 @@ export default function ApprovalsPage(): JSX.Element {
                   {payload.location || '-'}
                 </Descriptions.Item>
 
+                {/* O link da prévia é inventado (meet.google.com/fake-…): o de verdade nasce ao publicar */}
                 {previewData.preview.meet_link && (
                   <Descriptions.Item
                     label={<><VideoCameraOutlined /> Google Meet</>}
                   >
-                    <a href={previewData.preview.meet_link} target="_blank" rel="noopener noreferrer">
-                      <LinkOutlined /> {previewData.preview.meet_link}
-                    </a>
+                    O link do Meet é criado ao publicar
                   </Descriptions.Item>
                 )}
               </Descriptions>
@@ -884,28 +890,13 @@ export default function ApprovalsPage(): JSX.Element {
                   />
                 </>
               )}
-
-              {/* Metadados (colapsável) */}
-              <Divider orientation="left" className="mt-4">Metadados</Divider>
-              <Descriptions column={2} size="small">
-                <Descriptions.Item label="ID Evento">
-                  <Tag>{previewData.preview.event_id}</Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label="Hash Payload">
-                  <Tag color="default" style={{ fontSize: 10 }}>
-                    {previewData.preview.payload_hash?.substring(0, 12)}...
-                  </Tag>
-                </Descriptions.Item>
-              </Descriptions>
             </div>
           );
         })()}
 
-        {/* Fallback para JSON se não tiver payload */}
+        {/* Sem payload: diz que não montou (o JSON cru não serve a quem aprova) */}
         {!previewData?.preview?.payload && (
-          <pre style={{ maxHeight: 500, overflow: 'auto', backgroundColor: '#f5f5f5', padding: 12 }}>
-            {JSON.stringify(previewData, null, 2)}
-          </pre>
+          <Paragraph>Não foi possível montar a prévia deste evento.</Paragraph>
         )}
       </Modal>
 

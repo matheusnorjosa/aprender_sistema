@@ -129,6 +129,33 @@ function getTimelineColor(action: string): string {
   return 'gray';
 }
 
+// O que cada registro da linha do tempo quer dizer, em frase (B#18: o código da ação não vai à tela).
+const ACAO_LABELS: Record<string, string> = {
+  PUBLISH_GCAL_REQUESTED: 'Publicação pedida',
+  PUBLISH_GCAL: 'Publicado no Google',
+  PUBLISH_GCAL_ERROR: 'Erro ao publicar no Google',
+  CANCEL_GCAL_REQUESTED: 'Remoção do Google pedida',
+  CANCEL_GCAL: 'Removido do Google',
+  RESYNC_GCAL_REQUESTED: 'Reenvio pedido',
+  GOOGLE_CONNECT: 'Conta Google conectada',
+  GOOGLE_DISCONNECT: 'Conta Google desconectada',
+  GOOGLE_REFRESH_TOKEN: 'Acesso ao Google renovado',
+};
+
+// Papel do participante em português (COORD_ACOMPANHA é o coordenador extra da caixa "Coordenador(es)").
+const ROLE_LABELS: Record<string, string> = {
+  FORMADOR: 'Formador',
+  COORDENADOR: 'Coordenador',
+  COORD_ACOMPANHA: 'Coordenador extra',
+  CONVIDADO: 'Convidado',
+};
+
+// O aviso leva a mensagem do servidor (o fetchAPI a põe em error.message), não só o texto genérico.
+function avisarErro(texto: string, error: unknown): void {
+  const detalhe = error instanceof Error ? error.message : '';
+  message.error(detalhe ? `${texto}: ${detalhe}` : texto);
+}
+
 // Cópia Google → sistema (GCAL_COPIA_GOOGLE): o que mudou, em português, e o choque (D3: copia e avisa).
 const COPIA_GOOGLE = 'GCAL_COPIA_GOOGLE';
 
@@ -209,7 +236,7 @@ export default function GCalDashboardPage(): JSX.Element {
       setMetrics(data);
     } catch (error) {
       logger.error('Erro ao carregar métricas:', error);
-      message.error('Erro ao carregar métricas do dashboard');
+      avisarErro('Erro ao carregar métricas do painel', error);
     } finally {
       setLoading(false);
     }
@@ -233,7 +260,7 @@ export default function GCalDashboardPage(): JSX.Element {
       });
     } catch (error) {
       logger.error('Erro ao carregar eventos:', error);
-      message.error('Erro ao carregar lista de eventos');
+      avisarErro('Erro ao carregar a lista de eventos', error);
     } finally {
       setTableLoading(false);
     }
@@ -258,7 +285,7 @@ export default function GCalDashboardPage(): JSX.Element {
       setSuccessRate(data);
     } catch (error) {
       logger.error('Erro ao carregar success rate:', error);
-      message.error('Erro ao carregar taxa de sucesso');
+      avisarErro('Erro ao carregar a taxa de sucesso', error);
     } finally {
       setInsightsLoading(false);
     }
@@ -276,7 +303,7 @@ export default function GCalDashboardPage(): JSX.Element {
       setTopInsights(data);
     } catch (error) {
       logger.error('Erro ao carregar top insights:', error);
-      message.error('Erro ao carregar insights');
+      avisarErro('Erro ao carregar os municípios e projetos com mais eventos', error);
     } finally {
       setInsightsLoading(false);
     }
@@ -314,7 +341,7 @@ export default function GCalDashboardPage(): JSX.Element {
       setEventDetail(data);
     } catch (error) {
       logger.error('Erro ao carregar detalhes:', error);
-      message.error('Erro ao carregar detalhes do evento');
+      avisarErro('Erro ao carregar os detalhes do evento', error);
     } finally {
       setDetailLoading(false);
     }
@@ -339,7 +366,7 @@ export default function GCalDashboardPage(): JSX.Element {
       });
 
       if (data.queued > 0) {
-        message.success(`Evento reenfileirado para publicação (Reapply)`);
+        message.success('Atualização pedida: o evento vai ser enviado de novo ao Google');
         // Recarregar detalhes após 2 segundos
         setTimeout(() => { void loadEventDetail(selectedEventId); }, TIMING.GCAL_DETAIL_LOAD_DELAY_MS);
       } else if (data.errors && data.errors.length > 0) {
@@ -347,7 +374,7 @@ export default function GCalDashboardPage(): JSX.Element {
       }
     } catch (error) {
       logger.error('Erro ao reapliar:', error);
-      message.error((error as Error).message || 'Erro ao reapliar evento');
+      message.error((error as Error).message || 'Erro ao atualizar o evento no Google');
     }
   };
 
@@ -363,7 +390,7 @@ export default function GCalDashboardPage(): JSX.Element {
       });
 
       if (data.queued > 0) {
-        message.success(`Evento reenfileirado para ressincronização (Resync)`);
+        message.success('Reenvio pedido: o evento vai ser publicado de novo no Google');
         // Recarregar detalhes após 2 segundos
         setTimeout(() => { void loadEventDetail(selectedEventId); }, TIMING.GCAL_DETAIL_LOAD_DELAY_MS);
       } else if (data.errors && data.errors.length > 0) {
@@ -371,7 +398,7 @@ export default function GCalDashboardPage(): JSX.Element {
       }
     } catch (error) {
       logger.error('Erro ao ressincronizar:', error);
-      message.error((error as Error).message || 'Erro ao ressincronizar evento');
+      message.error((error as Error).message || 'Erro ao reenviar o evento ao Google');
     }
   };
 
@@ -685,7 +712,7 @@ export default function GCalDashboardPage(): JSX.Element {
           <Card
             title={
               <Space>
-                <Text strong>Top 5 {topMetric === 'municipios' ? 'Municípios' : 'Projetos'}</Text>
+                <Text strong>Os 5 {topMetric === 'municipios' ? 'municípios' : 'projetos'} com mais eventos</Text>
                 <Select
                   size="small"
                   value={topMetric}
@@ -744,14 +771,14 @@ export default function GCalDashboardPage(): JSX.Element {
         open={drawerOpen}
         extra={
           <Space>
-            <Tooltip title="Reapliar evento (forçar update sem resetar hash)">
+            <Tooltip title="Manda o evento de novo ao Google, como está no sistema">
               <Button icon={<EyeOutlined />} onClick={handleReapply}>
-                Reapply
+                Atualizar no Google
               </Button>
             </Tooltip>
-            <Tooltip title="Ressincronizar evento (resetar hash + reprocessar)">
+            <Tooltip title="Refaz a publicação do evento no Google desde o começo">
               <Button icon={<RedoOutlined />} onClick={handleResync} type="primary">
-                Resync
+                Reenviar
               </Button>
             </Tooltip>
           </Space>
@@ -785,7 +812,7 @@ export default function GCalDashboardPage(): JSX.Element {
                   {STATUS_LABELS[eventDetail.gcal_status]}
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="Event ID">{eventDetail.external_event_id || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Código no Google">{eventDetail.external_event_id || '-'}</Descriptions.Item>
               <Descriptions.Item label="Última Sincronização">
                 {eventDetail.gcal_last_sync_at ? formatFortaleza(eventDetail.gcal_last_sync_at) : '-'}
               </Descriptions.Item>
@@ -795,11 +822,6 @@ export default function GCalDashboardPage(): JSX.Element {
                     {eventDetail.meet_link}
                   </a>
                 ) : '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Payload Hash">
-                <Text ellipsis style={{ maxWidth: 500 }}>
-                  {eventDetail.gcal_payload_hash || '-'}
-                </Text>
               </Descriptions.Item>
               <Descriptions.Item label="Último Erro">
                 {eventDetail.gcal_last_error ? (
@@ -824,7 +846,7 @@ export default function GCalDashboardPage(): JSX.Element {
                         <UserOutlined />
                         {/* S5: o e-mail vem null quando é o de reserva ou leva CPF; o rótulo é o nome. */}
                         <Text strong>{participantLabel(p)}</Text>
-                        <Tag>{p.role}</Tag>
+                        <Tag>{ROLE_LABELS[p.role] ?? p.role}</Tag>
                         {p.ch_horas && <Text type="secondary">{p.ch_horas}h</Text>}
                       </Space>
                       {p.observacao && (
@@ -863,18 +885,11 @@ export default function GCalDashboardPage(): JSX.Element {
                     color: getTimelineColor(log.action),
                     children: (
                       <div>
-                        <Text strong>{log.action}</Text>
+                        <Text strong>{ACAO_LABELS[log.action] ?? 'Registro do Google'}</Text>
                         <br />
                         <Text type="secondary">
                           {log.usuario_nome} - {formatFortaleza(log.created_at, 'DD/MM/YYYY HH:mm:ss')}
                         </Text>
-                        {log.details && Object.keys(log.details).length > 0 && (
-                          <div className="mt-1">
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              {JSON.stringify(log.details, null, 2)}
-                            </Text>
-                          </div>
-                        )}
                       </div>
                     ),
                   };

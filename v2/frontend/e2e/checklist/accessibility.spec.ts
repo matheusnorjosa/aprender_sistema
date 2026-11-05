@@ -646,7 +646,7 @@ test.describe('Checklist: Acessibilidade — opções que não carregaram (C2, a
       const projetos = modal.getByRole('button', { name: 'Tentar de novo: carregar os projetos', exact: true });
       await expect(modal.getByRole('combobox', { name: 'Projeto' })).toBeDisabled();
 
-      await modal.getByLabel('Descricao').focus();
+      await modal.getByLabel('Descrição').focus();
       await page.keyboard.press('Tab');
       await expect(projetos).toBeFocused();
 

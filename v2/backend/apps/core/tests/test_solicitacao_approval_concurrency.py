@@ -15,14 +15,18 @@ from datetime import timedelta
 from types import SimpleNamespace
 from uuid import uuid4
 
-from django.db import close_old_connections
+from django.db import close_old_connections, transaction
 from django.utils import timezone
 
 import pytest
 
 from apps.core.exceptions import ValidationAPIError
 from apps.core.models import AuditLog, Solicitacao, Usuario
-from apps.core.services.solicitacao_approval import approve_solicitacao, batch_approve_solicitacoes
+from apps.core.services.solicitacao_approval import (
+    approve_solicitacao,
+    batch_approve_solicitacoes,
+    batch_reject_solicitacoes,
+)
 from apps.core.tests.factories import (
     GroupFactory,
     MunicipioFactory,
@@ -214,3 +218,62 @@ def test_batch_approve_solicitacoes_blocks_double_approval_race(
     assert solicitacao.status == "aprovado"
 
     assert AuditLog.objects.filter(action="APPROVE", details__solicitacao_id=solicitacao.id).count() == 1
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("acao", ["aprovar", "reprovar"])
+def test_lote_item_que_outra_pessoa_decide_agora_volta_como_ocupado(
+    acao,
+    usuario_superintendencia,
+    usuario_coordenador,
+    municipio,
+    projeto_super,
+    tipo_evento,
+):
+    """A#9: item ainda pendente, mas travado por outra decisão em curso, não diz "Status já é 'pendente'".
+
+    Outra conexão segura a linha (`select_for_update`); o lote a pula (`skip_locked`) e a devolve como
+    ocupada, com a orientação de atualizar e tentar de novo.
+    """
+    solicitacao = SolicitacaoFactory(
+        usuario=usuario_coordenador,
+        municipio=municipio,
+        projeto=projeto_super,
+        tipo_evento=tipo_evento,
+        inicio=timezone.now() + timedelta(days=3),
+        fim=timezone.now() + timedelta(days=3, hours=2),
+        status="pendente",
+    )
+    travada = threading.Event()
+    soltar = threading.Event()
+
+    def outra_pessoa_decidindo() -> None:
+        close_old_connections()
+        try:
+            with transaction.atomic():
+                Solicitacao.objects.select_for_update().get(pk=solicitacao.id)
+                travada.set()
+                soltar.wait(timeout=10)
+        finally:
+            close_old_connections()
+
+    req = SimpleNamespace(META={"REMOTE_ADDR": "127.0.0.1", "HTTP_USER_AGENT": "pytest"})
+    lote = batch_approve_solicitacoes if acao == "aprovar" else batch_reject_solicitacoes
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        futuro = executor.submit(outra_pessoa_decidindo)
+        try:
+            assert travada.wait(timeout=10)
+            result = lote(ids=[solicitacao.id], user=usuario_superintendencia, request=req)
+        finally:
+            soltar.set()
+            futuro.result(timeout=10)
+
+    assert result.errors == [
+        {
+            "id": solicitacao.id,
+            "code": "busy",
+            "detail": "Outra pessoa está decidindo esta solicitação agora; atualize a lista e tente de novo.",
+        }
+    ]
+    solicitacao.refresh_from_db()
+    assert solicitacao.status == "pendente"

@@ -157,7 +157,6 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
 
   const [form] = Form.useForm<GroupFormValues>();
   const selectedMemberIds = Form.useWatch('member_ids', form) || [];
-  const selectedGroupType = Form.useWatch('group_type_input', form) || forcedType || 'setor';
   const pageTypeMeta = forcedType ? TYPE_UI[forcedType] : null;
 
   const reservedGroupNames = useMemo(
@@ -508,14 +507,15 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
         <Tag color="blue" style={{ marginInlineEnd: 0 }}>{record.user_count || 0} usuário(s)</Tag>
       ),
     },
+    // Grupo é etiqueta (PR 12): as capacidades guardadas nele só valeriam na volta de emergência.
     {
-      title: 'Permissões funcionais',
+      title: 'Capacidades guardadas (não valem hoje)',
       key: 'permissoes_funcionais',
       responsive: VISIVEL_A_PARTIR.lg,
       render: (_, record) => {
         const permissoes = record.permissoes_funcionais;
         if (!permissoes || permissoes.length === 0) {
-          return <Text type="secondary">Sem permissões funcionais</Text>;
+          return <Text type="secondary">Nenhuma guardada</Text>;
         }
 
         const displayed = permissoes.slice(0, 3);
@@ -611,6 +611,13 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
           </div>
         </header>
 
+        <Alert
+          className="mb-4"
+          type="info"
+          showIcon
+          message="Grupo é etiqueta: colocar alguém num grupo não dá acesso. O acesso vem do vínculo com a gerência."
+        />
+
         {!currentIsSuperuser ? (
           <Text type="secondary" className="mb-4 block">
             <LockOutlined aria-hidden="true" /> Somente superusuário cria, edita ou exclui.
@@ -664,21 +671,21 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
               <Select
                 options={[
                   { label: 'Setor (onde o usuário trabalha)', value: 'setor' },
-                  { label: 'Função (o que o usuário pode fazer)', value: 'funcao' },
+                  { label: 'Função (cargo da pessoa; não dá acesso)', value: 'funcao' },
                 ]}
               />
             </Form.Item>
           ) : null}
 
-          {/* D4 (ADR-020): só leitura. O que um grupo pode muda por alteração revisada do sistema. */}
+          {/* D4 (ADR-020): só leitura. PR 12: grupo é etiqueta, o acesso vem da lotação. */}
           <Form.Item
-            label={selectedGroupType === 'funcao' ? 'Permissões de acesso da Função' : 'Permissões de acesso'}
-            extra="Definido no sistema: o que um grupo pode fazer muda só por uma alteração revisada do sistema, não por esta tela."
+            label="Capacidades guardadas (não valem hoje: o acesso vem da lotação)"
+            extra="Definido no sistema: muda só por uma alteração revisada do sistema, não por esta tela."
           >
             {permissionsByCategory.length === 0 ? (
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={editingGroup ? 'Este grupo não tem permissões de acesso' : 'Um grupo novo começa sem permissões de acesso'}
+                description={editingGroup ? 'Este grupo não tem capacidades guardadas' : 'Um grupo novo começa sem capacidades guardadas'}
               />
             ) : (
               <Space direction="vertical" className="w-full" size="middle">
@@ -754,7 +761,7 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
           <Card size="small" title="Resumo antes de salvar" className="mb-2">
             <Space direction="vertical" size={8} style={{ width: '100%' }}>
               <Text>
-                Permissões do grupo: <Tag color="purple">{totalPermissoesDoGrupo}</Tag>
+                Capacidades guardadas (não valem hoje): <Tag color="purple">{totalPermissoesDoGrupo}</Tag>
               </Text>
               {/* Sem a lista, a contagem seria 0 (o campo está vazio): mostra o estado da lista, não um número. */}
               {usuariosProntos ? (

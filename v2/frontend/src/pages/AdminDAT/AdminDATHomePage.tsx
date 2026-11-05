@@ -11,10 +11,12 @@
  * Fase 1 - Plano DAT/GCal 2025-10-29
  */
 
-import type { ReactNode, JSX } from 'react';
+import { useEffect, useState, type ReactNode, type JSX } from 'react';
 import { Card, Row, Col, Typography } from 'antd';
-import { UserOutlined, EnvironmentOutlined, TeamOutlined, ProjectOutlined, SettingOutlined, SafetyOutlined, BankOutlined, ShoppingOutlined } from '@ant-design/icons';
+import { UserOutlined, EnvironmentOutlined, TeamOutlined, ProjectOutlined, SettingOutlined, SafetyOutlined, BankOutlined, ShoppingOutlined, ClusterOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router';
+import { checkAuth } from '../../api/auth';
+import { ehSuperusuario } from '../../contexts/AcessoContext';
 
 const { Title, Text } = Typography;
 
@@ -32,12 +34,19 @@ interface ModuleConfig {
 
 export default function AdminDATHomePage(): JSX.Element {
   const navigate = useNavigate();
+  // Grupos (todos, inclusive os sem classificação) é tela de superusuário. Falha ao consultar = sem o cartão.
+  const [superusuario, setSuperusuario] = useState(false);
+  useEffect(() => {
+    checkAuth()
+      .then((auth) => setSuperusuario(ehSuperusuario(auth.user)))
+      .catch(() => setSuperusuario(false));
+  }, []);
 
   const modules: ModuleConfig[] = [
     {
       key: 'usuarios',
       title: 'Usuários',
-      description: 'Gerenciar usuários, CPF, grupos e perfis',
+      description: 'Contas, senha e lotação',
       icon: <UserOutlined className="text-5xl text-blue-500" />,
       path: '/dat/admin/usuarios',
       status: 'Disponível',
@@ -53,7 +62,7 @@ export default function AdminDATHomePage(): JSX.Element {
     {
       key: 'setores',
       title: 'Setores',
-      description: 'Gerenciar setores (onde cada usuário atua)',
+      description: 'Etiquetas de setor (não dão acesso; o acesso vem da lotação na gerência)',
       icon: <TeamOutlined className="text-5xl text-yellow-500" />,
       path: '/dat/admin/setores',
       status: 'Disponível',
@@ -61,11 +70,23 @@ export default function AdminDATHomePage(): JSX.Element {
     {
       key: 'funcoes',
       title: 'Funções',
-      description: 'Gerenciar funções (o que cada usuário pode fazer)',
+      description: 'Etiquetas de função (cargo; não dá acesso)',
       icon: <SafetyOutlined className="text-5xl text-amber-500" />,
       path: '/dat/admin/funcoes',
       status: 'Disponível',
     },
+    ...(superusuario
+      ? [
+          {
+            key: 'grupos',
+            title: 'Grupos',
+            description: 'Todos os grupos, inclusive os sem tipo (etiquetas; não dão acesso)',
+            icon: <ClusterOutlined className="text-5xl text-rose-500" />,
+            path: '/dat/admin/grupos',
+            status: 'Disponível' as const,
+          },
+        ]
+      : []),
     {
       key: 'gerencias',
       title: 'Gerências',
@@ -101,7 +122,7 @@ export default function AdminDATHomePage(): JSX.Element {
     {
       key: 'configuracoes',
       title: 'Configurações',
-      description: 'Configurações do sistema (disponibilidade, GCal, sessões, features)',
+      description: 'Buffer de deslocamento e teto de horas',
       icon: <SettingOutlined className="text-5xl text-cyan-500" />,
       path: '/dat/admin/configuracoes',
       status: 'Disponível',
@@ -114,7 +135,7 @@ export default function AdminDATHomePage(): JSX.Element {
       <header style={{ marginBottom: '24px' }}>
         <Title level={2} id="admin-dat-title">Admin DAT</Title>
         <Text type="secondary">
-          Gestão interna de cadastros do DAT - substitui uso cotidiano do Django Admin
+          Cadastros do sistema mantidos pelo DAT
         </Text>
       </header>
 

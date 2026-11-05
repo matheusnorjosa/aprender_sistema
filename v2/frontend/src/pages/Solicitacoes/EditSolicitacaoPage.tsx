@@ -5,7 +5,8 @@
  *
  * Regras:
  * - Apenas o criador ou usuários privilegiados (Superintendência/DAT) podem editar
- * - Não é possível editar solicitações já publicadas no Google Calendar
+ * - Não é possível editar solicitações já publicadas no Google Calendar, nem as que estão no Google
+ *   pela planilha ou com a sincronização em andamento (PENDING)
  * - Não é possível editar solicitações reprovadas
  */
 
@@ -50,7 +51,8 @@ import ComboBox from '../../components/ComboBox';
 import CoordenadoresPicker, { type CoordenadorItem } from '../../components/CoordenadoresPicker';
 import FormadoresPicker from '../../components/FormadoresPicker';
 import logger from '../../utils/logger';
-import type { ID, Solicitacao, GCalStatus, Participation } from '../../types';
+import { MOTIVO_NAO_PUBLICAVEL, motivoNaoPublicavel } from '../../utils/gcalRowActions';
+import type { ID, Solicitacao, SolicitacaoStatus, GCalStatus, Participation } from '../../types';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -137,6 +139,83 @@ function responsavelEfetivoDe(s: Solicitacao): ID {
   return s.coordenador ?? s.usuario;
 }
 
+/** Nome na tela (D15): nome e sobrenome que existirem; sem nenhum, o número. Nunca o login (o servidor nem o manda). */
+function nomeDe(u: { id: ID; first_name?: string; last_name?: string }): string {
+  return [u.first_name, u.last_name].filter(Boolean).join(' ') || `#${u.id}`;
+}
+
+const ROTULO_DO_STATUS: Record<SolicitacaoStatus, string> = {
+  pendente: 'Pendente',
+  aprovado: 'Aprovado',
+  reprovado: 'Reprovado',
+};
+
+const ROTULO_DO_GCAL: Record<GCalStatus, string> = {
+  NONE: 'Não publicado',
+  PENDING: 'Aguardando publicação',
+  PUBLISHED: 'Publicado',
+  ERROR: 'Erro ao publicar',
+};
+
+/**
+ * Por que a tela não abre o formulário, ou null. Os mesmos travamentos do servidor (o salvar daria 400)
+ * e os textos de Minhas Solicitações (D25, D27): o caminho que existe, não "cancele o evento".
+ */
+function travaDaEdicao(s: Solicitacao): { titulo: string; texto: string; publicado: boolean } | null {
+  if (s.publicado_fora_do_sistema === true) {
+    return {
+      titulo: 'Evento na agenda pela planilha',
+      texto: `Este evento ${MOTIVO_NAO_PUBLICAVEL.publicado_fora_do_sistema}; mudar aqui não muda a agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle.`,
+      publicado: true,
+    };
+  }
+  if (s.gcal_status === 'PUBLISHED') {
+    // Publicar na agenda (Apoio) e a Pré-agenda (Controle) só tiram do Google o aprovado com id, de hoje em diante.
+    const consegueTirar =
+      s.status === 'aprovado' && Boolean(s.external_event_id) && motivoNaoPublicavel(s) !== 'evento_passado';
+    return {
+      titulo: 'Solicitação já publicada',
+      texto: consegueTirar
+        ? 'Este evento já está no Google Agenda. Para editar, peça ao Apoio de Coordenação da sua gerência, na tela Publicar na agenda, ou ao Controle, na Pré-agenda, que tire o evento só do Google; depois disso, você consegue editar aqui.'
+        : 'Este evento já está no Google Agenda e não dá para editá-lo aqui. Para mudar, fale com a administração do sistema.',
+      publicado: true,
+    };
+  }
+  if (s.gcal_status === 'PENDING') {
+    return {
+      titulo: 'Sincronização em andamento',
+      texto: 'A sincronização com o Google Agenda está em andamento. Aguarde e recarregue a página para editar.',
+      publicado: true,
+    };
+  }
+  if (s.status === 'reprovado') {
+    return {
+      titulo: 'Solicitação reprovada',
+      texto: 'Solicitações reprovadas não podem ser editadas. Crie uma nova solicitação se necessário.',
+      publicado: false,
+    };
+  }
+  return null;
+}
+
+/**
+ * O que a aprovação SUPER aprovou (`_campos_materiais` do backend): projeto, município, início e fim
+ * (como instante), formadores, os coordenadores além do responsável e o responsável que acompanha.
+ */
+function camposMateriais(d: FormDataType): string {
+  const ids = (lista: Array<{ id: ID }>): string => lista.map(p => String(p.id)).sort().join(',');
+  const instante = (iso: string | null): number | null => (iso ? dayjs(iso).valueOf() : null);
+  return JSON.stringify([
+    d.projeto?.id ?? null,
+    d.municipio?.id ?? null,
+    instante(d.inicio),
+    instante(d.fim),
+    ids(d.formadores),
+    ids(d.coordenadores.slice(1)),
+    d.coordenadorAcompanha ? (d.coordenadores[0]?.id ?? null) : null,
+  ]);
+}
+
 export default function EditSolicitacaoPage(): JSX.Element {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -146,6 +225,8 @@ export default function EditSolicitacaoPage(): JSX.Element {
   const [saving, setSaving] = useState<boolean>(false);
   const [solicitacao, setSolicitacao] = useState<Solicitacao | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // O formulário como veio do servidor: a régua do aviso "volta para aprovação".
+  const [carregado, setCarregado] = useState<FormDataType | null>(null);
 
   // Estado do formulário
   const [formData, setFormData] = useState<FormDataType>({
@@ -183,9 +264,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
             .filter((p: Participation) => p.role === papel && p.usuario)
             .map((p: Participation) => ({
               id: p.usuario!.id,
-              label: p.usuario!.first_name && p.usuario!.last_name
-                ? `${p.usuario!.first_name} ${p.usuario!.last_name}`.trim()
-                : p.usuario!.username,
+              label: nomeDe(p.usuario!),
               avaliavel: avaliaveis.has(p.usuario!.id),
             }));
         const formadores = pessoasDoPapel('FORMADOR');
@@ -198,9 +277,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
         const linhaDoResponsavel = (data.participations || []).find(
           (p: Participation) => p.role === 'COORDENADOR' && p.usuario?.id === efetivoId,
         );
-        const nomeDaLinha = linhaDoResponsavel?.usuario
-          ? `${linhaDoResponsavel.usuario.first_name} ${linhaDoResponsavel.usuario.last_name}`.trim()
-          : '';
+        const nomeDaLinha = linhaDoResponsavel?.usuario ? nomeDe(linhaDoResponsavel.usuario) : '';
         const responsavelEfetivo: CoordenadorItem = {
           id: efetivoId,
           label: data.coordenador_nome || nomeDaLinha || `#${efetivoId}`,
@@ -211,7 +288,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
         ];
 
         // Preencher o formData com os dados existentes
-        setFormData({
+        const inicial: FormDataType = {
           projeto: data.projeto
             ? {
                 id: data.projeto,
@@ -234,7 +311,9 @@ export default function EditSolicitacaoPage(): JSX.Element {
           coordenadorAcompanha: data.coordenador_acompanha,
           pretendeAvaliar: data.pretende_avaliar_formador ?? null,
           formadorAvaliado: data.formador_avaliado ?? null,
-        });
+        };
+        setFormData(inicial);
+        setCarregado(inicial);
 
         // Preencher o form do Ant Design
         form.setFieldsValue({
@@ -325,6 +404,15 @@ export default function EditSolicitacaoPage(): JSX.Element {
   // Projeto em espera: o servidor recusa o par novo (não vai para aprovação), e a tela diz isso.
   const emEspera = parDiferente && formData.municipio?.projeto_em_espera === true;
   const semCompra = parDiferente && !emEspera && formData.municipio?.sem_compra === true;
+  // SUPER aprovada: mudar o que a aprovação aprovou a devolve para aprovação (decisões do dono de 14/10,
+  // 03/11 e 04/11/2026). A tela avisa antes do Salvar; o par sem compra ou em espera já tem o aviso dele.
+  const voltaParaAprovacao =
+    solicitacao?.status === 'aprovado' &&
+    (formData.projeto?.fluxo ?? solicitacao.fluxo) === 'SUPER' &&
+    !semCompra &&
+    !emEspera &&
+    carregado !== null &&
+    camposMateriais(formData) !== camposMateriais(carregado);
 
   // Trocar o projeto: a marca era do par antigo. Com município escolhido, reconfere o par novo pelo
   // mesmo lookup (só esse município); a resposta só vale se o par ainda é o mesmo.
@@ -556,11 +644,9 @@ export default function EditSolicitacaoPage(): JSX.Element {
   }
 
   // Verificar se pode editar
-  const isPublished = solicitacao?.gcal_status === ('PUBLISHED' as GCalStatus);
-  const isRejected = solicitacao?.status === 'reprovado';
-  const canEdit = !isPublished && !isRejected;
+  const trava = solicitacao && travaDaEdicao(solicitacao);
 
-  if (!canEdit) {
+  if (trava) {
     return (
       <div className="p-6 max-w-4xl mx-auto">
         <Card>
@@ -574,13 +660,9 @@ export default function EditSolicitacaoPage(): JSX.Element {
 
           <Result
             status="warning"
-            icon={isPublished ? <CalendarOutlined /> : <StopOutlined />}
-            title={isPublished ? 'Solicitação já publicada' : 'Solicitação reprovada'}
-            subTitle={
-              isPublished
-                ? 'Esta solicitação já foi publicada no Google Calendar e não pode ser editada. Cancele o evento primeiro se precisar fazer alterações.'
-                : 'Solicitações reprovadas não podem ser editadas. Crie uma nova solicitação se necessário.'
-            }
+            icon={trava.publicado ? <CalendarOutlined /> : <StopOutlined />}
+            title={trava.titulo}
+            subTitle={trava.texto}
           />
         </Card>
       </div>
@@ -600,9 +682,9 @@ export default function EditSolicitacaoPage(): JSX.Element {
 
         <Title level={2} className="mb-2">Editar Solicitação #{id}</Title>
         <Text type="secondary">
-          Status: <strong>{solicitacao?.status}</strong>
+          Status: <strong>{solicitacao && (ROTULO_DO_STATUS[solicitacao.status] ?? solicitacao.status)}</strong>
           {solicitacao?.gcal_status && solicitacao.gcal_status !== ('NONE' as GCalStatus) && (
-            <> | GCal: <strong>{solicitacao.gcal_status}</strong></>
+            <> | Google Agenda: <strong>{ROTULO_DO_GCAL[solicitacao.gcal_status] ?? solicitacao.gcal_status}</strong></>
           )}
         </Text>
 
@@ -790,6 +872,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
           <Form.Item
             label="Observações"
             name="observacoes"
+            rules={[{ max: 5000, message: 'Máximo 5000 caracteres' }]}
           >
             <TextArea
               rows={4}
@@ -820,6 +903,17 @@ export default function EditSolicitacaoPage(): JSX.Element {
             className="mb-6"
           />
 
+          {voltaParaAprovacao && (
+            <Alert
+              id="edit-volta-aprovacao"
+              type="warning"
+              showIcon
+              role="status"
+              message="Esta mudança volta o evento para aprovação."
+              className="mb-4"
+            />
+          )}
+
           <div className="flex gap-2 justify-end">
             <Button onClick={() => navigate('/solicitacoes/minhas')}>
               Cancelar
@@ -829,6 +923,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
               icon={<SaveOutlined />}
               onClick={handleSubmit}
               loading={saving}
+              aria-describedby={voltaParaAprovacao ? 'edit-volta-aprovacao' : undefined}
             >
               Salvar Alterações
             </Button>

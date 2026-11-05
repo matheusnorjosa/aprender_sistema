@@ -114,7 +114,7 @@ describe('GruposPage: permissões do grupo só leitura (D4)', () => {
     const modal = (await screen.findByText('Editar Setor', {}, { timeout: 10000 })).closest<HTMLElement>('[role="dialog"]')!;
 
     expect(await within(modal).findByText(CAPACIDADE.label)).toBeInTheDocument();
-    expect(within(modal).queryByText('Este grupo não tem permissões de acesso')).not.toBeInTheDocument();
+    expect(within(modal).queryByText('Este grupo não tem capacidades guardadas')).not.toBeInTheDocument();
   }, 40000);
 
   test('o Salvar da edição não manda permissao_funcional_ids', async () => {

@@ -40,6 +40,12 @@ describe('ImportacoesPage — DAT > Importações (PR-B)', () => {
     ).toBeInTheDocument();
   });
 
+  test('diz que o acesso é só do superusuário (decisão do dono de 02/10/2026)', () => {
+    render(<ImportacoesPage />);
+    expect(screen.getByText(/Acesso restrito ao superusuário\./)).toBeInTheDocument();
+    expect(screen.queryByText(/DAT e superusuários/)).not.toBeInTheDocument();
+  });
+
   test('renderiza 3 categorias com títulos corretos', () => {
     render(<ImportacoesPage />);
     expect(screen.getByRole('heading', { level: 3, name: 'Cadastros base' })).toBeInTheDocument();

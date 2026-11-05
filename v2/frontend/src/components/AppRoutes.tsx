@@ -98,8 +98,9 @@ export function AppRoutes({ user }: AppRoutesProps): JSX.Element {
             (mesma policy da API; use_gcal/Pré-agenda não dão acesso). */}
         <Route path="/solicitacoes/publicacao" element={<RequirePolicy policy="publish_setor_solicitacao" policies={policies}><PublicacaoSetorPage /></RequirePolicy>} />
         {/* :id/editar (#1169): quem pode ser dono (create_solicitation: quem cria é dono e o servidor
-            deixa o dono editar), o aprovador e o DAT. O servidor segue decidindo o salvar. */}
-        <Route path="/solicitacoes/:id/editar" element={<RequirePolicy policy={['create_solicitation', 'access_solicitation_approvals', 'manage_admin_registries']} policies={policies}><EditSolicitacaoPage /></RequirePolicy>} />
+            deixa o dono editar; a aprovadora da Superintendência entra por ela) e o DAT. Só aprovar (o
+            Controle) não abre: o servidor recusa o salvar. O servidor segue decidindo o salvar. */}
+        <Route path="/solicitacoes/:id/editar" element={<RequirePolicy policy={['create_solicitation', 'manage_admin_registries']} policies={policies}><EditSolicitacaoPage /></RequirePolicy>} />
 
         {/* Páginas movidas para sob /solicitacoes/* (com redirects abaixo) */}
         <Route path="/solicitacoes/aprovacoes" element={<RequirePolicy policy="access_solicitation_approvals" policies={policies}><ApprovalsPage /></RequirePolicy>} />

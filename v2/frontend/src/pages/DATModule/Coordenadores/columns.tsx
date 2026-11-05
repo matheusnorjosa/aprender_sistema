@@ -48,6 +48,8 @@ export interface ColumnHandlers {
   onEdit: (record: CoordenadorRecord) => void;
   onDelete: (record: CoordenadorRecord) => void;
   onToggleAtivo: (record: CoordenadorRecord) => void;
+  /** `execute_restricted_operations`, que o destroy exige: sem ela, Excluir não aparece. */
+  podeExcluir: boolean;
 }
 
 /**
@@ -55,7 +57,7 @@ export interface ColumnHandlers {
  * @param handlers - Event handlers object
  * @returns Column definitions
  */
-export function getColumns({ onView, onEdit, onDelete, onToggleAtivo }: ColumnHandlers): ColumnsType<CoordenadorRecord> {
+export function getColumns({ onView, onEdit, onDelete, onToggleAtivo, podeExcluir }: ColumnHandlers): ColumnsType<CoordenadorRecord> {
   return [
     {
       title: '',
@@ -187,7 +189,7 @@ export function getColumns({ onView, onEdit, onDelete, onToggleAtivo }: ColumnHa
     {
       title: 'Ações',
       key: 'acoes',
-      width: 120,
+      width: podeExcluir ? 120 : 88,
       fixed: 'right',
       render: (_, record) => (
         <Space size="small">
@@ -209,16 +211,18 @@ export function getColumns({ onView, onEdit, onDelete, onToggleAtivo }: ColumnHa
               aria-label="Editar coordenador"
             />
           </Tooltip>
-          <Tooltip title="Excluir">
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => onDelete(record)}
-              aria-label="Excluir coordenador"
-            />
-          </Tooltip>
+          {podeExcluir && (
+            <Tooltip title="Excluir">
+              <Button
+                type="text"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => onDelete(record)}
+                aria-label="Excluir coordenador"
+              />
+            </Tooltip>
+          )}
         </Space>
       ),
     },

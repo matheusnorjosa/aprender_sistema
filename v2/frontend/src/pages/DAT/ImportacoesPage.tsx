@@ -198,8 +198,8 @@ export default function ImportacoesPage(): JSX.Element {
           DAT &gt; Importações
         </Title>
         <Text type="secondary">
-          Centralize aqui todas as importações em massa da plataforma. Acesso restrito ao DAT
-          e superusuários.
+          Centralize aqui todas as importações em massa da plataforma. Acesso restrito ao
+          superusuário.
         </Text>
       </header>
 

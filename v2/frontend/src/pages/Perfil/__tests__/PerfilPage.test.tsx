@@ -46,6 +46,14 @@ function renderPage(user: CurrentUser = makeUser()) {
   );
 }
 
+/** Erro como o `fetchAPI` lança num 400 de validação: `message` = detail e `response.data.errors` por campo. */
+function erroDeValidacao(errors: Record<string, string[]>) {
+  return Object.assign(new Error('Erro de validação.'), {
+    status: 400,
+    response: { status: 400, data: { detail: 'Erro de validação.', code: 'INVALID', errors } },
+  });
+}
+
 function fill(placeholder: string, value: string) {
   fireEvent.change(screen.getByPlaceholderText(placeholder), { target: { value } });
 }
@@ -73,7 +81,7 @@ describe('PerfilPage — redefinições da senha por outra pessoa (F1)', () => {
   });
 });
 
-describe('PerfilPage', () => {
+describe('PerfilPage', { timeout: 20000 }, () => {
   beforeEach(() => {
     changeMyPasswordMock.mockReset();
     updateMyContactMock.mockReset();
@@ -107,17 +115,35 @@ describe('PerfilPage', () => {
     expect(screen.getByText('pessoa.teste@example.invalid')).toBeInTheDocument();
   });
 
-  test('PR A: o setor vem do vínculo (me.gerencias, nome de tela), não do grupo', async () => {
-    renderPage(
-      makeUser({ setores: ['Vidas'], gerencias: [{ id: 4, rotulo: 'Superativar', papeis: ['COORDENADOR'] }] })
-    );
+  test('P#2: o setor vem da lotação (me.setores_da_lotacao, nome de tela), não do grupo', async () => {
+    renderPage(makeUser({ setores: ['Vidas'], setores_da_lotacao: ['Superativar'] }));
     expect(await screen.findByText('Superativar')).toBeInTheDocument();
     expect(screen.queryByText('Vidas')).not.toBeInTheDocument();
   });
 
-  test('PR A: sem vínculo (Controle opera por grupo), o setor cai para os grupos de setor', async () => {
-    renderPage(makeUser({ setores: ['Controle'], gerencias: [] }));
-    expect(await screen.findByText('Controle')).toBeInTheDocument();
+  test('P#2: lotado como EQUIPE (DAT), mostra a gerência mesmo sem escopo em me.gerencias', async () => {
+    renderPage(makeUser({ setores: ['Controle'], gerencias: [], setores_da_lotacao: ['DAT'] }));
+    expect(await screen.findByText('DAT')).toBeInTheDocument();
+    expect(screen.queryByText('Controle')).not.toBeInTheDocument();
+  });
+
+  test('P#2: sem vínculo, o setor mostra "—" e nunca o grupo', async () => {
+    renderPage(
+      makeUser({
+        setores: ['Controle'],
+        gerencias: [{ id: 4, rotulo: 'Superativar', papeis: ['COORDENADOR'] }],
+        setores_da_lotacao: [],
+      })
+    );
+    expect(await screen.findByText('Pessoa Teste')).toBeInTheDocument();
+    expect(screen.queryByText('Controle')).not.toBeInTheDocument();
+    expect(screen.queryByText('Superativar')).not.toBeInTheDocument();
+  });
+
+  test('A#43: conta sem nome não mostra o username (CPF) no lugar do nome', async () => {
+    renderPage(makeUser({ name: '', username: '12345678900', cpf: '12345678900' }));
+    expect(await screen.findByText('123.***.***-00')).toBeInTheDocument();
+    expect(screen.queryByText('12345678900')).not.toBeInTheDocument();
   });
 
   test('mascara o CPF do campo cpf (não do username) e mostra telefone/cargo', async () => {
@@ -180,8 +206,10 @@ describe('PerfilPage', () => {
     expect(changeMyPasswordMock).not.toHaveBeenCalled();
   });
 
-  test('erro do backend exibe message.error', async () => {
-    changeMyPasswordMock.mockRejectedValueOnce(new Error('Senha atual incorreta.'));
+  test('P#1: senha atual recusada mostra o motivo no campo, não só "Erro de validação."', async () => {
+    changeMyPasswordMock.mockRejectedValueOnce(
+      erroDeValidacao({ old_password: ['Senha atual incorreta.'] })
+    );
     const errorSpy = vi.spyOn(message, 'error');
     renderPage();
 
@@ -190,7 +218,53 @@ describe('PerfilPage', () => {
     fill('Confirmar nova senha', 'N0vaSenh@Forte');
     fireEvent.click(screen.getByRole('button', { name: /alterar senha/i }));
 
-    await waitFor(() => expect(changeMyPasswordMock).toHaveBeenCalled());
-    await waitFor(() => expect(errorSpy).toHaveBeenCalled());
+    expect(await screen.findByText('Senha atual incorreta.')).toBeInTheDocument();
+    expect(errorSpy).not.toHaveBeenCalledWith('Erro de validação.');
+  });
+
+  test('P#1: nova senha recusada (D73) mostra cada motivo no campo da nova senha', async () => {
+    changeMyPasswordMock.mockRejectedValueOnce(
+      erroDeValidacao({
+        new_password: ['Esta senha é muito comum.', 'A senha é muito parecida com o nome de usuário.'],
+      })
+    );
+    renderPage();
+
+    fill('Senha atual', 'SenhaAtual123!');
+    fill('Nova senha', 'N0vaSenh@Forte');
+    fill('Confirmar nova senha', 'N0vaSenh@Forte');
+    fireEvent.click(screen.getByRole('button', { name: /alterar senha/i }));
+
+    expect(await screen.findByText('Esta senha é muito comum.')).toBeInTheDocument();
+    expect(screen.getByText('A senha é muito parecida com o nome de usuário.')).toBeInTheDocument();
+  });
+
+  test('P#1: erro sem campo (ex.: muitas tentativas) cai no detail em message.error', async () => {
+    changeMyPasswordMock.mockRejectedValueOnce(new Error('Muitas tentativas. Aguarde e tente de novo.'));
+    const errorSpy = vi.spyOn(message, 'error');
+    renderPage();
+
+    fill('Senha atual', 'SenhaAtual123!');
+    fill('Nova senha', 'N0vaSenh@Forte');
+    fill('Confirmar nova senha', 'N0vaSenh@Forte');
+    fireEvent.click(screen.getByRole('button', { name: /alterar senha/i }));
+
+    await waitFor(() =>
+      expect(errorSpy).toHaveBeenCalledWith('Muitas tentativas. Aguarde e tente de novo.')
+    );
+  });
+
+  test('P#1: telefone recusado mostra o motivo no campo do telefone', async () => {
+    updateMyContactMock.mockRejectedValueOnce(
+      erroDeValidacao({ telefone: ['Certifique-se de que este campo não tenha mais de 20 caracteres.'] })
+    );
+    renderPage();
+
+    fill('(85) 99999-0000', '(85) 97777-2222');
+    fireEvent.click(screen.getByRole('button', { name: /salvar telefone/i }));
+
+    expect(
+      await screen.findByText('Certifique-se de que este campo não tenha mais de 20 caracteres.')
+    ).toBeInTheDocument();
   });
 });

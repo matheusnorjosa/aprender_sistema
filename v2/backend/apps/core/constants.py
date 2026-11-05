@@ -3,7 +3,7 @@ Constantes RBAC centralizadas — Fonte única de verdade.
 
 Definições:
 - SETOR_GROUPS: Grupos de setor (onde o usuário trabalha)
-- FUNCAO_GROUPS: Grupos de função (o que o usuário pode fazer)
+- FUNCAO_GROUPS: Grupos de função (cargo da pessoa; etiqueta, não dá acesso)
 - ALLOWED_USER_GROUPS: União de setores + funções (whitelist para atribuição)
 - RESERVED_GROUPS: Grupos que não podem ser deletados/renomeados sem confirmação
 

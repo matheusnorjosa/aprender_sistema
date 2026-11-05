@@ -181,11 +181,11 @@ class DATRegistroViewSet(LockOnWriteMixin, viewsets.ModelViewSet):
     def get_permissions(self):
         """
         Permissões baseadas na ação:
-        Apenas DAT (e Superintendência/Superusers) têm acesso.
 
-        - list, retrieve, export, stats: DAT ou Superintendência
-        - create, update, partial_update: DAT ou Superintendência
-        - destroy: apenas Superintendência (SPEC_DAT_REGISTROS.md seção 4.3)
+        - destroy: `execute_restricted_operations` (o DAT, pelo pacote ADMIN_OPERACIONAL,
+          e o superusuário)
+        - todo o resto (list, retrieve, create, update, partial_update, export, stats):
+          `manage_admin_registries` (o DAT e o superusuário)
         """
         if self.action == "destroy":
             return [HasPerm("execute_restricted_operations")()]

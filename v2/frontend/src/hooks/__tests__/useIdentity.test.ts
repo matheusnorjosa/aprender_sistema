@@ -84,8 +84,8 @@ describe('computeIdentity (Issue #1269)', () => {
     expect(id.badge).toBe('DAT');
   });
 
-  test('displayName cai para username quando name vazio', () => {
-    const id = computeIdentity(makeUser({ name: '', username: 'jdoe' }));
-    expect(id.displayName).toBe('jdoe');
+  test('A#43: name vazio não cai para o username (que é o CPF)', () => {
+    const id = computeIdentity(makeUser({ name: '', username: '12345678900' }));
+    expect(id.displayName).toBe('');
   });
 });

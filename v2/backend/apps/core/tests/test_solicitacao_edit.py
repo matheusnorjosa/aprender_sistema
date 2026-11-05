@@ -343,7 +343,10 @@ class TestSolicitacaoEditBusinessRules:
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Google Calendar" in str(response.data)
+        # D25: quem pediu não cancela o evento; o caminho é o Apoio ou o Controle tirar só do Google.
+        assert "peça ao Apoio de Coordenação da sua gerência" in str(response.data)
+        assert "que tire o evento só do Google" in str(response.data)
+        assert "Cancele o evento" not in str(response.data)
         solicitacao_publicada.refresh_from_db()
         assert solicitacao_publicada.local == "Local Publicado"
 
@@ -887,7 +890,9 @@ class TestSolicitacaoDelete:
         response = api_client.delete(f"/api/solicitacoes/{sol_id}/")
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Google Calendar" in str(response.data)
+        # D25: o caminho é pedir ao Apoio, em Publicar na agenda; "Cancele o evento" não existe para o dono.
+        assert "peça ao Apoio de Coordenação da sua gerência, na tela Publicar na agenda" in str(response.data)
+        assert "Cancele o evento" not in str(response.data)
         # Solicitação ainda existe
         assert Solicitacao.objects.filter(id=sol_id).exists()
 

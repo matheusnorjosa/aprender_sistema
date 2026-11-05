@@ -22,6 +22,7 @@ from drf_spectacular.utils import extend_schema
 
 from .api_schemas import COMMON_ERROR_RESPONSES
 from .models import AuditLog, EquipeGerencia
+from .pii import email_sem_cpf
 from .rbac.helpers import separar_setores_e_funcoes
 from .rbac.policies import user_has_policy
 from .serializers import CurrentUserSerializer, MeContactUpdateSerializer
@@ -60,6 +61,16 @@ def _gerencias_do_vinculo(user: Any) -> list[dict[str, Any]]:
     for item in por_gerencia.values():
         item["papeis"].sort()
     return sorted(por_gerencia.values(), key=lambda g: g["rotulo"].casefold())
+
+
+def _setores_da_lotacao(user: Any) -> list[str]:
+    """Só exibição (Perfil): rótulos das gerências ativas de TODOS os vínculos vigentes, EQUIPE inclusa.
+
+    Quem fica lotado como EQUIPE (DAT, Controle) também vê onde trabalha. Não é escopo nem permissão:
+    para isso é `gerencias`. Sem vínculo, lista vazia (nenhuma tela tira setor de grupo, D03).
+    """
+    vinculos = EquipeGerencia.vigentes_em().filter(usuario=user, gerencia__ativo=True).select_related("gerencia")
+    return sorted({v.gerencia.rotulo for v in vinculos}, key=str.casefold)
 
 
 def _aviso_senha_redefinida(user: Any) -> dict[str, str] | None:
@@ -131,6 +142,7 @@ class CurrentUserView(APIView):
             "gerencias": [              # Vínculos EquipeGerencia vigentes em gerência ativa
                 {"id": int, "rotulo": str, "papeis": list[str]}
             ],
+            "setores_da_lotacao": list[str],  # Só exibição: gerências de todos os vínculos (EQUIPE inclusa)
             "is_superuser": bool,
             "is_superintendencia": bool,
             "can_approve_super": bool,  # Legado: = policy access_solicitation_approvals (DAT aprova: PR 10)
@@ -178,10 +190,10 @@ class CurrentUserView(APIView):
         # autoriza por vínculo (`HasSectorAccess`).
         gerencias = _gerencias_do_vinculo(user)
 
-        # Compute display name
+        # Nome de tela. Sem nome, o e-mail, menos o de reserva `<cpf>@placeholder.local` ou o que leva CPF.
         name: str = f"{user.first_name or ''} {user.last_name or ''}".strip()
         if not name:
-            name = user.email or f"#{user.id}"
+            name = email_sem_cpf(user.email) or f"Usuario #{user.id}"
 
         return Response(
             {
@@ -199,6 +211,7 @@ class CurrentUserView(APIView):
                 "setores": setores,
                 "funcoes": funcoes,
                 "gerencias": gerencias,
+                "setores_da_lotacao": _setores_da_lotacao(user),
                 "is_superuser": user.is_superuser,
                 "is_superintendencia": is_superintendencia,
                 "can_approve_super": can_approve_super,

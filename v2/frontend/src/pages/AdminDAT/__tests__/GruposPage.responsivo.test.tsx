@@ -99,7 +99,7 @@ describe('GruposPage responsiva (C2)', () => {
     const linha = await linhaDo(NOME);
     await within(linha).findByRole('button', { name: `Editar: ${NOME}` });
 
-    expect(cabecalhos()).toEqual(['Nome', 'Tipo', 'Usuários', 'Permissões funcionais', 'Ações']);
+    expect(cabecalhos()).toEqual(['Nome', 'Tipo', 'Usuários', 'Capacidades guardadas (não valem hoje)', 'Ações']);
     expect(linha.textContent).not.toContain('9731');
     expect(within(linha).getByText('Aprovar solicitações')).toBeInTheDocument();
     expect(within(linha).getByText('+1')).toBeInTheDocument();
@@ -120,7 +120,7 @@ describe('GruposPage responsiva (C2)', () => {
 
     await clicarNaLinha(user, NOME, `Expandir linha de ${NOME}`);
     const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
-    expect(expandida.getByText('Permissões funcionais')).toBeInTheDocument();
+    expect(expandida.getByText('Capacidades guardadas (não valem hoje)')).toBeInTheDocument();
     expect(expandida.getByText('Aprovar solicitações')).toBeInTheDocument();
   }, 20000);
 
@@ -145,7 +145,7 @@ describe('GruposPage responsiva (C2)', () => {
   test('mudar a largura com a página aberta reorganiza as colunas', async () => {
     renderPage();
     await within(await linhaDo(NOME)).findByRole('button', { name: `Editar: ${NOME}` });
-    expect(cabecalhos()).toContain('Permissões funcionais');
+    expect(cabecalhos()).toContain('Capacidades guardadas (não valem hoje)');
 
     act(() => definirLarguraTela(360));
 

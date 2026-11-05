@@ -15,6 +15,7 @@ import { Link } from 'react-router';
 
 import type { CurrentUser } from '../../types/usuario';
 import { changeMyPassword, exportMyData, updateMyContact } from '../../api/me';
+import { errosDosCampos, mensagemDoErro } from '../AdminDAT/usuario_form_helpers';
 
 const { Title } = Typography;
 
@@ -27,6 +28,12 @@ interface ChangePasswordForm {
 interface ContatoForm {
   telefone: string;
 }
+
+/** Campo do backend (`/me/change-password/`) → campo do formulário de troca de senha. */
+const CAMPO_DA_SENHA: Record<string, keyof ChangePasswordForm> = {
+  old_password: 'senha_atual',
+  new_password: 'nova_senha',
+};
 
 /** Mascara o CPF (LGPD): mostra só os 3 primeiros e os 2 últimos dígitos. */
 export function maskCpf(value: string): string {
@@ -86,7 +93,14 @@ export default function PerfilPage({ user }: { user: CurrentUser }) {
       message.success('Senha alterada com sucesso.');
       form.resetFields();
     } catch (error) {
-      message.error((error as Error).message || 'Não foi possível alterar a senha.');
+      // O motivo da recusa (senha atual incorreta, senha comum, a recebida no primeiro acesso)
+      // vai para o campo; sem campo conhecido, o texto do erro vai para o aviso.
+      const campos = errosDosCampos<ChangePasswordForm>(error).flatMap((c) => {
+        const nome = CAMPO_DA_SENHA[String(c.name)];
+        return nome ? [{ name: nome, errors: c.errors ?? [] }] : [];
+      });
+      if (campos.length > 0) form.setFields(campos);
+      else message.error(mensagemDoErro(error) || 'Não foi possível alterar a senha.');
     } finally {
       setSaving(false);
     }
@@ -100,7 +114,9 @@ export default function PerfilPage({ user }: { user: CurrentUser }) {
       setTelefone(atualizado.telefone ?? values.telefone.trim());
       message.success('Telefone atualizado com sucesso.');
     } catch (error) {
-      message.error((error as Error).message || 'Não foi possível atualizar o telefone.');
+      const campos = errosDosCampos<ContatoForm>(error).filter((c) => c.name === 'telefone');
+      if (campos.length > 0) contatoForm.setFields(campos);
+      else message.error(mensagemDoErro(error) || 'Não foi possível atualizar o telefone.');
     } finally {
       setSavingContato(false);
     }
@@ -119,17 +135,15 @@ export default function PerfilPage({ user }: { user: CurrentUser }) {
           </span>
         }>
           <Descriptions column={1} size="small">
-            <Descriptions.Item label="Nome">{user.name || user.username}</Descriptions.Item>
+            <Descriptions.Item label="Nome">{user.name || '—'}</Descriptions.Item>
             <Descriptions.Item label="CPF">{maskCpf(user.cpf ?? user.username)}</Descriptions.Item>
             <Descriptions.Item label="E-mail">{user.email || '—'}</Descriptions.Item>
             <Descriptions.Item label="Telefone">{telefone || '—'}</Descriptions.Item>
             <Descriptions.Item label="Cargo">{user.cargo || '—'}</Descriptions.Item>
-            {/* PR A: setor = gerência do vínculo vigente (nome de tela). Sem vínculo (Controle,
-                DAT, Diretoria operam por grupo), cai para os grupos de setor. */}
+            {/* Setor = gerência de cada vínculo vigente (nome de tela), inclusive EQUIPE (DAT,
+                Controle). Sem vínculo, "—": nenhuma tela tira setor de grupo (D03). */}
             <Descriptions.Item label="Setores">
-              <TagList
-                items={user.gerencias?.length ? user.gerencias.map((g) => g.rotulo) : user.setores}
-              />
+              <TagList items={user.setores_da_lotacao ?? []} />
             </Descriptions.Item>
             <Descriptions.Item label="Funções">
               <TagList items={user.funcoes} />

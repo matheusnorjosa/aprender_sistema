@@ -61,6 +61,11 @@ export interface CurrentUser {
   funcoes: string[];
   /** Vínculos vigentes (EquipeGerencia). Fora do guard: payload antigo sem o campo não derruba o login. */
   gerencias: GerenciaVinculo[];
+  /**
+   * Só exibição (Perfil): rótulos das gerências de todos os vínculos vigentes, EQUIPE inclusa (DAT,
+   * Controle). Não é escopo: para isso é `gerencias`. Fora do guard: payload antigo sem o campo vale [].
+   */
+  setores_da_lotacao?: string[];
   is_superuser: boolean;
   is_superintendencia: boolean;
   can_approve_super: boolean;

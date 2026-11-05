@@ -47,7 +47,14 @@ export default function Disponibilidade(): JSX.Element {
       message.success('Bloqueio criado com sucesso!');
       await fetchBlocks(); // Recarregar lista
     } catch (error) {
-      message.error(`Erro ao criar bloqueio: ${(error as Error).message}`);
+      // No 400 de validação o `detail` é genérico ("Erro de validação."); o motivo vem em
+      // `errors.<campo>` (ex.: fim igual ao início).
+      const errors = (error as { response?: { data?: { errors?: Record<string, unknown> } } }).response?.data
+        ?.errors;
+      const motivoDoCampo = Object.values(errors ?? {})
+        .flat()
+        .find((texto): texto is string => typeof texto === 'string');
+      message.error(`Erro ao criar bloqueio: ${motivoDoCampo ?? (error as Error).message}`);
       throw error; // Propagar erro para o form
     }
   };

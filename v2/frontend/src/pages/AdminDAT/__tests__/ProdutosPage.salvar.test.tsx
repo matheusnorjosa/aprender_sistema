@@ -158,7 +158,7 @@ describe('ProdutosPage: salvar e filtrar (C2)', () => {
     expect(alerta).toHaveTextContent('Não foi possível carregar os projetos.');
     expect(within(modal).getByRole('combobox', { name: 'Projeto' })).toBeDisabled();
 
-    within(modal).getByLabelText('Descricao').focus();
+    within(modal).getByLabelText('Descrição').focus();
     await user.tab();
     expect(within(alerta).getByRole('button', { name: 'Tentar de novo: carregar os projetos' })).toHaveFocus();
   }, 40000);

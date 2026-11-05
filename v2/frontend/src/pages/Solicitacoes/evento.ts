@@ -91,10 +91,11 @@ export interface FormDataType {
 export const ORDEM_DO_CARTAO = [
   'projeto',
   'tipoEvento',
+  // "Nº da formação" fica na 1ª linha do cartão, antes do Município (03/11/2026).
+  'encontro',
   'municipio',
   'horarios',
   'tipo',
-  'encontro',
   'segmento',
   'local',
   'observacoes',

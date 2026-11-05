@@ -15,6 +15,7 @@ import {
   ROTAS_MEDIDAS,
   SENHA_PERFIS,
   TELA_LOGIN,
+  TEXTOS_DO_SEED,
   chaveDe,
   type DadosDaTela,
   type Largura,
@@ -330,6 +331,74 @@ export function registrarMatriz(larguras: readonly Largura[]): void {
         const alvo = { marco: TELA_LOGIN, redeEsperada: REDE_DA_TELA_DE_LOGIN };
         await garantirTela(page, alvo, rede);
         await afirmarSemRolagem(page, TELA_LOGIN, largura, rede, REDE_DA_TELA_DE_LOGIN);
+      });
+    }
+  });
+}
+
+/** O que a medição com evento lê e reescreve na resposta de `/api/availability/monthly/`. */
+interface GradeMensal {
+  days: number[];
+  people: unknown[];
+  cells: string[][];
+  details_index?: Record<string, unknown[]>;
+}
+
+/** Os 7 códigos, com o mais largo (D1) e o conflito (X), em rodízio. Legenda e códigos não mudam. */
+const CODIGOS_DA_GRADE = ['D1', 'X', '2', 'E', 'T', 'P', 'D'] as const;
+
+/** A resposta real do seed, com código e detalhe (textos longos do seed) em toda célula. */
+function comEventoTodoDia(grade: GradeMensal, anoMes: string): GradeMensal {
+  const details_index: Record<string, unknown[]> = {};
+  const cells = grade.people.map((_, linha) =>
+    grade.days.map((dia, idx) => {
+      details_index[`${linha}:${idx}`] = [
+        {
+          id: linha * 100 + idx,
+          municipio: TEXTOS_DO_SEED.municipio,
+          tipo: TEXTOS_DO_SEED.projeto,
+          data: `${anoMes}-${String(dia).padStart(2, '0')}`,
+          inicio: '08:00',
+          fim: '17:00',
+        },
+      ];
+      return CODIGOS_DA_GRADE[idx % CODIGOS_DA_GRADE.length] ?? 'E';
+    })
+  );
+  return { ...grade, cells, details_index };
+}
+
+/**
+ * Grade Mensal com evento em todo dia e o detalhe do dia (C4). O relógio da rota fixa janeiro de
+ * 2026, mês em que o seed não tem evento (ele só cria datas relativas ao dia em que roda): aqui a
+ * resposta real de `/api/availability/monthly/` (pessoas e dias do seed) ganha código e detalhe em
+ * toda célula, por page.route. Sem `test.fail`: estas medições passam desde o C4. Evento em data
+ * fixa direto no seed fica para um PR de backend.
+ */
+export function registrarGradeComEvento(larguras: readonly Largura[]): void {
+  const rota = ROTAS_MEDIDAS.find((r) => r.path === '/solicitacoes/disponibilidade');
+  if (!rota?.relogio) throw new Error('a Grade Mensal saiu de ROTAS_MEDIDAS ou perdeu o relógio fixo');
+  const anoMes = rota.relogio.slice(0, 7);
+  test.describe(`Sem rolagem horizontal: Grade Mensal com evento todo dia (${larguras.join(' e ')} px)`, () => {
+    for (const largura of larguras) {
+      test(`${rota.path}#com-evento e #detalhe @ ${largura}px (${rota.perfil})`, async ({ page, baseURL }) => {
+        const rede = vigiarRede(page, baseURL);
+        await entrar(page, rota.perfil, largura);
+        await page.route(
+          (url) => url.pathname === '/api/availability/monthly/',
+          async (r) => {
+            const resposta = await r.fetch();
+            const grade = (await resposta.json()) as GradeMensal;
+            await r.fulfill({ response: resposta, json: comEventoTodoDia(grade, anoMes) });
+          }
+        );
+        await abrir(page, rota);
+        await garantirTela(page, rota, rede);
+        await afirmarSemRolagem(page, `${rota.path}#com-evento`, largura, rede);
+
+        await page.locator('main#main tr').filter({ hasText: TEXTOS_DO_SEED.pessoa }).first().locator('button').first().click();
+        await garantirTela(page, { marco: rota.marco, dados: { em: 'li', texto: TEXTOS_DO_SEED.municipio } }, rede);
+        await afirmarSemRolagem(page, `${rota.path}#detalhe`, largura, rede);
       });
     }
   });

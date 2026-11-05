@@ -166,15 +166,15 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     perfil: 'controle',
     marco: 'Grade Mensal de Disponibilidade',
     dados: { em: 'tr', texto: T.pessoa },
-    // A Grade desenha o mês de hoje do navegador, 1 coluna por dia, e o dia com evento (49 px) é
-    // mais largo que o vazio (18 a 25 px). O seed põe evento em hoje+3 a hoje+20, que cai ou não no
-    // mês corrente: a largura mudava com o dia da CI (run 36845410982, 01/10/2026: passou a rolar a
-    // 1280, +76/+25 px; no Windows, um fevereiro sem evento no mês deixaria de rolar a 1024). Janeiro
-    // de 2026 tem 31 dias, o máximo de colunas, e nenhum evento do seed, que só cria datas a partir
-    // do dia em que roda. Sem evento é a Grade mais estreita: por isso ela não sai de PENDENTES por
-    // esta medição (ver NAO_MEDIDOS e o ratchet do Vitest).
+    // A Grade desenha o mês de hoje do navegador. Desde o C4 (05/11/2026), abaixo de 1280 px ela
+    // mostra uma semana (com ‹ ›) e, a partir de 1280, o mês inteiro, com a coluna do dia sem
+    // largura fixa (table-fixed): a largura não depende mais de haver evento. O relógio fica em
+    // 15/01/2026 para medir sempre o mesmo mês de 31 dias (o pior caso a 1280) e a mesma semana
+    // (12 a 18/01). O seed só cria eventos relativos ao dia em que roda e não tem evento nesse
+    // mês: a Grade com evento todo dia e o detalhe do dia são medidos por `registrarGradeComEvento`
+    // (medicao.ts), que injeta os códigos e o detalhe na resposta real do seed por page.route.
+    // Evento em data fixa direto no seed fica para um PR de backend.
     relogio: '2026-01-15T12:00:00-03:00',
-    naoMedirEm: [1280],
   },
   {
     path: '/solicitacoes/bloqueios',
@@ -359,17 +359,6 @@ export const NAO_MEDIDOS: Readonly<Record<string, string>> = {
   'Home com outros perfis': 'os cartões da Home mudam por perfil; a rota é medida só com Controle',
   '/controle/plano-formacoes (Calendário e Resumo)': 'placeholders "em desenvolvimento", sem conteúdo',
   '/controle/pre-agenda (modo Google)': 'a tabela de eventos do Google exige OAuth',
-  '/solicitacoes/disponibilidade (detalhe do dia)':
-    'o drawer abre ao clicar num evento, e o mês medido (relógio fixo em janeiro de 2026) não tem evento do seed (C4)',
-  '/solicitacoes/disponibilidade @ 1280px':
-    'no mês fixo, sem evento, a Grade cabe a 1280 (sobram 40 px no Windows; no Linux da CI, estimado a ' +
-    'partir do run 36845410982, uns 15 a 30 px) e o ' +
-    'teste passaria; com dados reais (evento quase todo dia útil, coluna de 49 px) ela rola a 1280 em ' +
-    'qualquer mês. Medir de verdade exige mês com evento em dias fixos, e o seed não fixa isso. O C4 ' +
-    'redesenha a Grade (semana com ‹ › abaixo de 1280) e volta a medir com data fixa',
-  '/solicitacoes/disponibilidade (Grade com evento, 360 a 1024)':
-    'o mês fixo não tem evento do seed, e sem evento é a Grade mais estreita: ela segue em PENDENTES a 360, ' +
-    '768 e 1024 até o C4 medir com evento em data fixa (o ratchet do Vitest impede que saia por esta medição)',
   '/solicitacoes/nova (pergunta de avaliar e avisos de agenda)':
     'aparecem só depois de escolher projeto, formadores e horário nos ComboBox (lookup assíncrono)',
   '/mapa-brasil (municípios do estado clicado)': 'exige clicar numa região do mapa',
@@ -379,7 +368,8 @@ export const NAO_MEDIDOS: Readonly<Record<string, string>> = {
   'Modais e drawers de edição':
     'exigem abrir o formulário de cada tela; o AntD limita modal e drawer à largura da tela. O Drawer de ' +
     'detalhe de Usuários (C1) é medido (/dat/admin/usuarios#detalhe); cada PR do Programa C que criar um ' +
-    'drawer de detalhe declara a vista dele',
+    'drawer de detalhe declara a vista dele (o detalhe do dia da Grade, desde o C4: ' +
+    '/solicitacoes/disponibilidade#detalhe, em registrarGradeComEvento)',
 };
 
 /**
@@ -443,6 +433,9 @@ export const TELA_LOGIN = 'login';
  * "expandida" é medida e não rola.
  * Edição de solicitação (03/11/2026, caixa única de coordenadores): saiu /solicitacoes/:id/editar
  * @ 360. Ficam 54.
+ * C4, Grade Mensal (05/11/2026, semana com ‹ › abaixo de 1280 px): saíram as 3 de
+ * /solicitacoes/disponibilidade. Ficam 51. A Grade com evento todo dia (#com-evento) e o detalhe
+ * do dia (#detalhe) são medidos nas 4 larguras e não rolam.
  * O ratchet do Vitest (semRolagemHorizontal.pendentes.test.ts) trava a lista: nada novo
  * entra e o tamanho só desce.
  */
@@ -453,7 +446,6 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/dashboards/gcal': [360, 768, 1024],
   '/mapa-brasil': [360, 1024, 1280],
   '/mapa-brasil#lista': [360, 1024, 1280],
-  '/solicitacoes/disponibilidade': [360, 768, 1024],
   '/solicitacoes/bloqueios': [360, 768, 1024, 1280],
   '/solicitacoes/deslocamentos': [360, 768, 1024, 1280],
   '/controle/coordenadores': [360, 768, 1024, 1280],

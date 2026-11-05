@@ -13,6 +13,7 @@ import { test, expect } from '@playwright/test';
 import {
   entrar,
   medirAssentada,
+  registrarGradeComEvento,
   registrarMatriz,
   resumir,
   verificarTela,
@@ -60,3 +61,4 @@ test.describe('Sem rolagem horizontal (desktop): controles', () => {
 });
 
 registrarMatriz([1024, 1280]);
+registrarGradeComEvento([1024, 1280]);

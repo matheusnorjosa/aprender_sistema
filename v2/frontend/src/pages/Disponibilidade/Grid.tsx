@@ -6,9 +6,14 @@
  * - Cada linha: uma pessoa
  * - Primeira coluna: nome da pessoa
  * - Células: barras coloridas mostrando eventos/bloqueios
+ *
+ * Sem rolagem horizontal (C4): só os dias de `diasVisiveis` (a semana abaixo de 1280 px, o mês
+ * inteiro a partir dele) e `table-fixed`, com a coluna do dia sem largura fixa.
  */
 
 import type { JSX } from 'react';
+import dayjs from 'dayjs';
+import { FORTALEZA_TZ } from '../../utils/datetime';
 import { CODE_LABEL } from './codes';
 import type { ID } from '../../types';
 
@@ -36,6 +41,8 @@ interface GridProps {
   month: number;
   title: string;
   days: number[];
+  /** Índices de `days` mostrados, na ordem. A chave da célula continua sendo o índice no mês. */
+  diasVisiveis: readonly number[];
   people: GridPersonType[];
   cells: CellCode[][];
   detailsIndex: DetailsIndexType;
@@ -61,11 +68,12 @@ const CODE_COLOR: Record<CellCode, string> = {
  * Verifica se um dia é hoje.
  */
 const isToday = (year: number, month: number, day: number): boolean => {
-  const t = new Date();
+  // Hoje em Fortaleza, o mesmo "hoje" da semana inicial (semanas.ts) e do mês inicial.
+  const t = dayjs().tz(FORTALEZA_TZ);
   return (
-    t.getFullYear() === year &&
-    t.getMonth() + 1 === month &&
-    t.getDate() === day
+    t.year() === year &&
+    t.month() + 1 === month &&
+    t.date() === day
   );
 };
 
@@ -74,6 +82,7 @@ export default function Grid({
   month,
   title,
   days,
+  diasVisiveis,
   people,
   cells,
   detailsIndex,
@@ -87,22 +96,23 @@ export default function Grid({
         <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
       </div>
 
-      {/* Tabela horizontal com scroll */}
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
+      {/* Tabela sem rolagem: colunas dos dias repartem o que sobra do Nome */}
+      <div>
+        <table className="w-full table-fixed border-collapse">
           <thead>
             <tr className="bg-gray-50 border-b">
               {/* Coluna de nomes */}
-              <th className="sticky left-0 z-10 bg-gray-50 px-3 py-2 text-left text-xs font-semibold text-gray-900 border-r min-w-[180px] max-w-[200px]">
+              <th className="bg-gray-50 px-3 py-2 text-left text-xs font-semibold text-gray-900 border-r w-28 sm:w-40">
                 Nome
               </th>
               {/* Colunas dos dias */}
-              {days.map((day) => {
+              {diasVisiveis.map((dayIdx) => {
+                const day = days[dayIdx] ?? 0;
                 const today = isToday(year, month, day);
                 return (
                   <th
-                    key={day}
-                    className={`px-1.5 py-2 text-center text-xs font-semibold w-12 ${
+                    key={dayIdx}
+                    className={`px-0 py-2 text-center text-xs font-semibold ${
                       today ? 'bg-blue-100 text-blue-700' : 'text-gray-700'
                     }`}
                   >
@@ -116,9 +126,9 @@ export default function Grid({
             {people.map((person, rowIdx) => (
               <tr key={person.id} className="border-b hover:bg-gray-50">
                 {/* Nome da pessoa */}
-                <td className="sticky left-0 z-10 bg-white px-3 py-1.5 text-xs font-medium text-gray-900 border-r whitespace-nowrap">
+                <td className="bg-white px-3 py-1.5 text-xs font-medium text-gray-900 border-r">
                   <div className="flex flex-col">
-                    <span className="truncate max-w-[170px]" title={person.name}>{person.name}</span>
+                    <span className="break-words [overflow-wrap:anywhere]" title={person.name}>{person.name}</span>
                     {person.ch_month !== undefined && (
                       <span className="text-[10px] text-gray-500">
                         {person.ch_month}h
@@ -127,7 +137,8 @@ export default function Grid({
                   </div>
                 </td>
                 {/* Células dos dias */}
-                {days.map((day, dayIdx) => {
+                {diasVisiveis.map((dayIdx) => {
+                  const day = days[dayIdx] ?? 0;
                   const code = cells[rowIdx]?.[dayIdx];
                   const key = `${rowIdx}:${dayIdx}`;
                   const hasDetails = (detailsIndex[key])?.length ?? 0 > 0;
@@ -144,7 +155,7 @@ export default function Grid({
                   return (
                     <td
                       key={dayIdx}
-                      className={`px-1 py-1.5 text-center relative ${cellClass}`}
+                      className={`px-0.5 py-1.5 text-center relative ${cellClass}`}
                     >
                       {code && (
                         <button
@@ -152,7 +163,7 @@ export default function Grid({
                           title={CODE_LABEL[code as keyof typeof CODE_LABEL] || code}
                           onClick={() => hasDetails && onSelect(rowIdx, dayIdx)}
                           className={`
-                            w-10 h-7 rounded flex items-center justify-center
+                            w-full max-w-12 mx-auto min-w-0 h-7 rounded flex items-center justify-center
                             transition-all hover:scale-110
                             ${CODE_COLOR[code]}
                             ${hasDetails ? 'cursor-pointer' : 'cursor-default opacity-70'}

@@ -6,9 +6,15 @@
  * Drawer compartilhado (sabe de qual grade veio a seleção).
  *
  * Design visual atualizado: células maiores, barras coloridas, layout limpo.
+ *
+ * Sem rolagem horizontal (C4, decisão do dono): abaixo de 1280 px (a mesma quebra da sidebar,
+ * `useResponsive`), as duas grades mostram a mesma semana, com ‹ › dentro do mês; a partir de
+ * 1280 px, o mês inteiro.
  */
 
 import { useState, useMemo, JSX } from 'react';
+import dayjs from 'dayjs';
+import { FORTALEZA_TZ } from '../../utils/datetime';
 import useMonthlyQuery from './useMonthlyQuery';
 import SyncIndicator from '../../components/SyncIndicator';
 import AvisoAtualizacaoPausada from '../../components/AvisoAtualizacaoPausada';
@@ -16,6 +22,8 @@ import FiltersBar from './FiltersBar';
 import Legend from './Legend';
 import Grid from './Grid';
 import DetailsDrawer from './DetailsDrawer';
+import { rotuloSemana, semanaInicial, semanasDoMes } from './semanas';
+import { useResponsive } from '../../hooks/useResponsive';
 import type { ID } from '../../types';
 import type { PersonType, EventDetailType } from './DetailsDrawer';
 
@@ -28,6 +36,17 @@ interface FiltersType {
   q: string;
 }
 
+/** Semana escolhida nas setas, válida só no mês da `chave` (`ano-mês`). */
+interface SemanaEscolhida {
+  chave: string;
+  indice: number;
+}
+
+const BOTAO_SEMANA =
+  'px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 ' +
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ' +
+  'aria-disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:hover:bg-gray-100';
+
 /** Selection type */
 interface SelectionType {
   role: 'FORMADOR' | 'COORDENADOR';
@@ -37,10 +56,10 @@ interface SelectionType {
 
 export default function MonthlyPage(): JSX.Element {
   // Estado de filtros compartilhados
-  const now = new Date();
+  const now = dayjs().tz(FORTALEZA_TZ); // mês de hoje em Fortaleza, como a semana inicial
   const [filters, setFilters] = useState<FiltersType>({
-    year: now.getFullYear(),
-    month: now.getMonth() + 1,
+    year: now.year(),
+    month: now.month() + 1,
     gerenciaId: null, // null = Superintendência (default)
     sector: '',
     q: '',
@@ -52,6 +71,28 @@ export default function MonthlyPage(): JSX.Element {
 
   // Estado de seleção (sabe de qual grade veio)
   const [selected, setSelected] = useState<SelectionType | null>(null);
+
+  // Semana ou mês inteiro. As duas grades são do mesmo mês: os mesmos dias.
+  const mesInteiro = useResponsive().modo === 'aberta';
+  const days = formadores.data?.days ?? coordenadores.data?.days;
+  const semanas = useMemo(
+    () => semanasDoMes(filters.year, filters.month, days ?? []),
+    [filters.year, filters.month, days],
+  );
+  const chaveMes = `${filters.year}-${filters.month}`;
+  const [semanaEscolhida, setSemanaEscolhida] = useState<SemanaEscolhida | null>(null);
+  // Mês trocado: volta à semana inicial sem efeito, porque a escolha guardada é de outro mês.
+  const indiceSemana = Math.min(
+    semanaEscolhida?.chave === chaveMes
+      ? semanaEscolhida.indice
+      : semanaInicial(filters.year, filters.month, days ?? [], semanas),
+    Math.max(semanas.length - 1, 0),
+  );
+  const semanaAtual = semanas[indiceSemana] ?? [];
+  const diasVisiveis = mesInteiro ? (days ?? []).map((_, idx) => idx) : semanaAtual;
+  const primeiraSemana = indiceSemana === 0;
+  const ultimaSemana = indiceSemana >= semanas.length - 1;
+  const irParaSemana = (indice: number): void => setSemanaEscolhida({ chave: chaveMes, indice });
 
   /**
    * Handlers de seleção por grade.
@@ -142,6 +183,33 @@ export default function MonthlyPage(): JSX.Element {
           <Legend legend={formadores.data?.legend || coordenadores.data?.legend} />
         </aside>
 
+        {/* Semana mostrada (abaixo de 1280 px) */}
+        {!mesInteiro && semanaAtual.length > 0 && (
+          <div role="group" aria-label="Semana mostrada" className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              aria-label="Semana anterior"
+              aria-disabled={primeiraSemana}
+              onClick={() => !primeiraSemana && irParaSemana(indiceSemana - 1)}
+              className={BOTAO_SEMANA}
+            >
+              &lsaquo;
+            </button>
+            <span aria-live="polite" className="px-3 py-2 font-semibold text-gray-900">
+              Semana: {rotuloSemana(filters.month, semanaAtual.map((idx) => days?.[idx] ?? 0))}
+            </span>
+            <button
+              type="button"
+              aria-label="Próxima semana"
+              aria-disabled={ultimaSemana}
+              onClick={() => !ultimaSemana && irParaSemana(indiceSemana + 1)}
+              className={BOTAO_SEMANA}
+            >
+              &rsaquo;
+            </button>
+          </div>
+        )}
+
         {/* Grades */}
         <div className="space-y-6">
             {/* Grade de Formadores */}
@@ -172,6 +240,7 @@ export default function MonthlyPage(): JSX.Element {
                   year={filters.year}
                   month={filters.month}
                   days={formadores.data.days}
+                  diasVisiveis={diasVisiveis}
                   people={formadores.data.people}
                   cells={formadores.data.cells}
                   detailsIndex={formadores.data.details_index || {}}
@@ -219,6 +288,7 @@ export default function MonthlyPage(): JSX.Element {
                   year={filters.year}
                   month={filters.month}
                   days={coordenadores.data.days}
+                  diasVisiveis={diasVisiveis}
                   people={coordenadores.data.people}
                   cells={coordenadores.data.cells}
                   detailsIndex={coordenadores.data.details_index || {}}

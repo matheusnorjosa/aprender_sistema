@@ -25,6 +25,7 @@ import { test, expect } from '@playwright/test';
 import {
   entrar,
   medirRolagemHorizontal,
+  registrarGradeComEvento,
   registrarMatriz,
   verificarTela,
   vigiarRede,
@@ -158,3 +159,4 @@ test.describe('Sem rolagem horizontal: controles das pré-condições (tela queb
 });
 
 registrarMatriz([360, 768]);
+registrarGradeComEvento([360, 768]);

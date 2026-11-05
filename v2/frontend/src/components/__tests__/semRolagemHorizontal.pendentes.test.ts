@@ -33,7 +33,7 @@ interface Pendencias {
  * Medida em 2026-09-29 (main acd04afd), menos o que o Programa C consertou. 112 combinações da
  * 1ª medição, mais 14 que vieram de critério e vistas novos, não de regressão: o corte sem
  * reticências em Coordenadores (4) e as vistas Coordenadores "Lista" (4) e "Por área" (2) e Mapa
- * "Lista" (4). O C1 tirou 9, o C2 tirou 27 e o item 36 tirou as 4 de Meus Eventos e as 4 de Minhas Solicitações, e o item 38, as 4 de Gestão de Ações, as 4 de Registros de Turmas e as 4 de Gestão de Compras, e a edição de solicitação a 360 (03/11/2026) (as mesmas que saíram de PENDENTES). Consertou uma tela? Tire as
+ * "Lista" (4). O C1 tirou 9, o C2 tirou 27 e o item 36 tirou as 4 de Meus Eventos e as 4 de Minhas Solicitações, e o item 38, as 4 de Gestão de Ações, as 4 de Registros de Turmas e as 4 de Gestão de Compras, e a edição de solicitação a 360 (03/11/2026), e o C4, as 3 da Grade Mensal (05/11/2026) (as mesmas que saíram de PENDENTES). Consertou uma tela? Tire as
  * combinações daqui também (o ratchet reprova folga: o que ficasse aqui poderia voltar a
  * PENDENTES sem ele ver). Não edite para acomodar tela nova: conserte a tela.
  */
@@ -44,7 +44,6 @@ const LINHA_DE_BASE: ListaPendentes = {
   '/dashboards/gcal': [360, 768, 1024],
   '/mapa-brasil': [360, 1024, 1280],
   '/mapa-brasil#lista': [360, 1024, 1280],
-  '/solicitacoes/disponibilidade': [360, 768, 1024],
   '/solicitacoes/bloqueios': [360, 768, 1024, 1280],
   '/solicitacoes/deslocamentos': [360, 768, 1024, 1280],
   '/controle/coordenadores': [360, 768, 1024, 1280],
@@ -66,14 +65,15 @@ const LINHA_DE_BASE_SO_LINUX: ListaPendentes = {
 };
 
 /**
- * Tamanho atual de PENDENTES mais PENDENTES_SO_LINUX (54 + 2). Só desce. C0: 126 + 2; o C1
+ * Tamanho atual de PENDENTES mais PENDENTES_SO_LINUX (51 + 2). Só desce. C0: 126 + 2; o C1
  * tirou 9 (as 4 de Usuários e 5 que a sidebar nova liberou a 768 e 1024); o C2 tirou 27 (Admin
  * DAT: grupos, setores, funções, gerências, municípios, produtos e projetos gerais); a tela
  * Projetos (01/10/2026, marca de série) tirou 3; Meus Eventos e Minhas Solicitações (item 36, 19/10/2026) tiraram 4 cada; Aprovações, Publicar na agenda e Pré-agenda (19/10/2026, item 36)
  * tiraram 12; Gestão de Ações e Registros de Turmas (20/10/2026, item 38) tiraram 8; Gestão de Compras (26/10/2026,
- * item 38) tirou 4; a edição de solicitação (03/11/2026, caixa única de coordenadores) tirou 1.
+ * item 38) tirou 4; a edição de solicitação (03/11/2026, caixa única de coordenadores) tirou 1; o C4
+ * (05/11/2026, Grade Mensal em semana abaixo de 1280 px) tirou 3.
  */
-const TETO_PENDENTES = 56;
+const TETO_PENDENTES = 53;
 
 const SO_LINUX = ' (só Linux)';
 
@@ -248,6 +248,13 @@ describe('ratchet de PENDENTES: lista real', () => {
     ]);
   });
 
+  // O C4 (05/11/2026) redesenhou a Grade Mensal: semana com ‹ › abaixo de 1280 px.
+  test.each([360, 768, 1024])('/solicitacoes/disponibilidade @ %ipx, consertada no C4, não volta a PENDENTES', (largura) => {
+    expect(devolverAPendentes('/solicitacoes/disponibilidade', largura)).toEqual([
+      `combinação fora da linha de base: /solicitacoes/disponibilidade @ ${largura}px`,
+    ]);
+  });
+
   test.each(Object.entries(CONSERTADAS_NO_C2).flatMap(([chave, larguras]) => larguras.map((l) => [chave, l] as const)))(
     '%s @ %ipx, consertada no C2, não volta a PENDENTES',
     (chave, largura) => {
@@ -266,9 +273,9 @@ describe('ratchet de PENDENTES: lista real', () => {
  */
 const EXCECOES_DA_MEDICAO: readonly string[] = [
   // 01/10/2026: a Grade desenha o mês de hoje do navegador, e a largura dela mudava com o dia em
-  // que a CI rodava (detalhe no comentário da rota e em NAO_MEDIDOS). O C4 redesenha a Grade.
+  // que a CI rodava. Desde o C4 (05/11/2026) ela é medida nas 4 larguras; o relógio fica para
+  // medir sempre o mesmo mês de 31 dias (o pior caso de colunas a 1280 px) e a mesma semana.
   '/solicitacoes/disponibilidade: relógio fixo em 2026-01-15T12:00:00-03:00',
-  '/solicitacoes/disponibilidade @ 1280px: não medida',
 ];
 
 type RotaComExcecao = Pick<RotaMedida, 'path' | 'relogio' | 'naoMedirEm'>;
@@ -376,9 +383,10 @@ describe('exceções à medição: controles', () => {
 });
 
 describe('exceções à medição: lista real', () => {
-  test('a Grade medida no mês fixo (sem evento) não sai de PENDENTES: só o C4, medindo com evento', () => {
-    // Sem evento é a Grade mais estreita; caber assim não prova que a tela com dados reais cabe.
-    expect(PENDENTES['/solicitacoes/disponibilidade']).toEqual([360, 768, 1024]);
+  test('a Grade é medida nas 4 larguras desde o C4 (com evento todo dia em registrarGradeComEvento)', () => {
+    const grade = ROTAS_MEDIDAS.find((r) => r.path === '/solicitacoes/disponibilidade');
+    expect(grade?.naoMedirEm ?? []).toEqual([]);
+    expect(Object.keys(NAO_MEDIDOS).filter((k) => k.startsWith('/solicitacoes/disponibilidade'))).toEqual([]);
   });
 
   test('relógio fixo e larguras não medidas são exatamente a linha de base, com motivo', () => {

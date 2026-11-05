@@ -389,6 +389,19 @@ describe('PublicacaoSetorPage — conexão e prontidão', () => {
     );
   });
 
+  // Teste E2E de 28/09 (#2069): o botão desabilitado não levava o motivo, que só aparecia no aviso do topo.
+  test('(b1) sem conexão: o botão desabilitado é descrito pelo aviso do topo, que diz o motivo', async () => {
+    googleHook.status = NOT_CONNECTED;
+    listResponse = pageOf([makeSolic()]);
+    renderPage();
+
+    const botao = await screen.findByLabelText(/^Publicar: Vidas Em Rede/);
+    expect(botao).toBeDisabled();
+    const id = botao.getAttribute('aria-describedby') ?? '';
+    expect(id).not.toBe('');
+    expect(document.getElementById(id)).toHaveTextContent('Conecte sua conta Google para publicar os eventos.');
+  });
+
   test('(b2) conexão removida pelo sistema: só o aviso do card, sem repetir o da página', async () => {
     googleHook.status = { ...NOT_CONNECTED, reconnectRequired: true };
     listResponse = pageOf([makeSolic()]);
@@ -397,6 +410,9 @@ describe('PublicacaoSetorPage — conexão e prontidão', () => {
     expect(await screen.findByLabelText(/^Publicar: Vidas Em Rede/)).toBeDisabled();
     expect(screen.getByText(/O Google revogou o acesso da sua conta/)).toBeInTheDocument();
     expect(screen.queryByText('Conecte sua conta Google para publicar os eventos.')).not.toBeInTheDocument();
+    // Sem o aviso da página, o botão não aponta para um id que não existe.
+    const id = screen.getByLabelText(/^Publicar: Vidas Em Rede/).getAttribute('aria-describedby');
+    if (id) expect(document.getElementById(id)).not.toBeNull();
   });
 
   test('(b3) conexão removida pelo sistema E sem setor: o alerta da DAT continua (o card não aparece)', async () => {
@@ -590,9 +606,9 @@ describe('PublicacaoSetorPage — ações', () => {
   });
 
   test.each([
-    { acao: 'Publicar', row: {}, ok: 'Publicar' },
-    { acao: 'Tirar só do Google', row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' }, ok: 'Tirar do Google' },
-  ])('$acao confirmado: a linha recarrega sem o botão e o foco vai para a tabela, não para o body', async ({ acao, row, ok }) => {
+    { acao: 'Publicar', row: {}, ok: 'Publicar', emVoo: 'Publicando…' },
+    { acao: 'Tirar só do Google', row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' }, ok: 'Tirar do Google', emVoo: 'Removendo…' },
+  ])('$acao confirmado: a linha recarrega sem o botão e o foco vai para a tabela, não para o body', async ({ acao, row, ok, emVoo }) => {
     listResponse = pageOf([makeSolic(row)]);
     // Depois da ação a linha volta em voo (PENDING): sem ação nenhuma, o botão da linha sai do DOM.
     actionResult = () => {
@@ -608,10 +624,29 @@ describe('PublicacaoSetorPage — ações', () => {
     fireEvent.click(within(dialogo).getByRole('button', { name: ok }));
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    const linhaEmVoo = await screen.findByText('Publicando…');
+    const linhaEmVoo = await screen.findByText(emVoo);
     expect(botao).not.toBeInTheDocument();
     await waitFor(() => expect(document.activeElement).not.toBe(document.body));
     expect(document.activeElement?.contains(linhaEmVoo)).toBe(true);
+  });
+
+  // Teste E2E de 28/09 (#2069): a tag em voo dizia "Publicando…" também ao atualizar e ao tirar do Google.
+  test.each([
+    { acao: 'Publicar', row: {}, ok: 'Publicar', emVoo: 'Publicando…' },
+    { acao: 'Atualizar no Google', row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' }, ok: 'Atualizar', emVoo: 'Atualizando…' },
+    { acao: 'Tirar só do Google', row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' }, ok: 'Tirar do Google', emVoo: 'Removendo…' },
+  ])('$acao confirmado: a linha em voo diz "$emVoo"', async ({ acao, row, ok, emVoo }) => {
+    listResponse = pageOf([makeSolic(row)]);
+    actionResult = () => {
+      listResponse = pageOf([makeSolic({ ...row, gcal_status: 'PENDING' })]);
+      return Promise.resolve({ detail: 'ok', solicitacao_id: 7 });
+    };
+    renderPage();
+
+    await confirmAction(new RegExp(`^${acao}: Vidas Em Rede`), acao === 'Publicar' ? 'Publicar na agenda' : 'Google Agenda', ok);
+
+    expect(await screen.findByText(emVoo)).toBeInTheDocument();
+    if (emVoo !== 'Publicando…') expect(screen.queryByText('Publicando…')).not.toBeInTheDocument();
   });
 
   test('linha PENDING não oferece ação (publicação em voo)', async () => {

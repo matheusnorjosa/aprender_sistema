@@ -75,6 +75,7 @@ const fakeUser = {
 
 const locationOriginal = window.location;
 const reloadMock = vi.fn();
+const replaceMock = vi.fn();
 
 describe('App — "Sair agora" e sessão expirada usam o logout real', () => {
   beforeEach(() => {
@@ -85,7 +86,7 @@ describe('App — "Sair agora" e sessão expirada usam o logout real', () => {
     clearApiCachesMock.mockResolvedValue(undefined);
     Object.defineProperty(window, 'location', {
       configurable: true,
-      value: { ...locationOriginal, reload: reloadMock },
+      value: { ...locationOriginal, reload: reloadMock, replace: replaceMock },
     });
   });
 
@@ -95,13 +96,16 @@ describe('App — "Sair agora" e sessão expirada usam o logout real', () => {
     vi.restoreAllMocks();
   });
 
-  test('"Sair agora" chama a API de logout, limpa os caches e recarrega', async () => {
+  // Teste E2E de 28/09 (#2069): o reload mantinha a URL, e quem entrava depois caía na tela de quem saiu.
+  test('"Sair agora" chama a API de logout, limpa os caches e volta para o início', async () => {
     render(<App />);
     await screen.findByTestId('app-routes');
 
     fireEvent.click(screen.getByRole('button', { name: 'Sair agora' }));
 
-    await waitFor(() => expect(reloadMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledTimes(1));
+    expect(replaceMock).toHaveBeenCalledWith('/');
+    expect(reloadMock).not.toHaveBeenCalled();
     expect(apiLogoutMock).toHaveBeenCalledTimes(1);
     expect(clearApiCachesMock).toHaveBeenCalledTimes(1);
   });
@@ -118,12 +122,12 @@ describe('App — "Sair agora" e sessão expirada usam o logout real', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sair agora' }));
 
     await waitFor(() => expect(erroSpy).toHaveBeenCalledWith('Não foi possível sair: sem conexão. Tente de novo.'));
-    expect(reloadMock).not.toHaveBeenCalled();
+    expect(replaceMock).not.toHaveBeenCalled();
     expect(clearApiCachesMock).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Sair agora' }));
 
-    await waitFor(() => expect(reloadMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledTimes(1));
     expect(apiLogoutMock).toHaveBeenCalledTimes(2);
   });
 
@@ -138,7 +142,7 @@ describe('App — "Sair agora" e sessão expirada usam o logout real', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sair agora' }));
 
     await waitFor(() => expect(erroSpy).toHaveBeenCalledWith('Não foi possível sair: erro no servidor. Tente de novo.'));
-    expect(reloadMock).not.toHaveBeenCalled();
+    expect(replaceMock).not.toHaveBeenCalled();
   });
 
   test('"Sair agora" com a sessão já encerrada no servidor (403): segue para o login', async () => {
@@ -148,7 +152,7 @@ describe('App — "Sair agora" e sessão expirada usam o logout real', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Sair agora' }));
 
-    await waitFor(() => expect(reloadMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledTimes(1));
     expect(clearApiCachesMock).toHaveBeenCalledTimes(1);
   });
 
@@ -169,7 +173,7 @@ describe('App — "Sair agora" e sessão expirada usam o logout real', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sair agora' }));
 
     await waitFor(() => expect(erroSpy).toHaveBeenCalledWith('Não foi possível sair: erro no servidor. Tente de novo.'));
-    expect(reloadMock).not.toHaveBeenCalled();
+    expect(replaceMock).not.toHaveBeenCalled();
     expect(clearApiCachesMock).not.toHaveBeenCalled();
   });
 
@@ -180,7 +184,7 @@ describe('App — "Sair agora" e sessão expirada usam o logout real', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Sair agora' }));
 
-    await waitFor(() => expect(reloadMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledTimes(1));
   });
 
   test('sessão expirada (monitor) não faz POST de logout: limpa os caches, guarda o motivo e recarrega', async () => {
@@ -213,7 +217,7 @@ describe('App — "Sair agora" e sessão expirada usam o logout real', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Sair agora' }));
 
-    await waitFor(() => expect(reloadMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledTimes(1));
     expect(localStorage.getItem(storageKeys.sessaoUltimaResposta)).toBeNull();
   });
 

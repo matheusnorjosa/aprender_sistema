@@ -157,3 +157,24 @@ describe('MySolicitacoesPage', () => {
     expect(await screen.findByText('Sol Sozinha')).toBeInTheDocument();
   });
 });
+
+// Teste E2E de 28/09 (#2069): o rodapé dizia "Total: 1 solicitações".
+describe('MySolicitacoesPage — total da lista', { timeout: 20000 }, () => {
+  beforeEach(() => {
+    listSolicitacoesMock.mockReset();
+  });
+
+  test.each([
+    [1, 'Total: 1 solicitação'],
+    [2, 'Total: 2 solicitações'],
+  ])('o total concorda com o número (%i)', async (quantos, texto) => {
+    listSolicitacoesMock.mockResolvedValue({
+      count: quantos,
+      next: null,
+      previous: null,
+      results: Array.from({ length: quantos }, (_, i) => makeSolic({ id: 40 + i })),
+    });
+    renderPage();
+    expect(await screen.findByText(texto)).toBeInTheDocument();
+  });
+});

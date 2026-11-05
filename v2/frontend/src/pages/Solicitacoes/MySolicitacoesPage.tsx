@@ -501,7 +501,7 @@ export default function MySolicitacoesPage(): JSX.Element {
                 total,
                 showSizeChanger: true,
                 pageSizeOptions: ['20', '50', '100'],
-                showTotal: (totalCount) => `Total: ${totalCount} solicitações`,
+                showTotal: (totalCount) => `Total: ${totalCount} ${totalCount === 1 ? 'solicitação' : 'solicitações'}`,
               }}
             />
           </section>

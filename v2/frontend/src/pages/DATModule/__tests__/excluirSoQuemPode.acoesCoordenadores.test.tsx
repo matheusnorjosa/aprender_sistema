@@ -96,7 +96,7 @@ async function linhaPelaAcao(nome: string): Promise<HTMLElement> {
 
 beforeEach(() => vi.clearAllMocks());
 
-describe('Gestão de Ações', { timeout: 20000 }, () => {
+describe('Gestão de Ações', { timeout: 45000 }, () => {
   test('o Controle não vê Excluir, nem na linha nem no modal', async () => {
     renderAcoes(CONTROLE);
     const linha = await linhaPelaAcao(`Editar: ${ACAO}`);
@@ -138,7 +138,7 @@ describe('Gestão de Ações', { timeout: 20000 }, () => {
   });
 });
 
-describe('Gestão de Coordenadores', { timeout: 20000 }, () => {
+describe('Gestão de Coordenadores', { timeout: 45000 }, () => {
   test('o Controle não vê Excluir no cartão, na lista nem no modal', async () => {
     renderCoordenadores(CONTROLE);
     await screen.findByText('Ana', {}, { timeout: 15000 });

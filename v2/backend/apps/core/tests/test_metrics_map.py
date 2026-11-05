@@ -24,7 +24,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, Participation, Produto
+from apps.core.models import Participation
 from apps.core.tests.factories import (
     GroupFactory,
     MunicipioFactory,
@@ -35,6 +35,7 @@ from apps.core.tests.factories import (
     com_pacote_da_diretoria,
     com_pacote_do_controle,
     com_pacote_do_dat,
+    liberar_par,
 )
 
 pytestmark = pytest.mark.django_db
@@ -473,27 +474,9 @@ def test_map_metrics_eventos_e_compras_separados_no_payload(user_diretoria):
         tipo_evento=tipo,
     )
 
-    produto_model = Produto.objects.create(nome="Kit Didático", codigo="KIT01", projeto=projeto)
-    Compra.objects.create(
-        codigo="COMP-001",
-        produto=produto_model,
-        projeto=projeto,
-        municipio=municipio,
-        quantidade=10,
-        data=timezone.localdate(),
-        uso="Uso 1",
-        external_hash="hash_compra_001",
-    )
-    Compra.objects.create(
-        codigo="COMP-002",
-        produto=produto_model,
-        projeto=projeto,
-        municipio=municipio,
-        quantidade=20,
-        data=timezone.localdate(),
-        uso="Uso 2",
-        external_hash="hash_compra_002",
-    )
+    # G19 (05/11/2026): "compras" conta pares município × projeto da lista atual (DATCompra válida)
+    liberar_par(municipio, projeto, quantidade=10)
+    liberar_par(municipio, ProjetoFactory(nome="Projeto Compras 2", codigo="PC02"), quantidade=20)
 
     url = reverse("core:metrics-map")
     res = client.get(url)

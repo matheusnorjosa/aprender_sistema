@@ -6,7 +6,7 @@
  * - Seção 2: Ranking de Formadores (bar chart + tabela com export)
  * - Seção 3: Qualidade (cards com thresholds visuais)
  *
- * RBAC: Controle + Gerência (validado em App.jsx)
+ * RBAC: policy view_team_dashboard (Diretoria e DAT) na rota (AppRoutes.tsx) e nos três endpoints
  */
 
 import { useState, useEffect, useCallback, type JSX } from 'react';

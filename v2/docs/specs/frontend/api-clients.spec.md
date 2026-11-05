@@ -1,7 +1,7 @@
 ---
 title: Clientes de API (Fetch)
 status: canonical
-last_verified: 2026-11-04
+last_verified: 2026-11-05
 sources_of_truth:
   - v2/frontend/src/api/config.ts
   - v2/frontend/src/api/auth.ts
@@ -65,8 +65,8 @@ Wrapper publico exportado por `config.ts`:
 | Funcao | Uso |
 |---|---|
 | `fetchAPI<T>(url, options?, isRetry?)` | Transporte JSON padrao (GET/POST/...). Retorna `T` ou `undefined` em 204. |
-| `fetchBlob(url, options?)` | Downloads binarios (CSV/Excel export). Injeta CSRF em mutacoes; sem parse JSON. |
-| `fetchWithErrorMapping<T>(url, options?, errorMap)` | Mapeia status HTTP -> mensagem amigavel por endpoint. |
+| `fetchBlob(url, options?)` | Downloads binarios (CSV/Excel export). Injeta CSRF em mutacoes; sem parse JSON. Falha com "Não foi possível exportar o arquivo (erro N)." |
+| `fetchWithErrorMapping<T>(url, options?, errorMap)` | O `detail` do servidor vence; o mapa por status só cobre a resposta sem mensagem (corpo vazio ou que não é JSON), e o erro do mapa mantém `status` e `response`. No módulo DAT (`DAT_ERROR_MAP`): 403 "Você não tem permissão para esta ação." e 404 "Registro não encontrado." (sem nomear setor). |
 | `buildUrl(path, params?)` | Monta querystring filtrando valores vazios. |
 | `ensureCsrfToken(forceRefresh?)` / `getCsrfToken()` / `clearCsrfCache()` / `initCsrfToken()` | Ciclo de vida do token CSRF. |
 

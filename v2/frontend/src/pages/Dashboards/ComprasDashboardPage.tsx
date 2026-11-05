@@ -206,13 +206,10 @@ export default function ComprasDashboardPage(): JSX.Element {
       if (filters.produto) dashboardParams['produto_id'] = filters.produto;
       if (filters['tipo_compra']) dashboardParams['tipo_compra'] = filters['tipo_compra'];
 
-      const pendenciasParams: Record<string, string | number> = {};
-      if (filters['uf']) pendenciasParams['uf'] = filters['uf'];
-      if (filters.projeto) pendenciasParams['projeto_id'] = filters.projeto;
-
+      // As pendências seguem os mesmos filtros dos KPIs (o servidor aceita os mesmos).
       const [dashboardResponse, pendenciasResponse] = await Promise.all([
         getComprasDashboard(dashboardParams),
-        getComprasPendencias(pendenciasParams),
+        getComprasPendencias(dashboardParams),
       ]);
       setData(dashboardResponse);
       setPendencias(pendenciasResponse);

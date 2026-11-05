@@ -22,7 +22,7 @@ from __future__ import annotations
 from typing import cast
 
 from django.contrib.auth import update_session_auth_hash
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from django.http import JsonResponse
 from rest_framework import generics, serializers
 from rest_framework.permissions import IsAuthenticated
@@ -34,7 +34,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, extend_schema_view, inline_serializer
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
-from apps.core.models import AuditLog, Solicitacao, Usuario
+from apps.core.models import AuditLog, Participation, Solicitacao, Usuario
 from apps.core.rbac.policies import resolve_public_policies
 from apps.core.serializers.me import MeEventSerializer
 from apps.core.serializers.usuario import ChangePasswordSerializer
@@ -42,14 +42,22 @@ from apps.core.services.audit import registrar_auditoria
 from apps.core.services.lgpd_export_service import build_lgpd_export_data, export_counts
 from apps.core.utils.net import get_client_ip
 
+# Papéis que põem o evento em Meus Eventos de quem quer que seja; COORDENADOR só para o responsável.
+_PAPEIS_QUE_CONTAM_SEMPRE = (
+    Participation.Role.FORMADOR,
+    Participation.Role.COORD_ACOMPANHA,
+    Participation.Role.CONVIDADO,
+)
+
 
 @extend_schema_view(
     get=extend_schema(
         summary="Listar eventos do usuário autenticado",
         description=(
             "Retorna a lista paginada de eventos (Solicitacoes aprovadas) onde o "
-            "usuário autenticado é participante (qualquer role). Formador é o caso "
-            "primário, mas qualquer user autenticado pode consumir."
+            "usuário autenticado é formador, coordenador além do responsável, convidado "
+            "ou o coordenador responsável (sem responsável gravado, quem criou). Quem só "
+            "cadastrou o evento para outra pessoa não o vê. Qualquer user autenticado pode consumir."
         ),
         responses={
             200: MeEventSerializer(many=True),
@@ -65,10 +73,11 @@ class MeEventsListView(generics.ListAPIView):
     GET /api/me/events/
 
     Filtros aplicados:
-        - participations__usuario = request.user
+        - Participation do request.user como FORMADOR, COORD_ACOMPANHA ou CONVIDADO, ou como
+          COORDENADOR sendo o responsável (`coordenador`; nulo, quem criou)
         - status = "aprovado" (eventos pendentes/reprovados não aparecem)
 
-    Ordenação: -inicio (mais recente primeiro).
+    Ordenação: -inicio (mais recente primeiro), id para desempatar (paginação estável).
     Paginação: padrão DRF (PageNumberPagination).
     """
 
@@ -76,14 +85,20 @@ class MeEventsListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self) -> QuerySet[Solicitacao]:
+        user = cast(Usuario, self.request.user)
+        # Decisão do dono (05/11/2026): a linha COORDENADOR só conta para o responsável (FK
+        # `coordenador`; nula, quem criou). Quem só cadastrou o evento para outra pessoa não o vê aqui.
+        # Num único filter(): papel e pessoa valem para a MESMA Participation.
+        e_responsavel = Q(coordenador=user) | Q(coordenador__isnull=True, usuario=user)
         return (
             Solicitacao.objects.filter(
-                participations__usuario=self.request.user,
+                Q(participations__role__in=_PAPEIS_QUE_CONTAM_SEMPRE) | e_responsavel,
+                participations__usuario=user,
                 status="aprovado",
             )
             .select_related("municipio", "projeto", "tipo_evento", "coordenador", "usuario")
             .prefetch_related("participations__usuario")
-            .order_by("-inicio")
+            .order_by("-inicio", "id")
             .distinct()
         )
 

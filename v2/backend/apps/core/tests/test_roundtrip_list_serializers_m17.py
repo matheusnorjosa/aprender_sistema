@@ -25,3 +25,9 @@ def test_dat_compra_list_exposes_fk_ids() -> None:
     fields = DATCompraListSerializer.Meta.fields
     for f in ("municipio", "projeto", "produto"):
         assert f in fields, f
+
+
+def test_dat_compra_list_exposes_observacoes() -> None:
+    # G17/P#27: sem observacoes na List, o modal (semeado da linha) abre a compra com o campo vazio;
+    # quem escreve ali apaga a observação anterior sem tê-la visto.
+    assert "observacoes" in DATCompraListSerializer.Meta.fields

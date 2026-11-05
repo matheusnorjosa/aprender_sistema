@@ -103,7 +103,7 @@ correspondentes).
 | POST | `/auth/ping/` | ![Stable](https://img.shields.io/badge/-stable-green) | Keep-alive de sessão (CP5) | IsAuthenticated |
 | GET | `/me/` | ![Stable](https://img.shields.io/badge/-stable-green) | Dados do usuário logado + RBAC | IsAuthenticated |
 | GET | `/me/policies/` | ![Stable](https://img.shields.io/badge/-stable-green) | Policies públicas do usuário (SSOT do frontend) | IsAuthenticated |
-| GET | `/me/events/` | ![Stable](https://img.shields.io/badge/-stable-green) | Eventos em que o usuário participa | IsAuthenticated |
+| GET | `/me/events/` | ![Stable](https://img.shields.io/badge/-stable-green) | Eventos aprovados em que o usuário é formador, coordenador além do responsável, convidado ou o responsável | IsAuthenticated |
 | POST | `/me/change-password/` | ![Stable](https://img.shields.io/badge/-stable-green) | Troca de senha self-service | IsAuthenticated |
 
 **Troca obrigatória de senha (primeiro acesso).** `GET /me/` inclui `deve_trocar_senha`
@@ -492,10 +492,10 @@ para todas as actions (`ProjetoViewSet`, `views/admin.py`). Selects usam `/api/o
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
-| GET | `/api/produtos/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar produtos | `manage_admin_registries` \| `manage_purchases_and_materials` \| `run_daily_operations` |
-| POST/PUT/PATCH/DELETE | `/api/produtos/` | ![Stable](https://img.shields.io/badge/-stable-green) | Escrita de produto | `IsAuthenticated` + `manage_purchases_and_materials` |
+| GET | `/api/produtos/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar produtos | `manage_admin_registries` |
+| POST/PUT/PATCH/DELETE | `/api/produtos/` | ![Stable](https://img.shields.io/badge/-stable-green) | Escrita de produto | `manage_admin_registries` |
 
-Gate em `ProdutoViewSet.get_permissions` (`views/admin.py`, D11). Selects abertos ficam em `/api/options/produtos/`.
+Gate em `ProdutoViewSet.permission_classes` (`views/admin.py`, D30): a mesma capacidade da tela `/dat/admin/produtos`. Selects abertos ficam em `/api/options/produtos/`.
 
 ### Grupos (RBAC)
 
@@ -678,20 +678,21 @@ capability de DAT. A lista já vem filtrada por `ativo=True`.
 | GET | `/api/metrics/map/` | ![Stable](https://img.shields.io/badge/-stable-green) | Dados para mapa | `HasPerm("view_map_metrics")` |
 | GET | `/api/metrics/map/coordinators/` | ![Stable](https://img.shields.io/badge/-stable-green) | Mapa por coordenador | `HasPerm("view_map_metrics")` |
 
-Gate em `metrics_map` e `metrics_map_coordinators` (`views/metrics/map_metrics.py`). **Não** existe
+Gate em `metrics_map` e `metrics_map_coordinators` (`views/metrics/map_metrics.py`). Em `metrics_map`, `compras` conta pares município × projeto com `DATCompra` válida pela regra da compra (`services/compra_elegibilidade.py`); `data_inicio`/`data_fim` filtram as compras por `data_compra`. **Não** existe
 `/api/metrics/map/summary/`, nem `/api/metrics/coordinators/`, nem
 `/api/metrics/coordinators/{id}/`.
 
 ### Métricas de Equipe
 
-Todas sob `/api/metrics/team/`, com a mesma composition
-`run_daily_operations | supervise_operations | manage_admin_registries`
+Todas sob `/api/metrics/team/`, com a policy da tela `/dashboards/equipe`:
+`CanViewTeamDashboard` (`view_team_dashboard` = `supervise_operations | manage_admin_registries`;
+Diretoria e DAT; D30)
 (`productivity_metrics` e `quality_metrics`, `views/metrics/dashboard_metrics.py`;
 `formadores_metrics`, `views/metrics/formador_metrics.py`).
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
-| GET | `/api/metrics/team/productivity/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Produtividade da equipe | `run_daily_operations` \| `supervise_operations` \| `manage_admin_registries` |
+| GET | `/api/metrics/team/productivity/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Produtividade da equipe | `CanViewTeamDashboard` |
 | GET | `/api/metrics/team/formadores/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Métricas por formador | idem |
 | GET | `/api/metrics/team/quality/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Indicadores de qualidade | idem |
 
@@ -809,13 +810,16 @@ cada um traz `sem_compra` e `projeto_em_espera`. O isento recebe `sem_compra: fa
 | GET | `/api/readyz/` | ![Stable](https://img.shields.io/badge/-stable-green) | Readiness (DB + Redis) | AllowAny |
 | GET | `/api/version/` | ![Stable](https://img.shields.io/badge/-stable-green) | SHA/tag da build em execução | AllowAny |
 | GET | `/api/features/` | ![Stable](https://img.shields.io/badge/-stable-green) | Feature flags ativas | **IsAuthenticated** |
-| GET/PUT | `/api/config/` | ![Stable](https://img.shields.io/badge/-stable-green) | Configurações operacionais (leitura **e escrita**; o PUT grava só as chaves enviadas: chave ausente mantém o valor atual e chaves que o serializer não conhece ficam no JSON) | `manage_purchases_and_materials` \| `approve_solicitation` |
+| GET/PUT | `/api/config/` | ![Stable](https://img.shields.io/badge/-stable-green) | Configurações operacionais (leitura **e escrita**; o PUT grava só as chaves enviadas: chave ausente mantém o valor atual e chaves que o serializer não conhece ficam no JSON) | `manage_admin_registries` (DAT e superusuário; até 05/11/2026, `manage_purchases_and_materials` \| `approve_solicitation`) |
 
 Provas: `/healthz/` e `/healthz/detailed/` estão em `v2/backend/config/urls.py`
 (fora do `include("apps.core.urls")` do path `api/`) — `/api/healthz/` **não existe**.
 `/api/features/` usa `@permission_classes([IsAuthenticated])` (view `features`, `views_health.py`),
 não `AllowAny`. `/api/config/` aceita `GET` e `PUT` e é gateado por capability
-(`config_view`, `views_config.py`), não por `IsAuthenticated`.
+(`config_view`, `views_config.py`), não por `IsAuthenticated`: só `HasPerm("manage_admin_registries")`,
+a mesma capacidade da tela `/dat/admin/configuracoes`. Decisão do dono de 05/11/2026: o Controle
+(`approve_solicitation`) e quem só tem `manage_purchases_and_materials` não leem nem gravam o buffer
+RD-04 e o teto de horas.
 
 ---
 
@@ -844,6 +848,7 @@ Policies usadas nesta referência (`rbac/policies.py`):
 | Policy | Capabilities aceitas |
 |--------|----------------------|
 | `CanUseGcal` | `operate_preagenda`, `approve_solicitation` |
+| `CanViewTeamDashboard` | `supervise_operations`, `manage_admin_registries` |
 | `CanAccessAuditLogs` | `manage_admin_registries`, `operate_preagenda` |
 | `CanViewComprasStats` | `manage_admin_registries`, `manage_purchases_and_materials`, `run_daily_operations` |
 | `CanViewComprasDashboard` | `view_compras_dashboard`, `manage_admin_registries` |

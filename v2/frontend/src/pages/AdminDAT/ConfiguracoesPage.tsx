@@ -94,7 +94,7 @@ export default function ConfiguracoesPage(): JSX.Element {
             <SettingOutlined aria-hidden="true" /> Configurações do Sistema
           </Title>
           <Text type="secondary">
-            Parâmetros que a checagem de disponibilidade dos formadores aplica. A mudança vale assim que você salva.
+            Buffer de deslocamento (checagem de agenda) e teto da contagem de horas. A mudança vale assim que você salva.
           </Text>
         </header>
 

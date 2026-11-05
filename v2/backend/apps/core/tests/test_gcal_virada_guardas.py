@@ -32,7 +32,7 @@ from apps.core.services.gcal.payload import build_event_payload
 from apps.core.services.gcal.sync import CriacaoRecusada, apply_one_solicitacao, upsert_one
 from apps.core.services.gcal.utils import _payload_hash
 from apps.core.services.gcal_fake_client import FakeCalendarClient
-from apps.core.services.solicitacao_publish import motivo_nao_publicavel, publish_to_gcal
+from apps.core.services.solicitacao_publish import motivo_nao_publicavel, publish_to_gcal, resync_to_gcal
 from apps.core.tests.factories import GroupFactory, SolicitacaoFactory, UsuarioFactory, com_pacote_do_controle
 
 pytestmark = pytest.mark.django_db
@@ -286,6 +286,53 @@ def controle_client():
     c = APIClient()
     c.force_authenticate(user=user)
     return c
+
+
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
+@pytest.mark.parametrize(
+    ("kw", "code"),
+    [
+        ({"quando": "passado", "gcal_status": "PUBLISHED"}, "evento_passado"),
+        ({"quando": "passado", "gcal_status": "ERROR"}, "evento_passado"),
+        ({"gcal_status": "NONE"}, "nao_publicado"),
+        ({"gcal_status": "PUBLISHED", "publicado_fora_do_sistema": True}, "publicado_fora_do_sistema"),
+    ],
+)
+def test_resync_to_gcal_individual_recusa_como_o_lote(kw, code):
+    """D64: o Reenviar de uma linha recusa o que o lote recusa; evento que já terminou não é sobrescrito."""
+    quando = kw.pop("quando", "futuro")
+    s = _passado(**kw) if quando == "passado" else _futuro(**kw)
+    with patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay") as task:
+        task.return_value.id = "t1"
+        with pytest.raises(ValidationAPIError) as exc:
+            resync_to_gcal(s, UsuarioFactory(), RequestFactory().post("/x/"))
+    assert exc.value.code == code
+    assert task.call_count == 0
+    s.refresh_from_db()
+    assert s.gcal_status == kw["gcal_status"], "recusa não marca PENDING"
+
+
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
+def test_resync_endpoint_de_evento_passado_400(controle_client):
+    s = _passado(gcal_status="PUBLISHED")
+    with patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay") as task:
+        task.return_value.id = "t1"
+        resp = controle_client.post(f"/api/solicitacoes/{s.id}/resync-gcal/", format="json")
+    assert resp.status_code == 400
+    assert resp.data["code"] == "evento_passado"
+    assert task.call_count == 0
+
+
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
+def test_resync_to_gcal_aceita_futuro_publicado_e_error():
+    for st in ("PUBLISHED", "ERROR"):
+        s = _futuro(gcal_status=st)
+        with patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay") as task:
+            task.return_value.id = "t1"
+            resync_to_gcal(s, UsuarioFactory(), RequestFactory().post("/x/"))
+        assert task.call_count == 1
+        s.refresh_from_db()
+        assert s.gcal_status == "PENDING"
 
 
 @override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")

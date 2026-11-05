@@ -8,7 +8,9 @@ Endpoints:
 - PUT /api/config/ - Atualiza configurações + AuditLog
 
 Permissions:
-- HasPerm("manage_purchases_and_materials") | HasPerm("approve_solicitation") (RBAC)
+- HasPerm("manage_admin_registries") (RBAC): a mesma capacidade da tela /dat/admin/configuracoes.
+  Decisão do dono (05/11): antes aceitava `manage_purchases_and_materials` ou `approve_solicitation`,
+  e o Controle mudava pela API o buffer (RD-04) e o teto de horas sem ver a tela.
 
 Cache:
 - Invalidação automática via signal post_save (apps/core/signals.py)
@@ -108,13 +110,13 @@ def _config_atual() -> dict[str, Any]:
     tags=["config"],
 )
 @api_view(["GET", "PUT"])
-@permission_classes([HasPerm("manage_purchases_and_materials") | HasPerm("approve_solicitation")])
+@permission_classes([HasPerm("manage_admin_registries")])
 def config_view(request: Request) -> Response:
     """
     GET: Lê configurações consolidadas do Config model.
     PUT: Atualiza as chaves enviadas + cria AuditLog. Chave ausente mantém o valor atual.
 
-    Permissions: HasPerm("manage_purchases_and_materials") | HasPerm("approve_solicitation")
+    Permissions: HasPerm("manage_admin_registries")
 
     GET Response (200):
         {

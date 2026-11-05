@@ -20,21 +20,14 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
 from apps.core.models import AuditLog, Solicitacao
-from apps.core.permissions import HasPerm
+from apps.core.rbac.policies import CanViewTeamDashboard
 
 
 @api_view(["GET"])
 @permission_classes(
-    # Onda 2 A3 (β, 2026-04-27): adicionado `manage_admin_registries` para DAT
-    # como ator transversal (validar/suportar). Composition OR mantida em vez
-    # de policy unificada — decisão Lote 4.2.b2 preservada (3 endpoints
-    # protegem objetos semanticamente diferentes: pessoas vs fluxo).
-    # Motivos legítimos:
-    #   run_daily_operations    → Controle (operar)
-    #   supervise_operations    → Diretoria (supervisionar)
-    #   manage_admin_registries → DAT (validar/suportar)
-    # Racional completo + guard-rail: ADR-019 (v2/docs/adr/ADR-019-metrics-composition-or.md).
-    [HasPerm("run_daily_operations") | HasPerm("supervise_operations") | HasPerm("manage_admin_registries")]
+    # A mesma policy da tela /dashboards/equipe (`view_team_dashboard`: Diretoria e DAT). O Controle
+    # saiu (decisão do dono, 05/11/2026): lia o ranking com nomes e horas pela API sem ter a tela.
+    [CanViewTeamDashboard]
 )
 @throttle_classes([ScopedRateThrottle])
 def productivity_metrics(request: Request) -> Response:
@@ -61,7 +54,7 @@ def productivity_metrics(request: Request) -> Response:
         - avg_approval_time_hours = avg(updated_at - created_at).total_seconds() / 3600
         - gcal_error_rate = (errors / approved) * 100 (0.0 if division by zero)
 
-    Permissions: HasPerm("run_daily_operations") | HasPerm("supervise_operations") (only authorized users)
+    Permissions: CanViewTeamDashboard (a policy da tela /dashboards/equipe)
     """
     days = int(request.GET.get("days", 7))
     cutoff = timezone.now() - timedelta(days=days)
@@ -125,16 +118,9 @@ productivity_metrics.throttle_scope = "metrics"  # type: ignore[attr-defined]
 
 @api_view(["GET"])
 @permission_classes(
-    # Onda 2 A3 (β, 2026-04-27): adicionado `manage_admin_registries` para DAT
-    # como ator transversal (validar/suportar). Composition OR mantida em vez
-    # de policy unificada — decisão Lote 4.2.b2 preservada (3 endpoints
-    # protegem objetos semanticamente diferentes: pessoas vs fluxo).
-    # Motivos legítimos:
-    #   run_daily_operations    → Controle (operar)
-    #   supervise_operations    → Diretoria (supervisionar)
-    #   manage_admin_registries → DAT (validar/suportar)
-    # Racional completo + guard-rail: ADR-019 (v2/docs/adr/ADR-019-metrics-composition-or.md).
-    [HasPerm("run_daily_operations") | HasPerm("supervise_operations") | HasPerm("manage_admin_registries")]
+    # A mesma policy da tela /dashboards/equipe (`view_team_dashboard`: Diretoria e DAT). O Controle
+    # saiu (decisão do dono, 05/11/2026): lia o ranking com nomes e horas pela API sem ter a tela.
+    [CanViewTeamDashboard]
 )
 @throttle_classes([ScopedRateThrottle])
 def quality_metrics(request: Request) -> Response:
@@ -161,7 +147,7 @@ def quality_metrics(request: Request) -> Response:
         - avg_approval_time_hours = avg(updated_at - created_at).total_seconds() / 3600
         - avg_publish_time_minutes = avg(gcal_last_sync_at - updated_at).total_seconds() / 60
 
-    Permissions: HasPerm("run_daily_operations") | HasPerm("supervise_operations") (only authorized users)
+    Permissions: CanViewTeamDashboard (a policy da tela /dashboards/equipe)
     """
     days = int(request.GET.get("days", 30))
     cutoff = timezone.now() - timedelta(days=days)

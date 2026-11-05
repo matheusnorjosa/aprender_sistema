@@ -358,19 +358,25 @@ class _BatchIdsSerializer(serializers.Serializer):
     ),
     create=extend_schema(
         summary="Criar solicitação",
-        description="""Cria nova solicitação de evento.
+        description="""Cria uma solicitação de evento.
 
 ## Fluxo
-1. Frontend envia dados do wizard (4 steps)
-2. Backend valida disponibilidade (RD-01~08)
-3. Status inicial: `pendente` (SUPER) ou `aprovado` (NAO_SUPER) conforme PA-01
+1. A tela Nova Solicitação é uma página única com um cartão por horário e envia sempre por
+   `POST /api/solicitacoes/lote/` (1 a N eventos, tudo ou nada). Este endpoint cria um evento só.
+2. Backend valida disponibilidade (RD-01~08) de formadores, coordenadores além do responsável e do
+   responsável que acompanha.
+3. Status inicial: `pendente` (SUPER, ou par sem compra) ou `aprovado` (NAO_SUPER) conforme PA-01.
+4. `coordenador` é o responsável (sem ele, quem cria, se coordena na gerência do projeto). Só ele
+   ganha a linha COORDENADOR (convite do Google); quem cadastra para outra pessoa não.
 
 ## Exemplo curl
 ```bash
-curl -X POST /api/v1/solicitacoes/ \\
+curl -X POST /api/solicitacoes/ \\
   -H "Content-Type: application/json" \\
   -H "X-CSRFToken: $CSRF" \\
-  -d '{"titulo": "Formacao", "inicio": "2026-01-20T09:00:00-03:00", ...}'
+  -d '{"municipio": 1, "projeto": 1, "tipo_evento": 1, "inicio": "2026-01-20T09:00:00-03:00",
+       "fim": "2026-01-20T12:00:00-03:00", "coordenador": 7, "coordenador_acompanha": false,
+       "extra_participants": {"formador_ids": [12], "coord_acompanha_ids": []}}'
 ```
 """,
         request=SolicitacaoSerializer,
@@ -821,7 +827,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         Formato esperado:
         {
-            "coordenador_id": int,  # sempre o request.user, mas pode ser explícito
+            "coordenador_id": int,  # aceito e ignorado: o responsável vem do campo `coordenador`
             "formador_ids": [int, ...],
             "formador_emails": [str, ...],
             "coord_acompanha_ids": [int, ...],  # coordenadores além do responsável (03/11/2026)
@@ -860,8 +866,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             list({u.id: u for u in (*usuarios_by_id.values(), *usuarios_by_email.values())}.values()),
         )
 
-        # Sempre criar participação do coordenador (request.user)
-        Participation.objects.get_or_create(solicitacao=solicitacao, usuario=self.request.user, role="COORDENADOR")
+        # A linha COORDENADOR é só do responsável (`_gravar_evento`): quem cadastra para outra pessoa
+        # não vira coordenador do evento nem recebe o convite (decisão do dono, 05/11/2026).
 
         # Formadores por ID
         for formador_id in extra.get("formador_ids", []):
@@ -1119,20 +1125,19 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
     def _trocar_convite_do_responsavel(self, solicitacao, coordenador_antigo_id):
         """Troca de responsável na edição: o novo ganha o convite (papel COORDENADOR); o antigo
-        perde, salvo se for quem criou (esse sempre teve a linha). O cache de agenda do antigo
-        é renovado aqui porque o sinal de Solicitacao só vê o valor novo."""
+        perde, mesmo se for quem criou (decisão do dono, 05/11/2026). Sem FK gravada, o antigo
+        responsável era quem criou. O cache de agenda do antigo é renovado aqui porque o sinal de
+        Solicitacao só vê o valor novo."""
         from .models import Participation
         from .utils.cache_utils import invalidate_availability_cache
 
         Participation.objects.get_or_create(
             solicitacao=solicitacao, usuario_id=solicitacao.coordenador_id, role="COORDENADOR"
         )
-        if coordenador_antigo_id is not None:
-            if coordenador_antigo_id != solicitacao.usuario_id:
-                Participation.objects.filter(
-                    solicitacao=solicitacao, usuario_id=coordenador_antigo_id, role="COORDENADOR"
-                ).delete()
-            invalidate_availability_cache(usuario_id=coordenador_antigo_id)
+        antigo_id = coordenador_antigo_id if coordenador_antigo_id is not None else solicitacao.usuario_id
+        if antigo_id is not None and antigo_id != solicitacao.coordenador_id:
+            Participation.objects.filter(solicitacao=solicitacao, usuario_id=antigo_id, role="COORDENADOR").delete()
+            invalidate_availability_cache(usuario_id=antigo_id)
 
     def _update_formadores(self, solicitacao, extra):
         """

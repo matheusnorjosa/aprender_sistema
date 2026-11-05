@@ -656,53 +656,134 @@ class DATCompraAPITests(DATModuleAPITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_pendencias_action_returns_only_pairs_without_active_event(self):
-        """Pendencias should list only core_compra pairs without pending/approved solicitacao."""
+    def _dat_compra(self, municipio, projeto, **extra):
+        dados = {"descricao_produto": "Kit", "quantidade": 10, "ano_uso": 2026, "created_by": self.dat_user}
+        dados.update(extra)
+        return DATCompra.objects.create(municipio=municipio, projeto=projeto, **dados)
+
+    def _evento(self, municipio, projeto, status_evento="pendente"):
+        inicio = timezone.now() + timedelta(days=2)
+        return SolicitacaoFactory(
+            usuario=self.dat_user,
+            municipio=municipio,
+            projeto=projeto,
+            tipo_evento=TipoEventoFactory(),
+            inicio=inicio,
+            fim=inicio + timedelta(hours=2),
+            status=status_evento,
+        )
+
+    def _pendencias(self, **params):
         self.client.force_authenticate(user=self.dat_user)
+        response = self.client.get(reverse("core:dat-compra-material-pendencias"), params, secure=True)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return response.data
 
-        tipo_evento = TipoEventoFactory(nome="Seminário DAT")
+    def test_pendencias_action_returns_only_pairs_without_active_event(self):
+        """Pendências: pares da DATCompra válida sem solicitação pendente/aprovada."""
+        self._dat_compra(self.municipio, self.projeto, data_compra=date(2026, 3, 1))
+        self._dat_compra(self.municipio2, self.projeto, quantidade=20, data_compra=date(2026, 3, 2))
+        self._evento(self.municipio, self.projeto)
 
+        data = self._pendencias()
+
+        self.assertEqual(data["total_com_compra"], 2)
+        self.assertEqual(data["total_com_evento"], 1)
+        self.assertEqual(data["total_pendentes"], 1)
+        self.assertEqual(len(data["pendentes"]), 1)
+        self.assertEqual(data["pendentes"][0]["municipio"], self.municipio2.nome)
+        self.assertEqual(data["pendentes"][0]["projeto"], self.projeto.nome)
+        self.assertEqual(data["pendentes"][0]["total_itens"], 20)
+        self.assertEqual(data["pendentes"][0]["ultima_compra"], date(2026, 3, 2))
+
+    def test_pendencias_ignoram_a_lista_legada_e_a_compra_que_nao_libera(self):
+        """A lista legada `Compra` não conta; DATCompra inativa ou com quantidade 0 também não."""
         Compra.objects.create(
-            codigo="CORE-A",
+            codigo="CORE-LEGADA",
             projeto=self.projeto,
             municipio=self.municipio,
             quantidade=10,
             data=date(2026, 3, 1),
-            uso="Fluxo A",
-            external_hash="a" * 64,
+            uso="Fluxo legado",
+            external_hash="c" * 64,
         )
-        Compra.objects.create(
-            codigo="CORE-B",
-            projeto=self.projeto,
-            municipio=self.municipio2,
-            quantidade=20,
-            data=date(2026, 3, 2),
-            uso="Fluxo B",
-            external_hash="b" * 64,
+        self._dat_compra(self.municipio2, self.projeto, ativo=False)
+        self._dat_compra(self.municipio2, self.projeto, quantidade=0, ano_uso=2027)
+
+        data = self._pendencias()
+
+        self.assertEqual(data["total_com_compra"], 0)
+        self.assertEqual(data["pendentes"], [])
+
+    def test_pendencias_evento_de_outro_projeto_da_colecao_atende_a_compra(self):
+        """Regra da compra: a compra libera a coleção inteira, então o evento da coleção a atende."""
+        colecao = ProjetoGeral.objects.create(nome="Colecao Ficticia Pendencias")
+        livro_1 = ProjetoFactory(nome="Ficticio Pendencias 1", projeto_geral=colecao)
+        livro_2 = ProjetoFactory(nome="Ficticio Pendencias 2", projeto_geral=colecao)
+        solto = ProjetoFactory(nome="Ficticio Pendencias Solto")
+        self._dat_compra(self.municipio, livro_1)
+        self._dat_compra(self.municipio2, solto)
+        self._evento(self.municipio, livro_2, status_evento="aprovado")
+        self._evento(self.municipio2, ProjetoFactory(nome="Ficticio Outro Solto"))  # sem coleção: não casa
+
+        data = self._pendencias()
+
+        self.assertEqual(data["total_com_compra"], 2)
+        self.assertEqual(data["total_com_evento"], 1)
+        self.assertEqual([p["projeto"] for p in data["pendentes"]], [solto.nome])
+
+    def test_pendencias_evento_do_projeto_de_nome_geral_da_gerencia_atende_a_compra(self):
+        """O projeto de nome geral é liberado pela compra de qualquer projeto da gerência."""
+        from apps.core.models import Gerencia
+
+        gerencia = Gerencia.objects.create(nome="G-PEND", nome_setor="Setor Pend", pergunta_avaliar_formador=False)
+        comprado = ProjetoFactory(nome="Ficticio Pend Comprado", gerencia=gerencia)
+        nome_geral = ProjetoFactory(nome="Ficticio Pend Geral", gerencia=gerencia, eh_nome_geral=True)
+        self._dat_compra(self.municipio, comprado)
+        self._evento(self.municipio, nome_geral)
+
+        data = self._pendencias()
+
+        self.assertEqual(data["total_com_evento"], 1)
+        self.assertEqual(data["pendentes"], [])
+
+    def test_pendencias_compra_sem_colecao_segue_pendente_com_evento_de_colecao_do_combo(self):
+        """Projeto sem coleção não cai no ramo do combo: o NULL do JOIN não pode sumir com a pendência."""
+        novo_lendo, _ = ProjetoGeral.objects.get_or_create(nome="NOVO LENDO")
+        sem_colecao = ProjetoFactory(nome="Ficticio Pend Sem Colecao")
+        self._dat_compra(self.municipio, sem_colecao)
+        self._evento(self.municipio, ProjetoFactory(nome="Ficticio Pend Livro NL", projeto_geral=novo_lendo))
+
+        data = self._pendencias()
+
+        self.assertEqual(data["total_com_compra"], 1)
+        self.assertEqual(data["total_pendentes"], 1)
+        self.assertEqual(data["total_com_compra"], data["total_com_evento"] + data["total_pendentes"])
+        self.assertEqual([p["projeto"] for p in data["pendentes"]], [sem_colecao.nome])
+
+    def test_pendencias_compra_do_combo_e_atendida_por_evento_de_colecao_do_combo(self):
+        """A compra do combo 'NL E AMMA PORT E MAT' libera o NOVO LENDO: o evento do livro a atende."""
+        combo, _ = ProjetoGeral.objects.get_or_create(nome="NL E AMMA PORT E MAT")
+        novo_lendo, _ = ProjetoGeral.objects.get_or_create(nome="NOVO LENDO")
+        self._dat_compra(self.municipio, ProjetoFactory(nome="Ficticio Pend Combo", projeto_geral=combo))
+        self._evento(self.municipio, ProjetoFactory(nome="Ficticio Pend Livro NL 2", projeto_geral=novo_lendo))
+
+        data = self._pendencias()
+
+        self.assertEqual(data["total_com_compra"], 1)
+        self.assertEqual(data["total_com_evento"], 1)
+        self.assertEqual(data["pendentes"], [])
+
+    def test_pendencias_seguem_os_filtros_do_painel(self):
+        """Ano de uso e tipo de compra filtram as pendências como filtram os KPIs."""
+        self._dat_compra(self.municipio, self.projeto, ano_uso=2026, tipo_compra="primeira")
+        self._dat_compra(self.municipio2, self.projeto, ano_uso=2027, tipo_compra="adicional_1")
+
+        self.assertEqual([p["municipio"] for p in self._pendencias(ano_uso=2026)["pendentes"]], [self.municipio.nome])
+        self.assertEqual(
+            [p["municipio"] for p in self._pendencias(tipo_compra="adicional_1")["pendentes"]], [self.municipio2.nome]
         )
-
-        inicio = timezone.now() + timedelta(days=2)
-        fim = inicio + timedelta(hours=2)
-        SolicitacaoFactory(
-            usuario=self.dat_user,
-            municipio=self.municipio,
-            projeto=self.projeto,
-            tipo_evento=tipo_evento,
-            inicio=inicio,
-            fim=fim,
-            status="pendente",
-        )
-
-        url = reverse("core:dat-compra-material-pendencias")
-        response = self.client.get(url, secure=True)
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["total_com_compra"], 2)
-        self.assertEqual(response.data["total_com_evento"], 1)
-        self.assertEqual(response.data["total_pendentes"], 1)
-        self.assertEqual(len(response.data["pendentes"]), 1)
-        self.assertEqual(response.data["pendentes"][0]["municipio"], self.municipio2.nome)
-        self.assertEqual(response.data["pendentes"][0]["projeto"], self.projeto.nome)
+        self.assertEqual(self._pendencias(uf="SP")["total_com_compra"], 0)
 
     def test_pendencias_action_allows_diretoria_user(self):
         """Diretoria deve acessar pendências de compras para leitura executiva."""
@@ -752,6 +833,59 @@ class DATCadastroAPITests(DATModuleAPITestCase):
         url = reverse("core:dat-cadastro-etapa", args=[cadastro.id])
         response = self.client.post(url, {"etapa": "invalid_etapa", "status": "concluido"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("detail", response.data)
+
+    def test_etapa_action_recusa_status_e_data_invalidos(self):
+        """B#44: status fora de DATCadastro.StatusEtapa ou data que não é data → 400 com mensagem."""
+        self.client.force_authenticate(user=self.dat_user)
+        cadastro = DATCadastro.objects.create(
+            municipio=self.municipio, projeto_geral=self.projeto_geral, plataforma="FORMAR", created_by=self.dat_user
+        )
+        url = reverse("core:dat-cadastro-etapa", args=[cadastro.id])
+
+        resp_status = self.client.post(url, {"etapa": "chaves", "status": "qualquer coisa"})
+        resp_data = self.client.post(url, {"etapa": "chaves", "status": "concluido", "data": "15/01/2025"})
+
+        self.assertEqual(resp_status.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Status inválido", resp_status.data["detail"])
+        self.assertEqual(resp_data.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Data inválida", resp_data.data["detail"])
+        cadastro.refresh_from_db()
+        self.assertEqual(cadastro.status_chaves, "pendente")
+        self.assertIsNone(cadastro.data_chaves)
+
+    def test_filtro_status_etapa(self):
+        """P#35: status_etapa filtra (concluído = todas as etapas da plataforma; pendente = nenhuma; resto)."""
+        import uuid
+
+        self.client.force_authenticate(user=self.dat_user)
+        uid = uuid.uuid4().hex[:6]
+        formar = ["status_criacao_curso", "status_chaves", "status_instrucoes", "status_envio"]
+        avaliar = ["status_recebidos", "status_validados", "status_importados"]
+
+        def cadastro(nome, plataforma, campos, valor):
+            return DATCadastro.objects.create(
+                municipio=MunicipioFactory(nome=f"{nome}_{uid}", uf="CE"),
+                projeto_geral=self.projeto_geral,
+                plataforma=plataforma,
+                created_by=self.dat_user,
+                **dict.fromkeys(campos, valor),
+            )
+
+        f_concluido = cadastro("FConcluido", "FORMAR", formar, "concluido")
+        f_pendente = cadastro("FPendente", "FORMAR", formar, "pendente")
+        f_andamento = cadastro("FAndamento", "FORMAR", formar[:1], "concluido")
+        a_concluido = cadastro("AConcluido", "AVALIAR", avaliar, "concluido")
+        a_pendente = cadastro("APendente", "AVALIAR", avaliar, "pendente")
+
+        def ids(valor):
+            response = self.client.get(reverse("core:dat-cadastro-list"), {"status_etapa": valor, "page_size": 50})
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            return {item["id"] for item in response.data["results"]}
+
+        self.assertEqual(ids("concluido"), {f_concluido.id, a_concluido.id})
+        self.assertEqual(ids("pendente"), {f_pendente.id, a_pendente.id})
+        self.assertEqual(ids("em_andamento"), {f_andamento.id})
 
     def test_stats_aggregations_not_fragmented_by_listing_ordering(self):
         """Regression: same bug as DATAcao stats (PR #1361).

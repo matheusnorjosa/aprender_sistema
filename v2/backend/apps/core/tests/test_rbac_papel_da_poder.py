@@ -20,6 +20,8 @@ from typing import Any
 from django.apps import apps as django_apps
 from django.contrib.auth.models import Group
 from django.core.cache import cache
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -492,6 +494,77 @@ class TestP16Deslocamento:
         response = _cliente(apoio).get("/api/deslocamentos/alvos/")
         assert response.status_code == 200
         assert response.data == []
+
+
+class TestPodeEditarDeslocamento:
+    """G07 (P#12, D22): a lista diz, por linha, se a pessoa pode editar e excluir (a tela só mostra os
+    botões aí). Espelha `_ensure_owner_or_delegate`: dono, ou `user_can_delegate_deslocamento` do alvo.
+    Não muda quem pode: cada caso confere o `pode_editar` contra o PATCH de verdade."""
+
+    @staticmethod
+    def _pode_editar(usuario: Usuario) -> dict[int, bool]:
+        response = _cliente(usuario).get("/api/deslocamentos/")
+        assert response.status_code == 200
+        return {d["id"]: d["pode_editar"] for d in response.data["results"]}
+
+    @pytest.fixture
+    def gerencia_com_registros(self, duas_gerencias):
+        minha, _ = duas_gerencias
+        formador = _so_vinculo("FORMADOR", minha)
+        coord_colega = _so_vinculo("COORDENADOR", minha)
+        return minha, {
+            "formador": Deslocamento.objects.create(usuario=formador, **_payload_deslocamento()),
+            "coord_colega": Deslocamento.objects.create(usuario=coord_colega, **_payload_deslocamento()),
+        }
+
+    def _confere_com_a_escrita(self, usuario: Usuario, esperado: dict[int, bool]) -> None:
+        assert self._pode_editar(usuario) == esperado
+        client = _cliente(usuario)
+        for pk, pode in esperado.items():
+            status_code = client.patch(f"/api/deslocamentos/{pk}/", {"destino": "Crato"}, format="json").status_code
+            assert status_code == (200 if pode else 403), (pk, pode, status_code)
+
+    def test_apoio_so_o_proprio(self, gerencia_com_registros):
+        minha, registros = gerencia_com_registros
+        apoio = _so_vinculo("APOIO", minha)
+        proprio = Deslocamento.objects.create(usuario=apoio, **_payload_deslocamento())
+        self._confere_com_a_escrita(
+            apoio, {proprio.id: True, registros["formador"].id: False, registros["coord_colega"].id: False}
+        )
+
+    def test_coordenadora_o_do_formador_sim_o_da_outra_coordenadora_nao(self, gerencia_com_registros):
+        minha, registros = gerencia_com_registros
+        coord = _so_vinculo("COORDENADOR", minha)
+        self._confere_com_a_escrita(coord, {registros["formador"].id: True, registros["coord_colega"].id: False})
+
+    def test_gerente_o_do_formador_sim_o_da_coordenadora_nao(self, gerencia_com_registros):
+        minha, registros = gerencia_com_registros
+        gerente = _so_vinculo("GERENTE", minha)
+        self._confere_com_a_escrita(gerente, {registros["formador"].id: True, registros["coord_colega"].id: False})
+
+    def test_dono_formador_edita_o_proprio(self, gerencia_com_registros):
+        _, registros = gerencia_com_registros
+        formador = registros["formador"].usuario
+        self._confere_com_a_escrita(formador, {registros["formador"].id: True})
+
+    def test_quem_delega_de_qualquer_um_edita_todos(self, gerencia_com_registros):
+        _, registros = gerencia_com_registros
+        self._confere_com_a_escrita(UsuarioFactory(superuser=True), {d.id: True for d in registros.values()})
+
+    def test_sem_n_mais_1(self, gerencia_com_registros, django_assert_max_num_queries):
+        """O cálculo é uma vez por requisição: a página com 2 ou com 12 linhas faz as mesmas consultas."""
+        minha, _ = gerencia_com_registros
+        gerente = _so_vinculo("GERENTE", minha)
+        mais_formadores = [_so_vinculo("FORMADOR", minha) for _ in range(10)]  # vínculos antes de medir
+        client = _cliente(gerente)
+        assert client.get("/api/deslocamentos/").status_code == 200  # aquece o cache de RBAC: as duas medidas iguais
+        with CaptureQueriesContext(connection) as poucas:
+            assert client.get("/api/deslocamentos/").status_code == 200
+        for formador in mais_formadores:
+            Deslocamento.objects.create(usuario=formador, **_payload_deslocamento())
+        with django_assert_max_num_queries(len(poucas.captured_queries)):
+            response = client.get("/api/deslocamentos/")
+        assert len(response.data["results"]) == 12
 
 
 # ============================================================================

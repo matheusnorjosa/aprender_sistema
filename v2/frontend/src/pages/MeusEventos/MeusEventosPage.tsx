@@ -6,7 +6,9 @@
  * acessível por intent matrix); qualquer user autenticado pode consumir.
  *
  * Backend: GET /api/me/events/ (PR #1237). Lê apenas Solicitacoes
- * aprovadas onde request.user é participante. Ordenação: -inicio.
+ * aprovadas onde request.user é formador, coordenador além do responsável,
+ * convidado ou o responsável; quem só cadastrou para outra pessoa não vê
+ * (decisão do dono, 05/11/2026). Ordenação: -inicio, id.
  */
 
 import { useState, useEffect, useCallback, useMemo, JSX } from 'react';
@@ -162,7 +164,7 @@ export default function MeusEventosPage(): JSX.Element {
               Meus Eventos
             </Title>
             <Text type="secondary">
-              Lista de eventos aprovados em que você é participante.
+              Eventos aprovados em que você é formador ou coordenador.
             </Text>
           </header>
 

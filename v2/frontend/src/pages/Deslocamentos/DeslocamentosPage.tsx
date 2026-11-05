@@ -57,6 +57,7 @@ import {
   type FormadorOption as UsuarioOptionType,
 } from '../../api/deslocamentos';
 import { useAcesso } from '../../contexts/AcessoContext';
+import { mensagemDoErro } from '../AdminDAT/usuario_form_helpers';
 import DatImportsCentralizedBanner from '../../components/DatImportsCentralizedBanner';
 import logger from '../../utils/logger';
 import type { ID } from '../../types';
@@ -73,13 +74,6 @@ interface FormValuesType {
   start_date: Dayjs;
   end_date: Dayjs;
   observacao?: string;
-}
-
-/** API error type */
-interface ApiErrorType {
-  end_date?: string[];
-  destino?: string[];
-  [key: string]: string[] | undefined;
 }
 
 export default function DeslocamentosPage(): JSX.Element {
@@ -239,14 +233,10 @@ export default function DeslocamentosPage(): JSX.Element {
       form.resetFields();
       void loadDeslocamentos(pagination.current);
     } catch (error) {
-      const apiError = error as ApiErrorType;
-      if (apiError.end_date) {
-        message.error(apiError.end_date[0]);
-      } else if (apiError.destino) {
-        message.error(apiError.destino[0]);
-      } else {
-        message.error('Erro ao salvar deslocamento');
-      }
+      // Campo vazio no formulário: o antd já marca o campo; não há resposta do servidor.
+      if ((error as { errorFields?: unknown }).errorFields) return;
+      // G07 (P#13): o motivo do servidor (validação em `errors`, 403 no `detail`).
+      message.error(mensagemDoErro(error) || 'Não foi possível salvar o deslocamento.');
     }
   };
 
@@ -254,10 +244,10 @@ export default function DeslocamentosPage(): JSX.Element {
   const handleDelete = async (id: ID): Promise<void> => {
     try {
       await deleteDeslocamento(id);
-      message.success('Deslocamento deletado com sucesso!');
+      message.success('Deslocamento excluído.');
       void loadDeslocamentos(pagination.current);
-    } catch {
-      message.error('Erro ao deletar deslocamento');
+    } catch (error) {
+      message.error(mensagemDoErro(error) || 'Não foi possível excluir o deslocamento.');
     }
   };
 
@@ -311,7 +301,8 @@ export default function DeslocamentosPage(): JSX.Element {
       key: 'actions',
       fixed: 'right',
       width: 120,
-      render: (_, record) => (
+      // G07 (P#12): só onde o servidor deixa (dono ou quem delega); nas outras linhas o clique dava 403.
+      render: (_, record) => record.pode_editar && (
         <Space size="small">
           <Button
             type="link"
@@ -321,10 +312,11 @@ export default function DeslocamentosPage(): JSX.Element {
             aria-label="Editar deslocamento"
           />
           <Popconfirm
-            title="Tem certeza que deseja deletar?"
+            title="Excluir este deslocamento?"
             onConfirm={() => handleDelete(record.id)}
-            okText="Sim"
-            cancelText="Não"
+            okText="Excluir"
+            okButtonProps={{ danger: true }}
+            cancelText="Cancelar"
           >
             <Button type="link" danger icon={<DeleteOutlined />} size="small" aria-label="Excluir deslocamento" />
           </Popconfirm>

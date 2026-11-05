@@ -34,7 +34,6 @@ import {
   ReloadOutlined,
   PlusOutlined,
   DeleteOutlined,
-  DownloadOutlined,
   FilterOutlined,
   ClearOutlined,
   CheckCircleFilled,
@@ -56,6 +55,7 @@ import {
   getCadastrosStats,
   getMunicipiosOptions,
   getProjetosGeraisOptions,
+  type CadastrosStats,
 } from '../../api/datModule';
 import {
   STATUS_OPTIONS,
@@ -114,14 +114,6 @@ interface CadastroFormValues {
   [key: string]: unknown;
 }
 
-interface CadastrosStats {
-  total_formar: number;
-  total_avaliar: number;
-  pendentes: number;
-  em_andamento: number;
-  concluidos: number;
-}
-
 interface MunicipioOption {
   id: number;
   nome: string;
@@ -161,7 +153,8 @@ export default function CadastrosPage(): JSX.Element {
   } = useTableFilters<CadastrosFilters, CadastroRecord, CadastrosStats>({
     defaultFilters: DEFAULT_FILTERS,
     listFn: listCadastros as unknown as (params: TableFilterParams) => Promise<PaginatedResponse<CadastroRecord>>,
-    statsFn: getCadastrosStats as unknown as (params: TableFilterParams) => Promise<CadastrosStats>,
+    // Sem `plataforma`: as duas abas precisam do número delas (por_plataforma).
+    statsFn: ({ plataforma: _plataforma, ...params }) => getCadastrosStats(params),
     buildParams: (f) => ({
       ...(f.search && { search: f.search }),
       ...(f.uf && { uf: f.uf }),
@@ -318,12 +311,9 @@ export default function CadastrosPage(): JSX.Element {
               Acompanhamento de workflows nas plataformas FORMAR e AVALIAR
             </Text>
           </div>
-          <Space>
-            <Button icon={<DownloadOutlined />}>Exportar</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-              Novo Cadastro
-            </Button>
-          </Space>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+            Novo Cadastro
+          </Button>
         </div>
       </header>
 
@@ -339,7 +329,7 @@ export default function CadastrosPage(): JSX.Element {
                 <Space>
                   <BookOutlined className="text-blue-500" />
                   <span>FORMAR</span>
-                  <Badge count={stats?.total_formar || 0} style={{ backgroundColor: '#1890ff' }} />
+                  <Badge count={stats?.por_plataforma?.FORMAR ?? 0} style={{ backgroundColor: '#1890ff' }} />
                 </Space>
               ),
             },
@@ -349,7 +339,7 @@ export default function CadastrosPage(): JSX.Element {
                 <Space>
                   <BarChartOutlined className="text-green-500" />
                   <span>AVALIAR</span>
-                  <Badge count={stats?.total_avaliar || 0} style={{ backgroundColor: '#52c41a' }} />
+                  <Badge count={stats?.por_plataforma?.AVALIAR ?? 0} style={{ backgroundColor: '#52c41a' }} />
                 </Space>
               ),
             },
@@ -359,40 +349,20 @@ export default function CadastrosPage(): JSX.Element {
         {/* Stats Cards */}
         {stats && (
           <Row gutter={16} className="mt-4">
-            <Col xs={24} sm={12} md={6}>
+            <Col xs={24} sm={12}>
               <Card size="small">
                 <Statistic
                   title="Total Cadastros"
-                  value={activeTab === 'FORMAR' ? stats.total_formar : stats.total_avaliar}
+                  value={stats.por_plataforma?.[activeTab] ?? 0}
                   prefix={currentPlataforma.icon}
                 />
               </Card>
             </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card size="small">
-                <Statistic
-                  title="Pendentes"
-                  value={stats.pendentes || 0}
-                  valueStyle={{ color: '#faad14' }}
-                  prefix={<ExclamationCircleFilled />}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card size="small">
-                <Statistic
-                  title="Em Andamento"
-                  value={stats.em_andamento || 0}
-                  valueStyle={{ color: '#1890ff' }}
-                  prefix={<ClockCircleFilled />}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
+            <Col xs={24} sm={12}>
               <Card size="small">
                 <Statistic
                   title="Concluídos"
-                  value={stats.concluidos || 0}
+                  value={(activeTab === 'FORMAR' ? stats.formar_completos : stats.avaliar_completos) ?? 0}
                   valueStyle={{ color: '#52c41a' }}
                   prefix={<CheckCircleFilled />}
                 />

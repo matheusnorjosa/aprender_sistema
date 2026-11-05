@@ -67,9 +67,10 @@ interface CompraRecord {
   projeto_nome: string;
   // Família do projeto (read-only do serializer) — coluna ao lado da variante. H.1/#1897.
   projeto_geral_nome?: string;
-  produto: number;
+  produto: number | null;
   produto_nome: string | null;
   codigo_produto: string | null;
+  descricao_produto?: string | null;
   tipo_compra?: string | null;
   uf?: string;
   municipio_uf?: string;
@@ -80,14 +81,15 @@ interface CompraRecord {
   data_compra?: string | null;
   ano_uso?: number | null;
   status_uso?: string | null;
+  observacoes?: string;
 }
 
 interface CompraFormValues {
   projeto: number;
-  produto: number;
+  produto?: number | null;
   descricao_produto?: string | null;
   tipo_compra?: string | null;
-  uf: string;
+  uf?: string;
   municipio: number;
   quantidade: number;
   quantidade_utilizada?: number | null;
@@ -109,6 +111,11 @@ export function buildCompraPayload(values: CompraFormValues): Record<string, unk
     ...values,
     data_compra: values.data_compra ? values.data_compra.format('YYYY-MM-DD') : null,
   };
+  // Select limpo (allowClear) devolve undefined, e o JSON.stringify do PATCH descarta a chave:
+  // o servidor manteria o valor antigo. null limpa de fato (os três aceitam null no modelo).
+  for (const k of ['produto', 'tipo_compra', 'ano_uso'] as const) {
+    if (payload[k] === undefined) payload[k] = null;
+  }
   // O DAT nao envia: uf/status_uso (read-only/derivado) + os campos de procurement
   // (fornecedor/NF/data_entrega, que sao do CONTROLE — #1637) + codigo_produto (derivado
   // de Produto, read-only). Colocar ownership no lado errado = perda silenciosa de dado.
@@ -145,12 +152,12 @@ interface ProdutoOption {
   nome: string;
 }
 
-// Status options
+// Status options: os mesmos de DATCompra.StatusUso (o servidor recalcula no save()).
 const STATUS_OPTIONS = [
-  { label: 'Disponível', value: 'disponivel', color: 'green' },
-  { label: 'Em Uso', value: 'em_uso', color: 'blue' },
-  { label: 'Reservado', value: 'reservado', color: 'orange' },
-  { label: 'Esgotado', value: 'esgotado', color: 'red' },
+  { label: 'Disponível', value: 'disponivel', color: 'green', legenda: 'nada utilizado' },
+  { label: 'Em Uso', value: 'em_uso', color: 'blue', legenda: 'parte utilizada' },
+  { label: 'Esgotado', value: 'esgotado', color: 'red', legenda: '0 disponível' },
+  { label: 'Devolvido', value: 'devolvido', color: 'default', legenda: 'material devolvido' },
 ];
 
 const TIPO_COMPRA_OPTIONS = [
@@ -183,7 +190,8 @@ const buildComprasParams = (f: ComprasFilters): TableFilterParams => ({
   ...(f.municipio !== undefined && { municipio_id: f.municipio }),
   ...(f.projeto !== undefined && { projeto_id: f.projeto }),
   ...(f.produto !== undefined && { produto_id: f.produto }),
-  ...(f.status && { status: f.status }),
+  // O servidor filtra por `status_uso` (`?status=` era ignorado e a lista voltava inteira).
+  ...(f.status && { status_uso: f.status }),
   ...(f.ano_uso !== undefined && { ano_uso: f.ano_uso }),
   ...(f.tipo_compra && { tipo_compra: f.tipo_compra }),
 });
@@ -213,6 +221,10 @@ export default function ComprasPage(): JSX.Element {
   const [editingCompra, setEditingCompra] = useState<CompraRecord | null>(null);
 
   const [form] = Form.useForm<CompraFormValues>();
+  // P#32: tipo e ano são obrigatórios na criação; na edição, só se o registro já tem valor
+  // (a compra importada não tem, e exigir obrigava a inventar dado para mudar outro campo).
+  const exigeTipo = !editingCompra || Boolean(editingCompra.tipo_compra);
+  const exigeAno = !editingCompra || editingCompra.ano_uso != null;
 
   const {
     data: compras,
@@ -228,7 +240,8 @@ export default function ComprasPage(): JSX.Element {
     defaultFilters: DEFAULT_COMPRAS_FILTERS,
     listFn: listCompras as unknown as (params: TableFilterParams) => Promise<PaginatedResponse<CompraRecord>>,
     buildParams: buildComprasParams,
-    defaultOrdering: '-updated_at',
+    // `updated_at` não está em ordering_fields do servidor (era ignorado): as mais novas primeiro.
+    defaultOrdering: '-created_at',
     entityName: 'compras',
   });
 
@@ -326,20 +339,12 @@ export default function ComprasPage(): JSX.Element {
   };
 
   // Status tag renderer
+  // B#34: o servidor sempre manda status_uso (o "Baixo Estoque" calculado aqui nunca aparecia).
+  // Sem ele, a mesma regra do DATCompra.save().
   const renderStatusTag = (status: string | null, disponivel: number, quantidade: number): JSX.Element => {
-    if (!status) {
-      // Auto-calculate based on disponível
-      if (disponivel === 0) {
-        return <Tag color="red">Esgotado</Tag>;
-      } else if (disponivel < quantidade * 0.1) {
-        return <Tag color="orange">Baixo Estoque</Tag>;
-      } else {
-        return <Tag color="green">Disponível</Tag>;
-      }
-    }
-
-    const statusConfig = STATUS_OPTIONS.find((s) => s.value === status);
-    return <Tag color={statusConfig?.color || 'default'}>{statusConfig?.label || status}</Tag>;
+    const valor = status ?? (disponivel <= 0 ? 'esgotado' : disponivel < quantidade ? 'em_uso' : 'disponivel');
+    const statusConfig = STATUS_OPTIONS.find((s) => s.value === valor);
+    return <Tag color={statusConfig?.color || 'default'}>{statusConfig?.label || valor}</Tag>;
   };
 
   const renderTipoCompraTag = (tipo: string | null | undefined): JSX.Element => {
@@ -744,18 +749,12 @@ export default function ComprasPage(): JSX.Element {
           <Text strong style={{ textTransform: 'uppercase', fontSize: 12 }}>
             Legenda:
           </Text>
-          <Space>
-            <Tag color="green">Disponível</Tag>
-            <Text type="secondary">{'>'}20% disponível</Text>
-          </Space>
-          <Space>
-            <Tag color="orange">Baixo Estoque</Tag>
-            <Text type="secondary">{'<'}10% disponível</Text>
-          </Space>
-          <Space>
-            <Tag color="red">Esgotado</Tag>
-            <Text type="secondary">0 disponível</Text>
-          </Space>
+          {STATUS_OPTIONS.map((s) => (
+            <Space key={s.value}>
+              <Tag color={s.color}>{s.label}</Tag>
+              <Text type="secondary">{s.legenda}</Text>
+            </Space>
+          ))}
         </Space>
       </Card>
       </aside>
@@ -821,13 +820,22 @@ export default function ComprasPage(): JSX.Element {
                 </Form.Item>
               </Col>
               <Col xs={24} sm={12}>
+                {/* P#32: como no servidor, a descrição vale no lugar do produto cadastrado
+                    (a compra importada costuma vir só com a descrição). */}
                 <Form.Item
                   name="produto"
                   label="Produto"
-                  rules={[{ required: true, message: 'Selecione o produto' }]}
+                  dependencies={['descricao_produto']}
+                  rules={[
+                    ({ getFieldValue }) => ({
+                      required: !String(getFieldValue('descricao_produto') ?? '').trim(),
+                      message: 'Selecione o produto ou preencha a descrição',
+                    }),
+                  ]}
                 >
                   <Select
                     placeholder="Selecione..."
+                    allowClear
                     showSearch
                     optionFilterProp="label"
                     options={produtos.map((p) => ({ label: p.nome, value: p.id }))}
@@ -848,21 +856,10 @@ export default function ComprasPage(): JSX.Element {
 
           {/* Localização */}
           <Card size="small" title="Localização" className="mb-4">
+            {/* P#31: saiu o campo UF — não filtrava os municípios, não ia no payload e travava
+                a edição (a linha traz municipio_uf). O município já mostra "Nome - UF". */}
             <Row gutter={16}>
-              <Col xs={24} sm={8}>
-                <Form.Item
-                  name="uf"
-                  label="UF"
-                  rules={[{ required: true, message: 'Selecione a UF' }]}
-                >
-                  <Select
-                    placeholder="Selecione..."
-                    options={UF_OPTIONS}
-                    showSearch
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={16}>
+              <Col xs={24}>
                 <Form.Item
                   name="municipio"
                   label="Município"
@@ -900,9 +897,9 @@ export default function ComprasPage(): JSX.Element {
                 <Form.Item
                   name="ano_uso"
                   label="Ano de Uso"
-                  rules={[{ required: true, message: 'Selecione o ano de uso' }]}
+                  rules={[{ required: exigeAno, message: 'Selecione o ano de uso' }]}
                 >
-                  <Select placeholder="Selecione..." options={ANO_OPTIONS} allowClear />
+                  <Select placeholder={exigeAno ? 'Selecione...' : 'Sem ano (pendente)'} options={ANO_OPTIONS} allowClear />
                 </Form.Item>
               </Col>
               <Col xs={12} sm={6}>
@@ -934,9 +931,13 @@ export default function ComprasPage(): JSX.Element {
                 <Form.Item
                   name="tipo_compra"
                   label="Tipo de Compra"
-                  rules={[{ required: true, message: 'Selecione o tipo de compra' }]}
+                  rules={[{ required: exigeTipo, message: 'Selecione o tipo de compra' }]}
                 >
-                  <Select placeholder="Selecione..." options={TIPO_COMPRA_OPTIONS} />
+                  <Select
+                    placeholder={exigeTipo ? 'Selecione...' : 'Não informado'}
+                    options={TIPO_COMPRA_OPTIONS}
+                    allowClear
+                  />
                 </Form.Item>
               </Col>
             </Row>

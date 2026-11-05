@@ -45,6 +45,7 @@ import type { Map as LeafletMap, Layer, GeoJSON as LeafletGeoJSON, PathOptions, 
 import type { Feature, Geometry, FeatureCollection } from 'geojson';
 import 'leaflet/dist/leaflet.css';
 import { fetchAPI, buildUrl, type QueryParams } from '../../api/config';
+import { unwrapList } from '../../api/unwrapList';
 import logger from '../../utils/logger';
 import type { ID } from '../../types';
 import {
@@ -137,6 +138,13 @@ function MapController({ mapRef }: MapControllerProps): null {
   return null;
 }
 
+const TODOS_OS_PROJETOS: ProjetoType = { id: null, nome: 'Todos os Projetos' };
+
+/** Mensagem do servidor (fetchAPI já a põe em `message`), ou o texto de reserva. */
+function mensagemDoErro(err: unknown, reserva: string): string {
+  return err instanceof Error && err.message ? err.message : reserva;
+}
+
 // Cores do mapa - Estilo SimpleMaps (flat, clean)
 const COLORS = {
   withEvents: '#4CAF50',      // Verde médio - estados com eventos
@@ -163,9 +171,12 @@ export default function MapaBrasilPage(): JSX.Element {
   // Estados para dados da API
   const [municipiosData, setMunicipiosData] = useState<MunicipioDataType[]>([]);
   const [estadosData, setEstadosData] = useState<EstadosDataType>({});
-  const [projetos, setProjetos] = useState<ProjetoType[]>([]);
+  const [projetos, setProjetos] = useState<ProjetoType[]>([TODOS_OS_PROJETOS]);
+  const [loadingProjetos, setLoadingProjetos] = useState<boolean>(true);
+  const [erroProjetos, setErroProjetos] = useState<boolean>(false);
   const [coordenadoresData, setCoordenadoresData] = useState<CoordenadorDataType[]>([]);
   const [loadingCoordinators, setLoadingCoordinators] = useState<boolean>(false);
+  const [erroCoordenadores, setErroCoordenadores] = useState<string | null>(null);
   const [appliedMapFilters, setAppliedMapFilters] = useState<MapQueryParams>({});
 
   // Refs
@@ -217,14 +228,17 @@ export default function MapaBrasilPage(): JSX.Element {
     };
   }, [selectedState]);
 
-  // Fetch projetos no mount
+  // Fetch projetos no mount: /options/projetos/ é aberto a quem está logado, só ativos e sem paginação
   useEffect(() => {
     const fetchProjetos = async (): Promise<void> => {
       try {
-        const data = await fetchAPI<{ results: Array<{ id: ID | null; nome: string }> }>(buildUrl('/projetos/', { page_size: 100 }));
-        setProjetos([{ id: null, nome: 'Todos os Projetos' }, ...(data.results || [])]);
+        const data = unwrapList(await fetchAPI<ProjetoType[]>('/options/projetos/'));
+        setProjetos([TODOS_OS_PROJETOS, ...data]);
       } catch (err) {
         logger.error('Erro ao carregar projetos:', err);
+        setErroProjetos(true);
+      } finally {
+        setLoadingProjetos(false);
       }
     };
     void fetchProjetos();
@@ -259,7 +273,7 @@ export default function MapaBrasilPage(): JSX.Element {
 
     } catch (err) {
       logger.error('Erro ao buscar dados do mapa:', err);
-      setError('Erro ao carregar dados. Tente novamente.');
+      setError(mensagemDoErro(err, 'Erro ao carregar dados. Tente novamente.'));
       message.error('Erro ao carregar dados do mapa');
       setMunicipiosData([]);
       setEstadosData({});
@@ -276,12 +290,14 @@ export default function MapaBrasilPage(): JSX.Element {
     }
 
     setLoadingCoordinators(true);
+    setErroCoordenadores(null);
     try {
       const data = await fetchAPI<{ coordenadores: CoordenadorDataType[] }>(buildUrl('/metrics/map/coordinators/', { uf, ...filters }));
       setCoordenadoresData(data.coordenadores || []);
     } catch (err) {
       logger.error('Erro ao buscar coordenadores:', err);
       setCoordenadoresData([]);
+      setErroCoordenadores(mensagemDoErro(err, 'Erro ao carregar os coordenadores.'));
     } finally {
       setLoadingCoordinators(false);
     }
@@ -293,6 +309,7 @@ export default function MapaBrasilPage(): JSX.Element {
       void fetchCoordinators(selectedState, appliedMapFilters);
     } else {
       setCoordenadoresData([]);
+      setErroCoordenadores(null);
     }
   }, [selectedState, appliedMapFilters]);
 
@@ -615,9 +632,19 @@ export default function MapaBrasilPage(): JSX.Element {
                     style={{ width: '100%' }}
                     value={selectedProjeto}
                     onChange={setSelectedProjeto}
+                    showSearch
+                    optionFilterProp="label"
                     options={projetos.map((p) => ({ label: p.nome, value: p.id }))}
-                    loading={projetos.length === 0}
+                    loading={loadingProjetos}
                   />
+                  {erroProjetos && (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      style={{ marginTop: 8 }}
+                      message="Não foi possível carregar a lista de projetos. O filtro fica em “Todos os Projetos”."
+                    />
+                  )}
                 </Panel>
 
                 {/* Filtro de Data */}
@@ -665,6 +692,11 @@ export default function MapaBrasilPage(): JSX.Element {
               showIcon
               closable
               onClose={() => setError(null)}
+              action={
+                <Button size="small" onClick={() => void fetchMapData()} loading={loading}>
+                  Tentar novamente
+                </Button>
+              }
               style={{ marginBottom: 16 }}
             />
           )}
@@ -936,6 +968,23 @@ export default function MapaBrasilPage(): JSX.Element {
                   <Title level={5} style={{ marginBottom: 12 }}>
                     Eventos por Coordenador
                   </Title>
+                  {erroCoordenadores && (
+                    <Alert
+                      type="error"
+                      showIcon
+                      style={{ marginBottom: 12 }}
+                      message={`Não foi possível carregar os coordenadores: ${erroCoordenadores}`}
+                      action={
+                        <Button
+                          size="small"
+                          onClick={() => void fetchCoordinators(selectedState, appliedMapFilters)}
+                          loading={loadingCoordinators}
+                        >
+                          Tentar novamente
+                        </Button>
+                      }
+                    />
+                  )}
                   <Table
                     scroll={{ x: "max-content" }}
                     size="small"

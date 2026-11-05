@@ -22,8 +22,9 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
 from apps.core.exceptions import ValidationAPIError
-from apps.core.models import Compra, Participation, Solicitacao, Usuario
+from apps.core.models import Participation, Projeto, Solicitacao, Usuario
 from apps.core.permissions import HasPerm
+from apps.core.services.compra_elegibilidade import _compras_validas, _q_libera  # pyright: ignore[reportPrivateUsage]
 
 MAP_LIMIT_MAX = 1000
 VALID_STATUS_FILTERS = {"pendente", "aprovado", "reprovado"}
@@ -182,19 +183,30 @@ def _apply_filters_to_solicitacoes(
     return queryset
 
 
-def _apply_filters_to_compras(queryset: QuerySet[Compra], filters: MapFilterValues) -> QuerySet[Compra]:
+def _pares_de_compra(filters: MapFilterValues) -> set[tuple[int, str, int]]:
+    """(município, UF, projeto) com compra pela regra da criação (`services/compra_elegibilidade`).
+
+    Decisão do dono (05/11/2026): conta a lista atual (`DATCompra` ativa com quantidade > 0), por par
+    município × projeto. Com o filtro de projeto vale a família da coleção: o par é município × projeto
+    filtrado, liberado por compra de qualquer projeto que o libere. O filtro de datas olha
+    `data_compra`; a compra sem data fica de fora só quando há filtro de datas.
     """
-    Aplica filtros compatíveis ao queryset de compras.
-    """
+    compras = _compras_validas()
     if filters.projeto_id is not None:
-        queryset = queryset.filter(projeto_id=filters.projeto_id)
+        projeto = Projeto.objects.select_related("projeto_geral").filter(pk=filters.projeto_id).first()
+        if projeto is None:
+            return set()
+        compras = compras.filter(_q_libera(projeto))
     if filters.uf:
-        queryset = queryset.filter(municipio__uf=filters.uf)
+        compras = compras.filter(municipio__uf=filters.uf)
     if filters.data_inicio:
-        queryset = queryset.filter(data__gte=filters.data_inicio)
+        compras = compras.filter(data_compra__gte=filters.data_inicio)
     if filters.data_fim:
-        queryset = queryset.filter(data__lte=filters.data_fim)
-    return queryset
+        compras = compras.filter(data_compra__lte=filters.data_fim)
+    return {
+        (municipio_id, uf, filters.projeto_id if filters.projeto_id is not None else projeto_id)
+        for municipio_id, uf, projeto_id in compras.values_list("municipio_id", "municipio__uf", "projeto_id")
+    }
 
 
 @api_view(["GET"])
@@ -210,9 +222,11 @@ def metrics_map(request: Request) -> Response:
     - status: filtrar por status (pendente, aprovado, reprovado)
     - projeto_id: filtrar por projeto ID
     - uf: filtrar por UF
-    - data_inicio: filtrar eventos/compras a partir da data (YYYY-MM-DD)
-    - data_fim: filtrar eventos/compras até a data (YYYY-MM-DD)
+    - data_inicio: filtrar eventos (início) e compras (data_compra) a partir da data (YYYY-MM-DD)
+    - data_fim: filtrar eventos (início) e compras (data_compra) até a data (YYYY-MM-DD)
     - limit: limita quantidade de municípios retornados (opcional)
+
+    "compras" conta pares município × projeto com compra pela regra da criação (`_pares_de_compra`).
 
     Response:
     {
@@ -242,7 +256,7 @@ def metrics_map(request: Request) -> Response:
     limit = _parse_map_limit(request)
 
     queryset = _apply_filters_to_solicitacoes(Solicitacao.objects.all(), filters)
-    compras_queryset = _apply_filters_to_compras(Compra.objects.all(), filters)
+    pares_de_compra = _pares_de_compra(filters)
 
     # Agregações por município (com coordenadas)
     by_municipio_queryset = (
@@ -285,11 +299,11 @@ def metrics_map(request: Request) -> Response:
     coordenadores_por_municipio = {mid: len(p) for mid, p in pessoas_por_municipio.items()}
     coordenadores_por_uf = {uf: len(p) for uf, p in pessoas_por_uf.items()}
 
-    compras_por_municipio: dict[int, int] = {}
-    for item in compras_queryset.exclude(municipio__isnull=True).values("municipio_id").annotate(compras=Count("id")):
-        municipio_id = item["municipio_id"]
-        if municipio_id is not None:
-            compras_por_municipio[int(municipio_id)] = int(item["compras"])
+    compras_por_municipio: dict[int, int] = defaultdict(int)
+    compras_por_uf: dict[str, int] = defaultdict(int)
+    for municipio_id, uf, _projeto_id in pares_de_compra:
+        compras_por_municipio[municipio_id] += 1
+        compras_por_uf[uf] += 1
 
     # Formatar resposta com coordenadores
     by_municipio_list: list[dict[str, object]] = []
@@ -319,12 +333,6 @@ def metrics_map(request: Request) -> Response:
         )
         .order_by("-eventos", "municipio__uf")
     )
-
-    compras_por_uf: dict[str, int] = {}
-    for item in compras_queryset.exclude(municipio__isnull=True).values("municipio__uf").annotate(compras=Count("id")):
-        uf = item["municipio__uf"]
-        if uf:
-            compras_por_uf[str(uf)] = int(item["compras"])
 
     by_uf_list: list[dict[str, object]] = []
     for item in by_uf_queryset:
@@ -365,7 +373,7 @@ def metrics_map(request: Request) -> Response:
             "totals": {
                 "all": queryset.count(),
                 "by_status": by_status,
-                "compras": compras_queryset.count(),
+                "compras": len(pares_de_compra),
             },
             "by_uf": by_uf_list,
             "by_municipio": by_municipio_list,

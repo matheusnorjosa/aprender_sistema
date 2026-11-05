@@ -7,6 +7,8 @@
  * - Exibe resumo de status GCal no topo
  * - Botões para preview e publish
  * - Operações em lote (Reapply/Resync) via seleção múltipla
+ * - Excluir (decisão do dono, 05/11/2026): só o DAT (`execute_restricted_operations`) e só na linha em
+ *   que o servidor deixa (`pode_excluir`); tira dos dois lados. O Controle fica com "Remover do Google".
  */
 
 import { useState, useEffect, useCallback, useContext, useMemo, useRef, ChangeEvent, CSSProperties, Key, JSX } from 'react';
@@ -46,6 +48,7 @@ import {
   InfoCircleOutlined,
   SyncOutlined,
   StopOutlined,
+  DeleteOutlined,
   EnvironmentOutlined,
   TeamOutlined,
   LinkOutlined,
@@ -64,6 +67,7 @@ import {
   publishSolicitacao,
   resyncSolicitacao,
   cancelSolicitacao,
+  deleteSolicitacao,
 } from '../../api/solicitacoes';
 import { getStatusSummary, reapplyBatch, resyncBatch, type GCalStatusSummary } from '../../api/gcal';
 import { MeetLink } from '../../components/MeetLink';
@@ -79,7 +83,15 @@ import { TIMING } from '../../constants/timing';
 import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
 import { FORTALEZA_TZ, formatFortaleza } from '../../utils/datetime';
-import { MOTIVO_NAO_PUBLICAVEL, gcalRowActions, motivoNaoPublicavel, type GcalRowTag } from '../../utils/gcalRowActions';
+import {
+  MOTIVO_NAO_PUBLICAVEL,
+  confirmacaoDeExcluirNoGoogle,
+  estaNoGoogle,
+  gcalRowActions,
+  motivoNaoPublicavel,
+  resumoDoEvento,
+  type GcalRowTag,
+} from '../../utils/gcalRowActions';
 import logger from '../../utils/logger';
 import type { ID, Solicitacao, GCalStatus, Gerencia, PaginatedResponse, Participation } from '../../types';
 import { formadoresLabel } from '../../utils/participants';
@@ -155,6 +167,14 @@ function rotuloDoEvento(row: Solicitacao): string {
   return [formatFortaleza(row.inicio), row.municipio_nome, row.projeto_nome].filter(Boolean).join(' · ');
 }
 const { RangePicker } = DatePicker;
+
+/** Resposta do convidado no Google (`responseStatus`), em português. */
+const RESPOSTA_DO_CONVIDADO: Record<string, string> = {
+  needsAction: 'Aguardando resposta',
+  accepted: 'Aceitou',
+  declined: 'Recusou',
+  tentative: 'Talvez',
+};
 
 /** Google Calendar event from API */
 interface GoogleCalendarEvent {
@@ -233,6 +253,9 @@ export default function PreAgendaPage(): JSX.Element {
 
   // OAuth Phase 5: acesso (AcessoContext) e integração Google
   const { caps, ehSuperusuario } = useAcesso();
+  // Excluir só para o DAT (e o superusuário), decisão do dono de 05/11/2026: o servidor também deixa o
+  // Controle (`pode_excluir`), mas ele continua só com "Remover do Google".
+  const podeExcluir = caps.canExecuteRestrictedOperations;
   const temaEscuro = useContext(ThemeContext)?.isDark === true; // o escuro tem fundo próprio (App.css)
   const { status: googleStatus, disconnect: googleDisconnect, fetchStatus: googleFetchStatus } = useGoogleIntegration();
 
@@ -421,7 +444,7 @@ export default function PreAgendaPage(): JSX.Element {
       icon: <SyncOutlined className="text-yellow-500" />,
       content: (
         <div>
-          <p>Deseja reenviar (forçar UPDATE) este evento no Google Calendar?</p>
+          <p>Deseja reenviar este evento ao Google Agenda?</p>
           <p className="text-gray-500 text-xs">
             Esta ação irá sobrescrever o evento existente com os dados atualizados.
           </p>
@@ -446,15 +469,21 @@ export default function PreAgendaPage(): JSX.Element {
 
   // Remover do Google tira o convite e o link do Meet de todos: a confirmação abre no Cancelar,
   // cita o evento e diz que a solicitação continua aprovada ("Cancelar Evento" sugeria cancelá-la).
+  // Evento que já terminou não se publica de novo (o Publicar recusa): a confirmação diz isso.
   const handleCancel = useCallback((record: Solicitacao): void => {
     const id = record.id;
+    const jaTerminou = motivoNaoPublicavel(record) === 'evento_passado';
     Modal.confirm({
       title: `Remover do Google Agenda: ${rotuloDoEvento(record)}?`,
       icon: <StopOutlined className="text-red-500" />,
       content: (
         <div>
           <p>O evento e o link do Meet saem do Google Agenda.</p>
-          <p>A solicitação continua aprovada no sistema e pode ser publicada de novo.</p>
+          <p>
+            {jaTerminou
+              ? 'A solicitação continua aprovada no sistema, mas o evento já terminou: ele não poderá ser publicado de novo.'
+              : 'A solicitação continua aprovada no sistema e pode ser publicada de novo.'}
+          </p>
         </div>
       ),
       okText: 'Remover do Google',
@@ -473,22 +502,51 @@ export default function PreAgendaPage(): JSX.Element {
     });
   }, [loadData]);
 
+  // Excluir tira dos dois lados: a mesma confirmação de Publicar na agenda e de Minhas Solicitações.
+  // A recusa do servidor (400 com o motivo) vai inteira para a pessoa; a lista recarrega, porque a
+  // recusa pode chegar depois de o Google já ter sido limpo.
+  const handleExcluir = useCallback((record: Solicitacao): void => {
+    const noGoogle = estaNoGoogle(record);
+    Modal.confirm({
+      ...(noGoogle
+        ? confirmacaoDeExcluirNoGoogle(record)
+        : { title: 'Excluir solicitação?', content: `${resumoDoEvento(record)}. Esta ação não pode ser desfeita.` }),
+      okText: 'Sim, excluir',
+      okType: 'danger',
+      cancelText: 'Cancelar',
+      autoFocusButton: 'cancel',
+      onOk: async () => {
+        try {
+          await deleteSolicitacao(record.id);
+          if (!noGoogle) message.success('Solicitação excluída.');
+          else if (record.gcal_status === ('ERROR' as GCalStatus) && !record.external_event_id)
+            message.success('Evento excluído do sistema e do Google Agenda, se estava lá.');
+          else message.success('Evento excluído do sistema e do Google Agenda.');
+        } catch (error) {
+          const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+          message.error(detail || 'Não foi possível excluir: ' + (error as Error).message);
+        }
+        void loadData();
+      },
+    });
+  }, [loadData]);
+
   // Issue #95: Batch Reapply
   const handleBatchReapply = (): void => {
     // Section 4 Epic #459: Use consolidated Google guard
     if (!requireGoogleConnection('realizar ações em massa')) return;
 
     if (selectedRowKeys.length === 0) {
-      message.warning('Selecione ao menos um evento para reaplica');
+      message.warning('Selecione ao menos um evento para reaplicar');
       return;
     }
 
     Modal.confirm({
-      title: `Confirmar Reapply em Massa (${selectedRowKeys.length} eventos)`,
+      title: `Reaplicar ${selectedRowKeys.length} eventos no Google?`,
       icon: <SyncOutlined className="text-yellow-500" />,
       content: (
         <div>
-          <p>Deseja reenviar (forçar UPDATE) estes {selectedRowKeys.length} eventos no Google Calendar?</p>
+          <p>Deseja reaplicar estes {selectedRowKeys.length} eventos no Google Agenda?</p>
           <p className="text-gray-500 text-xs">
             Esta ação irá sobrescrever os eventos existentes com os dados atualizados.
           </p>
@@ -506,7 +564,7 @@ export default function PreAgendaPage(): JSX.Element {
             apply_blocked: true,
           });
 
-          message.success(`${data.queued} eventos enfileirados para reapply!`);
+          message.success(`${data.queued} eventos enfileirados para reaplicar.`);
           if (data.errors && data.errors.length > 0) {
             message.warning(
               `${data.errors.length} erros: ${data.errors.map((e) => e.detail || e.error || 'erro').join(', ')}`
@@ -516,7 +574,7 @@ export default function PreAgendaPage(): JSX.Element {
           void loadData();
         } catch (error) {
           if (handleGoogleError(error)) return;
-          message.error('Erro ao reenviar em massa: ' + (error as Error).message);
+          message.error('Erro ao reaplicar os selecionados: ' + (error as Error).message);
         } finally {
           setBatchLoading(false);
         }
@@ -530,22 +588,22 @@ export default function PreAgendaPage(): JSX.Element {
     if (!requireGoogleConnection('realizar ações em massa')) return;
 
     if (selectedRowKeys.length === 0) {
-      message.warning('Selecione ao menos um evento para resync');
+      message.warning('Selecione ao menos um evento para reenviar');
       return;
     }
 
     Modal.confirm({
-      title: `Confirmar Resync em Massa (${selectedRowKeys.length} eventos)`,
+      title: `Reenviar ${selectedRowKeys.length} eventos ao Google?`,
       icon: <SyncOutlined className="text-red-500" />,
       content: (
         <div>
-          <p>Deseja forçar resync (resetar hash + PENDING) destes {selectedRowKeys.length} eventos?</p>
+          <p>Os {selectedRowKeys.length} eventos voltam para a fila e são enviados de novo ao Google, mesmo sem mudança.</p>
           <p className="text-gray-500 text-xs">
-            Útil para corrigir drift ou reprocessar eventos com erros.
+            Útil quando o Google ficou diferente do sistema ou quando a publicação deu erro.
           </p>
         </div>
       ),
-      okText: 'Resync',
+      okText: 'Reenviar',
       okType: 'danger',
       cancelText: 'Cancelar',
       autoFocusButton: 'cancel',
@@ -558,7 +616,7 @@ export default function PreAgendaPage(): JSX.Element {
             apply_blocked: true,
           });
 
-          message.success(`${data.queued} eventos enfileirados para resync!`);
+          message.success(`${data.queued} eventos enfileirados para reenviar.`);
           if (data.errors && data.errors.length > 0) {
             message.warning(
               `${data.errors.length} erros: ${data.errors.map((e) => e.detail || e.error || 'erro').join(', ')}`
@@ -568,7 +626,7 @@ export default function PreAgendaPage(): JSX.Element {
           void loadData();
         } catch (error) {
           if (handleGoogleError(error)) return;
-          message.error('Erro ao resync em massa: ' + (error as Error).message);
+          message.error('Erro ao reenviar os selecionados: ' + (error as Error).message);
         } finally {
           setBatchLoading(false);
         }
@@ -639,7 +697,7 @@ export default function PreAgendaPage(): JSX.Element {
     {
       title: 'Ações',
       key: 'actions',
-      // Até 4 ícones; no celular, dois por linha.
+      // Até 5 ícones (Excluir só para o DAT), que quebram linha; no celular, dois por linha.
       width: celular ? 76 : 128,
       render: (_, record) => {
         const isPublished = record.gcal_status === ('PUBLISHED' as GCalStatus);
@@ -649,8 +707,8 @@ export default function PreAgendaPage(): JSX.Element {
         const hasError = record.gcal_status === ('ERROR' as GCalStatus);
         const hasEventId = !!record.external_event_id;
 
-        // Resync: mostrar quando PUBLISHED ou ERROR
-        const showResync = isPublished || hasError;
+        // Reenviar: PUBLISHED ou ERROR, e só o que o backend aceita reenviar (D64: não o que já terminou).
+        const showResync = (isPublished || hasError) && motivoNaoPublicavel(record, { reenvio: true }) === null;
 
         // Cancel: mostrar apenas quando PUBLISHED e tem event_id
         const showCancel = isPublished && hasEventId;
@@ -698,11 +756,20 @@ export default function PreAgendaPage(): JSX.Element {
                 aria-label={`Remover do Google Agenda: ${rotuloDoEvento(record)}`}
               />
             )}
+            {podeExcluir && record.pode_excluir === true && (
+              <Button
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => handleExcluir(record)}
+                aria-label={`Excluir evento: ${rotuloDoEvento(record)}`}
+              />
+            )}
           </Space>
         );
       },
     },
-  ], [handlePreview, handlePublish, handleResync, handleCancel, celular]);
+  ], [handlePreview, handlePublish, handleResync, handleCancel, handleExcluir, podeExcluir, celular]);
 
   // Google Calendar events loader
   const loadGcalEvents = useCallback(async (): Promise<void> => {
@@ -886,7 +953,7 @@ export default function PreAgendaPage(): JSX.Element {
             {(pollingPausado || cargaFalhou) && <AvisoAtualizacaoPausada cargaFalhou={cargaFalhou} />}
 
             {/* Resumo GCal */}
-            <Card title="Resumo de Status GCal" size="small">
+            <Card title="Resumo no Google Agenda" size="small">
               <Row gutter={16}>
                 <Col span={6}>
                   <Statistic title="Não Publicados" value={summary.counts?.NONE || 0} />
@@ -963,7 +1030,7 @@ export default function PreAgendaPage(): JSX.Element {
                       loading={batchLoading}
                       style={{ color: COR_PENDENTE, borderColor: COR_PENDENTE }}
                     >
-                      Reapply Selecionados
+                      Reaplicar selecionados
                     </Button>
                     <Button
                       danger
@@ -971,7 +1038,7 @@ export default function PreAgendaPage(): JSX.Element {
                       onClick={handleBatchResync}
                       loading={batchLoading}
                     >
-                      Resync Selecionados
+                      Reenviar selecionados
                     </Button>
                     <Button
                       type="link"
@@ -1128,7 +1195,7 @@ export default function PreAgendaPage(): JSX.Element {
         title={
           <Space>
             <CalendarOutlined />
-            <span>Preview do Evento Google Calendar</span>
+            <span>Prévia do evento no Google</span>
           </Space>
         }
         open={previewVisible}
@@ -1189,16 +1256,16 @@ export default function PreAgendaPage(): JSX.Element {
                 )}
               </Descriptions.Item>
 
-              {/* Event ID */}
+              {/* Código do evento no Google */}
               <Descriptions.Item
-                label={<><LinkOutlined /> Event ID</>}
+                label={<><LinkOutlined /> Código do evento</>}
               >
                 <Text code copyable>{previewData.preview.event_id}</Text>
               </Descriptions.Item>
 
-              {/* Meet Link */}
+              {/* Link do Meet */}
               <Descriptions.Item
-                label={<><VideoCameraOutlined /> Meet Link</>}
+                label={<><VideoCameraOutlined /> Link do Meet</>}
               >
                 {previewData.preview.meet_link ? (
                   <Text copyable={{ text: previewData.preview.meet_link }}>
@@ -1226,7 +1293,10 @@ export default function PreAgendaPage(): JSX.Element {
                       <List.Item.Meta
                         avatar={<Avatar size="small" icon={<UserOutlined />} />}
                         title={attendee.email}
-                        description={attendee.responseStatus === 'needsAction' ? 'Aguardando resposta' : attendee.responseStatus}
+                        description={
+                          (attendee.responseStatus && RESPOSTA_DO_CONVIDADO[attendee.responseStatus]) ||
+                          attendee.responseStatus
+                        }
                       />
                     </List.Item>
                   )}

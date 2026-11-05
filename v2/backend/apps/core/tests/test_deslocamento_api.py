@@ -274,13 +274,13 @@ class TestDeslocamentoAPI:
         Test: Validation errors.
 
         Validation errors:
-        - end_date <= start_date → "Data fim deve ser posterior à data início"
+        - end_date < start_date → "Data fim não pode ser anterior à data início."
         - origem == destino → "Origem e destino devem ser diferentes"
         """
         client = APIClient()
         client.force_authenticate(user=user_controle)
 
-        # Test 1: end_date <= start_date
+        # Test 1: end_date < start_date
         payload = {
             "usuario": user_formador.id,
             "origem": "Fortaleza",
@@ -292,7 +292,7 @@ class TestDeslocamentoAPI:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         errors = get_field_errors(response)
         assert "end_date" in errors
-        assert "Data fim deve ser posterior à data início" in str(errors["end_date"])
+        assert "Data fim não pode ser anterior à data início." in str(errors["end_date"])
 
         # Test 2: origem == destino
         payload = {

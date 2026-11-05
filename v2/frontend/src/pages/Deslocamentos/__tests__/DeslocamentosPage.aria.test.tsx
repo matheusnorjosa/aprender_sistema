@@ -43,6 +43,7 @@ const UMA_LINHA = {
       id: 1,
       usuario: 1,
       usuario_nome: 'Fulano de Tal',
+      pode_editar: true,
       origem: 'Fortaleza',
       destino: 'Sobral',
       start_date: '2026-01-01',

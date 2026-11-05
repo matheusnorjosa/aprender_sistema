@@ -384,7 +384,7 @@ export async function fetchBlob(url: string, options: FetchOptions = {}): Promis
   });
 
   if (!response.ok) {
-    throw new Error(`Export failed: HTTP ${response.status}`);
+    throw new Error(`Não foi possível exportar o arquivo (erro ${response.status}).`);
   }
 
   return response.blob();
@@ -395,6 +395,9 @@ export async function fetchBlob(url: string, options: FetchOptions = {}): Promis
  *
  * Wraps fetchAPI and maps HTTP status codes to user-friendly messages.
  * Used by modules that need custom error messages per endpoint.
+ *
+ * A mensagem do servidor (`detail`) vence: o mapa só cobre a resposta sem mensagem
+ * (corpo vazio ou que não é JSON). O erro do mapa mantém `status` e `response`.
  *
  * @param url - API path
  * @param options - Fetch options
@@ -414,9 +417,17 @@ export async function fetchWithErrorMapping<T = unknown>(
   try {
     return await fetchAPI<T>(url, options);
   } catch (error) {
-    const status = (error as { status?: number }).status;
-    if (status && errorMap[status]) {
-      throw new Error(errorMap[status]);
+    const err = error as ErroHttp;
+    const detail = (err.response?.data as { detail?: unknown } | undefined)?.detail;
+    // Corpo que não é JSON vira `detail: "HTTP <n>: ..."` no fetchAPI: não é mensagem do servidor.
+    const servidorExplicou = typeof detail === 'string' && !/^HTTP \d+/.test(detail);
+    const status = err.status;
+    const reserva = status ? errorMap[status] : undefined;
+    if (status && reserva && !servidorExplicou) {
+      const mapeado: ErroHttp = new Error(reserva);
+      mapeado.status = status;
+      if (err.response) mapeado.response = err.response;
+      throw mapeado;
     }
     throw error;
   }

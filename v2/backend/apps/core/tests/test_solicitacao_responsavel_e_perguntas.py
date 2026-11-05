@@ -32,7 +32,14 @@ import pytest
 from apps.core.models import AuditLog, EquipeGerencia, Gerencia, Participation, Solicitacao
 from apps.core.services.gcal.payload import build_attendees_for_solicitacao
 from apps.core.tests.conftest import get_field_errors
-from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, TipoEventoFactory, UsuarioFactory, liberar_par
+from apps.core.tests.factories import (
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+    liberar_par,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -205,7 +212,24 @@ class TestCoordenadorResponsavel:
         emails = {a["email"] for a in build_attendees_for_solicitacao(Solicitacao.objects.get(pk=r.data["id"]))}
         assert c["coord"].email in emails
         assert c["formador"].email in emails
-        assert apoio.email in emails, "quem criou continua convidado (o convite não encolhe)"
+        # Decisão do dono (05/11/2026): quem só cadastrou para outra pessoa não é convidado.
+        assert apoio.email not in emails, "quem só cadastrou o evento para outro responsável não é convidado"
+
+    def test_linha_coordenador_antiga_de_quem_criou_nao_convida_quando_o_responsavel_e_outro(self, c):
+        # Eventos de antes de 05/11/2026 guardam a linha COORDENADOR de quem cadastrou (sem data-fix):
+        # o convite filtra pelo responsável, então reenviar o evento não volta a convidar quem criou.
+        apoio = _pessoa("Apoio de Coordenação", gerencia=c["gerencia"], papel="APOIO")
+        s = SolicitacaoFactory(usuario=apoio, coordenador=c["coord"], status="aprovado")
+        Participation.objects.create(solicitacao=s, usuario=apoio, role="COORDENADOR")
+        Participation.objects.create(solicitacao=s, usuario=c["coord"], role="COORDENADOR")
+        Participation.objects.create(solicitacao=s, usuario=c["formador"], role="FORMADOR")
+        emails = {a["email"] for a in build_attendees_for_solicitacao(s)}
+        assert emails == {c["coord"].email, c["formador"].email}
+
+    def test_sem_responsavel_gravado_quem_criou_continua_convidado(self, c):
+        s = SolicitacaoFactory(usuario=c["coord"], coordenador=None, status="aprovado")
+        Participation.objects.create(solicitacao=s, usuario=c["coord"], role="COORDENADOR")
+        assert c["coord"].email in {a["email"] for a in build_attendees_for_solicitacao(s)}
 
 
 # ---------------------------------------------------------------- avaliar o formador

@@ -352,7 +352,7 @@ def resync_to_gcal(
         PublishResult with task details
 
     Raises:
-        ValidationAPIError: If not approved or OAuth missing
+        ValidationAPIError: If not approved, OAuth missing, or `motivo_nao_publicavel(reenvio=True)`
     """
     from apps.core.tasks import task_publish_solicitacao_to_gcal
 
@@ -365,6 +365,10 @@ def resync_to_gcal(
             message="Apenas solicitações aprovadas podem ser resincronizadas.",
             code="not_approved",
         )
+    # D64: o Reenviar de uma linha recusa o mesmo que o lote (evento passado, nunca publicado, fora do sistema).
+    motivo = motivo_nao_publicavel(solicitacao, reenvio=True)
+    if motivo is not None:
+        raise ValidationAPIError(message=MENSAGENS_NAO_PUBLICAVEL[motivo], code=motivo)
 
     # Mark as PENDING (will be republished)
     solicitacao.mark_gcal(

@@ -211,6 +211,9 @@ class TestPreviewResyncCancelSetorScope:
     @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
     def test_resync_do_setor_ok(self, _t1, _t2, mock_task, apoio_fluir, sol_fluir_terceiro):
         mock_task.return_value = _mock_task_result("resync-task")
+        # Reenviar exige evento já publicado (D64); o NONE recebe 400 nao_publicado.
+        sol_fluir_terceiro.gcal_status = Solicitacao.GCalStatus.PUBLISHED
+        sol_fluir_terceiro.save(update_fields=["gcal_status"])
         client = APIClient()
         client.force_authenticate(apoio_fluir)
         resp = client.post(f"/api/solicitacoes/{sol_fluir_terceiro.id}/resync-gcal/", format="json")

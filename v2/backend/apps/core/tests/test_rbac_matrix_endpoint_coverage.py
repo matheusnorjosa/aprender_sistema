@@ -95,7 +95,6 @@ RBAC_MATRIX_EXEMPT_PREFIXES: dict[str, str] = {
     "/api/version/": "Endpoint de versão — observability",
     "/api/readyz/": "Health check — observability",
     "/api/healthz/": "Health check — observability",
-    "/api/config/": "Feature config flags — observability",
     "/api/features/": "Feature flags — observability",
     "/api/stats/": "Home stats — observability/dashboard",
     # ── Schema / docs ────────────────────────────────────────────────────
@@ -137,6 +136,7 @@ RBAC_MATRIX_EXEMPT_PREFIXES: dict[str, str] = {
     "/api/solicitacoes/validate/": "Validation endpoint — gate do UsuarioLookup; cobertura em test_seguranca_validate_participantes.py",
     "/api/rbac/meta/": "RBAC metadata — admin tooling, cobertura via test_admin_api.py",
     # ── Admin Registries (DAT-only via manage_admin_registries) ──────────
+    "/api/config/": "Configurações do DAT (buffer RD-04, teto de horas) — GET e PUT só com manage_admin_registries; cobertura em test_config_api.py",
     "/api/municipios/": "Admin DAT registry — cobertura via test_admin_api.py",
     "/api/projetos/": "Admin DAT registry — cobertura via test_admin_api.py + test_pr7_projeto_fluxo_required.py",
     "/api/projetos-gerais/": "Admin DAT registry — cobertura via tests específicos",

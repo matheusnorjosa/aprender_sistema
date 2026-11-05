@@ -12,7 +12,10 @@
  *   ela pode publicar. Nunca manda `mine` (pularia o escopo) nem `sector` (lê gerência).
  * - Prontidão: `status.publishReady`/`publishBlockReason`; sem prontidão as ações ficam
  *   desabilitadas, com o motivo visível.
- * - Polling só enquanto alguma linha está PENDING; `seqRef` descarta resposta obsoleta.
+ * - Polling só enquanto alguma linha está PENDING (a cada 20 s, sem ligar o carregando; um 429 o pausa);
+ *   `seqRef` descarta resposta obsoleta.
+ * - Evento de hoje que já terminou: Publicar, Tentar de novo e Atualizar ficam desabilitados, com o
+ *   motivo (o servidor recusa com `evento_passado`); Tirar do Google segue.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type JSX } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
@@ -25,6 +28,7 @@ import {
   publishSolicitacao,
   resyncSolicitacao,
 } from '../../api/solicitacoes';
+import AvisoAtualizacaoPausada from '../../components/AvisoAtualizacaoPausada';
 import { MeetLink } from '../../components/MeetLink';
 import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard';
@@ -38,12 +42,15 @@ import type { ID, Solicitacao } from '../../types';
 import type { PublishBlockReason } from '../../types/gcal';
 import { formatFortaleza } from '../../utils/datetime';
 import {
+  MOTIVO_NAO_PUBLICAVEL,
   confirmacaoDeExcluirNoGoogle,
   estaNoGoogle,
   gcalRowActions,
+  motivoNaoPublicavel,
   type GcalRowAction,
   type GcalRowTag,
 } from '../../utils/gcalRowActions';
+import { pausaDo429Ms } from '../../utils/retryAfter';
 
 const { Title, Text } = Typography;
 
@@ -183,13 +190,23 @@ export default function PublicacaoSetorPage(): JSX.Element {
   // mais recente grava na tela.
   const seqRef = useRef(0);
 
+  // Só há o que acompanhar enquanto alguma publicação está em voo (PENDING). O `loadRef` deixa o
+  // `load` usar o `pausar` do polling (429) sem depender dele.
+  const loadRef = useRef<(silencioso?: boolean) => Promise<void>>(() => Promise.resolve());
+  const { pausado: pollingPausado, pausar: pausarPolling } = usePolling(() => loadRef.current(true), {
+    enabled: rows.some((row) => row.gcal_status === 'PENDING'),
+    intervalMs: TIMING.PUBLICACAO_PENDENTE_POLL_MS,
+    immediate: false,
+  });
+
   /**
-   * `silencioso`: carga em segundo plano (polling, outra aba). Se falhar, a lista que estava na tela
-   * fica, com um toast; o aviso no lugar das linhas é só para a carga pedida pela pessoa.
+   * `silencioso`: carga em segundo plano (polling, outra aba). Não liga o carregando (a tabela não
+   * pisca). Se falhar, a lista que estava na tela fica, com um toast, ou com o aviso de atualização
+   * pausada no 429; o aviso no lugar das linhas é só para a carga pedida pela pessoa.
    */
   const load = useCallback(async (silencioso = false): Promise<void> => {
     const seq = ++seqRef.current;
-    setLoading(true);
+    if (!silencioso) setLoading(true);
     try {
       const data = await listSolicitacoes({
         status: 'aprovado',
@@ -215,10 +232,14 @@ export default function PublicacaoSetorPage(): JSX.Element {
         setPage((p) => Math.max(1, p - 1));
         return;
       }
+      // 429: pausa o polling pelo tempo pedido (Retry-After); no segundo plano, o aviso de pausa basta.
+      const pausa = pausaDo429Ms(error);
+      if (pausa !== null) pausarPolling(pausa);
       if (!silencioso) {
         setErroCarga((error as Error).message || 'Erro desconhecido.');
         return;
       }
+      if (pausa !== null) return;
       message.error({
         key: LOAD_ERROR_KEY,
         content: `Erro ao carregar os eventos: ${(error as Error).message}`,
@@ -226,18 +247,12 @@ export default function PublicacaoSetorPage(): JSX.Element {
     } finally {
       if (seq === seqRef.current) setLoading(false);
     }
-  }, [page]);
+  }, [page, pausarPolling]);
+  loadRef.current = load;
 
   useEffect(() => {
     void load();
   }, [load]);
-
-  // Só há o que acompanhar enquanto alguma publicação está em voo (PENDING).
-  usePolling(() => load(true), {
-    enabled: rows.some((row) => row.gcal_status === 'PENDING'),
-    intervalMs: TIMING.PUBLICACAO_PENDENTE_POLL_MS,
-    immediate: false,
-  });
 
   // Mudança de solicitação em outra aba → recarrega.
   useEffect(() => syncChannel.subscribe('solicitacoes', () => { void load(true); }), [load]);
@@ -452,17 +467,22 @@ export default function PublicacaoSetorPage(): JSX.Element {
         const podeExcluir = row.pode_excluir === true && estaNoGoogle(row);
         // Desabilitado: o motivo é o aviso do topo (sem ele, quando o card já explica, nada a apontar).
         const descritoPor = disabled && blocked ? MOTIVO_ID : undefined;
+        // Evento que já terminou: o servidor recusa Publicar, Tentar de novo e Atualizar; tirar do Google segue.
+        const jaTerminou = motivoNaoPublicavel(row) === 'evento_passado';
+        const motivoPassado = MOTIVO_NAO_PUBLICAVEL.evento_passado;
         return (
           <Space wrap size="small">
             {actions.map((action) => {
               const config = ACTIONS[action];
+              const recusada = jaTerminou && action !== 'remover';
               return (
                 <Button
                   key={action}
                   size="small"
                   danger={config.danger}
-                  disabled={disabled}
-                  aria-label={`${config.label}: ${evento}`}
+                  disabled={disabled || recusada}
+                  aria-label={recusada ? `${config.label}: ${evento}: ${motivoPassado}` : `${config.label}: ${evento}`}
+                  title={recusada ? motivoPassado : undefined}
                   aria-describedby={descritoPor}
                   // No celular, "Tirar só do Google" quebra linha no botão em vez de alargar a coluna.
                   style={celular ? { height: 'auto', whiteSpace: 'normal' } : undefined}
@@ -508,6 +528,8 @@ export default function PublicacaoSetorPage(): JSX.Element {
         </Card>
 
         {oauthReturn && <OAuthRetornoAlert retorno={oauthReturn} textoSucesso={OAUTH_SUCCESS_TEXT} />}
+
+        {pollingPausado && <AvisoAtualizacaoPausada />}
 
         {blocked && (
           <Alert

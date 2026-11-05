@@ -20,8 +20,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from django.db import transaction
-from django.db.models import Count, Exists, F, Max, OuterRef, Q, Sum, Value
+from django.db.models import BooleanField, Count, Exists, ExpressionWrapper, F, Max, OuterRef, Q, Sum, Value
 from django.db.models.functions import Coalesce, Greatest
+from django.utils.dateparse import parse_date
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
@@ -32,7 +33,6 @@ from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
 
 from apps.core.models import (
-    Compra,
     DATAcao,
     DATArea,
     DATCadastro,
@@ -56,6 +56,7 @@ from apps.core.serializers import (
     DATCoordenadorOptionSerializer,
     DATCoordenadorSerializer,
 )
+from apps.core.services.compra_elegibilidade import COMBOS
 from apps.core.services.dat_codigos import recompute_registros
 from apps.core.views.mixins import LockOnWriteMixin
 
@@ -645,10 +646,13 @@ class DATCompraViewSet(LockOnWriteMixin, viewsets.ModelViewSet):
     )
     def pendencias(self, request: Request) -> Response:
         """
-        Municípios com compra no domínio core_compra e sem solicitação ativa.
+        Pares (município, projeto) da lista atual de compras sem evento que a compra libere.
 
-        A pendência é calculada por par (município + projeto) para refletir
-        a regra de negócio da operação.
+        Parte da `DATCompra` ativa com quantidade > 0, a mesma lista da regra da compra
+        (`services/compra_elegibilidade.py`). O par tem evento quando há solicitação
+        pendente ou aprovada no município cujo projeto a compra libera: o mesmo projeto, a
+        mesma coleção, o projeto de nome geral da mesma gerência ou a coleção que o combo
+        da compra libera.
 
         GET /api/dat/compras-materiais/pendencias/
 
@@ -656,25 +660,30 @@ class DATCompraViewSet(LockOnWriteMixin, viewsets.ModelViewSet):
         não dashboard executivo. Acessível por DAT/Controle/Super; dashboard
         agregado mantém `view_compras_dashboard` (Diretoria).
 
-        Query params opcionais:
-            - uf: filtra por UF
-            - projeto_id: filtra por projeto
+        Query params opcionais: os mesmos filtros do `dashboard` (`DATCompraFilter`:
+        uf, projeto_id, produto_id, ano_uso, tipo_compra...).
         """
-        compras_qs = Compra.objects.select_related("municipio", "projeto")
-
-        uf = request.query_params.get("uf")
-        projeto_id = request.query_params.get("projeto_id")
-
-        if uf:
-            compras_qs = compras_qs.filter(municipio__uf__iexact=uf)
-        if projeto_id:
-            compras_qs = compras_qs.filter(projeto_id=projeto_id)
+        compras_qs = self.filter_queryset(self.get_queryset()).filter(ativo=True, quantidade__gt=0)
 
         solicitacoes_ativas = Solicitacao.objects.filter(
             municipio_id=OuterRef("municipio_id"),
-            projeto_id=OuterRef("projeto_id"),
             status__in=["pendente", "aprovado"],
         )
+        atendida = (
+            Exists(solicitacoes_ativas.filter(projeto_id=OuterRef("projeto_id")))
+            | Exists(solicitacoes_ativas.filter(projeto__projeto_geral_id=OuterRef("projeto__projeto_geral_id")))
+            | Exists(
+                solicitacoes_ativas.filter(
+                    projeto__eh_nome_geral=True, projeto__gerencia_id=OuterRef("projeto__gerencia_id")
+                )
+            )
+        )
+        # `isnull=False` faz o termo dar FALSE, não NULL, quando a compra não tem coleção (LEFT JOIN
+        # nulo): com NULL o par sairia das duas contas (com evento e pendente).
+        for combo, colecoes in COMBOS.items():
+            atendida |= Q(projeto__projeto_geral__isnull=False, projeto__projeto_geral__nome=combo) & Exists(
+                solicitacoes_ativas.filter(projeto__projeto_geral__nome__in=colecoes)
+            )
 
         base_pairs = (
             compras_qs.values(
@@ -687,8 +696,8 @@ class DATCompraViewSet(LockOnWriteMixin, viewsets.ModelViewSet):
             .annotate(
                 total_itens=Sum("quantidade"),
                 total_compras=Count("id"),
-                ultima_compra=Max("data"),
-                possui_evento=Exists(solicitacoes_ativas),
+                ultima_compra=Max("data_compra"),
+                possui_evento=ExpressionWrapper(atendida, output_field=BooleanField()),
             )
             .order_by("municipio__nome", "projeto__nome")
         )
@@ -729,10 +738,40 @@ class DATCompraViewSet(LockOnWriteMixin, viewsets.ModelViewSet):
 # ============================================================
 
 
+_ETAPAS_DA_PLATAFORMA = {
+    "FORMAR": ("status_criacao_curso", "status_chaves", "status_instrucoes", "status_envio"),
+    "AVALIAR": ("status_recebidos", "status_validados", "status_importados"),
+}
+
+
+def _data_iso(valor: object) -> bool:
+    """`valor` é uma data AAAA-MM-DD que existe."""
+    try:
+        return isinstance(valor, str) and parse_date(valor) is not None
+    except ValueError:  # formato certo, data impossível (2025-02-30)
+        return False
+
+
+def _todas_as_etapas(valor: str) -> Q:
+    """Cadastro com todas as etapas da sua plataforma em `valor`."""
+    formar = Q(plataforma="FORMAR", **dict.fromkeys(_ETAPAS_DA_PLATAFORMA["FORMAR"], valor))
+    return formar | Q(plataforma="AVALIAR", **dict.fromkeys(_ETAPAS_DA_PLATAFORMA["AVALIAR"], valor))
+
+
 class DATCadastroFilter(filters.FilterSet):
     """FilterSet para DATCadastro."""
 
     uf = filters.CharFilter(field_name="municipio__uf", lookup_expr="iexact")
+    # Concluído: todas as etapas da plataforma concluídas; pendente: todas pendentes; em andamento: o resto.
+    status_etapa = filters.ChoiceFilter(
+        choices=[("pendente", "Pendentes"), ("em_andamento", "Em andamento"), ("concluido", "Concluídos")],
+        method="filtrar_status_etapa",
+    )
+
+    def filtrar_status_etapa(self, queryset, name: str, value: str):
+        if value == "em_andamento":
+            return queryset.exclude(_todas_as_etapas("concluido") | _todas_as_etapas("pendente"))
+        return queryset.filter(_todas_as_etapas(value))
 
     class Meta:
         model = DATCadastro
@@ -882,7 +921,17 @@ class DATCadastroViewSet(viewsets.ModelViewSet):
 
         if etapa not in etapas_validas:
             return Response(
-                {"error": f"Etapa inválida. Válidas: {list(etapas_validas.keys())}"},
+                {"detail": f"Etapa inválida. Válidas: {', '.join(etapas_validas)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if novo_status and novo_status not in DATCadastro.StatusEtapa.values:
+            return Response(
+                {"detail": f"Status inválido. Válidos: {', '.join(DATCadastro.StatusEtapa.values)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if data and not _data_iso(data):
+            return Response(
+                {"detail": "Data inválida. Use o formato AAAA-MM-DD."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

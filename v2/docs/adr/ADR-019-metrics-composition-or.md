@@ -2,7 +2,7 @@
 
 | Field        | Value                                                                                  |
 | ------------ | -------------------------------------------------------------------------------------- |
-| **Status**   | Accepted                                                                               |
+| **Status**   | Superseded (05/11/2026): os três endpoints usam `CanViewTeamDashboard`, a policy da tela; o Controle saiu (decisão do dono, D30 em [rbac_authorization_matrix.md](../rbac_authorization_matrix.md)) |
 | **Date**     | 2026-04-27                                                                             |
 | **Deciders** | Backend (Aprender Sistema) — RBAC Onda 2 A3 / Lote 4.2.b2                               |
 | **Issue**    | [#1268](https://github.com/matheusnorjosa/aprender_sistema/issues/1268) — RBAC C3 metrics semantic review |

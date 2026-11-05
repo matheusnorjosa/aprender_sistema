@@ -145,17 +145,17 @@ describe('PreAgendaPage — status do Google em pt-BR, com o motivo do erro', ()
     });
   });
 
-  test('"Reapply Selecionados" sem o gold-6 (4,99:1 sobre o bg-blue-50 da barra do lote)', async () => {
+  test('"Reaplicar selecionados" sem o gold-6 (4,99:1 sobre o bg-blue-50 da barra do lote)', async () => {
     mockRows([row({ id: 1, municipio_nome: 'Crato', gcal_status: 'PUBLISHED', external_event_id: 'asv1' })]);
     render(<PreAgendaPage />);
     const linha = (await screen.findByText('Crato')).closest('tr') as HTMLElement;
 
     fireEvent.click(within(linha).getByRole('checkbox'));
-    expect((await screen.findByText('Reapply Selecionados')).closest('button')).toHaveStyle({ color: '#ad4e00' });
+    expect((await screen.findByText('Reaplicar selecionados')).closest('button')).toHaveStyle({ color: '#ad4e00' });
   });
 
   // O AntD tira o fundo da linha selecionada do colorPrimary (#006B52 → #9aaba4; com o mouse,
-  // #659e89) e o motivo do erro caía para 2,72 e 2,12:1 justo no caso do "Resync Selecionados".
+  // #659e89) e o motivo do erro caía para 2,72 e 2,12:1 justo no caso do "Reenviar selecionados".
   test('linha marcada para o lote: o motivo do erro mantém 4,5:1, parada e com o mouse em cima', async () => {
     mockRows([row({ id: 1, municipio_nome: 'Crato', gcal_status: 'ERROR', gcal_last_error: 'Motivo do Google.' })]);
     render(

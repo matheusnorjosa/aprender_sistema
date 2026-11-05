@@ -20,7 +20,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 
 from apps.core.models import Usuario
-from apps.core.permissions import HasPerm
+from apps.core.rbac.policies import CanViewTeamDashboard
 from apps.core.services.horas_formacao import horas_formacao, ocupacoes_aprovadas
 
 
@@ -41,11 +41,9 @@ def eventos_e_municipios_por_pessoa(*, de: date, ate: date) -> dict[int, tuple[i
 
 @api_view(["GET"])
 @permission_classes(
-    # Onda 2 A3 (β, 2026-04-27): adicionado `manage_admin_registries` para DAT
-    # como ator transversal (validar/suportar). Mesma decisão dos demais
-    # endpoints metrics — preserva Lote 4.2.b2 (composition OR ad-hoc por
-    # objetos semanticamente diferentes). Ver ADR-019 (v2/docs/adr/ADR-019-metrics-composition-or.md).
-    [HasPerm("run_daily_operations") | HasPerm("supervise_operations") | HasPerm("manage_admin_registries")]
+    # A mesma policy da tela /dashboards/equipe (`view_team_dashboard`: Diretoria e DAT). O Controle
+    # saiu (decisão do dono, 05/11/2026): lia o ranking com nomes e horas pela API sem ter a tela.
+    [CanViewTeamDashboard]
 )
 @throttle_classes([ScopedRateThrottle])
 def formadores_metrics(request: Request) -> Response:
@@ -80,7 +78,7 @@ def formadores_metrics(request: Request) -> Response:
           Grade Mensal)
         - Order by -eventos, limit to top 10
 
-    Permissions: HasPerm("run_daily_operations") | HasPerm("supervise_operations") (only authorized users)
+    Permissions: CanViewTeamDashboard (a policy da tela /dashboards/equipe)
     """
     days = int(request.GET.get("days", 30))
     # Período = os `days` dias locais [hoje − (days − 1), hoje], pelo INÍCIO do evento (antes filtrava

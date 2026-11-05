@@ -83,11 +83,11 @@ EXPECTED_MATRIX: dict[str, dict[str, int]] = {
     "metrics_team_productivity": {
         "Superuser": ALLOW,
         "DAT": ALLOW,
-        "Controle": ALLOW,
+        "Controle": DENY,  # decisão do dono, 05/11/2026
         "Diretoria": ALLOW,
         "Gerente": DENY,
         "Gerente da Superintendência": DENY,
-        "Assistente Administrativo do Controle": ALLOW,
+        "Assistente Administrativo do Controle": DENY,
         "Coordenador": DENY,
         "Apoio de Coordenação": DENY,
         "Formador": DENY,
@@ -155,11 +155,11 @@ EXPECTED_MATRIX: dict[str, dict[str, int]] = {
     "produtos_list": {
         "Superuser": ALLOW,
         "DAT": ALLOW,
-        "Controle": ALLOW,
+        "Controle": DENY,  # decisão do dono, 05/11/2026
         "Diretoria": DENY,
         "Gerente": DENY,
         "Gerente da Superintendência": DENY,
-        "Assistente Administrativo do Controle": ALLOW,
+        "Assistente Administrativo do Controle": DENY,
         "Coordenador": DENY,
         "Apoio de Coordenação": DENY,
         "Formador": DENY,

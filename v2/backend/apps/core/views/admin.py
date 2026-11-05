@@ -235,13 +235,15 @@ class ProdutoViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
 
     Endpoints:
         - GET /api/produtos/ - Listar produtos
-        - POST /api/produtos/ - Criar produto (manage_purchases_and_materials)
+        - POST /api/produtos/ - Criar produto
         - GET /api/produtos/{id}/ - Detalhe
-        - PUT/PATCH /api/produtos/{id}/ - Atualizar (manage_purchases_and_materials)
-        - DELETE /api/produtos/{id}/ - Deletar (manage_purchases_and_materials)
+        - PUT/PATCH /api/produtos/{id}/ - Atualizar
+        - DELETE /api/produtos/{id}/ - Deletar
 
-    Escrita: quem tem `manage_purchases_and_materials` — pacotes ADMIN_OPERACIONAL (DAT)
-    e CONTROLE, pelo vínculo EQUIPE/GERENTE (`services/rbac_pacotes.py`).
+    Leitura e escrita: quem tem `manage_admin_registries`, a mesma capacidade da tela
+    /dat/admin/produtos — hoje só o pacote ADMIN_OPERACIONAL (DAT), pelo vínculo EQUIPE/GERENTE
+    (`services/rbac_pacotes.py`), e o superusuário. O CONTROLE saiu (decisão do dono, 05/11/2026):
+    lia e escrevia pela API sem ter a tela.
 
     Filtros:
         - ativo (bool)
@@ -251,37 +253,13 @@ class ProdutoViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
 
     queryset = Produto.objects.select_related("projeto").order_by("codigo")
     serializer_class = ProdutoSerializer
-    # PR 4 hardening RBAC (2026-04-30, #1258): list/retrieve/CRUD são
-    # operações admin/operacionais — não devem ficar abertas a qualquer
-    # usuário autenticado. Composition cobre os 3 motivos legítimos:
-    #   - manage_admin_registries (DAT — admin de cadastros)
-    #   - manage_purchases_and_materials (DAT/Controle — gestão de materiais)
-    #   - run_daily_operations (Controle — operação diária)
-    # Dropdowns/selects de formulário continuam via /api/options/produtos/
-    # (IsAuthenticated) para Coordenador/Apoio/Diretoria.
-    permission_classes = [
-        HasPerm("manage_admin_registries") | HasPerm("manage_purchases_and_materials") | HasPerm("run_daily_operations")
-    ]
+    # Dropdowns/selects de formulário seguem em /api/options/produtos/ (IsAuthenticated).
+    permission_classes = [HasPerm("manage_admin_registries")]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["ativo", "projeto"]
     search_fields = ["codigo", "nome"]
     ordering_fields = ["codigo", "nome"]
     ordering = ["codigo"]
-
-    def get_permissions(self) -> list:  # type: ignore[type-arg]
-        """
-        PR 4 hardening RBAC (2026-04-30, #1258): list/retrieve/CRUD admin
-        compartilham o mesmo gate (capability operacional/admin). Dropdowns
-        públicos ficam em /api/options/produtos/.
-
-        Antes deste PR o override aceitava qualquer usuário autenticado em
-        list/retrieve, contornando `permission_classes` da classe.
-        """
-        if self.action in ["create", "update", "partial_update", "destroy"]:
-            # Escrita exige a cap específica de gestão de materiais (DAT/Controle).
-            return [IsAuthenticated(), HasPerm("manage_purchases_and_materials")()]
-        # Leitura: composition das 3 caps via permission_classes da classe.
-        return [permission() for permission in self.permission_classes]
 
 
 class GerenciaViewSet(viewsets.ModelViewSet):  # type: ignore[misc]

@@ -186,7 +186,7 @@ function AppContent(): JSX.Element {
   });
 
   // ── Logout ──
-  // TODO(tech-debt): replace window.location.reload() with state-driven
+  // TODO(tech-debt): replace the full-page navigation to '/' with state-driven
   // cleanup once a centralized auth store is in place (#927)
   // Só para a ação explícita: "Sair" do cabeçalho e "Sair agora" do aviso. '/login' e
   // '/logout' não são rotas — o login aparece quando não há sessão.
@@ -214,11 +214,12 @@ function AppContent(): JSX.Element {
     // As outras abas vão ao login na hora: sem isto, contavam das respostas deste logout e
     // seguiam com cara de logadas por mais 2 h (auditoria UX 30/09, rodada 6).
     avisarSaidaAsOutrasAbas();
-    // Remove os caches de identidade do SW antes do reload (Issue #1461):
+    // Remove os caches de identidade do SW antes de ir para o início (Issue #1461):
     // impede servir /api/me/* de um usuário anterior offline. Nunca lança (no-op seguro).
     await clearApiCaches();
     setUser(null);
-    window.location.reload();
+    // Volta para o início: o reload mantinha a URL, e quem entrava depois caía na tela de quem saiu (#2069).
+    window.location.replace('/');
   }, []);
 
   // ── Sessão encerrada pelo servidor (expirou, ou caiu em outra aba) ──

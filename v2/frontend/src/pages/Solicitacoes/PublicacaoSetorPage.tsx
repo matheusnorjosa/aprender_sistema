@@ -48,6 +48,8 @@ import {
 const { Title, Text } = Typography;
 
 const TITLE_ID = 'publicacao-setor-title';
+/** Aviso do topo com o motivo de as ações estarem desabilitadas: descreve cada botão (aria-describedby). */
+const MOTIVO_ID = 'publicacao-setor-motivo';
 const PAGE_SIZE = 20;
 /** O OAuth volta para esta página (o backend valida o `return_to`). */
 const GOOGLE_CONNECT_URL = `/api/oauth/google/start/?return_to=${encodeURIComponent('/solicitacoes/publicacao')}`;
@@ -136,6 +138,12 @@ const ACTIONS: Record<GcalRowAction, ActionConfig> = {
   },
 };
 
+/** Tag da linha em voo (PENDING) depois da ação feita nesta tela; sem ela, fica o "Publicando…" de sempre. */
+const ROTULO_EM_VOO: Partial<Record<GcalRowAction, string>> = {
+  atualizar: 'Atualizando…',
+  remover: 'Removendo…',
+};
+
 /** Formato do erro lançado por `fetchAPI` (status + corpo JSON do backend). */
 interface ApiErrorLike {
   message?: string;
@@ -168,6 +176,8 @@ export default function PublicacaoSetorPage(): JSX.Element {
   // ficava no vazio "Nenhum evento aprovado do seu setor", como se não houvesse o que publicar.
   const [erroCarga, setErroCarga] = useState<string | null>(null);
   const [oauthReturn, setOauthReturn] = useState<OAuthRetorno | null>(null);
+  // Última ação disparada por linha: a tag em voo diz "Atualizando…" ou "Removendo…", não só "Publicando…".
+  const [acaoEmVoo, setAcaoEmVoo] = useState<Partial<Record<ID, GcalRowAction>>>({});
 
   // Latest-wins: polling, paginação e ações disparam cargas concorrentes; só a
   // mais recente grava na tela.
@@ -191,6 +201,10 @@ export default function PublicacaoSetorPage(): JSX.Element {
       });
       if (seq !== seqRef.current) return;
       setRows(data.results);
+      // A ação guardada só vale enquanto a linha está PENDING: senão a próxima volta a PENDING
+      // (publicada em outra aba) mostraria o rótulo da ação antiga.
+      setAcaoEmVoo((atual) => Object.fromEntries(Object.entries(atual).filter(([id]) =>
+        data.results.some((r) => String(r.id) === id && r.gcal_status === 'PENDING'))));
       setTotal(data.count);
       setErroCarga(null);
     } catch (error) {
@@ -266,6 +280,7 @@ export default function PublicacaoSetorPage(): JSX.Element {
       handleActionError(error);
       return;
     }
+    setAcaoEmVoo((atual) => ({ ...atual, [row.id]: action }));
     message.success(config.successText);
     // Com await, o diálogo só fecha com a linha já recarregada: o afterClose sabe se o botão sobrou.
     await load();
@@ -378,12 +393,14 @@ export default function PublicacaoSetorPage(): JSX.Element {
       key: 'evento',
       render: (_, row) => {
         const { tag } = gcalRowActions(row, { ready });
+        const acao = acaoEmVoo[row.id];
+        const rotulo = (row.gcal_status === 'PENDING' && acao && ROTULO_EM_VOO[acao]) || tag.label;
         return (
           <Space direction="vertical" size={2} className="w-full">
             <div style={UMA_LINHA}>{formatFortaleza(row.inicio)}</div>
             <div style={UMA_LINHA} title={row.projeto_nome || undefined}>{row.projeto_nome || '-'}</div>
             <div style={UMA_LINHA} title={row.municipio_nome || undefined}>{row.municipio_nome || '-'}</div>
-            <Tag color={tag.color} style={{ whiteSpace: 'normal', color: TEXTO_DA_TAG_GCAL[tag.color] }}>{tag.label}</Tag>
+            <Tag color={tag.color} style={{ whiteSpace: 'normal', color: TEXTO_DA_TAG_GCAL[tag.color] }}>{rotulo}</Tag>
             {row.gcal_status === 'ERROR' && row.gcal_last_error && (
               // O motivo do Google tem até 500 caracteres: quebra linha na célula em vez de esticar a tabela.
               <Text type="danger" style={{ color: COR_DO_MOTIVO_DO_ERRO, fontSize: 12, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
@@ -433,6 +450,8 @@ export default function PublicacaoSetorPage(): JSX.Element {
         const { actions, disabled } = gcalRowActions(row, { ready });
         const evento = `${row.projeto_nome ?? 'Evento'}, ${formatFortaleza(row.inicio)}`;
         const podeExcluir = row.pode_excluir === true && estaNoGoogle(row);
+        // Desabilitado: o motivo é o aviso do topo (sem ele, quando o card já explica, nada a apontar).
+        const descritoPor = disabled && blocked ? MOTIVO_ID : undefined;
         return (
           <Space wrap size="small">
             {actions.map((action) => {
@@ -444,6 +463,7 @@ export default function PublicacaoSetorPage(): JSX.Element {
                   danger={config.danger}
                   disabled={disabled}
                   aria-label={`${config.label}: ${evento}`}
+                  aria-describedby={descritoPor}
                   // No celular, "Tirar só do Google" quebra linha no botão em vez de alargar a coluna.
                   style={celular ? { height: 'auto', whiteSpace: 'normal' } : undefined}
                   onClick={() => confirmar(row, action, evento)}
@@ -458,6 +478,7 @@ export default function PublicacaoSetorPage(): JSX.Element {
                 danger
                 disabled={disabled}
                 aria-label={`Excluir: ${evento}`}
+                aria-describedby={descritoPor}
                 style={celular ? { height: 'auto', whiteSpace: 'normal' } : undefined}
                 onClick={() => confirmarExclusao(row)}
               >
@@ -468,7 +489,7 @@ export default function PublicacaoSetorPage(): JSX.Element {
         );
       },
     },
-  ], [ready, confirmar, confirmarExclusao, celular]);
+  ], [ready, acaoEmVoo, blocked, confirmar, confirmarExclusao, celular]);
 
   return (
     <section className="p-3 sm:p-6" aria-labelledby={TITLE_ID}>
@@ -490,6 +511,7 @@ export default function PublicacaoSetorPage(): JSX.Element {
 
         {blocked && (
           <Alert
+            id={MOTIVO_ID}
             type={blockedIsWarning ? 'warning' : 'info'}
             role={blockedIsWarning ? 'alert' : 'status'}
             showIcon

@@ -103,38 +103,6 @@ def test_controle_upload_valid_xlsx(cliente_superusuario):
 
 
 # ============================================================================
-# Testes para ImportComprasView (/api/controle/import-compras/)
-# ============================================================================
-
-
-def test_controle_import_compras_upload_file_too_large(cliente_superusuario):
-    """Issue #569: Arquivo >10MB deve ser rejeitado com 413 no import-compras."""
-    large_file_size = 10 * 1024 * 1024 + 1
-    large_file = SimpleUploadedFile("compras.csv", b"x" * large_file_size, content_type="text/csv")
-
-    response = cliente_superusuario.post(
-        "/api/controle/import-compras/?dry_run=true", {"file": large_file}, format="multipart"
-    )
-
-    assert response.status_code == status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
-    assert "muito grande" in response.data["detail"].lower()
-
-
-def test_controle_import_compras_upload_invalid_mime_type(cliente_superusuario):
-    """Issue #569: MIME inválido deve ser rejeitado com 400 no import-compras."""
-    malicious_file = SimpleUploadedFile(
-        "malicious.exe", b"MZ\x90\x00", content_type="application/x-msdownload"  # PE header (Windows executable)
-    )
-
-    response = cliente_superusuario.post(
-        "/api/controle/import-compras/?dry_run=true", {"file": malicious_file}, format="multipart"
-    )
-
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "tipo de arquivo não permitido" in response.data["detail"].lower()
-
-
-# ============================================================================
 # Testes para DATImportCadastrosView (/api/dat/import-cadastros/)
 # ============================================================================
 

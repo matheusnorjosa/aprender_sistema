@@ -19,7 +19,7 @@ Você audita a configuração `.claude/` (skills, commands, agents, hooks, cheat
   As classes legacy `IsSuperintendencia`/`IsControleOrSuper`/`IsDATOrSuper` **não** são mais canônicas.
 - **ETL**: REMOVIDO (#967/#971). `apps.dat_ingest` deletado; comandos `etl_upsert_*`/`etl_import_*` e
   `make etl-*` **não existem**. Import atual = `import_export_contract` + endpoints DRF
-  (`/api/controle/import-compras/`, `/import-acoes/`, `/api/dat/import-cadastros/`) + `make import-*-dry`.
+  (`/api/controle/import-acoes/`, `/api/dat/import-cadastros/`) + `make import-*-dry`.
   SSOT: `v2/docs/specs/backend/imports.spec.md`.
 - **Apps reais**: `apps/core` + `apps/dev_tools` (só esses). Serviço de aprovação real =
   `apps/core/services/solicitacao_approval.py` (NÃO existe `approval_service.py`).

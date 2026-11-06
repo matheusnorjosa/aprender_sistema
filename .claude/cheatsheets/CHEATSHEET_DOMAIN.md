@@ -77,5 +77,5 @@ ficam nas specs vivas (com `status` + `last_verified`) e na skill `aprender-doma
 ```bash
 pytest apps/core/tests/test_availability_service.py -v      # RD
 pytest apps/core/tests/test_approval_policy_PA.py -v        # PA
-make import-compras-dry FILE=...                            # import (dry-run; ETL legado REMOVIDO)
+make import-acoes-dry FILE=...                            # import (dry-run; ETL legado REMOVIDO)
 ```

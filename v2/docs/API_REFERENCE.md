@@ -2,7 +2,7 @@
 
 **Última Atualização**: 2026-09-29 (PR A: `/me/.gerencias`, nomes da gerência, `gerencia_id`; última varredura de veracidade 2026-07-24)
 **Base canônica**: `/api`
-**ViewSets registrados no router**: 24 (bloco `router.register(...)`, `v2/backend/apps/core/urls.py`)
+**ViewSets registrados no router**: 22 (bloco `router.register(...)`, `v2/backend/apps/core/urls.py`)
 **Contagem total de endpoints**: não re-derivada nesta varredura — a fonte
 executável é o schema OpenAPI em `/api/schema/`.
 
@@ -623,8 +623,9 @@ Gate em `DATCadastroViewSet.get_permissions` (`views/dat_module.py`).
 ### Compras DAT
 
 A rota é `/api/dat/compras-materiais/` (basename `dat-compra-material`, `v2/backend/apps/core/urls.py`).
-**Não** existe `/api/dat/compras/`. O CRUD genérico de `Compra` (outro modelo)
-fica em `/api/compras/`.
+**Não** existe `/api/dat/compras/`. A lista antiga (`Compra`, outro modelo) saiu de uso em
+06/11/2026 (G29): `/api/compras/`, `/api/controle/compras/` e `/api/controle/import-compras/`
+(alias `/api/import-compras/`) respondem 404. A tabela fica até a etapa 2.
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
@@ -736,7 +737,6 @@ Importação pela tela é só do superusuário (decisão do dono, 02/10/2026): n
 | `/api/deslocamentos/import/` | `IsAuthenticated` + `SuperuserOnly` |
 | `/api/disponibilidade/import-bloqueios/` | `IsAuthenticated` + `SuperuserOnly` |
 | `/api/controle/import-acoes/` | `IsAuthenticated` + `SuperuserOnly` |
-| `/api/controle/import-compras/` (alias `/api/import-compras/`) | `IsAuthenticated` + `SuperuserOnly` |
 
 Imports assíncronos (ASQ-005): `POST /api/imports/bloqueios/`
 (`IsAuthenticated` + `SuperuserOnly`), `GET /api/imports/` e

@@ -3,14 +3,14 @@
  *
  * Plano DAT-Imports (2026-04-29) — PR-B (1º).
  *
- * Centraliza os 11 fluxos de upload de planilha do projeto em uma única
+ * Centraliza os 9 fluxos de upload de planilha do projeto em uma única
  * página, organizados por categoria. Substitui (em passos seguintes — PR-D)
  * os botões espalhados em ControlePage, ComprasPage, Disponibilidade e
  * DeslocamentosPage.
  *
  * Categorias:
  * - Cadastros base: Usuários, Municípios, Coleções, Cadastros DAT, Vínculos
- * - Operacional: Compras, Ações, Eventos, Produtos
+ * - Operacional: Ações, Eventos, Produtos (a lista antiga de compras saiu de uso: G29, 05/11/2026)
  * - Disponibilidade: Bloqueios, Deslocamentos
  *
  * Acesso: só superusuário (`podeImportarPelaTela` em AppRoutes; decisão do dono de 02/10/2026).
@@ -31,7 +31,6 @@ import {
   importAcoes,
   importBloqueios,
   importCadastros,
-  importCompras,
   importDeslocamentos,
   importEquipeGerencia,
   importEventos,
@@ -74,7 +73,7 @@ function toApplyResult(result: ImportResult): ApplyResult {
 }
 
 /**
- * Configuração canônica dos 11 cards de importação.
+ * Configuração canônica dos 9 cards de importação.
  *
  * Cada card recebe label, description e os callbacks de dry-run/apply ligados
  * a uma função existente em `api/ops.ts`. Mudar conteúdo de um card não
@@ -115,12 +114,6 @@ const CADASTROS_BASE: ImportCard[] = [
 ];
 
 const OPERACIONAL: ImportCard[] = [
-  {
-    key: 'compras',
-    label: 'Importar COMPRAS',
-    description: 'CSV/XLSX: codigo, produto, quant, municipio, uf, data, uso',
-    importFn: importCompras,
-  },
   {
     key: 'acoes',
     label: 'Importar AÇÕES',
@@ -211,7 +204,7 @@ export default function ImportacoesPage(): JSX.Element {
 
       <ImportSection
         title="Operacional"
-        description="Importações operacionais (compras, ações, eventos, produtos)."
+        description="Importações operacionais (ações, eventos, produtos)."
         cards={OPERACIONAL}
       />
 

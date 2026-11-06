@@ -257,6 +257,17 @@ class CompraAdmin(admin.ModelAdmin):
     list_select_related = ("municipio", "projeto")
     date_hierarchy = "data"
 
+    # Lista antiga de compras fora de uso (G29, decisão do dono de 05/11/2026): a atual é `DATCompra`.
+    # Fica só para consulta até a etapa 2 apagar a tabela (depois de backup e OK do dono).
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj: Compra | None = None) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: Compra | None = None) -> bool:
+        return False
+
 
 class DeslocamentoAdmin(admin.ModelAdmin):
     list_display = ("usuario", "origem", "destino", "start_date", "end_date")

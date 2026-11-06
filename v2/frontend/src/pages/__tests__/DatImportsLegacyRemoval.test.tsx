@@ -8,7 +8,6 @@ import ComprasPage from '../DATModule/ComprasPage';
 import Disponibilidade from '../Disponibilidade';
 import DeslocamentosPage from '../Deslocamentos/DeslocamentosPage';
 import { getMe, getBlocks } from '../../api/availability';
-import { listCompras as listControleCompras } from '../../api/ops';
 import {
   getMunicipiosOptions,
   getProdutosOptions,
@@ -41,10 +40,6 @@ vi.mock('../../api/availability', () => ({
   // mock estoura "No getGerencias export defined" ao renderizar, e o heading intermitente-
   // mente não pinta sob carga do CI (flake que bloqueava PRs alheios). Ver #1691.
   getGerencias: vi.fn().mockResolvedValue([]),
-}));
-
-vi.mock('../../api/ops', () => ({
-  listCompras: vi.fn(),
 }));
 
 vi.mock('../../api/datModule', () => ({
@@ -102,7 +97,6 @@ describe('DAT Imports PR-D — remoção de entrypoints legados', () => {
 
     vi.mocked(getMe).mockResolvedValue(controleUser);
     vi.mocked(getBlocks).mockResolvedValue([]);
-    vi.mocked(listControleCompras).mockResolvedValue([]);
     vi.mocked(listDatCompras).mockResolvedValue({ results: [], count: 0 });
     vi.mocked(getMunicipiosOptions).mockResolvedValue([]);
     vi.mocked(getProjetosOptions).mockResolvedValue([]);

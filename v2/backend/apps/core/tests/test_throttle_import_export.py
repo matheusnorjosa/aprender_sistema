@@ -42,7 +42,6 @@ IMPORT_VIEWS: list[tuple[str, str]] = [
     ("apps.core.views_import_usuarios", "ImportUsuariosView"),
     ("apps.core.views_import_equipe_gerencia", "ImportEquipeGerenciaView"),
     ("apps.core.views_import_municipios", "ImportMunicipiosView"),
-    ("apps.core.views_controle_imports", "ImportComprasView"),
     ("apps.core.views_imports", "ControleImportAcoesView"),
     ("apps.core.views_imports", "DATImportCadastrosView"),
     ("apps.core.views.imports", "ImportJobBloqueiosUploadView"),

@@ -287,8 +287,8 @@ Run against the **local prod-like stack** before merge (and spot-check prod afte
 
 > Data import is **not ETL** anymore. The import path is `import_export_contract` (mgmt command,
 > dry-run by default; `--apply` requires an allowlist) + the DRF endpoints
-> `POST /api/controle/import-compras/`, `/api/controle/import-acoes/`, `/api/dat/import-cadastros/`
-> (helpers: `make import-compras-dry` / `import-acoes-dry` / `import-cadastros-dry`).
+> `POST /api/controle/import-acoes/`, `/api/dat/import-cadastros/`
+> (helpers: `make import-acoes-dry` / `import-cadastros-dry`).
 > See `v2/docs/specs/backend/imports.spec.md`.
 
 **Cross-browser** (if UI changes): Chrome, Firefox, Safari, Edge, Mobile Chrome.

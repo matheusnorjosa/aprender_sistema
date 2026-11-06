@@ -923,8 +923,8 @@ Endpoints RESTful para consulta e criação de ações com **RBAC** (Role-Based 
 > programa de imports órfãos**, junto com o modelo `AcaoControle` que a alimentava — hoje
 > o import de ações grava em `DATAcao`. Não há `path("controle/acoes/", …)` em
 > `v2/backend/apps/core/urls.py`. As rotas `controle/…` que restaram são
-> `controle/import-acoes/` (`urls.py`), que é **upload de planilha**, e
-> `controle/compras/` (`urls.py`) — nenhuma delas lista ações. Registro:
+> `controle/import-acoes/` (`urls.py`), que é **upload de planilha** e não lista ações
+> (`controle/compras/` saiu em 06/11/2026, com a lista antiga de compras, G29). Registro:
 > `v2/docs/plans/PLANO_IMPORTS_ORFAOS.md` e o cabeçalho de
 > `apps/core/tests/test_controle_dat_api.py`.
 

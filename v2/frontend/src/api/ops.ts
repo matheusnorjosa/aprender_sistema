@@ -1,15 +1,14 @@
 /**
  * API Client - Operations (Controle & DAT)
  *
- * Endpoints para importação e listagem de:
- * - COMPRAS (Controle)
+ * Endpoints para importação de:
  * - AÇÕES (Controle)
  * - CADASTROS (DAT)
  *
  * Issue #135: Usa ensureCsrfToken() para suportar CSRF_COOKIE_HTTPONLY=True
  */
 
-import { API_BASE, ensureCsrfToken, fetchAPI, fetchNaRede, buildUrl } from './config';
+import { API_BASE, ensureCsrfToken, fetchNaRede } from './config';
 import logger from '../utils/logger';
 
 /**
@@ -37,38 +36,11 @@ export interface ImportResult {
 }
 
 /**
- * Compra record
- */
-export interface Compra {
-  id: number;
-  municipio: string;
-  projeto: string;
-  uf: string;
-  data: string;
-  codigo: string;
-  uso: string;
-  quantidade: number;
-}
-
-/**
- * Compras filter parameters
- */
-export interface ComprasFilters {
-  municipio?: string;
-  projeto?: string;
-  uf?: string;
-  from?: string;
-  to?: string;
-  q?: string;
-  [key: string]: string | undefined;
-}
-
-/**
  * Helper para upload de arquivo (multipart/form-data).
  *
  * Issue #135: Usa ensureCsrfToken() para suportar HttpOnly cookie
  *
- * @param url - URL do endpoint (relativo, ex: '/controle/import-compras/')
+ * @param url - URL do endpoint (relativo, ex: '/controle/import-acoes/')
  * @param file - Arquivo a enviar
  * @param dryRun - Se true, apenas preview (não aplica)
  */
@@ -120,9 +92,6 @@ async function postMultipart(url: string, file: File, dryRun: boolean = true): P
  *     acoes / deslocamentos / cadastros:
  *       stats = { created, updated, unchanged, skipped: {cat1: N, cat2: N, ...} }
  *       pendencias = { cat1: [{linha, erro, ...}], ... }
- *   - compras (controle_imports):
- *       stats = { created, updated, skipped: N, errors: N }
- *       pendencias = { municipios: [...], projetos: [...], linhas_invalidas: [...] }
  *   - eventos (eventos_import):
  *       stats = { solicitacoes: {created, updated, unchanged}, participations: {...}, skipped: {...} }
  *       pendencias = { ... }
@@ -212,16 +181,6 @@ function normalizeImportResponse(raw: unknown): ImportResult {
 }
 
 export const __testing = { normalizeImportResponse };
-
-/**
- * Importa COMPRAS de CSV/XLSX.
- *
- * @param file - Arquivo a enviar
- * @param dryRun - Se true, apenas preview
- */
-export async function importCompras(file: File, dryRun: boolean = true): Promise<ImportResult> {
-  return await postMultipart('/controle/import-compras/', file, dryRun);
-}
 
 /**
  * Importa AÇÕES de Controle de CSV/XLSX.
@@ -338,13 +297,4 @@ export async function importEquipeGerencia(file: File, dryRun: boolean = true): 
  */
 export async function importProdutos(file: File, dryRun: boolean = true): Promise<ImportResult> {
   return await postMultipart('/produtos/import/', file, dryRun);
-}
-
-/**
- * Lista COMPRAS com filtros opcionais.
- */
-export async function listCompras(filters: ComprasFilters = {}): Promise<Compra[]> {
-  const url = buildUrl('/controle/compras/', filters);
-  const data = await fetchAPI<{ results?: Compra[] } | Compra[]>(url);
-  return (data as { results: Compra[] }).results || (data as Compra[]);
 }

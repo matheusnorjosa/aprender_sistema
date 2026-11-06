@@ -96,12 +96,10 @@ docker compose exec web python manage.py import_export_contract --path=<dir-com-
 # Carga da virada (--mode virada) e regras de apply: ver specs/backend/imports.spec.md
 
 # Make targets (dry-run)
-make import-compras-dry FILE=...
 make import-acoes-dry FILE=...
 make import-cadastros-dry FILE=...
 
 # Endpoints DRF (aceitam ?dry_run=true)
-# POST /api/controle/import-compras/
 # POST /api/controle/import-acoes/
 # POST /api/dat/import-cadastros/
 ```

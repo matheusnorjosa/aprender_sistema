@@ -22,9 +22,8 @@ divergência, o arquivo `.ts` é a fonte — este documento é o resumo legível
 > **Atenção ao nome do primeiro caso.** O id diz `core-compra`, mas o endpoint exercitado é o
 > de `core_dat_compra` — a rota `/controle/compras` renderiza `DATModule/ComprasPage`
 > (`v2/frontend/src/components/AppRoutes.tsx:119`), o mesmo componente de
-> `/dat/compras-materiais`. Quem consome `/api/controle/compras/` (`core_compra`) é a rota
-> `/controle` via `listCompras` (`v2/frontend/src/api/ops.ts:369-373`, usado em
-> `pages/Controle/ControlePage.tsx:11`). Nenhum caso da matriz cobre esse endpoint hoje.
+> `/dat/compras-materiais`. A lista antiga (`core_compra`, `/api/controle/compras/`) saiu de uso em
+> 06/11/2026 (G29): o endpoint responde 404 e o `listCompras` de `api/ops.ts` saiu.
 
 ## Estratégia
 

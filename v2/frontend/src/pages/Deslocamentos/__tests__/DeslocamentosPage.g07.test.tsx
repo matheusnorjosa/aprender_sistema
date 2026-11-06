@@ -9,7 +9,7 @@
  */
 
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { message } from 'antd';
+import { message, Modal, type ModalFuncProps } from 'antd';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 
@@ -74,6 +74,21 @@ describe('DeslocamentosPage — G07', () => {
     vi.clearAllMocks();
   });
 
+  /**
+   * Modal.confirm não monta de forma confiável sob React 19 no jsdom (G30: a confirmação saiu do
+   * Popconfirm): o teste confere o que ele recebe e aperta o OK chamando o `onOk`.
+   */
+  function espiaConfirmacao() {
+    return vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
+  }
+
+  async function confirmarExclusao(confirmar: ReturnType<typeof espiaConfirmacao>): Promise<ModalFuncProps> {
+    await waitFor(() => expect(confirmar).toHaveBeenCalledTimes(1));
+    const opcoes = confirmar.mock.calls[0]![0];
+    await opcoes.onOk?.();
+    return opcoes;
+  }
+
   function espiaMensagens() {
     return {
       erro: vi.spyOn(message, 'error').mockImplementation(() => (() => undefined) as never),
@@ -85,12 +100,12 @@ describe('DeslocamentosPage — G07', () => {
     await renderComLinhas(linha(1, 'Minha Linha', true), linha(2, 'Da Colega', false));
 
     const minha = linhaDe('Minha Linha');
-    expect(within(minha).getByRole('button', { name: 'Editar deslocamento' })).toBeInTheDocument();
-    expect(within(minha).getByRole('button', { name: 'Excluir deslocamento' })).toBeInTheDocument();
+    expect(within(minha).getByRole('button', { name: /^Editar: deslocamento de / })).toBeInTheDocument();
+    expect(within(minha).getByRole('button', { name: /^Excluir: deslocamento de / })).toBeInTheDocument();
 
     const daColega = linhaDe('Da Colega');
-    expect(within(daColega).queryByRole('button', { name: 'Editar deslocamento' })).not.toBeInTheDocument();
-    expect(within(daColega).queryByRole('button', { name: 'Excluir deslocamento' })).not.toBeInTheDocument();
+    expect(within(daColega).queryByRole('button', { name: /^Editar: deslocamento de / })).not.toBeInTheDocument();
+    expect(within(daColega).queryByRole('button', { name: /^Excluir: deslocamento de / })).not.toBeInTheDocument();
   }, 20000);
 
   test('ao salvar, mostra o motivo da validação do servidor', async () => {
@@ -103,7 +118,7 @@ describe('DeslocamentosPage — G07', () => {
     const { erro } = espiaMensagens();
     await renderComLinhas(linha(1, 'Minha Linha', true));
 
-    fireEvent.click(within(linhaDe('Minha Linha')).getByRole('button', { name: 'Editar deslocamento' }));
+    fireEvent.click(within(linhaDe('Minha Linha')).getByRole('button', { name: /^Editar: deslocamento de / }));
     const dialogo = await screen.findByRole('dialog', {}, { timeout: 8000 });
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Salvar' }));
 
@@ -118,11 +133,12 @@ describe('DeslocamentosPage — G07', () => {
       erroHttp(403, { detail: 'Você não tem permissão para alterar deslocamento de outro usuário.' }),
     );
     const { erro } = espiaMensagens();
+    const confirmar = espiaConfirmacao();
     await renderComLinhas(linha(1, 'Minha Linha', true));
 
-    fireEvent.click(within(linhaDe('Minha Linha')).getByRole('button', { name: 'Excluir deslocamento' }));
-    expect(await screen.findByText('Excluir este deslocamento?')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Excluir' }));
+    fireEvent.click(within(linhaDe('Minha Linha')).getByRole('button', { name: /^Excluir: deslocamento de / }));
+    const opcoes = await confirmarExclusao(confirmar);
+    expect(opcoes).toMatchObject({ title: 'Excluir este deslocamento?', okText: 'Excluir', cancelText: 'Cancelar' });
 
     await waitFor(
       () => expect(erro).toHaveBeenCalledWith('Você não tem permissão para alterar deslocamento de outro usuário.'),
@@ -134,10 +150,11 @@ describe('DeslocamentosPage — G07', () => {
   test('exclusão que dá certo diz "excluído"', async () => {
     deleteMock.mockResolvedValue(undefined);
     const { sucesso } = espiaMensagens();
+    const confirmar = espiaConfirmacao();
     await renderComLinhas(linha(1, 'Minha Linha', true));
 
-    fireEvent.click(within(linhaDe('Minha Linha')).getByRole('button', { name: 'Excluir deslocamento' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Excluir' }));
+    fireEvent.click(within(linhaDe('Minha Linha')).getByRole('button', { name: /^Excluir: deslocamento de / }));
+    await confirmarExclusao(confirmar);
 
     await waitFor(() => expect(sucesso).toHaveBeenCalledWith('Deslocamento excluído.'), { timeout: 8000 });
   }, 20000);

@@ -15,11 +15,15 @@
  * - POST /api/deslocamentos/ (create)
  * - PUT /api/deslocamentos/{id}/ (update)
  * - DELETE /api/deslocamentos/{id}/ (delete)
+ *
+ * Sem rolagem horizontal (G30, padrão responsivo): ResponsiveTable. Sempre na linha o formador e
+ * as ações (AcoesLinha; no celular, o menu "Mais ações"); Data Início sobe a partir de sm, Destino
+ * e Data Fim de md, Origem de lg e a Observação (texto longo) só de xxl. O que some vai para a
+ * linha expandida.
  */
 
 import { useState, useEffect, useCallback, useRef, ChangeEvent, JSX } from 'react';
 import {
-  Table,
   Button,
   Modal,
   Form,
@@ -28,14 +32,13 @@ import {
   DatePicker,
   message,
   Space,
-  Popconfirm,
   Row,
   Col,
   Card,
   Typography,
-  Tooltip,
+  Grid,
 } from 'antd';
-import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
+import type { TablePaginationConfig } from 'antd/es/table';
 import type { Dayjs } from 'dayjs';
 import {
   PlusOutlined,
@@ -59,6 +62,8 @@ import {
 import { useAcesso } from '../../contexts/AcessoContext';
 import { mensagemDoErro } from '../AdminDAT/usuario_form_helpers';
 import DatImportsCentralizedBanner from '../../components/DatImportsCentralizedBanner';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
+import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
 import logger from '../../utils/logger';
 import type { ID } from '../../types';
 
@@ -67,6 +72,11 @@ const { RangePicker } = DatePicker;
 const { TextArea } = Input;
 
 /** Form values type */
+/** Quem a linha representa: nomeia o expandir e as ações ("Editar: deslocamento de Maria em 10/11/2026"). */
+function nomeDoDeslocamento(registro: DeslocamentoRecord): string {
+  return `deslocamento de ${registro.usuario_nome} em ${dayjs(registro.start_date).format('DD/MM/YYYY')}`;
+}
+
 interface FormValuesType {
   usuario?: ID;
   origem: string;
@@ -95,6 +105,7 @@ export default function DeslocamentosPage(): JSX.Element {
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [currentRecord, setCurrentRecord] = useState<DeslocamentoRecord | null>(null);
   const [form] = Form.useForm<FormValuesType>();
+  const acoesCompactas = !Grid.useBreakpoint().sm;
 
   // M09-06 (#1622): guarda de sequência (latest-wins). O debounce reduz mas não
   // elimina a corrida — se um request antigo (filtro obsoleto) resolver DEPOIS do
@@ -240,6 +251,19 @@ export default function DeslocamentosPage(): JSX.Element {
     }
   };
 
+  // Ação destrutiva: começa no Cancelar e cita o deslocamento (quem, de onde, para onde).
+  const confirmarExclusao = (record: DeslocamentoRecord): void => {
+    Modal.confirm({
+      title: 'Excluir este deslocamento?',
+      content: `${record.usuario_nome}, de ${record.origem} a ${record.destino}, ${dayjs(record.start_date).format('DD/MM/YYYY')}.`,
+      okText: 'Excluir',
+      okType: 'danger',
+      cancelText: 'Cancelar',
+      autoFocusButton: 'cancel',
+      onOk: () => handleDelete(record.id),
+    });
+  };
+
   // Handle delete
   const handleDelete = async (id: ID): Promise<void> => {
     try {
@@ -251,76 +275,71 @@ export default function DeslocamentosPage(): JSX.Element {
     }
   };
 
-  // Columns for table
-  const columns: ColumnsType<DeslocamentoRecord> = [
+  // Columns for table (G30: por prioridade de largura; o que some vai para a linha expandida)
+  const columns: ColunaResponsiva<DeslocamentoRecord>[] = [
     {
       title: 'Formador',
       dataIndex: 'usuario_nome',
       key: 'usuario_nome',
-      width: 200,
     },
     {
       title: 'Origem',
       dataIndex: 'origem',
       key: 'origem',
-      width: 150,
+      responsive: VISIVEL_A_PARTIR.lg,
+      ellipsis: true,
     },
     {
       title: 'Destino',
       dataIndex: 'destino',
       key: 'destino',
-      width: 150,
+      responsive: VISIVEL_A_PARTIR.md,
+      ellipsis: true,
     },
     {
       title: 'Data Início',
       dataIndex: 'start_date',
       key: 'start_date',
-      width: 120,
-      render: (date: string) => dayjs(date).format('DD/MM/YYYY'),
+      responsive: VISIVEL_A_PARTIR.sm,
+      width: 112,
+      render: (_, record) => dayjs(record.start_date).format('DD/MM/YYYY'),
     },
     {
       title: 'Data Fim',
       dataIndex: 'end_date',
       key: 'end_date',
-      width: 120,
-      render: (date: string) => dayjs(date).format('DD/MM/YYYY'),
+      responsive: VISIVEL_A_PARTIR.md,
+      width: 112,
+      render: (_, record) => dayjs(record.end_date).format('DD/MM/YYYY'),
     },
     {
       title: 'Observação',
       dataIndex: 'observacao',
       key: 'observacao',
+      responsive: VISIVEL_A_PARTIR.xxl,
       ellipsis: true,
-      render: (text: string | undefined) => (
-        <Tooltip title={text}>
-          <span>{text ? text.substring(0, 50) : '-'}</span>
-        </Tooltip>
-      ),
+      render: (_, record) => record.observacao || '-',
     },
     {
       title: 'Ações',
       key: 'actions',
-      fixed: 'right',
-      width: 120,
+      width: larguraAcoesLinha(2, acoesCompactas),
       // G07 (P#12): só onde o servidor deixa (dono ou quem delega); nas outras linhas o clique dava 403.
       render: (_, record) => record.pode_editar && (
-        <Space size="small">
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-            size="small"
-            aria-label="Editar deslocamento"
-          />
-          <Popconfirm
-            title="Excluir este deslocamento?"
-            onConfirm={() => handleDelete(record.id)}
-            okText="Excluir"
-            okButtonProps={{ danger: true }}
-            cancelText="Cancelar"
-          >
-            <Button type="link" danger icon={<DeleteOutlined />} size="small" aria-label="Excluir deslocamento" />
-          </Popconfirm>
-        </Space>
+        <AcoesLinha
+          compacto={acoesCompactas}
+          alvo={nomeDoDeslocamento(record)}
+          acoes={[
+            { chave: 'editar', rotulo: 'Editar', icone: <EditOutlined />, onClick: () => handleEdit(record) },
+            {
+              chave: 'excluir',
+              rotulo: 'Excluir',
+              icone: <DeleteOutlined />,
+              onClick: () => confirmarExclusao(record),
+              perigo: true,
+            },
+          ]}
+        />
       ),
     },
   ];
@@ -350,7 +369,7 @@ export default function DeslocamentosPage(): JSX.Element {
   return (
     <div className="p-6 space-y-4 bg-gray-50 min-h-screen">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <div>
           <Title level={2}>
             <CarOutlined /> Deslocamentos
@@ -416,14 +435,14 @@ export default function DeslocamentosPage(): JSX.Element {
 
       {/* Table */}
       <Card>
-        <Table
+        <ResponsiveTable<DeslocamentoRecord>
           columns={columns}
           dataSource={deslocamentos}
           rowKey="id"
           loading={tableLoading}
           pagination={pagination}
           onChange={handleTableChange}
-          scroll={{ x: 1000 }}
+          nomeDaLinha={nomeDoDeslocamento}
         />
       </Card>
 

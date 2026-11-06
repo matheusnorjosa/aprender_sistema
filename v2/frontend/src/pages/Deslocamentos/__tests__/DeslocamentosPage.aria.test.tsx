@@ -3,7 +3,8 @@
  *
  * Fix sob teste (DeslocamentosPage.tsx, coluna "Ações"):
  *   os botões só-ícone ganharam aria-label="Editar deslocamento" e
- *   aria-label="Excluir deslocamento".
+ *   aria-label="Excluir deslocamento". Desde o G30 (AcoesLinha), o nome diz qual:
+ *   "Editar: deslocamento de <formador> em <data>".
  *
  * Prova do RED (por que falharia SEM o fix):
  *   um <Button icon={<EditOutlined/>} /> sem texto e sem aria-label não expõe
@@ -79,17 +80,17 @@ describe('DeslocamentosPage — aria-label dos botões de ação (#1742)', () =>
 
     // findAllByRole é robusto a eventual duplicação de DOM da coluna fixa do antd.
     const editar = await screen.findAllByRole('button', {
-      name: /Editar deslocamento/i,
+      name: /Editar: deslocamento/i,
     });
     const excluir = await screen.findAllByRole('button', {
-      name: /Excluir deslocamento/i,
+      name: /Excluir: deslocamento/i,
     });
 
     expect(editar.length).toBeGreaterThanOrEqual(1);
     expect(excluir.length).toBeGreaterThanOrEqual(1);
 
     // O accessible name é exatamente o esperado (não só um "match parcial").
-    expect(editar[0]).toHaveAccessibleName('Editar deslocamento');
-    expect(excluir[0]).toHaveAccessibleName('Excluir deslocamento');
+    expect(editar[0]).toHaveAccessibleName('Editar: deslocamento de Fulano de Tal em 01/01/2026');
+    expect(excluir[0]).toHaveAccessibleName('Excluir: deslocamento de Fulano de Tal em 01/01/2026');
   }, 20000);
 });

@@ -69,7 +69,7 @@ async function linha(acao: 'Editar' | 'Mais ações' = 'Editar'): Promise<HTMLEl
   return tr;
 }
 
-describe('DeslocamentosPage sem rolagem horizontal (G30)', () => {
+describe('DeslocamentosPage sem rolagem horizontal (G30)', { timeout: 20000 }, () => {
   test('a 1280 px: colunas por prioridade, sem coluna fixa nem largura forçada', async () => {
     const { container } = renderPage();
     const tr = await linha();

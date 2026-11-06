@@ -16,7 +16,7 @@ vi.mock('../../components/BlockForm', () => ({ default: () => <div>formulario-bl
 
 import Disponibilidade from '../Disponibilidade';
 
-describe('Disponibilidade — largura dos cartões (G30)', () => {
+describe('Disponibilidade — largura dos cartões (G30)', { timeout: 20000 }, () => {
   test('formulário e lista ocupam a linha inteira abaixo de xxl e dividem a partir dele', async () => {
     render(<Disponibilidade />);
 

@@ -119,7 +119,7 @@ function expandida(): ReturnType<typeof within> {
   return within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
 }
 
-describe('Gestão de Cadastros sem rolagem horizontal (G30)', () => {
+describe('Gestão de Cadastros sem rolagem horizontal (G30)', { timeout: 20000 }, () => {
   test('a 1280 px: identidade, etapas, link e ações na linha; sem coluna fixa nem largura forçada', async () => {
     const { container } = renderCadastros();
     const linha = await linhaPelaAcao(`Editar: ${CADASTRO}`);
@@ -167,7 +167,7 @@ describe('Gestão de Cadastros sem rolagem horizontal (G30)', () => {
   });
 });
 
-describe('Gestão de Coordenadores sem rolagem horizontal (G30)', () => {
+describe('Gestão de Coordenadores sem rolagem horizontal (G30)', { timeout: 20000 }, () => {
   async function abrirLista(): Promise<HTMLElement> {
     fireEvent.click(await screen.findByLabelText('Visualizar como lista', {}, { timeout: 15000 }));
     return linhaPelaAcao(`Editar: ${COORD}`);

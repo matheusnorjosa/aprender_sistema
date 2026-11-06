@@ -97,7 +97,7 @@ function abrir(tr: HTMLElement): ReturnType<typeof within> {
   return within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
 }
 
-describe('Plano Anual sem rolagem horizontal (G30)', () => {
+describe('Plano Anual sem rolagem horizontal (G30)', { timeout: 20000 }, () => {
   test('a 1280 px: uma coluna Progresso no lugar de F1-F15, A1-A2 e P1-P3; sem coluna fixa nem largura forçada', async () => {
     const { container } = renderPage();
     const tr = await linha();

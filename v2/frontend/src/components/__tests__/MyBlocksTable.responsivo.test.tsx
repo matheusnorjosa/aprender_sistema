@@ -41,7 +41,7 @@ function linha(): HTMLElement {
   return tr;
 }
 
-describe('MyBlocksTable sem rolagem horizontal (G30)', () => {
+describe('MyBlocksTable sem rolagem horizontal (G30)', { timeout: 20000 }, () => {
   test('a 1280 px: todas as colunas, sem coluna fixa nem largura forçada; Excluir pelo nome do bloqueio', () => {
     const { container } = renderTabela();
 

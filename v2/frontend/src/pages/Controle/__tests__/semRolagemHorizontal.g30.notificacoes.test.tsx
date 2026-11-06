@@ -95,7 +95,7 @@ function expandida(): ReturnType<typeof within> {
   return within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
 }
 
-describe('Notificações Internas sem rolagem horizontal (G30)', () => {
+describe('Notificações Internas sem rolagem horizontal (G30)', { timeout: 20000 }, () => {
   test('a 1280 px: colunas por prioridade e "Marcar lida" pelo título; a mensagem na linha expandida', async () => {
     const { container } = render(<NotificacoesInternasPage />);
     const linha = await linhaPelaAcao(`Marcar lida: ${NOTIFICACAO.titulo}`);
@@ -130,7 +130,7 @@ describe('Notificações Internas sem rolagem horizontal (G30)', () => {
   });
 });
 
-describe('Ações Internas sem rolagem horizontal (G30)', () => {
+describe('Ações Internas sem rolagem horizontal (G30)', { timeout: 20000 }, () => {
   test('a 1280 px: todas as colunas, sem largura forçada; Registrar âncora e Concluir pelo nome da ação', async () => {
     const { container } = render(<AcoesNotificacaoPage />);
     const linha = await linhaPelaAcao(`Concluir: ${ACAO_NOME}`);

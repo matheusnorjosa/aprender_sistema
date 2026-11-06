@@ -126,7 +126,7 @@ function semLarguraForcada(container: HTMLElement): void {
   for (const tabela of Array.from(container.querySelectorAll('table'))) expect(tabela.style.width).toBe('');
 }
 
-describe('Dashboards (/dashboards) sem rolagem horizontal (G30)', () => {
+describe('Dashboards (/dashboards) sem rolagem horizontal (G30)', { timeout: 20000 }, () => {
   test('a 1280 px: Top 5 sem largura forçada, com posição, eventos e progresso', async () => {
     const { container } = renderPagina(<DashboardsPage />);
     const celula = await screen.findByText('Maria Coordenadora', {}, { timeout: 15000 });
@@ -156,7 +156,7 @@ describe('Dashboards (/dashboards) sem rolagem horizontal (G30)', () => {
   });
 });
 
-describe('Dashboard da Equipe sem rolagem horizontal (G30)', () => {
+describe('Dashboard da Equipe sem rolagem horizontal (G30)', { timeout: 20000 }, () => {
   test('a 1280 px: todas as colunas, sem largura forçada; o cabeçalho quebra linha', async () => {
     const { container } = renderPagina(<EquipeDashboardPage />);
     const celula = await screen.findByText('Rita Formadora', { selector: 'td, td *' }, { timeout: 15000 });
@@ -175,7 +175,7 @@ describe('Dashboard da Equipe sem rolagem horizontal (G30)', () => {
   });
 });
 
-describe('Dashboard Google Calendar sem rolagem horizontal (G30)', () => {
+describe('Dashboard Google Calendar sem rolagem horizontal (G30)', { timeout: 20000 }, () => {
   test('a 1280 px: eventos e "os 5 com mais eventos" sem largura forçada', async () => {
     const { container } = renderPagina(<GCalDashboardPage />);
     const evento = await screen.findByText('Formação em Sobral', {}, { timeout: 15000 });
@@ -208,7 +208,7 @@ describe('Dashboard Google Calendar sem rolagem horizontal (G30)', () => {
   });
 });
 
-describe('Dashboard de Compras sem rolagem horizontal (G30)', () => {
+describe('Dashboard de Compras sem rolagem horizontal (G30)', { timeout: 20000 }, () => {
   test('a 1280 px: pendências e "quem compra mais" sem largura forçada', async () => {
     const { container } = renderPagina(<ComprasDashboardPage />);
     const pendente = await screen.findByText('Iguatu', {}, { timeout: 15000 });

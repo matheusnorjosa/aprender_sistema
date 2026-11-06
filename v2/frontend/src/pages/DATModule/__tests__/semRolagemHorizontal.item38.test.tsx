@@ -8,6 +8,7 @@
  * some vai para a linha expandida.
  */
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 
@@ -159,6 +160,33 @@ describe('Gestão de Ações sem rolagem horizontal', () => {
     act(() => definirLarguraTela(360));
 
     expect(cabecalhos()).toEqual(['Município - UF', 'Ações']);
+  });
+});
+
+// Lote D (D2): DATAcao não tem `area` nem `observacoes` (só observacao_carta/contato/reuniao/entrega,
+// fora da lista). As duas colunas ficavam vazias em qualquer largura e saem da tela.
+describe('Gestão de Ações sem as colunas vazias Área e Observações', { timeout: 20000 }, () => {
+  test('a 360 px: a linha expandida não mostra Área nem Observações', async () => {
+    definirLarguraTela(360);
+    const user = userEvent.setup();
+    renderPagina('acoes');
+    const linha = await linhaPelaAcao(`Mais ações: ${ACAO}`);
+
+    await user.click(within(linha).getByRole('button', { name: `Expandir linha de ${ACAO}` }));
+    const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
+    expect(expandida.getByText('Progresso')).toBeInTheDocument();
+    expect(expandida.queryByText('Área')).toBeNull();
+    expect(expandida.queryByText('Observações')).toBeNull();
+  });
+
+  test('a 1700 px: nenhum cabeçalho Área nem Observações', async () => {
+    definirLarguraTela(1700);
+    renderPagina('acoes');
+    await linhaPelaAcao(`Editar: ${ACAO}`);
+
+    expect(cabecalhos()).toContain('Progresso');
+    expect(cabecalhos()).not.toContain('Área');
+    expect(cabecalhos()).not.toContain('Observações');
   });
 });
 

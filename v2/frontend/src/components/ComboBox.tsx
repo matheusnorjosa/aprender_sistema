@@ -67,12 +67,15 @@ export default function ComboBox({
   // Falha ao carregar: o motivo fica na tela (com "Tentar de novo") em vez de "Nenhum resultado".
   const [erro, setErro] = useState<string | null>(null);
   const campoRef = useRef<RefSelectProps>(null);
+  const seqRef = useRef(0); // latest-wins: só a busca mais nova mexe na lista (idioma de useTableFilters)
 
   /** Busca e troca as opções; devolve se carregou. */
   const carregar = useCallback(async (query: string): Promise<boolean> => {
+    const seq = ++seqRef.current;
     try {
       setLoading(true);
       const results = await lookupFunction(query);
+      if (seq !== seqRef.current) return false; // resposta obsoleta: uma busca mais nova venceu
       setOptions(results.map(item => ({
         value: String(item.id),
         label: item.label,
@@ -82,10 +85,11 @@ export default function ComboBox({
       return true;
     } catch (error) {
       logger.error('Erro ao buscar:', error);
+      if (seq !== seqRef.current) return false;
       setErro((error as Error)?.message || 'Tente de novo em instantes.');
       return false;
     } finally {
-      setLoading(false);
+      if (seq === seqRef.current) setLoading(false);
     }
   }, [lookupFunction]);
 

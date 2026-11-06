@@ -259,6 +259,27 @@ describe('useGoogleIntegration', () => {
     expect(result.current.status.defaultCalendarId).toBe(null);
   });
 
+  test('disconnect() com revogação não confirmada mantém conectado e devolve erro', async () => {
+    const mensagem =
+      'Não foi possível desconectar a conta Google agora. Ela continua conectada. Tente de novo; se o erro continuar, avise a DAT.';
+    fetchAPIMock.mockResolvedValueOnce({ ...RAW_CONNECTED });
+    fetchAPIMock.mockResolvedValueOnce({ message: mensagem, disconnected: false });
+
+    const { result } = renderHook(() => useGoogleIntegration());
+    await waitFor(() => {
+      expect(result.current.status.connected).toBe(true);
+    });
+
+    let disconnectResult;
+    await act(async () => {
+      disconnectResult = await result.current.disconnect();
+    });
+
+    expect(disconnectResult).toEqual({ success: false, error: mensagem });
+    expect(result.current.status.connected).toBe(true);
+    expect(result.current.error).toBe(mensagem);
+  });
+
   test('disconnect() deve tratar erro do backend', async () => {
     fetchAPIMock.mockResolvedValueOnce({ ...RAW_CONNECTED });
     fetchAPIMock.mockRejectedValueOnce({ response: { data: { error: 'Nenhuma conexão Google encontrada' } } });

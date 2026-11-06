@@ -93,9 +93,6 @@ interface AcaoRecord {
   data_contato?: string | null;
   data_reuniao?: string | null;
   data_entrega?: string | null;
-  // Referenciados pela tabela/form mas ausentes do serializer atual (podem vir undefined)
-  area?: string | null;
-  observacoes?: string | null;
 }
 
 interface AcaoFormValues {
@@ -103,7 +100,6 @@ interface AcaoFormValues {
   projeto: number;
   coordenador: number | null;
   ano?: number | null;
-  area?: string | null;
   status_carta?: string;
   status_contato?: string;
   status_reuniao?: string;
@@ -112,7 +108,6 @@ interface AcaoFormValues {
   data_contato?: Dayjs | null;
   data_reuniao?: Dayjs | null;
   data_entrega?: Dayjs | null;
-  observacoes?: string | null;
 }
 
 interface AcoesFilters {
@@ -388,13 +383,6 @@ export default function AcoesPage(): JSX.Element {
       ellipsis: true,
     },
     {
-      title: 'Área',
-      dataIndex: 'area',
-      key: 'area',
-      responsive: VISIVEL_A_PARTIR.xxl,
-      width: 100,
-    },
-    {
       title: (
         <Tooltip title="Carta Enviada">
           <Space>
@@ -499,19 +487,6 @@ export default function AcoesPage(): JSX.Element {
           />
         );
       },
-    },
-    {
-      title: 'Observações',
-      dataIndex: 'observacoes',
-      key: 'observacoes',
-      responsive: VISIVEL_A_PARTIR.xxl,
-      width: 200,
-      ellipsis: { showTitle: false },
-      render: (val: string | null) => (
-        <Tooltip title={val}>
-          <Text type="secondary">{val || '-'}</Text>
-        </Tooltip>
-      ),
     },
     {
       title: 'Ações',

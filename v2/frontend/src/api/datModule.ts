@@ -302,11 +302,10 @@ export async function deleteCoordenadorDAT(id: ID): Promise<void> {
 }
 
 export async function getCoordenadorAlocacoes(id: ID): Promise<GenericRecord[]> {
-  return unwrapList(
-    await fetchAPI<GenericRecord[] | PaginatedResponse<GenericRecord>>(
-      `/dat/coordenadores/${id}/alocacoes/`,
-    ),
+  const data = await fetchAPI<{ acoes?: GenericRecord[]; total_acoes: number }>(
+    `/dat/coordenadores/${id}/alocacoes/`,
   );
+  return data.acoes ?? [];
 }
 
 // ========== COORDENADORES OPTIONS ==========

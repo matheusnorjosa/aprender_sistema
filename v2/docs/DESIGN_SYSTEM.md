@@ -1,7 +1,7 @@
 ---
 title: Design System — Cores, Tema e Tokens (Frontend)
 status: active
-last_verified: 2026-08-25
+last_verified: 2026-11-06
 owner: frontend
 related:
   - ./INDEX_DOCUMENTACAO.md
@@ -92,6 +92,7 @@ Dois conjuntos de token AntD (`lightThemeTokens` / `darkThemeTokens`) trocados p
 | Aspecto | Claro | Escuro |
 |---|---|---|
 | `colorPrimary` (acento de interação) | `#006B52` (marca) | `#2FA37D` (`DARK_ACCENT`) — ver seção 4 |
+| `colorLink` / hover / active | `#006B52` (6,51:1 no branco) / `#004B3D` (10,13:1) / derivado `#004537` (11,02:1) | seed `#34BC8F` → `#2FA37D` (5,22:1 no `#1f1f1f`; 4,80:1 no `#262626`) / `#4FB08C` (6,22:1) / `#2FA37D` |
 | Fundo container | `#ffffff` | `#1f1f1f` |
 | Fundo layout | `#f0f2f5` | `#141414` |
 | Fundo elevado | (default AntD) | `#262626` |
@@ -102,6 +103,17 @@ Dois conjuntos de token AntD (`lightThemeTokens` / `darkThemeTokens`) trocados p
 `#8c8c8c`, que dá só **3.36:1** em branco (reprova o mínimo 4.5:1 de texto — SC 1.4.3),
 visível nos labels do `Descriptions`. Escurecemos para `rgba(0,0,0,.55)` ≈ `#737373`
 (**4.74:1**, passa). Mudança sutil, só aumenta contraste.
+
+**Fix de a11y no link do tema:** sem `colorLink` o AntD usa o azul `#1677ff` (**4,10:1** no
+branco, hover `#69b1ff` com **2,25:1**; no escuro `#1668dc` com 3,18:1). Agora o link é a cor
+da marca nos dois temas (tabela acima). O `colorLink` é token **seed**: o AntD descarta o valor
+passado e o rederiva pela paleta, e no escuro o `darkAlgorithm` mistura 85% do seed com
+`#141414`. Por isso o seed escuro é `#34BC8F` (sai `#2FA37D`); passar `DARK_ACCENT` direto
+sairia `#2b8e6d` (4,08:1, reprova). Só `colorLinkHover` e `colorLinkActive` aceitam valor
+direto. Alcance: `Button type="link"` (ícones do `AcoesLinha`, "Limpar seleção" etc.), o ícone
+de expandir das tabelas e os ícones e links do `Typography`. O `<a>` comum (e o `<Link>` do
+react-router) **não** passa pelo token: o preflight do Tailwind (`a { color: inherit }`) vence o
+reset do AntD e ele herda a cor do texto. Teste: `contexts/__tests__/ThemeContext.link.test.tsx`.
 
 **Fix de a11y no "Carregando..." de tela cheia** (`components/FullscreenLoader.tsx`): o AntD
 pinta o texto em branco sobre a máscara `colorBgMask` = `rgba(0,0,0,.45)`, que na página
@@ -207,6 +219,10 @@ console.log(ratio('#2FA37D', '#1f1f1f').toFixed(2)); // 5.22
 Sempre meça o acento do tema escuro contra **os dois** fundos (`#1f1f1f` container e `#141414`
 layout) — passar em um e reprovar no outro é o erro clássico.
 
+Token **seed** do AntD (`colorLink`, `colorPrimary`, `colorInfo`…) não sai como foi escrito:
+meça o token **derivado** com `theme.getDesignToken(antThemeConfig)`, não o objeto passado, e
+inclua o `#262626` (fundo elevado) no escuro.
+
 ---
 
 ## Histórico
@@ -214,3 +230,5 @@ layout) — passar em um e reprovar no outro é o erro clássico.
 - **2026-08-25** — Documento criado. Consolida o contrato de cor/tema que estava só em
   comentários de código. Registra o racional WCAG do `DARK_ACCENT` (`#ea2a33` → `#2FA37D`,
   PR #1846) e a cadeia SSOT de três consumidores.
+- **2026-11-06** — Link do tema `#1677ff` (4,10:1) → cor da marca (decisão 6 do piloto C1,
+  lote D): `colorLink`/`colorLinkHover` no claro e seed `#34BC8F` no escuro (seção 3).

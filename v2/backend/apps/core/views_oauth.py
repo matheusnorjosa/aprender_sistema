@@ -557,7 +557,11 @@ def google_oauth_disconnect(request: Request) -> Response:
     **Permissão**: `use_gcal` ou `publish_setor_solicitacao` (a própria credencial)
 
     Returns:
-        200 OK: {"message": "Conta Google desconectada com sucesso"}
+        200 OK: {"message": ..., "google_email": ..., "disconnected": bool}
+            disconnected=True: credencial removida (Google confirmou a revogação).
+            disconnected=False: revogação não confirmada (status do Google, rede ou
+            descriptografia); a credencial fica guardada para nova tentativa e a
+            conta continua conectada.
         404 Not Found: {"error": "Nenhuma conexão Google encontrada"}
 
     Example:
@@ -566,7 +570,15 @@ def google_oauth_disconnect(request: Request) -> Response:
         Response (sucesso):
         {
             "message": "Conta Google desconectada com sucesso",
-            "google_email": "operacional1@aprendereditora.com.br"
+            "google_email": "operacional1@aprendereditora.com.br",
+            "disconnected": true
+        }
+
+        Response (não confirmado):
+        {
+            "message": "Não foi possível desconectar a conta Google agora. Ela continua conectada. ...",
+            "google_email": "operacional1@aprendereditora.com.br",
+            "disconnected": false
         }
     """
     try:
@@ -575,18 +587,26 @@ def google_oauth_disconnect(request: Request) -> Response:
 
         # Revogar token no Google e remover credencial local
         success = revoke_token(credential)
+        # O banco decide: revoke_token também devolve False quando apagou e o AuditLog falhou.
+        disconnected = success or not GoogleOAuthCredential.objects.filter(user=request.user).exists()
 
-        if success:
+        if disconnected:
             logger.info(f"✅ OAuth disconnect: user_id={request.user.pk} ({google_email})")
 
-            return Response({"message": "Conta Google desconectada com sucesso", "google_email": google_email})
+            return Response(
+                {"message": "Conta Google desconectada com sucesso", "google_email": google_email, "disconnected": True}
+            )
         else:
             logger.warning(f"⚠️ OAuth disconnect: falha ao revogar token ({google_email})")
 
             return Response(
                 {
-                    "message": "Credencial removida localmente, mas falha ao revogar no Google",
+                    "message": (
+                        "Não foi possível desconectar a conta Google agora. Ela continua conectada. "
+                        "Tente de novo; se o erro continuar, avise a DAT."
+                    ),
                     "google_email": google_email,
+                    "disconnected": False,
                 },
                 status=status.HTTP_200_OK,
             )

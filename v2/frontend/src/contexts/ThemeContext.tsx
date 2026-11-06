@@ -96,6 +96,12 @@ const DARK_ACCENT = '#2FA37D';
 // Cores customizadas para o tema escuro (baseado no design de referência)
 const darkThemeTokens = {
   colorPrimary: DARK_ACCENT,
+  // colorLink é token SEED: o AntD descarta o valor passado e rederiva pela paleta, e o
+  // darkAlgorithm mistura 85% do seed com #141414. Por isso o seed '#34BC8F' sai #2FA37D
+  // (5,2:1 no #1f1f1f); passar DARK_ACCENT direto sairia #2b8e6d (4,08:1, reprova AA).
+  colorLink: '#34BC8F',
+  colorLinkHover: '#4FB08C',
+  colorLinkActive: DARK_ACCENT,
   colorBgContainer: '#1f1f1f',
   colorBgElevated: '#262626',
   colorBgLayout: '#141414',
@@ -111,6 +117,10 @@ const darkThemeTokens = {
 // Cores customizadas para o tema claro
 const lightThemeTokens = {
   colorPrimary: '#006B52',
+  // A11y (WCAG AA): sem colorLink o AntD usa o azul #1677ff (4,10:1 no branco; hover 2,25:1).
+  // A marca dá 6,5:1 e o hover escuro 10:1; o active derivado (#004537) já passa.
+  colorLink: BRAND_COLORS.primary,
+  colorLinkHover: BRAND_COLORS.primaryDark,
   borderRadius: 6,
   // A11y (WCAG AA): o default do Antd para texto terciário é rgba(0,0,0,0.45)=#8c8c8c,
   // que dá só 3.36:1 em branco (ex.: labels do Descriptions) e reprova 4.5:1. Escurecemos

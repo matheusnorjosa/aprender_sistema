@@ -12,8 +12,9 @@ Uso:
     python manage.py import_export_contract --path ... --mode virada
     python manage.py import_export_contract --path ... --mode virada --apply \
         --allow-entity solicitacao --allow-entity participation
-    # adoção do Event ID do Google (depois do A5), sozinha
-    python manage.py import_export_contract --path ... --mode virada --apply --allow-entity gcal_adocao
+    # adoção do Event ID do Google (depois do A5), sozinha, com o arquivo da conferência no Google:
+    python manage.py conferir_gcal_adocao --path ... --saida /tmp/conferido.json --operador <id>
+    python manage.py import_export_contract --path ... --mode virada --apply --allow-entity gcal_adocao         --gcal-verificado /tmp/conferido.json
 
 Segurança:
 - sem `--apply` → dry-run (só classifica).
@@ -21,6 +22,8 @@ Segurança:
 - modo `create-only`: só insere would_create; nunca atualiza; nunca sobrescreve campo protegido.
 - modo `virada`: atualiza o evento existente que ninguém mexeu pela tela (plano de 16/10/2026); exige
   `solicitacao` e `participation` juntos, ou `gcal_adocao` sozinha. A carga nunca chama o Google.
+- `gcal_adocao --apply` exige `--gcal-verificado` (decisão D63): só adota o id que o
+  `conferir_gcal_adocao` achou confirmado e na mesma data no Google há menos de 24 h; o resto fica travado.
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUnknownArgumentType=false
@@ -69,6 +72,12 @@ class Command(BaseCommand):
             default=None,
             help="CPF do usuário-ator (created_by) para apply de dat_cadastro/dat_registro.",
         )
+        parser.add_argument(
+            "--gcal-verificado",
+            dest="gcal_verificado",
+            default=None,
+            help="JSON do conferir_gcal_adocao. Obrigatório no --apply de gcal_adocao (vale 24 h).",
+        )
 
     def _resolve_actor(self, cpf_raw: str | None) -> Any:
         """Resolve o Usuario-ator (created_by) pelo CPF. None se não informado."""
@@ -82,6 +91,19 @@ class Command(BaseCommand):
         if actor is None:
             raise CommandError(f"--as-user: usuário com CPF {cpf_raw} não encontrado.")
         return actor
+
+    def _ler_verificado(self, caminho: str | None) -> dict[str, Any] | None:
+        """Lê o arquivo do conferir_gcal_adocao ({solicitacao_id: {event_id, verificado_em, ...}})."""
+        if not caminho:
+            return None
+        try:
+            with open(caminho, encoding="utf-8") as f:
+                dados = json.load(f)
+        except (OSError, ValueError) as e:
+            raise CommandError(f"--gcal-verificado ilegível: {type(e).__name__}") from e
+        if not isinstance(dados, dict):
+            raise CommandError("--gcal-verificado: o arquivo tem de ser um objeto JSON")
+        return dados
 
     def handle(self, *args: Any, **opts: Any) -> None:
         # CR-03: barra --allow-entity que aponta entidade não-escrivível (classifica mas não tem apply)
@@ -110,6 +132,11 @@ class Command(BaseCommand):
                     "--allow-entity gcal_adocao roda sozinha: primeiro a carga (solicitacao + participation),"
                     + " depois o A5, e só então a adoção."
                 )
+            if opts["apply"] and not opts.get("gcal_verificado"):
+                raise CommandError(
+                    "--allow-entity gcal_adocao --apply exige --gcal-verificado <arquivo>: rode antes"
+                    + " o conferir_gcal_adocao, que confere cada Event ID no Google (decisão D63)."
+                )
         elif opts["mode"] == "virada" and opts["apply"] and not {"solicitacao", "participation"} <= allow:
             raise CommandError(
                 "--mode virada --apply exige --allow-entity solicitacao e --allow-entity participation"
@@ -122,6 +149,7 @@ class Command(BaseCommand):
             apply=opts["apply"],
             allow=tuple(opts["allow"]),
             actor=actor,
+            gcal_verificado=self._ler_verificado(opts.get("gcal_verificado")),
         )
         report = importer.run()
 

@@ -49,7 +49,7 @@ cd v2 && make up
 docker exec aprender_dev-web-1 pytest apps/core/tests/ -v   # gate de CI usa --no-migrations (#1481)
 cd v2/backend && pyright apps/core config
 cd v2/frontend && npm run build    # frontend roda no HOST, não em Docker
-make import-compras-dry FILE=...    # import via API DRF (dry-run); ETL legado REMOVIDO
+make import-acoes-dry FILE=...    # import via API DRF (dry-run); ETL legado REMOVIDO
 ```
 
 ## SDD — specs vivas (consultar PRIMEIRO)

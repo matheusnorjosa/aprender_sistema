@@ -506,7 +506,7 @@ O ETL legado (`apps.dat_ingest`, comandos `etl_*`) foi **REMOVIDO** (#967/#971) 
 
 ### Caminho atual
 - Command: `import_export_contract` (dry-run por padrao; `--apply` exige allowlist; never-overwrite de campos protegidos).
-- API DRF: `POST /api/<recurso>/import/` (alvos `make import-compras-dry` / `import-acoes-dry` / `import-cadastros-dry`).
+- API DRF: `POST /api/<recurso>/import/` (alvos `make import-acoes-dry` / `import-cadastros-dry`).
 - Spec viva: `v2/docs/specs/backend/imports.spec.md`; contratos em `v2/docs/imports/`.
 
 ### Regras

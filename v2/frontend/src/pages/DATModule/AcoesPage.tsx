@@ -491,6 +491,7 @@ export default function AcoesPage(): JSX.Element {
         const progress = calculateProgress(record);
         return (
           <Progress
+            aria-label={`Progresso: ${progress}%`}
             percent={progress}
             size="small"
             status={progress === 100 ? 'success' : 'active'}
@@ -629,6 +630,7 @@ export default function AcoesPage(): JSX.Element {
               </Text>
             </div>
             <Select
+              aria-label="UF"
               style={{ width: '100%' }}
               placeholder="Todos"
               allowClear
@@ -645,6 +647,7 @@ export default function AcoesPage(): JSX.Element {
               </Text>
             </div>
             <Select
+              aria-label="Município"
               style={{ width: '100%' }}
               placeholder="Buscar município..."
               allowClear
@@ -662,6 +665,7 @@ export default function AcoesPage(): JSX.Element {
               </Text>
             </div>
             <Select
+              aria-label="Projeto"
               style={{ width: '100%' }}
               placeholder="Todos"
               allowClear
@@ -679,6 +683,7 @@ export default function AcoesPage(): JSX.Element {
               </Text>
             </div>
             <Select
+              aria-label="Coordenador"
               style={{ width: '100%' }}
               placeholder="Todos"
               allowClear
@@ -696,6 +701,7 @@ export default function AcoesPage(): JSX.Element {
               </Text>
             </div>
             <Select
+              aria-label="Status"
               style={{ width: '100%' }}
               placeholder="Todos"
               allowClear

@@ -699,9 +699,11 @@ export default function EditSolicitacaoPage(): JSX.Element {
         <Form form={form} layout="vertical" autoComplete="off">
           <Form.Item
             label="Projeto"
+            htmlFor="edit-projeto"
             rules={[{ required: true, message: 'Por favor selecione um projeto' }]}
           >
             <ComboBox
+              id="edit-projeto"
               lookupFunction={lookupProjetosElegiveis}
               onChange={handleProjetoChange}
               value={formData.projeto as unknown as { id: ID; label: string; [key: string]: unknown } | null}
@@ -711,9 +713,11 @@ export default function EditSolicitacaoPage(): JSX.Element {
 
           <Form.Item
             label="Tipo de Evento"
+            htmlFor="edit-tipo-evento"
             rules={[{ required: true, message: 'Por favor selecione um tipo de evento' }]}
           >
             <ComboBox
+              id="edit-tipo-evento"
               lookupFunction={lookupTiposEvento}
               onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, tipoEvento: value })}
               value={formData.tipoEvento as unknown as { id: ID; label: string; [key: string]: unknown } | null}
@@ -723,6 +727,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
 
           <Form.Item
             label="Município"
+            htmlFor="edit-municipio"
             rules={[{ required: true, message: 'Por favor selecione um município' }]}
             extra={
               emEspera ? (
@@ -733,6 +738,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
             }
           >
             <ComboBox
+              id="edit-municipio"
               lookupFunction={lookupMunicipiosElegiveis}
               renderOption={opcaoDoMunicipio}
               aria-describedby={semCompra || emEspera ? 'edit-municipio-sem-compra' : undefined}
@@ -744,9 +750,11 @@ export default function EditSolicitacaoPage(): JSX.Element {
 
           <Form.Item
             label="Formadores"
+            htmlFor="edit-formadores"
             rules={[{ required: true, message: 'Por favor selecione pelo menos um formador' }]}
           >
             <FormadoresPicker
+              id="edit-formadores"
               value={formData.formadores}
               onChange={handleFormadoresChange}
               projetoId={projetoId}

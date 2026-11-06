@@ -10,6 +10,7 @@ import { ETAPA_STATUS_OPTIONS } from './constants';
 import { renderStatusIcon } from './helpers';
 import type { ID } from '../../../types';
 import { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../../components/ResponsiveTable';
+import { TEXTO_DA_TAG } from '../../../components/textoDaTag';
 import { AcoesLinha, larguraAcoesLinha } from '../../../components/AcoesLinha';
 
 const { Text } = Typography;
@@ -169,7 +170,8 @@ export function getColumns({ onEdit, onDelete, compacto = false }: ColumnHandler
           erro: { color: 'red', label: 'Erro' },
         };
         const it = map[status];
-        return <Tag color={it?.color ?? 'default'}>{it?.label ?? status}</Tag>;
+        const cor = it?.color ?? 'default';
+        return <Tag color={cor} style={{ color: TEXTO_DA_TAG[cor] }}>{it?.label ?? status}</Tag>;
       },
     },
     {
@@ -205,7 +207,8 @@ export function getColumns({ onEdit, onDelete, compacto = false }: ColumnHandler
           nao_aplicavel: 'N/A',
           erro: 'Erro',
         };
-        return <Tag color={colors[status] ?? 'default'}>{labels[status] ?? status}</Tag>;
+        const cor = colors[status] ?? 'default';
+        return <Tag color={cor} style={{ color: TEXTO_DA_TAG[cor] }}>{labels[status] ?? status}</Tag>;
       },
     },
     {

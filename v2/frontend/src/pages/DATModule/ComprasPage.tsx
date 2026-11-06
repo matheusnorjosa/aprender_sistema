@@ -54,6 +54,7 @@ import { UF_OPTIONS } from '../../constants';
 import { useAcesso } from '../../contexts/AcessoContext';
 import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
+import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 
 const { Title, Text } = Typography;
 
@@ -159,6 +160,13 @@ const STATUS_OPTIONS = [
   { label: 'Esgotado', value: 'esgotado', color: 'red', legenda: '0 disponível' },
   { label: 'Devolvido', value: 'devolvido', color: 'default', legenda: 'material devolvido' },
 ];
+
+// Contraste AA (4,5:1) dos números da tabela, no branco: o azul e o verde do AntD (#1890ff 3,24 e
+// #52c41a 2,27:1) e o vermelho (#ff4d4f 3,27:1) reprovam, e os tokens colorInfoText/colorSuccessText/
+// colorErrorText do antd 5.29 são esses mesmos tons. Mesma régua de TEXTO_DA_TAG (components/textoDaTag.ts).
+const COR_DA_QUANTIDADE = '#0958d9'; // blue-7: 6,16:1
+const COR_DO_DISPONIVEL = '#237804'; // green-8: 5,59:1
+const COR_DO_ESGOTADO = '#cf1322'; // red-7: 5,57:1
 
 const TIPO_COMPRA_OPTIONS = [
   { label: 'Primeira compra', value: 'primeira', color: 'blue' },
@@ -344,13 +352,15 @@ export default function ComprasPage(): JSX.Element {
   const renderStatusTag = (status: string | null, disponivel: number, quantidade: number): JSX.Element => {
     const valor = status ?? (disponivel <= 0 ? 'esgotado' : disponivel < quantidade ? 'em_uso' : 'disponivel');
     const statusConfig = STATUS_OPTIONS.find((s) => s.value === valor);
-    return <Tag color={statusConfig?.color || 'default'}>{statusConfig?.label || valor}</Tag>;
+    const cor = statusConfig?.color || 'default';
+    return <Tag color={cor} style={{ color: TEXTO_DA_TAG[cor] }}>{statusConfig?.label || valor}</Tag>;
   };
 
   const renderTipoCompraTag = (tipo: string | null | undefined): JSX.Element => {
     if (!tipo) return <Tag color="default">Não informado</Tag>;
     const config = TIPO_COMPRA_OPTIONS.find((t) => t.value === tipo);
-    return <Tag color={config?.color || 'default'}>{config?.label || tipo}</Tag>;
+    const cor = config?.color || 'default';
+    return <Tag color={cor} style={{ color: TEXTO_DA_TAG[cor] }}>{config?.label || tipo}</Tag>;
   };
 
   // Sem rolagem horizontal (padrão responsivo, item 38): sempre na linha o produto (com o projeto
@@ -435,7 +445,7 @@ export default function ComprasPage(): JSX.Element {
       width: 100,
       align: 'right' as const,
       render: (val: number | null) => (
-        <Text strong style={{ color: '#1890ff' }}>
+        <Text strong style={{ color: COR_DA_QUANTIDADE }}>
           {val?.toLocaleString('pt-BR') || 0}
         </Text>
       ),
@@ -461,10 +471,11 @@ export default function ComprasPage(): JSX.Element {
 
         return (
           <Space direction="vertical" size={0} align="end">
-            <Text strong style={{ color: disponivel > 0 ? '#52c41a' : '#ff4d4f' }}>
+            <Text strong style={{ color: disponivel > 0 ? COR_DO_DISPONIVEL : COR_DO_ESGOTADO }}>
               {disponivel.toLocaleString('pt-BR')}
             </Text>
             <Progress
+              aria-label={`Disponível: ${percent}% da quantidade`}
               percent={percent}
               size="small"
               showInfo={false}
@@ -732,7 +743,7 @@ export default function ComprasPage(): JSX.Element {
             return (
               <Text strong>
                 {`Total da página: quantidade ${totalQtd.toLocaleString('pt-BR')} · utilizado ${totalUtilizado.toLocaleString('pt-BR')} · disponível `}
-                <Text type={totalDisponivel > 0 ? 'success' : 'danger'}>
+                <Text style={{ color: totalDisponivel > 0 ? COR_DO_DISPONIVEL : COR_DO_ESGOTADO }}>
                   {totalDisponivel.toLocaleString('pt-BR')}
                 </Text>
               </Text>
@@ -751,7 +762,7 @@ export default function ComprasPage(): JSX.Element {
           </Text>
           {STATUS_OPTIONS.map((s) => (
             <Space key={s.value}>
-              <Tag color={s.color}>{s.label}</Tag>
+              <Tag color={s.color} style={{ color: TEXTO_DA_TAG[s.color] }}>{s.label}</Tag>
               <Text type="secondary">{s.legenda}</Text>
             </Space>
           ))}

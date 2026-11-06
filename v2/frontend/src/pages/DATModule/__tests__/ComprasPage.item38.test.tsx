@@ -189,8 +189,8 @@ describe('Compras sem rolagem horizontal', () => {
 
     const rodape = document.querySelector<HTMLElement>('.ant-table-footer');
     expect(rodape?.textContent).toBe('Total da página: quantidade 200 · utilizado 40 · disponível 160');
-    // O disponível mantém a cor de antes (verde se sobra, vermelho se não).
-    expect(within(rodape!).getByText('160')).toHaveClass('ant-typography-success');
+    // O disponível segue verde se sobra (vermelho se não), no tom com contraste AA (green-8).
+    expect(within(rodape!).getByText('160')).toHaveStyle({ color: '#237804' });
   });
 
   test('entre 576 e 991 px: projeto e município embaixo do produto (as colunas ainda não estão todas)', async () => {

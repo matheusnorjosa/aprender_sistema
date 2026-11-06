@@ -1,8 +1,9 @@
 /**
  * Helpers puros (sem React) para o formulário de Usuário (Bug 3 fix, 2026-04-27).
  *
- * CPF é write-only por LGPD no serializer backend (`extra_kwargs` em
- * `UsuarioAdminSerializer`). API nunca retorna CPF raw — apenas `cpf_masked`.
+ * O campo `cpf` é write-only por LGPD no serializer backend (`extra_kwargs` em
+ * `UsuarioAdminSerializer`): a resposta traz `cpf_masked`. O login (`username`), que é o CPF, chega
+ * inteiro ao DAT por decisão do dono (05/11/2026); a tela o mostra mascarado (`loginDeTela`).
  * Por isso no edit precisamos:
  * - Mostrar `cpf_masked` como visual (input disabled)
  * - Não exigir CPF como required
@@ -17,7 +18,8 @@ import { computeCapabilities } from '../../hooks/useCapabilities';
 import type { ID } from '../../types';
 
 export interface UsuarioFormValues {
-  username: string;
+  // Só leitura: o login é o CPF (D14). O servidor o grava ao criar e o troca junto com o CPF; o payload não o leva.
+  username?: string | undefined;
   email: string;
   // exactOptionalPropertyTypes: casam com UserFormValues (hidratado de um AntD Form
   // cujos campos são T | undefined). buildUsuarioPayload já trata undefined/vazio.
@@ -65,12 +67,16 @@ export interface BuildPayloadOptions {
  * - Edit + locked: omitir `cpf` do payload (backend mantém valor atual)
  * - Edit + unlocked + valor preenchido: enviar `cpf` novo
  * - Edit + unlocked + valor vazio: omitir (não substitui CPF existente por vazio)
+ *
+ * Login e e-mail (lote C, 06/11/2026): `username` nunca vai (o servidor o deriva do CPF). Na edição, e-mail
+ * vazio não vai: o e-mail de reserva chega vazio do servidor (D15) e o salvar mantém o gravado.
  */
 export function buildUsuarioPayload(
   values: UsuarioFormValues,
   options: BuildPayloadOptions,
 ): Record<string, unknown> {
-  const { funcao_ids = [], gerencia_id, equipe_administrativa, is_superuser, cpf, ...rest } = values;
+  const { funcao_ids = [], gerencia_id, equipe_administrativa, is_superuser, cpf, username: _login, email, ...rest } =
+    values;
   const { isEditing, cpfEditUnlocked, currentIsSuperuser, lotaComum = false, funcoesCarregadas = true } = options;
   const editaLotacao = (currentIsSuperuser || lotaComum) && funcoesCarregadas;
 
@@ -94,23 +100,17 @@ export function buildUsuarioPayload(
   const equipePayload =
     editaLotacao && typeof equipe_administrativa === 'boolean' ? { equipe_administrativa } : {};
 
+  const emailPayload = !isEditing || email ? { email } : {};
+
   return {
     ...rest,
+    ...emailPayload,
     ...cpfPayload,
     ...superuserPayload,
     ...groupsPayload,
     ...gerenciaPayload,
     ...equipePayload,
   };
-}
-
-/** Setores que não viram grupo pela lotação; espelha `SETORES_RESERVADOS` (`apps/core/services/equipe_gerencia.py`). */
-const SETORES_DE_PAR_APROVADOR = new Set(['Superintendência', 'Controle']);
-
-interface GrupoLike {
-  id: ID;
-  name: string;
-  permissoes_funcionais?: readonly unknown[] | undefined;
 }
 
 interface GerenciaLike {
@@ -120,14 +120,19 @@ interface GerenciaLike {
 }
 
 /**
- * Gerências cujo perfil dá pacote a Equipe e Gerente; espelha `PERFIL_PERMITIDO`
- * (`apps/core/services/rbac_pacotes.py`). PR 11: os dois pacotes aprovam solicitações.
+ * O que o pacote da gerência dá a quem é Equipe ou Gerente nela; espelha `PERFIL_PERMITIDO` e `PACOTE`
+ * (`apps/core/services/rbac_pacotes.py`). PR 11: DAT e Controle aprovam; a Diretoria (D20) supervisiona e
+ * vê os painéis, sem aprovar.
  */
-const GERENCIAS_COM_PACOTE = new Set(['GERENCIA DAT', 'CONTROLE']);
+const AVISO_DO_PACOTE: Record<string, string> = {
+  'GERENCIA DAT': 'Nesta gerência, Equipe e Gerente recebem o pacote do setor, inclusive aprovar solicitações.',
+  CONTROLE: 'Nesta gerência, Equipe e Gerente recebem o pacote do setor, inclusive aprovar solicitações.',
+  DIRETORIA: 'Nesta gerência, Equipe e Gerente recebem o pacote da Diretoria: supervisão e painéis, sem aprovar solicitações.',
+};
 
-/** A gerência dá o pacote do setor (DAT ou Controle) a quem é Equipe ou Gerente nela? */
-export function gerenciaDaPacote(gerencia: Pick<GerenciaLike, 'nome'> | undefined): boolean {
-  return gerencia !== undefined && GERENCIAS_COM_PACOTE.has(gerencia.nome);
+/** O aviso do pacote que a gerência dá a quem é Equipe ou Gerente nela; null se ela não dá pacote. */
+export function avisoDoPacote(gerencia: Pick<GerenciaLike, 'nome'> | undefined): string | null {
+  return (gerencia && AVISO_DO_PACOTE[gerencia.nome]) ?? null;
 }
 
 /**
@@ -170,49 +175,15 @@ export function motivoDaLotacaoTravada(opts: {
   return null;
 }
 
-/**
- * Espelha `setor_group_for`: grupo com capacidade funcional não entra pela gerência (S3), mas
- * `comCapacidade` o devolve para achar o grupo que SAI na troca de gerência, como no backend.
- */
-function setorDaGerencia<G extends GrupoLike>(
-  grupos: G[],
-  gerencia: GerenciaLike | undefined,
-  comCapacidade = false,
-): G | undefined {
-  const setor = (gerencia?.setor_canonico ?? '').trim();
-  if (!setor || SETORES_DE_PAR_APROVADOR.has(setor)) return undefined;
-  return grupos.find((g) => g.name === setor && (comCapacidade || !g.permissoes_funcionais?.length));
-}
-
 /** Funções que viram papel no vínculo; espelha `PAPEL_POR_FUNCAO` (`services/equipe_gerencia.py`). */
 const FUNCOES_COM_PAPEL = new Set(['Formador', 'Coordenador', 'Gerente', 'Apoio de Coordenação']);
 
 /**
- * #2071: grupos da pessoa depois do Salvar, espelhando `_apply_lotacao` do backend. Os grupos
- * atuais que não são FUNÇÃO ficam; as funções vêm do form; o grupo de setor da gerência entra e
- * sai só quando a gerência muda e só com função que tem papel (a Equipe administrativa nunca dá
- * grupo); setor de par aprovador (Superintendência, Controle) não vira grupo, nem grupo com
- * capacidade (S3), que só sai.
+ * D10: só o superusuário dá ou tira função sem papel no vínculo (ex.: Assistente Administrativo); o servidor
+ * recusa o DAT (`_valida_lotacao_comum`). Para ele a opção fica bloqueada, não escondida.
  */
-export function gruposAposSalvar<G extends GrupoLike>(args: {
-  grupos: G[];
-  idsAtuais: ID[];
-  funcoes: Set<string>;
-  funcaoIds: ID[];
-  gerencia: GerenciaLike | undefined;
-  gerenciaAnterior: GerenciaLike | undefined;
-}): G[] {
-  const { grupos, idsAtuais, funcoes, funcaoIds, gerencia, gerenciaAnterior } = args;
-  let final = grupos.filter((g) => idsAtuais.includes(g.id) && !funcoes.has(g.name));
-  final.push(...grupos.filter((g) => funcaoIds.includes(g.id) && !final.includes(g)));
-  const temFuncaoComPapel = final.some((g) => FUNCOES_COM_PAPEL.has(g.name));
-  if (gerencia && gerencia.id !== gerenciaAnterior?.id && temFuncaoComPapel) {
-    const antigo = setorDaGerencia(grupos, gerenciaAnterior, true);
-    const novo = setorDaGerencia(grupos, gerencia);
-    if (antigo && antigo !== novo) final = final.filter((g) => g !== antigo);
-    if (novo && !final.includes(novo)) final.push(novo);
-  }
-  return final;
+export function funcaoSoDoSuperusuario(nome: string): boolean {
+  return !FUNCOES_COM_PAPEL.has(nome);
 }
 
 /**
@@ -258,9 +229,15 @@ export function errosDosCampos<Valores>(error: unknown): Parameters<FormInstance
   }));
 }
 
-/** Nome de tela da pessoa; sem nome cadastrado, o e-mail (nunca o username, que é o CPF). */
+/** E-mail de reserva `<cpf>@placeholder.local` da conta importada sem e-mail (D15); espelha `pii.email_de_reserva`. */
+function emailDeReserva(email: string): boolean {
+  return email.trim().toLowerCase().endsWith('@placeholder.local');
+}
+
+/** Nome de tela da pessoa; sem nome cadastrado, o e-mail (nunca o username, que é o CPF, nem o e-mail de reserva). */
 export function nomeDe(user: { first_name?: string; last_name?: string; email?: string }): string {
-  return `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || 'Sem nome';
+  const email = user.email && !emailDeReserva(user.email) ? user.email : '';
+  return `${user.first_name || ''} ${user.last_name || ''}`.trim() || email || 'Sem nome';
 }
 
 /**

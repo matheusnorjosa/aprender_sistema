@@ -44,7 +44,8 @@ describe('buildUsuarioPayload — CPF write-only LGPD (Bug 3 fix)', () => {
         currentIsSuperuser: true,
       });
       expect(payload.cpf).toBe('12345678901');
-      expect(payload.username).toBe('fabiana.veras');
+      // D14 (lote C): o login nasce do CPF no servidor; o payload não o leva.
+      expect(payload).not.toHaveProperty('username');
       // group_ids agora só as FUNÇÕES; o grupo de setor é auto-atribuído pelo backend via gerencia_id.
       expect(payload.group_ids).toEqual([2]);
       expect(payload.gerencia_id).toBe(5);
@@ -71,7 +72,7 @@ describe('buildUsuarioPayload — CPF write-only LGPD (Bug 3 fix)', () => {
       });
       expect(payload).not.toHaveProperty('cpf');
       // outros campos preservados
-      expect(payload.username).toBe('fabiana.veras');
+      expect(payload).not.toHaveProperty('username');
       expect(payload.telefone).toBe('85999991111');
     });
 
@@ -199,7 +200,7 @@ describe('buildUsuarioPayload — group_ids gated por superuser (P0-1 Tier-0)', 
       cpfEditUnlocked: false,
       currentIsSuperuser: false,
     });
-    expect(payload.username).toBe('fabiana.veras');
+    expect(payload.email).toBe('fabiana@example.com');
     expect(payload.telefone).toBe('85999991111');
     expect(payload.is_active).toBe(true);
   });

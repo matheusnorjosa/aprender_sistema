@@ -182,10 +182,10 @@ describe('UsuariosPage responsiva (C1)', () => {
     // (no jsdom o AntD dá o mesmo id "test-id" a todo diálogo: o nome acessível não distingue)
     const modal = (await screen.findByText('Editar Usuário', {}, { timeout: 10000 })).closest('[role="dialog"]');
     expect(modal).not.toBeNull();
-    expect(within(modal as HTMLElement).getByLabelText('Email')).toHaveValue('maria.aparecida@example.invalid');
+    expect(within(modal as HTMLElement).getByLabelText('E-mail')).toHaveValue('maria.aparecida@example.invalid');
   }, 30000);
 
-  test('Editar: o username (o CPF) aparece mascarado, e o Salvar manda o valor real', async () => {
+  test('Editar: o login (o CPF) aparece mascarado, e o Salvar não o manda (nasce e muda com o CPF)', async () => {
     const user = userEvent.setup();
     renderPage();
     const linha = await linhaDoUsuario();
@@ -193,13 +193,13 @@ describe('UsuariosPage responsiva (C1)', () => {
     await user.click(within(linha).getByRole('button', { name: `Editar: ${NOME}` }));
     const modal = await abrirModal('Editar Usuário');
 
-    expect(within(modal).getByLabelText('Username')).toHaveValue(LOGIN_MASCARADO);
+    expect(within(modal).getByLabelText('Usuário (login)')).toHaveValue(LOGIN_MASCARADO);
     semCpfCru(modal);
 
     await user.click(within(modal).getByRole('button', { name: 'Salvar' }));
-    // a máscara nunca vira o login: o form guarda o valor real (o PATCH manda o que mandava)
+    // a máscara nunca vira o login: o PATCH não leva o login (lote C, D14)
     await vi.waitFor(() => expect(updateUser).toHaveBeenCalledTimes(1), { timeout: 10000 });
-    expect(vi.mocked(updateUser).mock.calls[0]![1]).toEqual(expect.objectContaining({ username: CPF }));
+    expect(vi.mocked(updateUser).mock.calls[0]![1]).not.toHaveProperty('username');
   }, 30000);
 
   test('login com o CPF formatado (000.000.000-00) também sai mascarado, no detalhe e no Editar', async () => {
@@ -218,7 +218,7 @@ describe('UsuariosPage responsiva (C1)', () => {
 
     await user.click(within(drawer).getByRole('button', { name: /Editar/ }));
     const modal = await abrirModal('Editar Usuário');
-    expect(within(modal).getByLabelText('Username')).toHaveValue(LOGIN_MASCARADO);
+    expect(within(modal).getByLabelText('Usuário (login)')).toHaveValue(LOGIN_MASCARADO);
   }, 30000);
 
   test('Redefinir senha e Excluir não mostram o CPF cru', async () => {

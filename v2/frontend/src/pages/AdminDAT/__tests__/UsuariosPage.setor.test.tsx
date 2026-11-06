@@ -25,7 +25,7 @@ const { USUARIOS, GERENCIAS } = vi.hoisted(() => ({
       gerencia_atual: { gerencia_id: 9, rotulo: 'Setor Desativado', nome_setor: 'Antigo', setor_canonico: '', papel: 'COORDENADOR' },
     },
     {
-      // Controle: opera por grupo, sem vínculo EquipeGerencia
+      // Só o grupo Controle, sem vínculo EquipeGerencia: sem lotação (o grupo não dá poder)
       id: 9, username: 'controle.teste', email: 'controle@example.invalid', first_name: 'Ctrl', last_name: 'Teste',
       cpf_masked: '***.***.000-02', is_active: true, is_superuser: false,
       groups: ['Controle'], group_ids_display: [3],
@@ -101,8 +101,10 @@ describe('UsuariosPage — setor pela lotação (PR A)', () => {
     expect(within(dialog).getByTitle('Setor Desativado')).toBeInTheDocument();
   }, 30000);
 
-  test('sem vínculo, a coluna Setor cai para os grupos de setor (Controle continua "Controle")', async () => {
+  test('sem vínculo, a coluna Setor diz "Sem lotação": o grupo de setor não dá poder (lote C, D03)', async () => {
     renderPage();
-    expect(await screen.findByText('Controle', {}, { timeout: 15000 })).toBeInTheDocument();
+    const linha = (await screen.findByText('Ctrl Teste', {}, { timeout: 15000 })).closest('tr') as HTMLElement;
+    expect(within(linha).getByText('Sem lotação')).toBeInTheDocument();
+    expect(within(linha).queryByText('Controle')).not.toBeInTheDocument();
   }, 20000);
 });

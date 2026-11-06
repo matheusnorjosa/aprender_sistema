@@ -80,7 +80,7 @@ class TestCreateUserWithGerencia:
             format="json",
         )
         assert resp.status_code == status.HTTP_201_CREATED, resp.data
-        u = Usuario.objects.get(username="novo_formador")
+        u = Usuario.objects.get(cpf="92000000010")
         vinc = EquipeGerencia.objects.filter(usuario=u, gerencia=gerencia_fluir, papel="FORMADOR", ativo=True)
         assert vinc.exists(), "vínculo FORMADOR ativo deveria ter sido criado"
         # grupo de setor auto-atribuído por nome (== setor_canonico 'Fluir')
@@ -102,7 +102,7 @@ class TestCreateUserWithGerencia:
             format="json",
         )
         assert resp.status_code == status.HTTP_201_CREATED, resp.data
-        u = Usuario.objects.get(username="novo_coord")
+        u = Usuario.objects.get(cpf="92000000011")
         assert EquipeGerencia.objects.filter(
             usuario=u, gerencia=gerencia_fluir, papel="COORDENADOR", ativo=True
         ).exists()
@@ -123,7 +123,7 @@ class TestCreateUserWithGerencia:
             format="json",
         )
         assert resp.status_code == status.HTTP_201_CREATED, resp.data
-        u = Usuario.objects.get(username="novo_asa")
+        u = Usuario.objects.get(cpf="92000000012")
         # Assistente Administrativo não é papel -> nenhum vínculo criado
         assert not EquipeGerencia.objects.filter(usuario=u, gerencia=gerencia_fluir).exists()
 
@@ -143,7 +143,7 @@ class TestCreateUserWithGerencia:
             format="json",
         )
         assert resp.status_code == status.HTTP_201_CREATED, resp.data
-        u = Usuario.objects.get(username="novo_por_dat")
+        u = Usuario.objects.get(cpf="92000000013")
         # 17/10/2026: o DAT lota nas gerências comuns (as reservadas em test_dat_lota_comuns.py)
         assert EquipeGerencia.objects.filter(usuario=u, gerencia=gerencia_fluir, papel="FORMADOR", ativo=True).exists()
         assert set(u.groups.values_list("name", flat=True)) == {"Formador", "Fluir"}

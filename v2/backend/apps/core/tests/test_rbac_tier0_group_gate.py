@@ -146,7 +146,7 @@ class TestUserGroupIdsTier0Gate:
             format="json",
         )
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
-        assert not Usuario.objects.filter(username="novo_comum").exists()
+        assert not Usuario.objects.filter(cpf="91000000005").exists()
 
     def test_dat_update_user_da_funcao(self, api_client, dat):
         target = UsuarioFactory(username="alvo_update", cpf="91000000006")
@@ -180,4 +180,4 @@ class TestUserGroupIdsTier0Gate:
             format="json",
         )
         assert resp.status_code == status.HTTP_201_CREATED
-        assert Usuario.objects.get(username="novo_super").groups.count() == 1
+        assert Usuario.objects.get(cpf="91000000008").groups.count() == 1

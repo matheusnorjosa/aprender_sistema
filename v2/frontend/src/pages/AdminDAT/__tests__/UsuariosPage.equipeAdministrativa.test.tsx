@@ -5,7 +5,6 @@
  * - O Salvar reenvia o valor hidratado (salvar sem mudar mantém o vínculo); só o superuser envia.
  * - Com a caixa marcada, a função deixa de ser obrigatória ao criar e a gerência passa a ser.
  * - O detalhe mostra o papel em pt-BR.
- * - A prévia de grupos espelha o backend: o grupo de setor só vem com função que tem papel no vínculo.
  */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
@@ -13,9 +12,8 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 
 import {
+  avisoDoPacote,
   buildUsuarioPayload,
-  gerenciaDaPacote,
-  gruposAposSalvar,
   lotacaoObrigatoria,
   type UsuarioFormValues,
 } from '../usuario_form_helpers';
@@ -111,39 +109,13 @@ describe('lotacaoObrigatoria — equipe administrativa', () => {
   });
 });
 
-describe('gruposAposSalvar — grupo de setor só com função que tem papel', () => {
-  const grupos = [
-    { id: 1, name: 'Formador' },
-    { id: 4, name: 'Assistente Administrativo' },
-    { id: 5, name: 'Vidas' },
-  ];
-  const funcoes = new Set(['Formador', 'Assistente Administrativo']);
-  const vidas = { id: 2, nome: 'GERENCIA 2', setor_canonico: 'Vidas' };
-  const nomes = (funcaoIds: number[]): string[] =>
-    gruposAposSalvar({ grupos, idsAtuais: [], funcoes, funcaoIds, gerencia: vidas, gerenciaAnterior: undefined })
-      .map((g) => g.name)
-      .sort();
-
-  test('só a equipe administrativa (sem função) não dá o grupo do setor', () => {
-    expect(nomes([])).toEqual([]);
-  });
-
-  test('função sem papel no vínculo não dá o grupo do setor', () => {
-    expect(nomes([4])).toEqual(['Assistente Administrativo']);
-  });
-
-  test('função com papel continua dando o grupo do setor', () => {
-    expect(nomes([1])).toEqual(['Formador', 'Vidas']);
-  });
-});
-
-describe('gerenciaDaPacote (PR 11)', () => {
-  test('DAT e Controle dão o pacote, inclusive aprovar; as demais não', () => {
-    expect(gerenciaDaPacote({ nome: 'GERENCIA DAT' })).toBe(true);
-    expect(gerenciaDaPacote({ nome: 'CONTROLE' })).toBe(true);
-    expect(gerenciaDaPacote({ nome: 'SUPERINTENDENCIA' })).toBe(false);
-    expect(gerenciaDaPacote({ nome: 'GERENCIA 2' })).toBe(false);
-    expect(gerenciaDaPacote(undefined)).toBe(false);
+describe('avisoDoPacote (PR 11)', () => {
+  test('DAT e Controle dão o pacote, inclusive aprovar; as demais (fora a Diretoria) não', () => {
+    expect(avisoDoPacote({ nome: 'GERENCIA DAT' })).toMatch(/inclusive aprovar/);
+    expect(avisoDoPacote({ nome: 'CONTROLE' })).toMatch(/inclusive aprovar/);
+    expect(avisoDoPacote({ nome: 'SUPERINTENDENCIA' })).toBeNull();
+    expect(avisoDoPacote({ nome: 'GERENCIA 2' })).toBeNull();
+    expect(avisoDoPacote(undefined)).toBeNull();
   });
 });
 

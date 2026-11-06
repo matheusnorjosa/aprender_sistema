@@ -454,7 +454,8 @@ class TestUsuarioAdminAPI:
         }
         response = api_client.post("/api/usuarios-admin/", payload, format="json")
         assert response.status_code == status.HTTP_201_CREATED
-        created = Usuario.objects.get(username="novo_usuario")
+        created = Usuario.objects.get(cpf="98765432100")
+        assert created.username == "98765432100"  # D14: o login nasce igual ao CPF
         assert created.telefone == "85999990000"
         assert created.cargo == "Coordenador Operacional"
 
@@ -493,7 +494,7 @@ class TestUsuarioAdminAPI:
         response = api_client.post("/api/usuarios-admin/", payload, format="json")
         assert response.status_code == status.HTTP_201_CREATED
 
-        user = Usuario.objects.get(username="test_hash")
+        user = Usuario.objects.get(cpf="11111111111")
         assert user.password != "SecurePass456!"  # senha não em plaintext
         assert user.has_usable_password()  # armazenada como hash (independe do algoritmo)
         assert user.check_password("SecurePass456!")  # hash válido e verificável
@@ -505,7 +506,7 @@ class TestUsuarioAdminAPI:
         payload = {"username": "sem_senha", "email": "sem.senha@example.invalid", "cpf": "11111111112"}
         response = api_client.post("/api/usuarios-admin/", payload, format="json")
         assert response.status_code == status.HTTP_201_CREATED
-        assert Usuario.objects.get(username="sem_senha").deve_trocar_senha is False
+        assert Usuario.objects.get(cpf="11111111112").deve_trocar_senha is False
 
     def test_redefinir_senha_de_outra_pessoa_liga_a_marca(self, api_client, usuario_dat):
         target = UsuarioFactory(username="alvo_reset", cpf="22233344455")
@@ -571,7 +572,7 @@ class TestUsuarioAdminAPI:
         }
         response = api_client.post("/api/usuarios-admin/", payload, format="json")
         assert response.status_code == status.HTTP_201_CREATED
-        assert Usuario.objects.get(username="nasce_marcado").deve_trocar_senha is False
+        assert Usuario.objects.get(cpf="11111111113").deve_trocar_senha is False
 
     def test_controle_cannot_create_usuario(self, api_client, usuario_controle):
         """Controle NÃO pode criar usuário"""

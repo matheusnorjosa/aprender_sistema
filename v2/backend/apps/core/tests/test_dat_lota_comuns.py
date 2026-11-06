@@ -189,7 +189,7 @@ class TestDatLotaNasComuns:
             format="json",
         )
         assert resp.status_code == status.HTTP_201_CREATED, resp.data
-        assert _vigentes(Usuario.objects.get(username="nova_lotada_dat")) == {(comum.id, "FORMADOR")}
+        assert _vigentes(Usuario.objects.get(cpf="93017000001")) == {(comum.id, "FORMADOR")}
 
     def test_mantem_grupo_de_funcao_sem_papel_que_o_alvo_ja_tem(self, dat, comum):
         asst = _grupo("Assistente Administrativo")

@@ -3,7 +3,6 @@ Equivalence / snapshot tests for ``apps.core.services.normalize``.
 
 This module is the **legacy** normalization helper still used by:
 
-* ``apps.core.services.controle_imports``
 * ``apps.core.services.controle_acoes_import``
 * ``apps.core.services.dat_cadastros_import``
 * ``apps.core.views_lookup``

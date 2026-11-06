@@ -21,7 +21,6 @@ As of PR for issue #1349, `apps/core/services/normalize.py` is a thin
 **re-export wrapper** over `apps.core.imports.*`. It exists only so the
 existing callers keep working without touching their import lines:
 
-* `apps.core.services.controle_imports`
 * `apps.core.services.controle_acoes_import`
 * `apps.core.services.dat_cadastros_import`
 * `apps.core.views_lookup`

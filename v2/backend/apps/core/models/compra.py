@@ -17,7 +17,9 @@ class Compra(models.Model):
 
     - Idempotencia: external_hash (SHA256 da linha normalizada)
     - Chave natural: (codigo + municipio + projeto + data)
-    - Import: Suporta CSV/XLSX via import_compras service
+    - FORA DE USO desde 06/11/2026 (G29, decisão do dono de 05/11): a lista atual é `DATCompra`.
+      Nenhuma rota lê nem grava esta tabela; o admin só consulta. A tabela sai na etapa 2,
+      depois de backup e OK do dono.
     """
 
     codigo = models.CharField(

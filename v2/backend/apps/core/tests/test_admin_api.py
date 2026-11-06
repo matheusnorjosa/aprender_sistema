@@ -3,7 +3,7 @@ Testes para API Admin (PR 7/N)
 
 Testa:
 - RBAC: DAT, Controle, Superintendência, outros
-- CRUD: Município, Projeto, Compra, Usuario
+- CRUD: Município, Projeto, Usuario
 - Filtros DRF: search, ordering, filterset_fields
 - Edge cases: validações, permissões, dados inválidos
 """
@@ -12,8 +12,6 @@ Testa:
 
 from __future__ import annotations
 
-from datetime import date
-
 from django.contrib.auth.models import Group
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -21,7 +19,6 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core.models import (
-    Compra,
     GroupClassificacao,
     Municipio,
     MunicipioReferencia,
@@ -119,20 +116,6 @@ def municipio_sample(db):
 def projeto_sample(db):
     """Projeto de exemplo"""
     return ProjetoFactory(nome="Alfabetização", codigo="ALF-01")
-
-
-@pytest.fixture
-def compra_sample(db, municipio_sample, projeto_sample):
-    """Compra de exemplo"""
-    return Compra.objects.create(
-        codigo="COMP-001",
-        projeto=projeto_sample,
-        municipio=municipio_sample,
-        quantidade=10,
-        data=date(2025, 1, 15),
-        uso="Formação inicial",
-        external_hash="abc123xyz",
-    )
 
 
 # ==========================
@@ -320,106 +303,6 @@ class TestProjetoAPI:
         response = api_client.get("/api/projetos/?search=Alfabetiza")
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data["results"]) == 1
-
-
-# ==========================
-# Testes de Compra
-# ==========================
-
-
-@pytest.mark.django_db
-class TestCompraAPI:
-    """Testes do endpoint /api/compras/"""
-
-    def test_dat_can_list_compras(self, api_client, usuario_dat, compra_sample):
-        """DAT pode listar compras"""
-        api_client.force_authenticate(user=usuario_dat)
-        response = api_client.get("/api/compras/")
-        assert response.status_code == status.HTTP_200_OK
-        assert len(response.data["results"]) == 1
-
-    def test_controle_can_list_compras(self, api_client, usuario_controle, compra_sample):
-        """Controle pode listar compras (read-only)"""
-        api_client.force_authenticate(user=usuario_controle)
-        response = api_client.get("/api/compras/")
-        assert response.status_code == status.HTTP_200_OK
-        assert len(response.data["results"]) == 1
-
-    def test_dat_can_create_compra(self, api_client, usuario_dat, municipio_sample, projeto_sample):
-        """DAT pode criar compra"""
-        api_client.force_authenticate(user=usuario_dat)
-        payload = {
-            "codigo": "COMP-002",
-            "projeto": projeto_sample.id,
-            "municipio": municipio_sample.id,
-            "quantidade": 20,
-            "data": "2025-02-01",
-            "uso": "Formação continuada",
-            "external_hash": "xyz789abc",
-        }
-        response = api_client.post("/api/compras/", payload, format="json")
-        assert response.status_code == status.HTTP_201_CREATED
-        assert Compra.objects.filter(codigo="COMP-002").exists()
-
-    def test_controle_can_create_compra(self, api_client, usuario_controle, municipio_sample, projeto_sample):
-        """Issue #1222 (Epic 1): Controle agora pode criar compras
-        (`manage_purchases_and_materials` foi atribuído a DAT + Controle)."""
-        api_client.force_authenticate(user=usuario_controle)
-        payload = {
-            "codigo": "COMP-003",
-            "projeto": projeto_sample.id,
-            "municipio": municipio_sample.id,
-            "quantidade": 5,
-            "data": "2025-02-01",
-            "uso": "Formação continuada",
-            "external_hash": "hash_controle_create_001",
-        }
-        response = api_client.post("/api/compras/", payload, format="json")
-        assert response.status_code == status.HTTP_201_CREATED
-
-    def test_formador_cannot_access_compras(self, api_client, usuario_formador, compra_sample):
-        """Formador NÃO pode acessar compras"""
-        api_client.force_authenticate(user=usuario_formador)
-        response = api_client.get("/api/compras/")
-        assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    def test_filter_compras_by_projeto(self, api_client, usuario_dat, compra_sample, municipio_sample, db):
-        """Filtrar compras por projeto"""
-        projeto2 = ProjetoFactory(nome="Ciências")
-        Compra.objects.create(
-            codigo="COMP-004",
-            projeto=projeto2,
-            municipio=municipio_sample,
-            quantidade=15,
-            data=date(2025, 3, 1),
-            external_hash="hash456",
-        )
-        api_client.force_authenticate(user=usuario_dat)
-        response = api_client.get(f"/api/compras/?projeto={compra_sample.projeto.id}")
-        assert response.status_code == status.HTTP_200_OK
-        assert len(response.data["results"]) == 1
-
-    def test_search_compras_by_codigo(self, api_client, usuario_dat, compra_sample):
-        """Buscar compras por código"""
-        api_client.force_authenticate(user=usuario_dat)
-        response = api_client.get("/api/compras/?search=COMP-001")
-        assert response.status_code == status.HTTP_200_OK
-        assert len(response.data["results"]) == 1
-
-    def test_compra_quantidade_validation(self, api_client, usuario_dat, municipio_sample, projeto_sample):
-        """Validação: quantidade não pode ser negativa"""
-        api_client.force_authenticate(user=usuario_dat)
-        payload = {
-            "codigo": "COMP-005",
-            "projeto": projeto_sample.id,
-            "municipio": municipio_sample.id,
-            "quantidade": -5,
-            "data": "2025-02-01",
-            "external_hash": "hash789",
-        }
-        response = api_client.post("/api/compras/", payload, format="json")
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "quantidade" in str(response.data).lower()
 
 
 # ==========================

@@ -58,8 +58,6 @@ MATRIX_ENDPOINT_COVERAGE: dict[str, list[str]] = {
     # import_pela_tela cobre os endpoints de upload de planilha (mesmo gate
     # `SuperuserOnly`, 2026-10-02); um a um em test_imports_pela_tela_so_superusuario.py.
     "import_pela_tela": [
-        "/api/controle/import-compras/",
-        "/api/import-compras/",
         "/api/controle/import-acoes/",
         "/api/dat/import-cadastros/",
         "/api/disponibilidade/import-bloqueios/",
@@ -116,7 +114,6 @@ RBAC_MATRIX_EXEMPT_PREFIXES: dict[str, str] = {
     "/api/municipios/import/": "Import síncrono — cobertura própria",
     "/api/usuarios/import/": "Import síncrono — cobertura própria",
     "/api/dat/import-cadastros/": "Import síncrono — cobertura própria",
-    "/api/import-compras/": "Alias legado de import compras",
     "/api/solicitacoes/import/": "Import síncrono — cobertura própria",
     # ── ASQ-005 async ────────────────────────────────────────────────────
     "/api/imports/": "ASQ-005 async (regime separado #778)",
@@ -140,7 +137,6 @@ RBAC_MATRIX_EXEMPT_PREFIXES: dict[str, str] = {
     "/api/municipios/": "Admin DAT registry — cobertura via test_admin_api.py",
     "/api/projetos/": "Admin DAT registry — cobertura via test_admin_api.py + test_pr7_projeto_fluxo_required.py",
     "/api/projetos-gerais/": "Admin DAT registry — cobertura via tests específicos",
-    "/api/compras/": "Compras CRUD — cobertura via test_admin_api.py",
     "/api/usuarios-admin/": "Admin Usuários — cobertura via tests específicos",
     "/api/grupos/": "Admin Groups — cobertura via tests específicos",
     "/api/permissoes-funcionais/": "Admin Permissions — cobertura via tests específicos",

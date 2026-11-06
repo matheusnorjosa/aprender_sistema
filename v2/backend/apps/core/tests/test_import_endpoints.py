@@ -33,24 +33,6 @@ def _file(bytes_: bytes, name="sample.csv"):
     return f
 
 
-def test_import_compras_com_superusuario():
-    """Import de COMPRAS pela tela: superusuário."""
-    user = UsuarioFactory(superuser=True)
-    client = APIClient()
-    client.force_authenticate(user=user)
-
-    csv_data = b"codigo,produto,quant,municipio,uf,data,uso\nC1,X,10,Acarape,CE,2025-01-01,Formacao\n"
-
-    r = client.post(
-        "/api/controle/import-compras/?dry_run=true",
-        {"file": _file(csv_data)},
-        format="multipart",
-    )
-
-    assert r.status_code == 200
-    assert r.json()["dry_run"] is True
-
-
 def test_import_acoes_com_superusuario():
     """PR-A1 DAT-Imports: import de AÇÕES requer grupo DAT."""
     user = UsuarioFactory(superuser=True)
@@ -155,7 +137,7 @@ def test_trailing_slash_in_import_endpoints():
 
     # Com trailing slash (correto)
     r1 = client.post(
-        "/api/controle/import-compras/?dry_run=true",
+        "/api/controle/import-acoes/?dry_run=true",
         {"file": _file(csv_data)},
         format="multipart",
     )
@@ -165,7 +147,7 @@ def test_trailing_slash_in_import_endpoints():
 
     # Sem trailing slash (deve redirecionar ou funcionar via APPEND_SLASH)
     r2 = client.post(
-        "/api/controle/import-compras?dry_run=true",
+        "/api/controle/import-acoes?dry_run=true",
         {"file": _file(csv_data)},
         format="multipart",
     )

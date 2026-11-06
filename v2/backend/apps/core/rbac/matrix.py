@@ -155,10 +155,10 @@ RESOURCES: Final[tuple[ResourceCase, ...]] = (
     ResourceCase("produtos_list", "GET", "/api/produtos/"),
     # UsuarioLookup (PR 5 #1310): cap-gated, sem hardcode de grupos.
     ResourceCase("usuario_lookup", "GET", "/api/lookup/usuarios/"),
-    # Upload de planilha (2026-10-02): import-compras representa as 13 rotas (12 endpoints + 1 alias) de
-    # import pela tela (mesmo gate `SuperuserOnly`); cada um tem cobertura em
-    # test_imports_pela_tela_so_superusuario.py.
-    ResourceCase("import_pela_tela", "POST", "/api/controle/import-compras/"),
+    # Upload de planilha (2026-10-02): import-acoes representa as 10 rotas de import pela tela (mesmo
+    # gate `SuperuserOnly`); cada uma tem cobertura em test_imports_pela_tela_so_superusuario.py. Até
+    # 06/11/2026 o representante era import-compras, que saiu com a lista antiga de compras (G29).
+    ResourceCase("import_pela_tela", "POST", "/api/controle/import-acoes/"),
     # Escrita em gerências (decisão do dono, 19/10/2026): POST representa create/update/partial_update/
     # destroy (mesmo gate em `GerenciaViewSet.get_permissions`); método a método em
     # test_gerencias_escrita_so_dat.py. Corpo vazio: o gate aprova e o serializer responde 400.

@@ -148,27 +148,3 @@ class TestEventosExternalHashEquivalence:
         legacy = _legacy_sha1("|".join(["7", "3", "5", "2026-05-16", "08:00", "12:30", "Fundamental I"]))
 
         assert digest == legacy
-
-
-class TestSha1StrWrapperEquivalence:
-    """
-    ``apps.core.services.controle_imports.sha1_str`` is migrated to a thin
-    wrapper around ``stable_import_hash``. This test pins byte-equivalence
-    so historical ``Compra.external_hash`` values stay valid.
-    """
-
-    @pytest.mark.parametrize(
-        "value",
-        [
-            "",
-            "a",
-            "a|b|c",
-            "1|2|3|São Paulo|SP",
-            "x" * 1000,
-        ],
-    )
-    def test_sha1_str_matches_stable_import_hash_single_arg(self, value):
-        from apps.core.services.controle_imports import sha1_str
-
-        assert sha1_str(value) == stable_import_hash(value)
-        assert sha1_str(value) == _legacy_sha1(value)

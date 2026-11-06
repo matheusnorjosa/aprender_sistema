@@ -242,63 +242,6 @@ def test_endpoint_solicitacoes_list_requires_authentication(run_seed_rbac):
     assert res.status_code == 403, "Endpoints de solicitações devem requerer autenticação"
 
 
-def test_endpoint_import_compras_dat_forbidden(run_seed_rbac):
-    """Import pela tela é só do superusuário (02/10/2026): DAT com `import_spreadsheet` recebe 403."""
-    user = UsuarioFactory(username="dat1", email="dat@x.com", password="x", cpf="66666666666")
-    dat = Group.objects.get(name="DAT")
-    PermissaoFuncional.objects.get(codename="import_spreadsheet").groups.add(dat)
-    user.groups.add(dat)
-
-    client = APIClient()
-    client.force_authenticate(user=user)
-
-    url = reverse("core:import-compras")
-    res = client.post(url, {})
-
-    assert res.status_code == 403
-
-
-def test_endpoint_import_compras_controle_forbidden(run_seed_rbac):
-    """PR-A1 DAT-Imports (2026-04-29): Controle perde import em massa de compras.
-
-    Mesmo que Controle receba via seed_rbac as caps `run_daily_operations` e
-    `manage_purchases_and_materials`, o gate atual é `import_spreadsheet`
-    (DAT-only) — Controle continua 403.
-    """
-    user = UsuarioFactory(username="controle1", email="controle@x.com", password="x", cpf="55555555555")
-    controle = Group.objects.get(name="Controle")
-    # Reatribuir caps que Controle teria por seed em produção (já que
-    # seed_rbac.py usa assign_default_groups=False).
-    PermissaoFuncional.objects.get(codename="run_daily_operations").groups.add(controle)
-    PermissaoFuncional.objects.get(codename="manage_purchases_and_materials").groups.add(controle)
-    user.groups.add(controle)
-
-    client = APIClient()
-    client.force_authenticate(user=user)
-
-    url = reverse("core:import-compras")
-    res = client.post(url, {})
-
-    assert res.status_code == 403, f"Controle deve receber 403 em POST {url}: {res.status_code}"
-
-
-def test_endpoint_import_compras_coordenador_forbidden(run_seed_rbac):
-    """Coordenador NÃO tem acesso ao endpoint de import compras."""
-    user = UsuarioFactory(username="coord1", email="coord@x.com", password="x", cpf="77777777777")
-    coord = Group.objects.get(name="Coordenador")
-    user.groups.add(coord)
-
-    client = APIClient()
-    client.force_authenticate(user=user)
-
-    # POST /api/import/compras/
-    url = reverse("core:import-compras")
-    res = client.post(url, {})
-
-    # 403 esperado
-    assert res.status_code == 403, "Coordenador não deve ter acesso a import compras"
-
-
 def test_superuser_bypasses_all_permissions(run_seed_rbac):
     """Superuser sempre tem acesso, independente de grupos."""
     user = UsuarioFactory(superuser=True)

@@ -1,8 +1,8 @@
 """
 Hardening: ``safe_temp_upload_file`` neutraliza path-injection via ``upload.name``.
 
-Cobre CodeQL py/path-injection (CWE-022/023/036/073/099) nos 11 endpoints de
-import (``views_import_*.py`` + ``views_imports.py`` + ``views_controle_imports.py``).
+Cobre CodeQL py/path-injection (CWE-022/023/036/073/099) nos endpoints de
+import (``views_import_*.py`` + ``views_imports.py``).
 
 A correção move o ``suffix`` de ``os.path.splitext(upload.name)`` direto para
 ``NamedTemporaryFile`` (vulnerável a path traversal via nome do upload) para

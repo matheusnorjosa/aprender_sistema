@@ -74,12 +74,6 @@ class TestViewsBackwardsCompatibility:
 
         assert GerenciaViewSet is not None
 
-    def test_compra_viewset_importable_from_legacy(self):
-        """CompraViewSet should be importable from views (facade)."""
-        from apps.core.views import CompraViewSet
-
-        assert CompraViewSet is not None
-
     def test_usuario_admin_viewset_importable_from_legacy(self):
         """UsuarioAdminViewSet should be importable from views (facade)."""
         from apps.core.views import UsuarioAdminViewSet
@@ -143,7 +137,6 @@ class TestViewsPackageDirectImports:
         """Admin module should be importable."""
         from apps.core.views.admin import (
             AuditLogViewSet,
-            CompraViewSet,
             GerenciaViewSet,
             GroupViewSet,
             MunicipioViewSet,
@@ -156,7 +149,6 @@ class TestViewsPackageDirectImports:
         assert ProjetoViewSet is not None
         assert ProdutoViewSet is not None
         assert GerenciaViewSet is not None
-        assert CompraViewSet is not None
         assert UsuarioAdminViewSet is not None
         assert GroupViewSet is not None
         assert AuditLogViewSet is not None

@@ -281,7 +281,6 @@ class TestOpenAPISchema(TestCase):
         schema = response.json()
 
         import_paths = [
-            "/api/controle/import-compras/",
             "/api/controle/import-acoes/",
             "/api/dat/import-cadastros/",
             "/api/disponibilidade/import-bloqueios/",

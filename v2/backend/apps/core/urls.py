@@ -23,7 +23,6 @@ from .views import (  # ASQ-005: async imports; DAT Module ViewSets; Plano Forma
     AcaoInstanciaViewSet,
     AuditLogViewSet,
     CicloAcoesViewSet,
-    CompraViewSet,
     DATAcaoViewSet,
     DATAreaViewSet,
     DATCadastroViewSet,
@@ -45,10 +44,8 @@ from .views_auth import csrf_token, login, logout, ping
 from .views_availability import AvailabilityBlockViewSet, AvailabilityCheckManyView, AvailabilityCheckView
 from .views_availability_monthly import MonthlyAvailabilityView
 from .views_basic import CurrentUserView, api_root
-from .views_compras import ControleComprasListView
 from .views_config import config_view  # Issue #187
 from .views_controle_dat import DATAcoesListCreateView
-from .views_controle_imports import ImportComprasView
 from .views_dashboard import dashboard_overview  # Issue #311
 from .views_deslocamento import DeslocamentoViewSet  # Issue #188
 from .views_gcal import AlertsSummaryView  # Issue #97
@@ -124,7 +121,6 @@ router.register(r"municipios", MunicipioViewSet, basename="municipio")
 router.register(r"projetos", ProjetoViewSet, basename="projeto")
 router.register(r"produtos", ProdutoViewSet, basename="produto")  # Issue #146
 router.register(r"gerencias", GerenciaViewSet, basename="gerencia")  # Issue #145
-router.register(r"compras", CompraViewSet, basename="compra")
 router.register(
     r"usuarios-admin", UsuarioAdminViewSet, basename="usuario-admin"
 )  # Reativado (Fase 1 Iteração 2, GAP-001)
@@ -194,25 +190,9 @@ urlpatterns = [
         name="availability-monthly",
     ),
     path(
-        "controle/import-compras/",
-        ImportComprasView.as_view(),
-        name="controle-import-compras",
-    ),
-    # Alias for RBAC tests
-    path(
-        "import-compras/",
-        ImportComprasView.as_view(),
-        name="import-compras",
-    ),
-    path(
         "controle/import-acoes/",
         ControleImportAcoesView.as_view(),
         name="controle-import-acoes",
-    ),
-    path(
-        "controle/compras/",
-        ControleComprasListView.as_view(),
-        name="controle-compras-list",
     ),
     path(
         "dat/import-cadastros/",

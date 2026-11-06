@@ -20,7 +20,7 @@ Match the FIRST rule that applies:
 | New feature, "add", "create", "implement" | `/create-feature` |
 | Code review, "review this", PR review | `/review-enhanced` |
 | Testing, "write tests", "test this" | `test-driven-development` skill + `/test-coverage` |
-| Import, data migration (ETL legado REMOVIDO) | `import_export_contract` (dry-run default, `--apply` exige allowlist) ou `make import-compras-dry`/`import-acoes-dry`/`import-cadastros-dry` / endpoints DRF — ver `v2/docs/specs/backend/imports.spec.md` |
+| Import, data migration (ETL legado REMOVIDO) | `import_export_contract` (dry-run default, `--apply` exige allowlist) ou `make import-acoes-dry`/`import-cadastros-dry` / endpoints DRF — ver `v2/docs/specs/backend/imports.spec.md` |
 | Deploy, staging, production | `/deploy-staging` |
 | Approval flow validation | `/approve-flow` |
 | Availability/conflict rules | `/check-conflicts` |

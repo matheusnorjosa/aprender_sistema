@@ -25,7 +25,6 @@ class TestSerializersBackwardsCompatibility:
             AuditLogSerializer,
             AuditLogTimelineSerializer,
             AvailabilityBlockSerializer,
-            CompraSerializer,
             ConfigSerializer,
             CurrentUserSerializer,
             DeslocamentoSerializer,
@@ -66,8 +65,6 @@ class TestSerializersBackwardsCompatibility:
         assert EventDetailSerializer is not None
         # Agenda
         assert AvailabilityBlockSerializer is not None
-        # Compra
-        assert CompraSerializer is not None
         # Workflow
         assert AcaoDATSerializer is not None
         assert AcaoDATCreateSerializer is not None
@@ -132,12 +129,6 @@ class TestSerializersBackwardsCompatibility:
         from apps.core.serializers.agenda import AvailabilityBlockSerializer
 
         assert AvailabilityBlockSerializer is not None
-
-    def test_direct_import_compra(self) -> None:
-        """Import direto: from apps.core.serializers.compra import X"""
-        from apps.core.serializers.compra import CompraSerializer
-
-        assert CompraSerializer is not None
 
     def test_direct_import_workflow(self) -> None:
         """Import direto: from apps.core.serializers.workflow import X"""

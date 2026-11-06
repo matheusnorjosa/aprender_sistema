@@ -1362,10 +1362,6 @@ class TestTelas:
             is False
         )
 
-    def test_dat_lista_controle_compras(self, g19):
-        """`/controle/compras/` pede `run_daily_operations`, que vem do pacote final."""
-        assert _client(_dat(g19, grupo=False)).get("/api/controle/compras/").status_code == 200
-
     def test_dat_exclui_solicitacao_alheia(self, g19, g1):
         """Pendente SUPER nunca aprovada sai (204); a já aprovada não (400, adendo da PA-04)."""
         dat = _dat(g19)

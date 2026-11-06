@@ -11,7 +11,6 @@ from __future__ import annotations
 from apps.core.views.acoes_notificacao import AcaoInstanciaViewSet, CicloAcoesViewSet, NotificacaoInternaViewSet
 from apps.core.views.admin import (
     AuditLogViewSet,
-    CompraViewSet,
     GerenciaViewSet,
     GroupViewSet,
     MunicipioViewSet,
@@ -58,7 +57,6 @@ __all__ = [
     "ProjetoViewSet",
     "ProdutoViewSet",
     "GerenciaViewSet",
-    "CompraViewSet",
     "UsuarioAdminViewSet",
     "GroupViewSet",
     "PermissaoFuncionalViewSet",

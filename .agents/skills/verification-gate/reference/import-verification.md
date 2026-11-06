@@ -2,13 +2,13 @@
 
 ETL legado (`apps.dat_ingest`) foi REMOVIDO. Import atual:
 - `import_export_contract` (mgmt command) — **dry-run por padrão**; escreve só com `--apply` **e** `--allow-entity` (sem allowlist, `--apply` é bloqueado e nada é escrito).
-- targets `make` / endpoints DRF (ex.: `make import-compras-dry FILE=...`).
+- targets `make` / endpoints DRF (ex.: `make import-acoes-dry FILE=...`).
 
 ## 1. Dry-run sem erros
 
 ```bash
 # target make (dry-run; nunca grava)
-make import-compras-dry FILE=...
+make import-acoes-dry FILE=...
 
 # pipeline export-contract (sem --apply = dry-run por padrão; --path é obrigatório)
 docker exec aprender_dev-web-1 python manage.py import_export_contract --path /caminho/export-contract

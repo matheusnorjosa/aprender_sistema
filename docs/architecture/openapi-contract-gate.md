@@ -31,7 +31,6 @@ Evitar regressão silenciosa de schema (`No response body` ou respostas genéric
   - `GET /api/options/areas/`
   - `GET /api/options/formadores-do-setor/`
 - Import operations (frontend):
-  - `POST /api/controle/import-compras/`
   - `POST /api/controle/import-acoes/`
   - `POST /api/dat/import-cadastros/`
   - `POST /api/disponibilidade/import-bloqueios/`

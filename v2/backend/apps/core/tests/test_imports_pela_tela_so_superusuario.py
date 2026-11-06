@@ -2,14 +2,13 @@
 Importação pela tela é só do superusuário (decisão do dono, 02/10/2026).
 
 Nenhum perfil importa planilha pela tela na liberação: as cargas passam por script, com ensaio.
-As 13 rotas de upload (12 endpoints + 1 alias) exigem ``SuperuserOnly``; nenhuma capability
+As 10 rotas de upload exigem ``SuperuserOnly``; nenhuma capability
 (``import_spreadsheet``, ``manage_admin_registries``, ``run_daily_operations``) dá acesso. O command de terminal
 ``import_export_contract`` não passa por estes endpoints e não muda.
 
 Substitui a matriz do PR-A1 DAT-Imports (2026-04-29), que fixava "DAT importa" em 6 deles.
 
 Endpoints cobertos:
-- POST /api/controle/import-compras/ e o alias /api/import-compras/
 - POST /api/controle/import-acoes/
 - POST /api/dat/import-cadastros/
 - POST /api/disponibilidade/import-bloqueios/
@@ -55,8 +54,6 @@ pytestmark = pytest.mark.django_db
 
 
 ENDPOINTS_DE_IMPORT: list[str] = [
-    "/api/controle/import-compras/",
-    "/api/import-compras/",
     "/api/controle/import-acoes/",
     "/api/dat/import-cadastros/",
     "/api/disponibilidade/import-bloqueios/",

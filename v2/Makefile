@@ -12,7 +12,7 @@ DC = COMPOSE_PROJECT_NAME=$(PROJECT) IMAGE_TAG=$(IMAGE_TAG) docker compose -f in
 WEB = $(DC) exec -T web
 
 .PHONY: up down build logs shell migrate collect seed seed-demo seed-rbac \
-        import-compras-dry import-acoes-dry import-cadastros-dry \
+        import-acoes-dry import-cadastros-dry \
         solic-pend-super solic-approve solic-reject \
         readyz healthz preview-json apply-json flags-fake flags-google preview-on preview-off \
         ban-v1 up-worker up-beat logs-worker logs-beat logs-worker-last logs-beat-last \
@@ -52,19 +52,6 @@ seed-rbac:
 # ════════════════════════════════════════════════════════════════════════════
 # API HTTP Imports (via curl - requer autenticação)
 # ════════════════════════════════════════════════════════════════════════════
-
-import-compras-dry:
-	@echo "⚙️  Uso: make import-compras-dry FILE=/path/to/compras.csv"
-	@if [ -z "$(FILE)" ]; then \
-		echo "❌ Erro: Variável FILE não definida"; \
-		echo "   Exemplo: make import-compras-dry FILE=./data/compras.csv"; \
-		exit 1; \
-	fi
-	@echo "📤 POST /api/controle/import-compras/?dry_run=true"
-	curl -X POST "http://localhost:8002/api/controle/import-compras/?dry_run=true" \
-		-H "Content-Type: multipart/form-data" \
-		-F "file=@$(FILE)" \
-		-b cookies.txt -c cookies.txt || true
 
 import-acoes-dry:
 	@echo "⚙️  Uso: make import-acoes-dry FILE=/path/to/acoes.csv"
@@ -219,7 +206,6 @@ help:
 	@echo "  make seed-rbac             Seed RBAC groups/permissions (idempotent)"
 	@echo ""
 	@echo "Import via API HTTP (porta 8002, trailing slashes):"
-	@echo "  make import-compras-dry    POST /api/controle/import-compras/ (use FILE=...)"
 	@echo "  make import-acoes-dry      POST /api/controle/import-acoes/ (use FILE=...)"
 	@echo "  make import-cadastros-dry  POST /api/dat/import-cadastros/ (use FILE=...)"
 	@echo "  Nota: Relatórios salvos em out_etl/"

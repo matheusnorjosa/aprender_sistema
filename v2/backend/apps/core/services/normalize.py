@@ -4,7 +4,7 @@ Compat re-export wrapper for ``apps.core.imports``.
 Implementations moved to the canonical namespace ``apps.core.imports.*`` in
 PR for issue #1349 (after backfilling equivalence tests in #1350). This
 module remains so existing imports keep working without code changes in
-the callers (``controle_imports``, ``controle_acoes_import``,
+the callers (``controle_acoes_import``,
 ``dat_cadastros_import``, ``views_lookup``).
 
 Future cleanup: callers can migrate to ``apps.core.imports.*`` directly,

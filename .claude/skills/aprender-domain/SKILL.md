@@ -57,7 +57,7 @@ Testes: `apps/core/tests/test_approval_policy_PA.py`.
 
 SSOT: `v2/docs/specs/domain/requisitos-funcionais.spec.md`.
 
-- **RF01 — Import de dados**: ETL legado (`apps.dat_ingest`) REMOVIDO. Import atual = command `import_export_contract` (dry-run por padrão; `--apply` exige allowlist) + endpoints DRF (`POST /api/controle/import-compras/`, `/api/controle/import-acoes/`, `/api/dat/import-cadastros/`). Idempotência via `external_hash` (SHA1/SHA256). Spec: `v2/docs/specs/backend/imports.spec.md`.
+- **RF01 — Import de dados**: ETL legado (`apps.dat_ingest`) REMOVIDO. Import atual = command `import_export_contract` (dry-run por padrão; `--apply` exige allowlist) + endpoints DRF (`POST /api/controle/import-acoes/`, `/api/dat/import-cadastros/`). Idempotência via `external_hash` (SHA1/SHA256). Spec: `v2/docs/specs/backend/imports.spec.md`.
 - **RF02 — Solicitação de evento**: página única (`NewSolicitacaoWizard.tsx`, desde 28/10/2026). Cada evento é um cartão (`CartaoEvento`); no cartão, "+ horário" acrescenta um horário, e cada horário vira mais um evento do lote, até 10 (`MAX_EVENTOS`). O envio é sempre o lote (`createSolicitacoesEmLote` → `POST /api/solicitacoes/lote/`, tudo ou nada). O servidor confere conflitos (RF03) e a regra da compra: NAO_SUPER auto-aprova, salvo par sem compra criado por quem não é isento; esse caso e o SUPER ficam pendentes (PA-01..PA-07).
 - **RF03 — Verificação de conflitos**: `availability_service.py:check_conflicts()` retorna `AvailabilityResult` com lista de `ConflictDetail` (regras RD-01..RD-08). Endpoints `GET /api/availability/check/` e `POST /api/availability/check-many/`. Frontend `pages/Solicitacoes/NewSolicitacaoWizard.tsx` com feedback visual por tipo: X/T/P/D bloqueiam (alerta vermelho, botão desabilitado); o M (aviso azul) não é mais emitido desde 05/10/2026.
 - **RF04 — Fluxo de aprovação**: política PA acima. `PATCH /api/solicitacoes/{id}/approve/` (AuditLog APPROVE) e `PATCH .../reject/` (REJECT). Frontend `ApprovalsPage.tsx`.
@@ -97,7 +97,7 @@ pytest apps/core/tests/test_gcal*.py -v
 docker compose exec web python manage.py import_export_contract --path <dir_do_export>
 
 # Imports via API DRF (dry-run)
-make import-compras-dry FILE=...
+make import-acoes-dry FILE=...
 make import-acoes-dry FILE=...
 make import-cadastros-dry FILE=...
 ```

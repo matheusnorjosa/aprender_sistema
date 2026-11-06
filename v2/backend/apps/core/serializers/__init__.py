@@ -18,7 +18,6 @@ from apps.core.serializers.acoes_notificacao import (
 )
 from apps.core.serializers.agenda import AvailabilityBlockSerializer
 from apps.core.serializers.auditoria import AuditLogSerializer
-from apps.core.serializers.compra import CompraSerializer
 from apps.core.serializers.config import ConfigSerializer
 from apps.core.serializers.dat_module import (
     DATAcaoListSerializer,
@@ -116,8 +115,6 @@ __all__ = [
     "EventDetailSerializer",
     # Agenda
     "AvailabilityBlockSerializer",
-    # Compra
-    "CompraSerializer",
     # Workflow
     "AcaoDATSerializer",
     "AcaoDATCreateSerializer",

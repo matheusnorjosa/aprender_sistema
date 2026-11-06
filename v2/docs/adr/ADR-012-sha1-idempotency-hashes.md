@@ -171,7 +171,7 @@ Project policy:
 
 | Alert | Path                                              | PR     | Justification (summarized) |
 | ----- | ------------------------------------------------- | ------ | -------------------------- |
-| #20   | `services/controle_imports.py:46` `sha1_str`       | #1342  | `Compra.external_hash` idempotency |
+| #20   | `services/controle_imports.py:46` `sha1_str` (módulo removido em 06/11/2026, G29) | #1342  | `Compra.external_hash` idempotency |
 | #21   | `services/gcal/utils.py:170` `_payload_hash`       | #1342  | GCal payload stable hash |
 | #26   | `services/normalize.py:406` `hash_event_v2`        | #1350  | Acompanhamento ETL idempotency |
 | #27   | `imports/hashing.py:186` `hash_event_v2` (moved)   | #1353  | Same as #26 after migration |

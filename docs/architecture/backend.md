@@ -74,30 +74,16 @@ grupos (`user.groups.filter(name=...)`) é **banida** pelo `scripts/rbac_lint.py
 
 ## Fronteira de Domínio de Compras
 
-O sistema possui dois domínios distintos de compras e eles não devem ser confundidos:
+A lista de compras é `core_dat_compra` (`DATCompra`, endpoint `/api/dat/compras-materiais/`): a regra da
+compra (`services/compra_elegibilidade.py`), as pendências, o dashboard e o Mapa leem só ela.
 
-- `core_compra` (`core_compra` table, endpoint `/api/controle/compras/`)
-- `core_dat_compra` (`core_dat_compra` table, endpoint `/api/dat/compras-materiais/`)
+- leitura/escrita: DAT e Controle, pelo pacote do perfil da gerência (`CanViewComprasStats` no `DATCompraViewSet`, `views/dat_module.py`); excluir exige `execute_restricted_operations` (DAT). A Superintendência não tem acesso. Gates por endpoint: tabela do `v2/docs/API_REFERENCE.md`.
+- contrato: `quantidade`, `quantidade_utilizada`, `valor_unitario` etc.
 
-### Política oficial (fonte de verdade)
-
-- Elegibilidade de solicitação (município + projeto) usa **somente** `core_compra`.
-- Operação DAT de materiais/estoque usa **somente** `core_dat_compra`.
-- Dashboard de compras DAT usa `core_dat_compra`.
-- Importação de compras de controle (planilha de compras que libera solicitação) alimenta `core_compra`.
-
-### Leitura e escrita por caso de uso
-
-- `core_compra`
-  - leitura: Controle e DAT, pelo pacote do perfil da gerência (`/api/controle/compras/` exige `run_daily_operations`; ver `views_compras.py`)
-  - escrita: pipelines/importações de controle (`services/controle_imports.py`)
-- `core_dat_compra`
-  - leitura/escrita: DAT e Controle, pelo pacote do perfil da gerência (`CanViewComprasStats` no `DATCompraViewSet`, `views/dat_module.py`); excluir exige `execute_restricted_operations` (DAT). A Superintendência não tem acesso a nenhum dos dois. Gates por endpoint: tabela do `v2/docs/API_REFERENCE.md`
-
-### Contratos mínimos
-
-- `/api/controle/compras/` retorna `quantidade` (não `valor`).
-- `/api/dat/compras-materiais/` retorna contrato DAT (`quantidade`, `quantidade_utilizada`, `valor_unitario`, etc.).
+A lista antiga `core_compra` (`Compra`) saiu de uso em 06/11/2026 (G29, etapa 1): nenhuma rota a lê nem
+a grava (`/api/compras/`, `/api/controle/compras/` e `/api/controle/import-compras/` respondem 404) e o
+Django admin só a consulta. A tabela fica até a etapa 2, depois de backup e OK do dono. Ver
+`v2/docs/specs/backend/imports.spec.md`.
 
 ## Services
 
@@ -108,7 +94,6 @@ A lógica de negócio está isolada em `apps/core/services/` (~50 módulos). Os 
 - `gcal_sync_service.py` + `gcal_*_client.py`: integração Google Calendar (fake/google/oauth)
 - `export_contract_importer.py` e os `*_import.py`: pipeline de importação
 - `monthly_grid_service.py`: grade mensal de disponibilidade
-- `controle_imports.py`: importação de compras de controle (`core_compra`)
 
 ## Type Hints
 

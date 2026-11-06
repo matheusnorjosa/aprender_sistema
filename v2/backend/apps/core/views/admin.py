@@ -27,7 +27,6 @@ from drf_spectacular.utils import extend_schema
 from apps.core.constants import RESERVED_GROUPS, SETOR_GROUPS, SETORES_PRODUTO
 from apps.core.models import (
     AuditLog,
-    Compra,
     Gerencia,
     GroupClassificacao,
     Municipio,
@@ -42,7 +41,6 @@ from apps.core.permissions import HasPerm, SuperuserOnly
 from apps.core.rbac.policies import CanAccessAuditLogs, can_admin_mutate_target, resolve_public_policies
 from apps.core.serializers import (
     AuditLogSerializer,
-    CompraSerializer,
     GerenciaSerializer,
     GroupSerializer,
     MunicipioSerializer,
@@ -302,42 +300,6 @@ class GerenciaViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
         if self.action in ["create", "update", "partial_update", "destroy"]:
             return [IsAuthenticated(), HasPerm("manage_admin_registries")()]
         return [IsAuthenticated()]
-
-
-class CompraViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet para CRUD de Compras.
-
-    Permissões:
-    - DAT: CRUD completo
-    - Controle: read-only + import via endpoint separado
-
-    Filtros disponíveis:
-    - projeto: FK (ID do projeto)
-    - municipio: FK (ID do município)
-    - search: busca textual em codigo, uso
-    - ordering: data, codigo, id
-    """
-
-    queryset = Compra.objects.select_related("projeto", "municipio").all()
-    serializer_class = CompraSerializer
-
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ["projeto", "municipio"]
-    search_fields = ["codigo", "uso", "municipio__nome", "projeto__nome"]
-    ordering_fields = ["data", "codigo", "id"]
-    ordering = ["-data"]
-
-    def get_permissions(self):
-        """
-        DAT: full CRUD
-        Controle: apenas leitura (list, retrieve)
-        """
-        # Issue #1222 (Epic 1): list/retrieve aberto pra DAT (manage_purchases)
-        # ou Controle (operate_preagenda); CUD restrito a quem gerencia compras.
-        if self.action in ["list", "retrieve"]:
-            return [(HasPerm("manage_purchases_and_materials") | HasPerm("operate_preagenda"))()]
-        return [HasPerm("manage_purchases_and_materials")()]
 
 
 class UsuarioAdminViewSet(viewsets.ModelViewSet):

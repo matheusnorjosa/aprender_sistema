@@ -11,7 +11,8 @@ Princípios de segurança:
 - **modo `virada`** (carga única, plano de 16/10/2026): o evento existente que ninguém mexeu pela tela
   recebe projeto (só pela disciplina), data e hora, formadores e status da planilha; a exceção ao campo
   protegido é só cancelado → reprovado e a reaprovação (SUPER aprovado com mudança material → pendente).
-  Nunca aprova e nunca chama o Google. A adoção do Event ID (`gcal_adocao`) roda à parte, depois do A5.
+  Nunca aprova e nunca chama o Google. A adoção do Event ID (`gcal_adocao`) roda à parte, depois do A5,
+  e só grava o id que o `conferir_gcal_adocao` conferiu no Google (decisão D63).
 
 Primeira fatia implementada (master, baixo risco): `dat_area`, `municipio`, `projeto_geral`.
 Demais entidades → `not_implemented` (contagem reportada, sem processamento).
@@ -29,7 +30,7 @@ import os
 import re
 import unicodedata
 from collections.abc import Callable
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -1000,7 +1001,53 @@ _MOTIVOS_NAO_ADOTA = (
     "id_em_outro_evento",
     "tocado_com_diferenca",
     "diverge_da_planilha",
+    # Conferência no Google (`conferir_gcal_adocao`, decisão D63): só com o arquivo `--gcal-verificado`.
+    "sem_conferencia_no_google",
+    "conferencia_com_outro_id",
+    "conferencia_vencida",
+    "conferencia_outra_data",
 )
+
+# Quanto tempo vale a conferência no Google: o bastante para conferir e adotar no mesmo dia; depois disso o
+# evento pode ter sido cancelado ou movido lá, e a conferência tem de rodar de novo.
+GCAL_CONFERENCIA_VALIDADE = timedelta(hours=24)
+
+
+def data_inicio_google(bruto: str) -> date:
+    """Data em America/Fortaleza do início que o Google devolveu: `start.date` (dia inteiro) ou
+    `start.dateTime` com fuso. ValueError se ilegível ou sem fuso (o fuso do servidor não decide o dia)."""
+    try:
+        return date.fromisoformat(bruto)
+    except ValueError:
+        pass
+    dt = datetime.fromisoformat(bruto)
+    if dt.tzinfo is None:
+        raise ValueError("início do Google sem fuso")
+    return dt.astimezone(_FORTALEZA_TZ).date()
+
+
+def _motivo_conferencia(conferido: Any, eid: str, agora: datetime, inicio: datetime) -> str | None:
+    """Por que a conferência no Google (entrada do arquivo do `conferir_gcal_adocao`) não libera a adoção
+    deste id, ou None. Data da conferência ilegível, sem fuso ou fora da janela conta como vencida. O início
+    no Google tem de cair no mesmo dia que o `inicio` do evento lido agora: outra carga pode tê-lo movido
+    depois da conferência. Início ausente, ilegível ou sem fuso também não libera."""
+    if not isinstance(conferido, dict):
+        return "sem_conferencia_no_google"
+    if conferido.get("event_id") != eid:
+        return "conferencia_com_outro_id"
+    try:
+        em = datetime.fromisoformat(str(conferido.get("verificado_em")))
+    except ValueError:
+        return "conferencia_vencida"
+    if em.tzinfo is None or not agora - GCAL_CONFERENCIA_VALIDADE <= em <= agora:
+        return "conferencia_vencida"
+    try:
+        dia_google = data_inicio_google(str(conferido.get("inicio_google") or ""))
+    except ValueError:
+        return "conferencia_outra_data"
+    if dia_google != timezone.localtime(inicio, _FORTALEZA_TZ).date():
+        return "conferencia_outra_data"
+    return None
 
 
 def _marca_da_linha(r: dict[str, str]) -> bool:
@@ -1019,12 +1066,16 @@ class ExportContractImporter:
         apply: bool = False,
         allow: tuple[str, ...] = (),
         actor: Usuario | None = None,
+        gcal_verificado: dict[str, Any] | None = None,
     ) -> None:
         self.path = path
         self.mode = mode
         self.apply = apply
         self.allow = tuple(allow)
         self.actor = actor  # created_by no apply de entidades com auditoria (dat_cadastro/dat_registro)
+        # Arquivo do `conferir_gcal_adocao` ({solicitacao_id: {event_id, verificado_em, ...}}); sem ele a
+        # adoção só classifica.
+        self.gcal_verificado = gcal_verificado
         self._pidx = None
         self._dat_uso_projetos: set[str] | None = None
         # IMP-2: previsão do classify de solicitacao (para o de participation) e o que o apply criou.
@@ -2046,6 +2097,8 @@ class ExportContractImporter:
                     continue
                 if name == "gcal_adocao":
                     if self.mode == "virada":
+                        if self.gcal_verificado is None:
+                            raise ValueError("gcal_adocao só grava com o arquivo do conferir_gcal_adocao (decisão D63)")
                         applied[name] = self._gcal_adocao(escrever=True)["would_adopt_gcal"]
                     continue
                 if name == "usuario":
@@ -3004,15 +3057,37 @@ class ExportContractImporter:
         return True
 
     # ── adoção do Event ID do Google (`gcal_adocao`, depois da carga e do A5) ──
-    def _gcal_adocao(self, *, escrever: bool) -> dict[str, Any]:
+    def candidatos_gcal_adocao(self) -> list[tuple[int, str, datetime]]:
+        """(solicitacao_id, event_id, inicio) que a adoção gravaria hoje, pela mesma regra (dry-run). É o
+        que o `conferir_gcal_adocao` confere no Google, com o importer montado sem `gcal_verificado`."""
+        candidatos: list[tuple[int, str, datetime]] = []
+        self._gcal_adocao(escrever=False, candidatos=candidatos)
+        return candidatos
+
+    def _gcal_adocao(
+        self,
+        *,
+        escrever: bool,
+        candidatos: list[tuple[int, str, datetime]] | None = None,
+    ) -> dict[str, Any]:
         """Classifica (e, com `escrever`, grava) a adoção do Event ID que o sheet2gcal criou, lendo o mesmo
         solicitacao.csv da carga. Só `confianca=alta` (decisão 3 do dono); o resto fica com a marca
         `publicado_fora_do_sistema`, que segura o Publicar. Pode rodar de novo com o mesmo CSV para os
-        eventos aprovados depois: o adotado vira `ja_tem_event_id`. Nunca chama o Google."""
+        eventos aprovados depois: o adotado vira `ja_tem_event_id`. Nunca chama o Google.
+
+        Decisão D63 (20/10): só grava o id que o `conferir_gcal_adocao` achou no Google confirmado e na
+        mesma data, há menos de `GCAL_CONFERENCIA_VALIDADE`. Com o arquivo (`gcal_verificado`), o evento
+        que passa na regra e não bate com ele fica travado: `sem_conferencia_no_google`,
+        `conferencia_com_outro_id`, `conferencia_vencida` ou `conferencia_outra_data` (o início conferido
+        no Google não cai no dia do evento lido na hora da escrita). Sem o arquivo, o dry-run classifica como
+        antes e avisa na `nota`; a escrita sem ele é recusada em `_apply_create_only`."""
         tally: dict[str, Any] = dict.fromkeys(
             ("would_create", "would_update", "would_skip_same", "protected_diff", "would_reject"), 0
         )
+        if self.gcal_verificado is None:
+            tally["nota"] = "a gravação exige --gcal-verificado (arquivo do conferir_gcal_adocao)"
         motivos: dict[str, int] = dict.fromkeys(_MOTIVOS_NAO_ADOTA, 0)
+        agora = timezone.now()
         por_hash = {x.external_hash: x for x in Solicitacao.objects.exclude(external_hash__isnull=True)}
         usados: dict[str, int] = {
             eid: sid
@@ -3052,6 +3127,8 @@ class ExportContractImporter:
                     parts = list(Participation.objects.filter(solicitacao_id=sol.id))
                     logs, admin = logs_idx.get(sol.id, []), sol.id in admin_idx
                 motivo = self._motivo_nao_adota(sol, r, eid, usados, (logs, admin), parts, parts_csv, cpf_idx)
+                if motivo is None and self.gcal_verificado is not None:
+                    motivo = _motivo_conferencia(self.gcal_verificado.get(str(sol.id)), eid, agora, sol.inicio)
             if motivo is not None or sol is None:
                 motivos[motivo or "evento_inexistente"] = motivos.get(motivo or "evento_inexistente", 0) + 1
                 tally["would_skip_same"] += 1
@@ -3059,6 +3136,8 @@ class ExportContractImporter:
             usados[eid] = sol.id
             adotados += 1
             tally["would_update"] += 1
+            if candidatos is not None:
+                candidatos.append((sol.id, eid, sol.inicio))
             if escrever:
                 self._adotar(sol, eid, conf)
         tally["would_adopt_gcal"] = adotados

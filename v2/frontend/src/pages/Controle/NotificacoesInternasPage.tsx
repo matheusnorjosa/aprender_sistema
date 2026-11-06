@@ -1,7 +1,17 @@
+/**
+ * Notificações Internas: lembretes e escalonamentos das ações.
+ *
+ * Sem rolagem horizontal (G30): ResponsiveTable. Sempre na linha o status, o título e as ações
+ * (AcoesLinha: "Marcar lida"; no celular, o menu "Mais ações"); Referência sobe a partir de sm,
+ * Prioridade de md, Fase de lg e Tipo de xxl. A mensagem fica só na linha expandida, como antes.
+ */
 import { useEffect, useState, type JSX } from 'react';
-import { Button, Card, Space, Table, Tag, Typography, message } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { Button, Card, Grid, Space, Tag, Typography, message } from 'antd';
+import { CheckOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
+import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
 
 import { listNotificacoesInternas, marcarNotificacaoLida, marcarTodasNotificacoesLidas } from '../../api/acoesNotificacao';
 import type { NotificacaoInterna } from '../../types/acoesNotificacao';
@@ -35,8 +45,8 @@ const PRIORIDADE_LABELS: Record<string, string> = {
 export default function NotificacoesInternasPage(): JSX.Element {
   const [notifications, setNotifications] = useState<NotificacaoInterna[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [markingId, setMarkingId] = useState<number | null>(null);
   const [markingAll, setMarkingAll] = useState<boolean>(false);
+  const acoesCompactas = !Grid.useBreakpoint().sm;
 
   const loadNotifications = async () => {
     setLoading(true);
@@ -55,15 +65,14 @@ export default function NotificacoesInternasPage(): JSX.Element {
   }, []);
 
   const handleMarkRead = async (notificationId: number) => {
-    setMarkingId(notificationId);
     try {
       await marcarNotificacaoLida(notificationId);
+      // O ícone do AcoesLinha não tem estado de carregando: a confirmação vem em mensagem.
+      message.success('Notificação marcada como lida.');
       await loadNotifications();
       window.dispatchEvent(new Event('notificacoes:refresh'));
     } catch (error) {
       message.error(`Erro ao marcar notificação como lida: ${(error as Error).message}`);
-    } finally {
-      setMarkingId(null);
     }
   };
 
@@ -80,34 +89,42 @@ export default function NotificacoesInternasPage(): JSX.Element {
     }
   };
 
-  const columns: ColumnsType<NotificacaoInterna> = [
+  const columns: ColunaResponsiva<NotificacaoInterna>[] = [
     {
       title: 'Status',
       dataIndex: 'lida',
-      width: 90,
+      key: 'lida',
+      width: 80,
       render: (read: boolean) => (read ? <Tag color="default">Lida</Tag> : <Tag color="blue">Nova</Tag>),
-    },
-    {
-      title: 'Fase',
-      dataIndex: 'fase_disparo',
-      width: 150,
-      render: (value: string) => <Tag color="purple">{FASE_LABELS[value] ?? value}</Tag>,
     },
     {
       title: 'Título',
       dataIndex: 'titulo',
+      key: 'titulo',
       ellipsis: true,
+    },
+    {
+      title: 'Fase',
+      dataIndex: 'fase_disparo',
+      key: 'fase_disparo',
+      responsive: VISIVEL_A_PARTIR.lg,
+      width: 168,
+      render: (value: string) => <Tag color="purple">{FASE_LABELS[value] ?? value}</Tag>,
     },
     {
       title: 'Tipo',
       dataIndex: 'tipo',
+      key: 'tipo',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 130,
       render: (value: string) => TIPO_LABELS[value] ?? value,
     },
     {
       title: 'Prioridade',
       dataIndex: 'prioridade',
-      width: 110,
+      key: 'prioridade',
+      responsive: VISIVEL_A_PARTIR.md,
+      width: 104,
       render: (value: string) => {
         const color = value === 'CRITICA' ? 'red' : value === 'ALTA' ? 'orange' : 'default';
         return <Tag color={color}>{PRIORIDADE_LABELS[value] ?? value}</Tag>;
@@ -116,23 +133,34 @@ export default function NotificacoesInternasPage(): JSX.Element {
     {
       title: 'Referência',
       dataIndex: 'referencia_data',
-      width: 120,
+      key: 'referencia_data',
+      responsive: VISIVEL_A_PARTIR.sm,
+      width: 112,
       render: (value: string) => dayjs(value).format('DD/MM/YYYY'),
+    },
+    {
+      // A mensagem abria na linha expandida e continua lá: nunca entra na linha.
+      title: 'Mensagem',
+      dataIndex: 'mensagem',
+      key: 'mensagem',
+      responsive: VISIVEL_A_PARTIR.detalhe,
+      render: (value: string) => value || '-',
     },
     {
       title: 'Ações',
       key: 'actions',
-      width: 130,
-      render: (_: unknown, record: NotificacaoInterna) => (
-        <Button
-          size="small"
-          disabled={record.lida}
-          loading={markingId === record.id}
-          onClick={() => void handleMarkRead(record.id)}
-        >
-          Marcar lida
-        </Button>
-      ),
+      width: larguraAcoesLinha(1, acoesCompactas),
+      // Já lida: nada a fazer na linha (antes, o botão ficava desabilitado).
+      render: (_: unknown, record: NotificacaoInterna) =>
+        record.lida ? null : (
+          <AcoesLinha
+            compacto={acoesCompactas}
+            alvo={record.titulo}
+            acoes={[
+              { chave: 'marcar-lida', rotulo: 'Marcar lida', icone: <CheckOutlined />, onClick: () => void handleMarkRead(record.id) },
+            ]}
+          />
+        ),
     },
   ];
 
@@ -167,17 +195,13 @@ export default function NotificacoesInternasPage(): JSX.Element {
         </Card>
 
         <Card>
-          <Table
+          <ResponsiveTable<NotificacaoInterna>
             rowKey="id"
             dataSource={notifications}
             columns={columns}
             loading={loading}
             pagination={{ pageSize: 12 }}
-            scroll={{ x: 760 }}
-            expandable={{
-              expandedRowRender: (record) => <Text>{record.mensagem}</Text>,
-              rowExpandable: (record) => Boolean(record.mensagem),
-            }}
+            nomeDaLinha={(notificacao) => notificacao.titulo}
           />
         </Card>
       </Space>

@@ -78,10 +78,10 @@ function quemImportaTable(regras: Linter.RulesRecord, arquivos: readonly (readon
 /**
  * Tamanho atual da allowlist: 27 em 2026-09-29, 26 depois do C1 (Usuários) e 21 depois do C2
  * (Admin DAT: grupos, gerências, municípios, produtos e projetos gerais), 20 depois de Projetos
- * (marca de série, 01/10/2026), 19 depois de Meus Eventos, 18 depois de Minhas Solicitações, 17 depois de Aprovações, 16 depois de Publicar na agenda, 15 depois de Pré-agenda (item 36, 19/10/2026), 13 depois de Gestão de Ações e Registros de Turmas (item 38, 20/10/2026) e 12 depois de Gestão de Compras (item 38, 26/10/2026); no G30 (06/11/2026), 11 depois de Bloqueios, 10 depois de Deslocamentos, 9 depois de Cadastros, 8 depois de Coordenadores, 7 depois de Plano Anual, 2 depois de Dashboards e Mapa. Só desce: voltar a
+ * (marca de série, 01/10/2026), 19 depois de Meus Eventos, 18 depois de Minhas Solicitações, 17 depois de Aprovações, 16 depois de Publicar na agenda, 15 depois de Pré-agenda (item 36, 19/10/2026), 13 depois de Gestão de Ações e Registros de Turmas (item 38, 20/10/2026) e 12 depois de Gestão de Compras (item 38, 26/10/2026); no G30 (06/11/2026), 11 depois de Bloqueios, 10 depois de Deslocamentos, 9 depois de Cadastros, 8 depois de Coordenadores, 7 depois de Plano Anual, 2 depois de Dashboards e Mapa e 0 depois de Notificações: zerou. Só desce: voltar a
  * pôr um arquivo na allowlist (e fazê-lo importar Table de novo) reprova aqui, no diff deste teste.
  */
-const TETO_ALLOWLIST = 2;
+const TETO_ALLOWLIST = 0;
 
 function conferirTeto(allowlist: Readonly<Record<string, string>>, teto: number): string[] {
   const tamanho = Object.keys(allowlist).length;
@@ -145,10 +145,11 @@ describe('lint: Table do AntD só via ResponsiveTable (Programa C)', () => {
     expect(await regrasPara(TABELA_ANTD_PADRAO)).toEqual({});
   });
 
-  test('arquivo da allowlist não recebe a regra', async () => {
-    const [primeiro] = Object.keys(TABELA_ANTD_ALLOWLIST);
-    expect(primeiro).toBeDefined();
-    expect(await regrasPara(primeiro ?? '')).toEqual({});
+  test('a allowlist zerou (G30): o último arquivo que saiu dela recebe a regra', async () => {
+    // Enquanto havia allowlist, este teste provava que o arquivo dela não recebia a regra. Zerada,
+    // prova o contrário com quem saiu por último: a isenção acabou de verdade na config real.
+    expect(Object.keys(TABELA_ANTD_ALLOWLIST)).toEqual([]);
+    expect(Object.keys(await regrasPara('src/pages/Controle/NotificacoesInternasPage.tsx')).sort()).toEqual([...REGRAS].sort());
   });
 
   test('toda entrada da allowlist diz qual PR do Programa C a remove', () => {

@@ -2,7 +2,7 @@
  * B#2 (alinhamento das telas): /notificacoes-internas mostra rótulos em português no lugar dos
  * valores crus de fase, tipo e prioridade, e não abre um segundo <main> dentro do main do App.
  */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
 import type { NotificacaoInterna } from '../../../types/acoesNotificacao';
@@ -38,6 +38,8 @@ describe('NotificacoesInternasPage — rótulos em português (B#2)', { timeout:
   it('mostra fase, tipo, prioridade e data de referência legíveis', async () => {
     render(<NotificacoesInternasPage />);
     expect(await screen.findByText('Crítica')).toBeInTheDocument();
+    // G30: o Tipo só entra na linha a partir de 1600 px; até lá, na linha expandida.
+    fireEvent.click(screen.getByRole('button', { name: /^Expandir linha de / }));
     expect(screen.getByText('Vencimento')).toBeInTheDocument();
     expect(screen.getByText('No vencimento')).toBeInTheDocument();
     expect(screen.getByText('10/03/2026')).toBeInTheDocument();

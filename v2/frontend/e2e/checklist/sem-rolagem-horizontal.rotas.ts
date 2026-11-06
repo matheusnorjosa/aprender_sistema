@@ -283,14 +283,29 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     estados: [expandida(T.municipio, 'Formações')],
   },
   { path: '/controle/pre-agenda', perfil: 'controle', marco: 'Pré-agenda', dados: { em: LINHA, texto: T.municipio } },
-  { path: '/acoes-notificacao', perfil: 'superusuario', marco: 'Ações Internas', dados: { em: LINHA, texto: T.acao } },
+  {
+    path: '/acoes-notificacao',
+    perfil: 'superusuario',
+    marco: 'Ações Internas',
+    dados: { em: LINHA, texto: T.acao },
+    // G30: Ordem e Estado (< 576), Vencimento (< 768), Âncora (< 992) e Realização (< 1200) vão para
+    // a linha expandida.
+    estados: [expandida(T.acao, 'Realização', [360, 768, 1024])],
+  },
   {
     path: '/acoes-notificacao/timeline',
     perfil: 'superusuario',
     marco: 'Timeline das Ações',
     dados: { em: '.ant-timeline-item', texto: T.acao },
   },
-  { path: '/notificacoes-internas', perfil: 'superusuario', marco: 'Notificações Internas', dados: { em: LINHA, texto: T.notificacao } },
+  {
+    path: '/notificacoes-internas',
+    perfil: 'superusuario',
+    marco: 'Notificações Internas',
+    dados: { em: LINHA, texto: T.notificacao },
+    // G30: a mensagem nunca entra na linha (e o Tipo só de 1600 px): há linha expandida em toda largura.
+    estados: [expandida(T.notificacao, 'Mensagem')],
+  },
   { path: '/dat/admin', perfil: 'dat', marco: 'Admin DAT' },
   {
     path: '/dat/admin/usuarios',
@@ -501,12 +516,11 @@ export const TELA_LOGIN = 'login';
  * G30: saíram as 3 de /dashboards, as 4 de /dashboards/compras e de /dashboards/equipe, as 3 de
  * /dashboards/gcal e as 3 de /mapa-brasil e de /mapa-brasil#lista (as tabelas são o ResponsiveTable;
  * no Mapa, os cartões por estado só dividem a largura a partir de 1600 px). Ficam 6.
+ * G30: saíram as 4 de /acoes-notificacao e as 2 de /notificacoes-internas. PENDENTES zerou.
  * O ratchet do Vitest (semRolagemHorizontal.pendentes.test.ts) trava a lista: nada novo
  * entra e o tamanho só desce.
  */
 export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
-  '/acoes-notificacao': [360, 768, 1024, 1280],
-  '/notificacoes-internas': [360, 768],
 };
 
 /**

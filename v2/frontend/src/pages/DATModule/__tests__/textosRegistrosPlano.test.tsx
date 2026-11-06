@@ -113,7 +113,7 @@ describe('Plano Anual', { timeout: 20000 }, () => {
 
   test('sem as abas Calendário e Resumo (só "em desenvolvimento...")', async () => {
     renderPagina('plano');
-    await screen.findByRole('button', { name: /Editar plano/ }, { timeout: 15000 });
+    await screen.findByRole('button', { name: /^Editar: / }, { timeout: 15000 });
     for (const nome of [/Calend[aá]rio/, /Resumo/, /^Tabela$/]) {
       expect(screen.queryByRole('button', { name: nome })).not.toBeInTheDocument();
     }
@@ -123,9 +123,9 @@ describe('Plano Anual', { timeout: 20000 }, () => {
   test('o aviso de excluir diz que plano com formação concluída não se exclui', async () => {
     const confirmar = espiarConfirm();
     renderPagina('plano');
-    const linha = (await screen.findByRole('button', { name: /Excluir plano/ }, { timeout: 15000 })).closest('tr')!;
+    const linha = (await screen.findByRole('button', { name: /^Excluir: / }, { timeout: 15000 })).closest('tr')!;
 
-    fireEvent.click(within(linha).getByRole('button', { name: /Excluir plano/ }));
+    fireEvent.click(within(linha).getByRole('button', { name: /^Excluir: / }));
 
     expect(confirmar).toHaveBeenCalledTimes(1);
     const { title, content } = confirmar.mock.calls[0]![0] as { title: string; content: string };

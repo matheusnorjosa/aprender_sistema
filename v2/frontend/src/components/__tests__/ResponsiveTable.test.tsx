@@ -288,6 +288,29 @@ describe('ResponsiveTable', () => {
     expect(screen.queryByText('Total: 42')).not.toBeInTheDocument();
   });
 
+  test('coluna só do detalhe: nunca na linha, sempre na linha expandida (G30, Plano Anual)', async () => {
+    const user = userEvent.setup();
+    render(
+      <ResponsiveTable<Pessoa>
+        columns={[
+          { title: 'Nome', dataIndex: 'nome', key: 'nome' },
+          { title: 'Setor', dataIndex: 'setor', key: 'setor', responsive: VISIVEL_A_PARTIR.detalhe },
+        ]}
+        dataSource={PESSOAS}
+        rowKey="id"
+        pagination={false}
+        nomeDaLinha={(pessoa) => pessoa.nome}
+      />,
+    );
+
+    // A 1280 px (e em qualquer largura), a coluna não entra na linha.
+    expect(cabecalhos()).toEqual(['Nome']);
+    await user.click(botaoExpandir()!);
+    const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
+    expect(expandida.getByText('Setor')).toBeInTheDocument();
+    expect(expandida.getByText('Gerência de Formação Continuada')).toBeInTheDocument();
+  });
+
   test('layout fixo: as colunas cabem na largura da tabela', () => {
     const { container } = renderTabela();
     expect(container.querySelector('table')).toHaveStyle({ tableLayout: 'fixed' });

@@ -13,8 +13,10 @@ import {
   PENDENTES_SO_LINUX,
   PERFIS,
   ROTAS_MEDIDAS,
+  MARCO_TROCA_DE_SENHA,
   SENHA_PERFIS,
   TELA_LOGIN,
+  TELA_TROCA_DE_SENHA,
   TEXTOS_DO_SEED,
   chaveDe,
   type DadosDaTela,
@@ -148,6 +150,8 @@ export interface AlvoDaTela {
   dados?: DadosDaTela;
   /** Requisições com falha que são esperadas nesta tela (regex sobre "status caminho"). */
   redeEsperada?: readonly RegExp[];
+  /** Tela que ocupa o lugar do sistema, sem a casca (header com "Sair"): a troca obrigatória de senha. */
+  semCasca?: boolean;
 }
 
 const TITULOS = 'h1, h2, h3, h4, h5, [role="heading"], .ant-card-head-title';
@@ -185,7 +189,7 @@ export async function verificarTela(
     problemas.push('a página não assentou (rede ou spinner)');
   }
   const sair = page.locator('header[aria-label="Perfil do usuario e acoes"]').getByRole('button', { name: 'Sair' });
-  if (!login && !(await sair.isVisible())) problemas.push('casca autenticada ausente (header com "Sair")');
+  if (!login && !alvo.semCasca && !(await sair.isVisible())) problemas.push('casca autenticada ausente (header com "Sair")');
   const erros = await main.locator(ERRO_NA_TELA).count();
   if (erros > 0) problemas.push(`erro na tela: ${erros} Result/Alert de erro em main`);
   for (const texto of ['Algo deu errado', 'Recurso indisponível']) {
@@ -302,13 +306,15 @@ export function registrarMatriz(larguras: readonly Largura[]): void {
           });
           continue;
         }
-        test(`${rota.path} @ ${largura}px (${rota.perfil})`, async ({ page, baseURL }) => {
-          const rede = vigiarRede(page, baseURL);
-          await entrar(page, rota.perfil, largura);
-          await abrir(page, rota);
-          await garantirTela(page, rota, rede);
-          await afirmarSemRolagem(page, chaveDe(rota), largura, rede);
-        });
+        for (const perfil of [rota.perfil, ...(rota.outrosPerfis ?? [])]) {
+          test(`${rota.path} @ ${largura}px (${perfil})`, async ({ page, baseURL }) => {
+            const rede = vigiarRede(page, baseURL);
+            await entrar(page, perfil, largura);
+            await abrir(page, rota);
+            await garantirTela(page, rota, rede);
+            await afirmarSemRolagem(page, chaveDe(rota), largura, rede);
+          });
+        }
         for (const estado of (rota.estados ?? []).filter((e) => !e.larguras || e.larguras.includes(largura))) {
           test(`${chaveDe(rota, estado)} @ ${largura}px (${rota.perfil})`, async ({ page, baseURL }) => {
             const rede = vigiarRede(page, baseURL);
@@ -332,8 +338,109 @@ export function registrarMatriz(larguras: readonly Largura[]): void {
         await garantirTela(page, alvo, rede);
         await afirmarSemRolagem(page, TELA_LOGIN, largura, rede, REDE_DA_TELA_DE_LOGIN);
       });
+
+      test(`troca obrigatória de senha @ ${largura}px (coordenador)`, async ({ page, baseURL }) => {
+        const rede = vigiarRede(page, baseURL);
+        await entrar(page, 'coordenador', largura);
+        await exigirTrocaDeSenha(page);
+        await page.goto('/');
+        await garantirTela(page, { marco: MARCO_TROCA_DE_SENHA, semCasca: true }, rede);
+        await afirmarSemRolagem(page, TELA_TROCA_DE_SENHA, largura, rede);
+      });
+
+      test(`/solicitacoes/nova#avaliar @ ${largura}px (coordenador)`, async ({ page, baseURL }) => {
+        const rota = ROTAS_MEDIDAS.find((r) => r.path === '/solicitacoes/nova');
+        if (!rota) throw new Error('a Nova Solicitação saiu de ROTAS_MEDIDAS');
+        const rede = vigiarRede(page, baseURL);
+        await entrar(page, rota.perfil, largura);
+        await interceptarLookupsComAvaliar(page);
+        await abrir(page, rota);
+        await garantirTela(page, rota, rede);
+        await abrirPerguntaDeAvaliar(page);
+        await garantirTela(page, { marco: rota.marco, dados: { em: '.ant-form-item', texto: PERGUNTA_DE_AVALIAR } }, rede);
+        await afirmarSemRolagem(page, `${rota.path}#avaliar`, largura, rede);
+      });
     }
   });
+}
+
+/**
+ * A troca obrigatória de senha (G30): o /api/me/ real do perfil, com `deve_trocar_senha` e um aviso e
+ * duas redefinições com o nome longo do seed (o que a tela mostra). O App põe a tela no lugar do sistema.
+ */
+async function exigirTrocaDeSenha(page: Page): Promise<void> {
+  const por = `${TEXTOS_DO_SEED.pessoa} dos Santos Albuquerque Cavalcanti de Vasconcelos Figueiredo`;
+  await page.route(
+    (url) => url.pathname === '/api/me/',
+    async (r) => {
+      const resposta = await r.fetch();
+      const me = (await resposta.json()) as Record<string, unknown>;
+      await r.fulfill({
+        response: resposta,
+        json: {
+          ...me,
+          deve_trocar_senha: true,
+          aviso_senha_redefinida: { por, em: '05/11/2026' },
+          redefinicoes_senha: [
+            { por, em: '05/11/2026' },
+            { por, em: '29/10/2026' },
+          ],
+        },
+      });
+    }
+  );
+}
+
+const PERGUNTA_DE_AVALIAR = 'Você pretende avaliar o formador nesse evento?';
+
+/**
+ * Lookup de projetos e de formadores interceptado (G30): a resposta real, e o formador vem avaliável
+ * (a pergunta de avaliar só aparece com formador avaliável). Sem resultado real, um item com o texto
+ * longo do seed, para a pergunta abrir de qualquer jeito.
+ */
+async function interceptarLookupsComAvaliar(page: Page): Promise<void> {
+  const interceptar = async (caminho: string, extra: Record<string, unknown>, reserva: Record<string, unknown>) =>
+    page.route(
+      (url) => url.pathname === caminho,
+      async (r) => {
+        const resposta = await r.fetch();
+        const reais = resposta.ok() ? ((await resposta.json()) as Record<string, unknown>[]) : [];
+        const itens = reais.length > 0 ? reais : [reserva];
+        await r.fulfill({ status: 200, contentType: 'application/json', json: itens.map((item) => ({ ...item, ...extra })) });
+      }
+    );
+  // A gerência do projeto pergunta (é o padrão; o 1º projeto da lista podia ser de uma que não pergunta).
+  await interceptar(
+    '/api/lookup/projetos/',
+    { pergunta_avaliar_formador: true },
+    { id: 990001, label: TEXTOS_DO_SEED.projeto, kind: 'projeto' }
+  );
+  await interceptar(
+    '/api/lookup/usuarios/',
+    { avaliavel: true },
+    { id: 990002, label: TEXTOS_DO_SEED.pessoa, kind: 'usuario' }
+  );
+}
+
+/** Escolhe o 1º projeto e o 1º formador do cartão do Evento 1 e responde "Sim" à pergunta de avaliar. */
+async function abrirPerguntaDeAvaliar(page: Page): Promise<void> {
+  const cartao = page.getByRole('region', { name: /^Evento 1( com problema)?$/ });
+  await escolherPrimeira(page, cartao.getByLabel('Projeto', { exact: true }));
+  await escolherPrimeira(page, cartao.getByRole('combobox', { name: /Formadores/ }));
+  const pergunta = cartao.getByRole('radiogroup', { name: /pretende avaliar o formador/ });
+  await pergunta.waitFor({ state: 'visible' });
+  // "Sim" abre também "Qual formador você pretende avaliar?": a medição pega as duas.
+  await pergunta.getByLabel('Sim').check();
+  await cartao.getByText('Qual formador você pretende avaliar?').waitFor({ state: 'visible' });
+}
+
+/** A 1ª opção de um ComboBox/AutoComplete do AntD (a lista abre fora do cartão), como o POM da Nova Solicitação. */
+async function escolherPrimeira(page: Page, campo: ReturnType<Page['locator']>): Promise<void> {
+  await campo.click();
+  await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
+  await page.waitForFunction(
+    () => document.querySelectorAll('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').length === 0
+  );
 }
 
 /** O que a medição com evento lê e reescreve na resposta de `/api/availability/monthly/`. */

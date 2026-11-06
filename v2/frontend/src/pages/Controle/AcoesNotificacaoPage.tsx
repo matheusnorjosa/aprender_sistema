@@ -1,20 +1,30 @@
+/**
+ * Ações Internas (32 passos): registro de âncora e conclusão por ciclo.
+ *
+ * Sem rolagem horizontal (G30): ResponsiveTable. Sempre na linha o nome da ação (abaixo de sm, com o
+ * estado embaixo) e as ações (AcoesLinha: "Registrar âncora" e "Concluir"; no celular, o menu "Mais
+ * ações"); Ordem e Estado sobem a partir de sm, Vencimento de md, Âncora de lg e Realização de xl.
+ * O que some vai para a linha expandida.
+ */
 import { useEffect, useState, type JSX } from 'react';
 import {
-  Button,
   Card,
   DatePicker,
   Form,
+  Grid,
   Input,
   Modal,
   Select,
   Space,
-  Table,
   Tag,
   Typography,
   message,
 } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { CheckOutlined, PushpinOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
+
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
+import { AcoesLinha, larguraAcoesLinha, type AcaoDaLinha } from '../../components/AcoesLinha';
 
 import { concluirAcao, listAcoesByCiclo, listCiclosAcoes, registrarAncora } from '../../api/acoesNotificacao';
 import type { AcaoInstancia, CicloAcoes } from '../../types/acoesNotificacao';
@@ -34,6 +44,15 @@ const cycleLabel = (cycle: CicloAcoes): string =>
   `${cycle.projeto_nome} / ${cycle.municipio_nome} (${cycle.semestre}/${cycle.ano})`;
 
 type ModalMode = 'ancora' | 'conclusao';
+
+/** Quem a linha representa: nomeia o expandir e as ações ("Concluir: 1. Enviar kit"). */
+const nomeDaAcao = (acao: AcaoInstancia): string => `${acao.ordem}. ${acao.template_nome}`;
+
+function tagDoEstado(value: string): JSX.Element {
+  const color =
+    value === 'CONCLUIDA' ? 'green' : value === 'ATRASADA' ? 'red' : value === 'EM_ANDAMENTO' ? 'blue' : 'gold';
+  return <Tag color={color}>{ESTADO_LABELS[value] ?? value}</Tag>;
+}
 
 interface AcaoNotificacaoFormValues {
   data_ancora: Dayjs;
@@ -56,6 +75,7 @@ export default function AcoesNotificacaoPage(): JSX.Element {
   const [modalMode, setModalMode] = useState<ModalMode>('ancora');
   const [selectedAction, setSelectedAction] = useState<AcaoInstancia | null>(null);
   const [form] = Form.useForm<AcaoNotificacaoFormValues>();
+  const acoesCompactas = !Grid.useBreakpoint().sm;
 
   const loadActions = async (cycleId: number) => {
     setLoadingActions(true);
@@ -154,65 +174,73 @@ export default function AcoesNotificacaoPage(): JSX.Element {
     }
   };
 
-  const columns: ColumnsType<AcaoInstancia> = [
+  const columns: ColunaResponsiva<AcaoInstancia>[] = [
     {
       title: 'Ordem',
       dataIndex: 'ordem',
-      width: 90,
+      key: 'ordem',
+      responsive: VISIVEL_A_PARTIR.sm,
+      width: 80,
       sorter: (a, b) => a.ordem - b.ordem,
     },
     {
+      // Identidade: quebra linha em vez de cortar. Abaixo de sm, o estado vai embaixo do nome.
       title: 'Ação',
       dataIndex: 'template_nome',
-      ellipsis: true,
+      key: 'template_nome',
+      render: (_: unknown, record: AcaoInstancia) => (
+        <>
+          <div>{record.template_nome}</div>
+          {acoesCompactas && tagDoEstado(record.estado)}
+        </>
+      ),
     },
     {
       title: 'Estado',
       dataIndex: 'estado',
-      width: 160,
-      render: (value: string) => {
-        const color =
-          value === 'CONCLUIDA' ? 'green' : value === 'ATRASADA' ? 'red' : value === 'EM_ANDAMENTO' ? 'blue' : 'gold';
-        return <Tag color={color}>{ESTADO_LABELS[value] ?? value}</Tag>;
-      },
+      key: 'estado',
+      responsive: VISIVEL_A_PARTIR.sm,
+      width: 152,
+      render: (value: string) => tagDoEstado(value),
     },
     {
       title: 'Âncora',
       dataIndex: 'data_ancora',
-      width: 130,
+      key: 'data_ancora',
+      responsive: VISIVEL_A_PARTIR.lg,
+      width: 112,
       render: formatarData,
     },
     {
       title: 'Vencimento',
       dataIndex: 'data_vencimento',
-      width: 130,
+      key: 'data_vencimento',
+      responsive: VISIVEL_A_PARTIR.md,
+      width: 112,
       render: formatarData,
     },
     {
       title: 'Realização',
       dataIndex: 'data_realizacao',
-      width: 130,
+      key: 'data_realizacao',
+      responsive: VISIVEL_A_PARTIR.xl,
+      width: 112,
       render: formatarData,
     },
     {
       title: 'Ações',
       key: 'actions',
-      width: 250,
-      render: (_: unknown, record: AcaoInstancia) => (
-        <Space>
-          <Button size="small" onClick={() => openActionModal('ancora', record)}>
-            Registrar Âncora
-          </Button>
-          <Button
-            size="small"
-            type="primary"
-            disabled={record.estado === 'CONCLUIDA'}
-            onClick={() => openActionModal('conclusao', record)}
-          >
-            Concluir
-          </Button>
-        </Space>
-      ),
+      width: larguraAcoesLinha(2, acoesCompactas),
+      render: (_: unknown, record: AcaoInstancia) => {
+        const acoes: AcaoDaLinha[] = [
+          { chave: 'ancora', rotulo: 'Registrar âncora', icone: <PushpinOutlined />, onClick: () => openActionModal('ancora', record) },
+          // Concluída: sem "Concluir" (antes, o botão ficava desabilitado).
+          ...(record.estado === 'CONCLUIDA'
+            ? []
+            : [{ chave: 'concluir', rotulo: 'Concluir', icone: <CheckOutlined />, onClick: () => openActionModal('conclusao', record) }]),
+        ];
+        return <AcoesLinha compacto={acoesCompactas} alvo={nomeDaAcao(record)} acoes={acoes} />;
+      },
     },
   ];
 
@@ -247,13 +275,13 @@ export default function AcoesNotificacaoPage(): JSX.Element {
         </Card>
 
         <Card>
-          <Table
+          <ResponsiveTable<AcaoInstancia>
             rowKey="id"
             dataSource={actions}
             columns={columns}
             loading={loadingActions}
             pagination={{ pageSize: 12 }}
-            scroll={{ x: 1200 }}
+            nomeDaLinha={nomeDaAcao}
           />
         </Card>
       </Space>

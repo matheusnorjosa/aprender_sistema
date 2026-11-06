@@ -7,14 +7,18 @@
  * Visualizacao: tabela (as abas Calendario e Resumo, que so diziam "em desenvolvimento",
  * sairam em 05/11/2026; os endpoints `calendario` e `resumo-projeto` existem no backend).
  *
+ * Sem rolagem horizontal (G30, decisão do dono): ResponsiveTable. As 20 células da matriz
+ * (F1-F15, A1-A2, P1-P3) viraram UMA coluna Progresso, com o resumo do que foi realizado, e a
+ * edição de cada célula fica na linha aberta (colunas `VISIVEL_A_PARTIR.detalhe`), com os mesmos
+ * modais de antes. As tabelas do detalhe (modal) também não forçam largura.
+ *
  * Ref: prompt-pagina-formacoes.md
  */
 
-import { useState, useEffect, useMemo, type JSX } from 'react';
+import { useState, useEffect, useMemo, type JSX, type ReactNode } from 'react';
 import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
 import type { PaginatedResponse } from '../../types';
 import {
-  Table,
   Card,
   Button,
   Space,
@@ -35,6 +39,7 @@ import {
   Checkbox,
   Tabs,
   Alert,
+  Grid,
 } from 'antd';
 import {
   PlusOutlined,
@@ -52,7 +57,6 @@ import {
   InfoCircleOutlined,
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
-import type { ColumnsType } from 'antd/es/table';
 
 import {
   listPlanoFormacoes,
@@ -66,6 +70,8 @@ import {
 } from '../../api/datModule';
 import { getMunicipiosOptions, getProjetosOptions } from '../../api/datModule';
 import { useAcesso } from '../../contexts/AcessoContext';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
+import { AcoesLinha, larguraAcoesLinha, type AcaoDaLinha } from '../../components/AcoesLinha';
 
 const { Title, Text } = Typography;
 
@@ -122,6 +128,37 @@ interface PlanoFormacaoRecord {
   formacoes_list: FormacaoItem[];
   acompanhamentos_list: AcompanhamentoItem[];
   provas_list: ProvaItem[];
+}
+
+/** Quem a linha representa: nomeia o expandir e as ações ("Editar: Fortaleza - CE · Projeto X · 2026"). */
+function nomeDoPlano(plano: PlanoFormacaoRecord): string {
+  return `${plano.municipio_nome} - ${plano.municipio_uf} · ${plano.projeto_nome} · ${plano.ano ?? 'sem ano'}`;
+}
+
+/** Resumo da coluna Progresso: realizados sobre os previstos de cada tipo. */
+function resumoDoProgresso(plano: PlanoFormacaoRecord): string {
+  const formacoes = plano.formacoes_list ?? [];
+  const acompanhamentos = plano.acompanhamentos_list ?? [];
+  const provas = plano.provas_list ?? [];
+  return [
+    `${formacoes.filter((f) => f.realizada).length}/${formacoes.length} formações`,
+    `${acompanhamentos.filter((a) => a.realizado).length}/${acompanhamentos.length} acompanhamentos`,
+    `${provas.filter((p) => p.realizada).length}/${provas.length} provas`,
+  ].join(' · ');
+}
+
+/** As células de edição na linha aberta: o rótulo da posição (F1, A1, P1...) em cima da célula. */
+function celulasDeEdicao(itens: readonly { rotulo: string; celula: ReactNode }[]): JSX.Element {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {itens.map(({ rotulo, celula }) => (
+        <div key={rotulo} className="rounded border border-gray-200 text-center" style={{ minWidth: 56 }}>
+          <div className="text-xs text-gray-600">{rotulo}</div>
+          {celula}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 interface PlanoFormacaoFormValues {
@@ -468,6 +505,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
       <div
         role="button"
         tabIndex={0}
+        aria-label={`Editar formação ${formacao.numero}`}
         style={{ textAlign: 'center', cursor: 'pointer', padding: 4 }}
         onClick={() => handleFormacaoClick(plano, formacao)}
         onKeyDown={(e) => {
@@ -563,35 +601,28 @@ export default function PlanoFormacoesPage(): JSX.Element {
   // TABLE COLUMNS (memoized §16 Epic #459)
   // ============================================================
 
-  const columns = useMemo<ColumnsType<PlanoFormacaoRecord>>(() => [
+  const telas = Grid.useBreakpoint();
+  const acoesCompactas = !telas.sm;
+
+  const columns = useMemo<ColunaResponsiva<PlanoFormacaoRecord>[]>(() => [
     {
       title: 'Município',
       dataIndex: 'municipio_nome',
       key: 'municipio',
-      width: 150,
-      fixed: 'left' as const,
       render: (nome: string, record: PlanoFormacaoRecord) => (
         <div>
           <Text strong>{nome}</Text>
           <div style={{ fontSize: 12, color: '#888' }}>{record.municipio_uf}</div>
+          {/* Abaixo de sm a coluna Progresso some: o resumo vai junto do município. */}
+          {acoesCompactas && <div>{resumoDoProgresso(record)}</div>}
         </div>
       ),
-    },
-    {
-      title: 'Coord.',
-      dataIndex: 'coordenador_nome',
-      key: 'coordenador',
-      width: 100,
-      fixed: 'left' as const,
-      ellipsis: true,
-      render: (nome: string | null) => nome || <Text type="secondary">-</Text>,
     },
     {
       title: 'Projeto',
       dataIndex: 'projeto_nome',
       key: 'projeto',
-      width: 150,
-      fixed: 'left' as const,
+      responsive: VISIVEL_A_PARTIR.md,
       ellipsis: true,
     },
     {
@@ -599,117 +630,93 @@ export default function PlanoFormacoesPage(): JSX.Element {
       title: 'Coleção',
       dataIndex: 'projeto_geral_nome',
       key: 'projeto_geral',
-      width: 150,
-      fixed: 'left' as const,
-      ellipsis: true,
+      responsive: VISIVEL_A_PARTIR.lg,
       sorter: (a: PlanoFormacaoRecord, b: PlanoFormacaoRecord) =>
         (a.projeto_geral_nome ?? '').localeCompare(b.projeto_geral_nome ?? ''),
-      render: (nome: string | undefined) => (nome ? <Tag color="geekblue">{nome}</Tag> : <Text type="secondary">—</Text>),
+      // A coleção pode ter nome longo: a tag quebra linha em vez de passar da célula.
+      render: (nome: string | undefined) =>
+        nome ? (
+          <Tag color="geekblue" style={{ whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{nome}</Tag>
+        ) : (
+          <Text type="secondary">—</Text>
+        ),
+    },
+    {
+      title: 'Coord.',
+      dataIndex: 'coordenador_nome',
+      key: 'coordenador',
+      responsive: VISIVEL_A_PARTIR.xl,
+      ellipsis: true,
+      render: (nome: string | null) => nome || <Text type="secondary">-</Text>,
     },
     {
       title: 'Ano',
       dataIndex: 'ano',
       key: 'ano',
-      width: 60,
-      fixed: 'left' as const,
+      responsive: VISIVEL_A_PARTIR.md,
+      width: 64,
       align: 'center' as const,
       render: (ano: number | null) => (ano != null ? <Text>{ano}</Text> : <Text type="secondary">-</Text>),
     },
-    // 15 formacoes columns
-    ...Array.from({ length: 15 }, (_, i) => ({
-      title: `F${i + 1}`,
-      key: `f${i + 1}`,
-      width: 70,
-      align: 'center' as const,
-      render: (_: unknown, record: PlanoFormacaoRecord) => {
-        const formacao = record.formacoes_list?.find((f) => f.numero === i + 1);
-        return renderFormacaoCell(record, formacao);
-      },
-    })),
+    {
+      title: 'Progresso',
+      key: 'progresso',
+      responsive: VISIVEL_A_PARTIR.sm,
+      width: 168,
+      render: (_: unknown, record: PlanoFormacaoRecord) => resumoDoProgresso(record),
+    },
     {
       title: 'CH',
       dataIndex: 'ch_anual',
       key: 'ch_anual',
-      width: 60,
+      responsive: VISIVEL_A_PARTIR.md,
+      width: 64,
       align: 'center' as const,
       render: (ch: number) => <Text strong>{ch}h</Text>,
     },
+    // A edição célula a célula (antes F1-F15, A1-A2 e P1-P3 na linha) fica só na linha aberta.
     {
-      title: 'A1',
-      key: 'a1',
-      width: 50,
-      align: 'center' as const,
-      render: (_: unknown, record: PlanoFormacaoRecord) => renderAcompanhamentoCell(record, 0),
+      title: 'Formações',
+      key: 'formacoes',
+      responsive: VISIVEL_A_PARTIR.detalhe,
+      render: (_: unknown, record: PlanoFormacaoRecord) =>
+        celulasDeEdicao(
+          Array.from({ length: 15 }, (_x, i) => ({
+            rotulo: `F${i + 1}`,
+            celula: renderFormacaoCell(record, record.formacoes_list?.find((f) => f.numero === i + 1)),
+          })),
+        ),
     },
     {
-      title: 'A2',
-      key: 'a2',
-      width: 50,
-      align: 'center' as const,
-      render: (_: unknown, record: PlanoFormacaoRecord) => renderAcompanhamentoCell(record, 1),
+      title: 'Acompanhamentos',
+      key: 'acompanhamentos',
+      responsive: VISIVEL_A_PARTIR.detalhe,
+      render: (_: unknown, record: PlanoFormacaoRecord) =>
+        celulasDeEdicao([0, 1].map((i) => ({ rotulo: `A${i + 1}`, celula: renderAcompanhamentoCell(record, i) }))),
     },
     {
-      title: 'P1',
-      key: 'p1',
-      width: 50,
-      align: 'center' as const,
-      render: (_: unknown, record: PlanoFormacaoRecord) => renderProvaCell(record, 0),
-    },
-    {
-      title: 'P2',
-      key: 'p2',
-      width: 50,
-      align: 'center' as const,
-      render: (_: unknown, record: PlanoFormacaoRecord) => renderProvaCell(record, 1),
-    },
-    {
-      title: 'P3',
-      key: 'p3',
-      width: 50,
-      align: 'center' as const,
-      render: (_: unknown, record: PlanoFormacaoRecord) => renderProvaCell(record, 2),
+      title: 'Provas',
+      key: 'provas',
+      responsive: VISIVEL_A_PARTIR.detalhe,
+      render: (_: unknown, record: PlanoFormacaoRecord) =>
+        celulasDeEdicao([0, 1, 2].map((i) => ({ rotulo: `P${i + 1}`, celula: renderProvaCell(record, i) }))),
     },
     {
       title: 'Ações',
       key: 'acoes',
-      width: 100,
-      fixed: 'right' as const,
-      render: (_: unknown, record: PlanoFormacaoRecord) => (
-        <Space size="small">
-          <Tooltip title="Ver detalhes">
-            <Button
-              type="text"
-              size="small"
-              icon={<InfoCircleOutlined />}
-              onClick={() => handleViewDetail(record)}
-              aria-label="Ver detalhes do plano"
-            />
-          </Tooltip>
-          <Tooltip title="Editar">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-              aria-label="Editar plano de formações"
-            />
-          </Tooltip>
-          {canDeletePlano && (
-            <Tooltip title="Excluir">
-              <Button
-                type="text"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => handleDelete(record)}
-                aria-label="Excluir plano de formações"
-              />
-            </Tooltip>
-          )}
-        </Space>
-      ),
+      width: larguraAcoesLinha(canDeletePlano ? 3 : 2, acoesCompactas),
+      render: (_: unknown, record: PlanoFormacaoRecord) => {
+        const acoes: AcaoDaLinha[] = [
+          { chave: 'ver', rotulo: 'Ver detalhes', icone: <InfoCircleOutlined />, onClick: () => handleViewDetail(record) },
+          { chave: 'editar', rotulo: 'Editar', icone: <EditOutlined />, onClick: () => handleEdit(record) },
+          ...(canDeletePlano
+            ? [{ chave: 'excluir', rotulo: 'Excluir', icone: <DeleteOutlined />, onClick: () => handleDelete(record), perigo: true }]
+            : []),
+        ];
+        return <AcoesLinha compacto={acoesCompactas} alvo={nomeDoPlano(record)} acoes={acoes} />;
+      },
     },
-  ], [canDeletePlano]);
+  ], [canDeletePlano, acoesCompactas]);
 
   // ============================================================
   // RENDER
@@ -718,7 +725,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
   return (
     <section className="p-6" aria-labelledby="plano-formacoes-title">
       {/* Header */}
-      <header className="mb-6 flex justify-between items-center">
+      <header className="mb-6 flex flex-wrap justify-between items-center gap-3">
         <div>
           <Title level={3} className="m-0" id="plano-formacoes-title">Plano Anual</Title>
           <Text type="secondary">Gestão do plano anual de formações por município e projeto</Text>
@@ -859,7 +866,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
           </Col>
         </Row>
         <Divider className="my-4 mb-3" />
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Button icon={<ClearOutlined />} onClick={handleClearFilters}>Limpar</Button>
           <Button icon={<ReloadOutlined />} onClick={() => fetchData(1)} loading={loading}>Atualizar</Button>
           <Button type="primary" icon={<FilterOutlined />} onClick={() => fetchData(1)}>Filtrar</Button>
@@ -870,12 +877,12 @@ export default function PlanoFormacoesPage(): JSX.Element {
       {/* Main Content */}
       <section aria-label="Conteúdo principal">
         <Card>
-          <Table
+          <ResponsiveTable<PlanoFormacaoRecord>
             columns={columns}
             dataSource={planos}
             rowKey="id"
             loading={loading}
-            scroll={{ x: 2200 }}
+            nomeDaLinha={nomeDoPlano}
             pagination={{
               ...pagination,
               showSizeChanger: true,
@@ -1049,18 +1056,18 @@ export default function PlanoFormacoesPage(): JSX.Element {
                 key: 'formacoes',
                 label: 'Formações',
                 children: (
-                  <Table
-                    scroll={{ x: "max-content" }}
+                  <ResponsiveTable<FormacaoItem>
                     dataSource={detailPlano.formacoes_list || []}
                     rowKey="id"
                     size="small"
                     pagination={false}
+                    nomeDaLinha={(f) => `formação ${f.numero}`}
                     columns={[
-                      { title: '#', dataIndex: 'numero', width: 50 },
+                      { title: '#', dataIndex: 'numero', width: 48 },
                       { title: 'Data', dataIndex: 'data', render: (d: string | null) => d ? dayjs(d).format('DD/MM/YYYY') : '-' },
-                      { title: 'CH', dataIndex: 'ch', render: (v) => `${v}h` },
-                      { title: 'Modalidade', dataIndex: 'modalidade', render: (m) => m === 'online' ? 'Online' : 'Presencial' },
-                      { title: 'Realizada', dataIndex: 'realizada', render: (v) => v ? <CheckCircleOutlined className="text-green-500" /> : '-' },
+                      { title: 'CH', dataIndex: 'ch', responsive: VISIVEL_A_PARTIR.sm, render: (_v, f) => `${f.ch}h` },
+                      { title: 'Modalidade', dataIndex: 'modalidade', responsive: VISIVEL_A_PARTIR.sm, render: (m) => m === 'online' ? 'Online' : 'Presencial' },
+                      { title: 'Realizada', dataIndex: 'realizada', width: 96, render: (v) => v ? <CheckCircleOutlined className="text-green-500" /> : '-' },
                     ]}
                   />
                 ),
@@ -1069,12 +1076,12 @@ export default function PlanoFormacoesPage(): JSX.Element {
                 key: 'acompanhamentos',
                 label: 'Acompanhamentos',
                 children: (
-                  <Table
-                    scroll={{ x: "max-content" }}
+                  <ResponsiveTable<AcompanhamentoItem>
                     dataSource={detailPlano.acompanhamentos_list || []}
                     rowKey="id"
                     size="small"
                     pagination={false}
+                    nomeDaLinha={(a) => `acompanhamento ${a.tipo}`}
                     columns={[
                       { title: 'Tipo', dataIndex: 'tipo', render: (t) => t === 'primeiro' ? '1º Acomp.' : '2º Acomp.' },
                       { title: 'Data', dataIndex: 'data', render: (d: string | null) => d ? dayjs(d).format('DD/MM/YYYY') : '-' },
@@ -1087,14 +1094,14 @@ export default function PlanoFormacoesPage(): JSX.Element {
                 key: 'provas',
                 label: 'Provas',
                 children: (
-                  <Table
-                    scroll={{ x: "max-content" }}
+                  <ResponsiveTable<ProvaItem>
                     dataSource={detailPlano.provas_list || []}
                     rowKey="id"
                     size="small"
                     pagination={false}
+                    nomeDaLinha={(p) => `prova ${p.numero}`}
                     columns={[
-                      { title: '#', dataIndex: 'numero', width: 50 },
+                      { title: '#', dataIndex: 'numero', width: 48 },
                       { title: 'Data', dataIndex: 'data', render: (d: string | null) => d ? dayjs(d).format('DD/MM/YYYY') : '-' },
                       { title: 'Realizada', dataIndex: 'realizada', render: (v) => v ? <CheckCircleOutlined className="text-green-500" /> : '-' },
                     ]}

@@ -1,10 +1,14 @@
 /**
  * Column definitions for CoordenadoresPage
  * Issue #303: Split large DATModule pages
+ *
+ * Sem rolagem horizontal (G30, padrão responsivo): colunas do ResponsiveTable. Sempre na linha o
+ * nome, o status e as ações (AcoesLinha; no celular, o menu "Mais ações"); a Área sobe a partir de
+ * md, foto e contagens de lg, o e-mail de xl e o telefone só de xxl. O que some vai para a linha
+ * expandida.
  */
 
-import { Space, Tag, Typography, Tooltip, Button, Avatar, Badge, Switch } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { Tag, Typography, Tooltip, Avatar, Badge, Switch } from 'antd';
 import {
   EditOutlined,
   DeleteOutlined,
@@ -17,6 +21,8 @@ import {
   EyeOutlined,
 } from '@ant-design/icons';
 import { getAreaColor, getInitials } from './helpers';
+import { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../../components/ResponsiveTable';
+import { AcoesLinha, larguraAcoesLinha, type AcaoDaLinha } from '../../../components/AcoesLinha';
 import type { ID } from '../../../types';
 
 const { Text } = Typography;
@@ -57,14 +63,17 @@ export interface ColumnHandlers {
  * @param handlers - Event handlers object
  * @returns Column definitions
  */
-export function getColumns({ onView, onEdit, onDelete, onToggleAtivo, podeExcluir }: ColumnHandlers): ColumnsType<CoordenadorRecord> {
+export function getColumns(
+  { onView, onEdit, onDelete, onToggleAtivo, podeExcluir }: ColumnHandlers,
+  acoesCompactas = false,
+): ColunaResponsiva<CoordenadorRecord>[] {
   return [
     {
-      title: '',
+      title: <span className="sr-only">Foto</span>,
       dataIndex: 'foto_url',
       key: 'foto',
-      width: 60,
-      fixed: 'left',
+      responsive: VISIVEL_A_PARTIR.lg,
+      width: 64,
       render: (foto: string | undefined, record) => (
         <Avatar
           src={foto}
@@ -79,8 +88,6 @@ export function getColumns({ onView, onEdit, onDelete, onToggleAtivo, podeExclui
       title: 'Nome',
       dataIndex: 'nome',
       key: 'nome',
-      width: 180,
-      fixed: 'left',
       sorter: true,
       render: (nome: string, record) => (
         <div>
@@ -99,15 +106,20 @@ export function getColumns({ onView, onEdit, onDelete, onToggleAtivo, podeExclui
       title: 'Área',
       dataIndex: 'area',
       key: 'area',
-      width: 120,
+      responsive: VISIVEL_A_PARTIR.md,
       sorter: true,
-      render: (area: string | undefined) => <Tag color={getAreaColor(area)}>{area || '-'}</Tag>,
+      // A área pode ser longa: a tag quebra linha em vez de passar da célula.
+      render: (area: string | undefined) => (
+        <Tag color={getAreaColor(area)} style={{ whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+          {area || '-'}
+        </Tag>
+      ),
     },
     {
       title: 'Email',
       dataIndex: 'email',
       key: 'email',
-      width: 200,
+      responsive: VISIVEL_A_PARTIR.xl,
       ellipsis: true,
       render: (email: string | undefined) =>
         email ? (
@@ -123,6 +135,7 @@ export function getColumns({ onView, onEdit, onDelete, onToggleAtivo, podeExclui
       title: 'Telefone',
       dataIndex: 'telefone',
       key: 'telefone',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 140,
       render: (telefone: string | undefined) =>
         telefone ? (
@@ -138,6 +151,7 @@ export function getColumns({ onView, onEdit, onDelete, onToggleAtivo, podeExclui
       title: 'Municípios',
       dataIndex: 'total_municipios',
       key: 'municipios',
+      responsive: VISIVEL_A_PARTIR.lg,
       width: 100,
       align: 'center',
       sorter: true,
@@ -155,6 +169,7 @@ export function getColumns({ onView, onEdit, onDelete, onToggleAtivo, podeExclui
       title: 'Projetos',
       dataIndex: 'total_projetos',
       key: 'projetos',
+      responsive: VISIVEL_A_PARTIR.lg,
       width: 100,
       align: 'center',
       sorter: true,
@@ -172,7 +187,7 @@ export function getColumns({ onView, onEdit, onDelete, onToggleAtivo, podeExclui
       title: 'Status',
       dataIndex: 'ativo',
       key: 'ativo',
-      width: 90,
+      width: 72,
       align: 'center',
       render: (ativo: boolean | undefined, record) => (
         <Tooltip title={ativo !== false ? 'Clique para desativar' : 'Clique para ativar'}>
@@ -189,42 +204,17 @@ export function getColumns({ onView, onEdit, onDelete, onToggleAtivo, podeExclui
     {
       title: 'Ações',
       key: 'acoes',
-      width: podeExcluir ? 120 : 88,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="Ver detalhes">
-            <Button
-              type="text"
-              size="small"
-              icon={<EyeOutlined />}
-              onClick={() => onView(record)}
-              aria-label="Ver detalhes do coordenador"
-            />
-          </Tooltip>
-          <Tooltip title="Editar">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => onEdit(record)}
-              aria-label="Editar coordenador"
-            />
-          </Tooltip>
-          {podeExcluir && (
-            <Tooltip title="Excluir">
-              <Button
-                type="text"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => onDelete(record)}
-                aria-label="Excluir coordenador"
-              />
-            </Tooltip>
-          )}
-        </Space>
-      ),
+      width: larguraAcoesLinha(podeExcluir ? 3 : 2, acoesCompactas),
+      render: (_, record) => {
+        const acoes: AcaoDaLinha[] = [
+          { chave: 'ver', rotulo: 'Ver detalhes', icone: <EyeOutlined />, onClick: () => onView(record) },
+          { chave: 'editar', rotulo: 'Editar', icone: <EditOutlined />, onClick: () => onEdit(record) },
+          ...(podeExcluir
+            ? [{ chave: 'excluir', rotulo: 'Excluir', icone: <DeleteOutlined />, onClick: () => onDelete(record), perigo: true }]
+            : []),
+        ];
+        return <AcoesLinha compacto={acoesCompactas} alvo={record.nome} acoes={acoes} />;
+      },
     },
   ];
 }

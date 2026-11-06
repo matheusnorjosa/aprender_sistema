@@ -75,6 +75,11 @@ export interface RotaMedida {
   path: string;
   /** Perfil que consegue abrir a rota (e que vê linhas nas tabelas dela). */
   perfil: Perfil;
+  /**
+   * Outros perfis com que a rota também é medida (mesma chave em PENDENTES): tela cujo conteúdo muda
+   * por perfil (G30: os cartões da Home).
+   */
+  outrosPerfis?: readonly Perfil[];
   /** Rota com parâmetro: o spec descobre o id pela API antes de navegar. */
   parametro?: 'solicitacaoEditavel';
   /** Título próprio da tela (h1-h5, heading ou título de Card dentro de `main`). */
@@ -110,11 +115,44 @@ function expandida(textoDaLinha: string, rotulo: string, larguras?: readonly Lar
 }
 
 export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
-  { path: '/', perfil: 'controle', marco: 'Página Inicial' },
-  { path: '/dashboards', perfil: 'superusuario', marco: 'Dashboards e Analises', dados: { em: LINHA, texto: T.pessoa } },
-  { path: '/dashboards/compras', perfil: 'dat', marco: 'Dashboard de Compras', dados: { em: LINHA, texto: T.municipio } },
-  { path: '/dashboards/equipe', perfil: 'dat', marco: 'Dashboard da Equipe', dados: { em: LINHA, texto: T.pessoa } },
-  { path: '/dashboards/gcal', perfil: 'controle', marco: 'Dashboard Google Calendar', dados: { em: LINHA, texto: T.municipio } },
+  // G30: os cartões da Home mudam por perfil; medida também com o aprovador e o superusuário.
+  { path: '/', perfil: 'controle', marco: 'Página Inicial', outrosPerfis: ['aprovador', 'superusuario'] },
+  // G30: as tabelas dos dashboards e do mapa são o ResponsiveTable; a vista "expandida" é medida
+  // nas larguras em que há coluna escondida (a 1ª linha com o texto do seed).
+  {
+    path: '/dashboards',
+    perfil: 'superusuario',
+    marco: 'Dashboards e Analises',
+    dados: { em: LINHA, texto: T.pessoa },
+    // Posicao (< 576) e Progresso (< 768) vão para a linha expandida.
+    estados: [expandida(T.pessoa, 'Posicao', [360])],
+  },
+  {
+    path: '/dashboards/compras',
+    perfil: 'dat',
+    marco: 'Dashboard de Compras',
+    dados: { em: LINHA, texto: T.municipio },
+    // As duas tabelas escondem "Compras" abaixo de 992 px (pendências: também Itens, Projeto e Última
+    // compra; quem compra mais: Entregues e Comparativo): o rótulo vale para a que tiver a 1ª linha.
+    estados: [expandida(T.municipio, 'Compras', [360, 768])],
+  },
+  {
+    path: '/dashboards/equipe',
+    perfil: 'dat',
+    marco: 'Dashboard da Equipe',
+    dados: { em: LINHA, texto: T.pessoa },
+    // Detalhamento: Horas (< 992) e Municípios (< 1200).
+    estados: [expandida(T.pessoa, 'Municípios', [360, 768, 1024])],
+  },
+  {
+    path: '/dashboards/gcal',
+    perfil: 'controle',
+    marco: 'Dashboard Google Calendar',
+    dados: { em: LINHA, texto: T.municipio },
+    // "Os 5 com mais eventos" esconde Erros (< 768) e Eventos esconde Erro (< 992): "Erro" está na linha
+    // expandida das duas, seja qual for a 1ª linha com o município.
+    estados: [expandida(T.municipio, 'Erro', [360])],
+  },
   {
     path: '/mapa-brasil',
     perfil: 'superusuario',
@@ -122,6 +160,8 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     dados: { em: LINHA, texto: 'BA' },
     estados: [
       { nome: 'lista', clicar: 'label.ant-radio-button-wrapper:has-text("Lista")', dados: { em: '.ant-list-item', texto: T.municipio } },
+      // G30: Detalhes por Estado; Municípios (< 576) e Coordenadores e Compras (< 768).
+      expandida('BA', 'Coordenadores', [360]),
     ],
   },
   {
@@ -180,9 +220,20 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     path: '/solicitacoes/bloqueios',
     perfil: 'coordenador',
     marco: 'Gerenciar Disponibilidade',
-    dados: { em: LINHA, texto: T.motivoBloqueio },
+    // G30: o Motivo só entra na linha a partir de md; o status (o seed é aprovado) fica na linha
+    // em toda largura. A 360 px, o motivo longo do seed é medido na linha expandida.
+    dados: { em: LINHA, texto: 'Aprovado' },
+    estados: [expandida('Aprovado', T.motivoBloqueio, [360])],
   },
-  { path: '/solicitacoes/deslocamentos', perfil: 'controle', marco: 'Deslocamentos', dados: { em: LINHA, texto: T.municipio } },
+  {
+    path: '/solicitacoes/deslocamentos',
+    perfil: 'controle',
+    marco: 'Deslocamentos',
+    // G30: o formador fica na linha em toda largura (a Origem, com o município do seed, só de lg); a
+    // Observação só entra na linha de xxl: há linha expandida em toda largura.
+    dados: { em: LINHA, texto: T.pessoa },
+    estados: [expandida(T.pessoa, 'Observação')],
+  },
   {
     path: '/solicitacoes/meus-eventos',
     perfil: 'coordenador',
@@ -228,16 +279,39 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
       },
     ],
   },
-  { path: '/controle/plano-formacoes', perfil: 'controle', marco: 'Plano Anual', dados: { em: LINHA, texto: T.municipio } },
+  {
+    path: '/controle/plano-formacoes',
+    perfil: 'controle',
+    marco: 'Plano Anual',
+    dados: { em: LINHA, texto: T.municipio },
+    // G30: F1-F15, A1-A2 e P1-P3 viraram a coluna Progresso; a edição de cada célula fica na linha
+    // aberta (Formações, Acompanhamentos e Provas nunca entram na linha): há linha expandida em toda largura.
+    estados: [expandida(T.municipio, 'Formações')],
+  },
   { path: '/controle/pre-agenda', perfil: 'controle', marco: 'Pré-agenda', dados: { em: LINHA, texto: T.municipio } },
-  { path: '/acoes-notificacao', perfil: 'superusuario', marco: 'Ações Internas', dados: { em: LINHA, texto: T.acao } },
+  {
+    path: '/acoes-notificacao',
+    perfil: 'superusuario',
+    marco: 'Ações Internas',
+    dados: { em: LINHA, texto: T.acao },
+    // G30: Ordem e Estado (< 576), Vencimento (< 768), Âncora (< 992) e Realização (< 1200) vão para
+    // a linha expandida.
+    estados: [expandida(T.acao, 'Realização', [360, 768, 1024])],
+  },
   {
     path: '/acoes-notificacao/timeline',
     perfil: 'superusuario',
     marco: 'Timeline das Ações',
     dados: { em: '.ant-timeline-item', texto: T.acao },
   },
-  { path: '/notificacoes-internas', perfil: 'superusuario', marco: 'Notificações Internas', dados: { em: LINHA, texto: T.notificacao } },
+  {
+    path: '/notificacoes-internas',
+    perfil: 'superusuario',
+    marco: 'Notificações Internas',
+    dados: { em: LINHA, texto: T.notificacao },
+    // G30: a mensagem nunca entra na linha (e o Tipo só de 1600 px): há linha expandida em toda largura.
+    estados: [expandida(T.notificacao, 'Mensagem')],
+  },
   { path: '/dat/admin', perfil: 'dat', marco: 'Admin DAT' },
   {
     path: '/dat/admin/usuarios',
@@ -333,6 +407,8 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     perfil: 'dat',
     marco: 'Gestão de Cadastros em Plataformas',
     dados: { em: LINHA, texto: T.municipio },
+    // G30: Alunos, Profs. e Códs. só entram na linha de xxl: há linha expandida em toda largura.
+    estados: [expandida(T.municipio, 'Alunos')],
   },
   { path: '/dat/importacoes', perfil: 'superusuario', marco: 'DAT > Importações' },
   {
@@ -356,11 +432,11 @@ export function chaveDe(rota: RotaMedida, estado?: EstadoDaTela): string {
  * sai daqui quando passar a ser medido (de preferência no PR do Programa C que mexe na tela).
  */
 export const NAO_MEDIDOS: Readonly<Record<string, string>> = {
-  'Home com outros perfis': 'os cartões da Home mudam por perfil; a rota é medida só com Controle',
   '/controle/plano-formacoes (Calendário e Resumo)': 'placeholders "em desenvolvimento", sem conteúdo',
   '/controle/pre-agenda (modo Google)': 'a tabela de eventos do Google exige OAuth',
-  '/solicitacoes/nova (pergunta de avaliar e avisos de agenda)':
-    'aparecem só depois de escolher projeto, formadores e horário nos ComboBox (lookup assíncrono)',
+  '/solicitacoes/nova (avisos de agenda)':
+    'aparecem só depois de escolher projeto, formadores e um horário com conflito na agenda; a pergunta ' +
+    'de avaliar o formador é medida desde o G30 (#avaliar, com o lookup interceptado)',
   '/mapa-brasil (municípios do estado clicado)': 'exige clicar numa região do mapa',
   '/dat/cadastros (aba AVALIAR)': 'o seed só tem cadastro FORMAR',
   'ImportUploader depois da validação':
@@ -399,8 +475,15 @@ export const ROTAS_NAO_MEDIDAS: Readonly<Record<string, { tipo: 'redirect' | 'al
 export const TELA_LOGIN = 'login';
 
 /**
+ * A troca obrigatória de senha também não é rota do AppRoutes: ocupa o lugar do sistema quando o
+ * /api/me/ diz `deve_trocar_senha` (G30). Medida com o /api/me/ interceptado; sem header com "Sair".
+ */
+export const TELA_TROCA_DE_SENHA = 'troca-de-senha';
+export const MARCO_TROCA_DE_SENHA = 'Defina sua senha';
+
+/**
  * DÍVIDA MEDIDA: rota × largura que TEM rolagem horizontal hoje.
- * Chave = `path` de ROTAS_MEDIDAS (ou TELA_LOGIN).
+ * Chave = `path` de ROTAS_MEDIDAS (ou TELA_LOGIN, TELA_TROCA_DE_SENHA, `/solicitacoes/nova#avaliar`).
  *
  * Cada combinação listada roda com `test.fail`: o teste passa enquanto a tela
  * ainda rola. Quando um PR do Programa C (C1..C7) conserta a tela, o teste
@@ -436,25 +519,21 @@ export const TELA_LOGIN = 'login';
  * C4, Grade Mensal (05/11/2026, semana com ‹ › abaixo de 1280 px): saíram as 3 de
  * /solicitacoes/disponibilidade. Ficam 51. A Grade com evento todo dia (#com-evento) e o detalhe
  * do dia (#detalhe) são medidos nas 4 larguras e não rolam.
+ * G30 (06/11/2026): saíram as 4 de /solicitacoes/bloqueios (ResponsiveTable; a lista divide a
+ * largura com o formulário só a partir de 1600 px). Ficam 47. A vista "expandida" é medida a 360.
+ * G30: saíram as 4 de /solicitacoes/deslocamentos. Ficam 43. A vista "expandida" é medida.
+ * G30: saíram as 4 de /dat/cadastros (a "expandida" é medida) e as 9 de /controle/coordenadores
+ * (cartões, "Lista" e "Por área": a área longa quebra linha, e cabeçalho e filtros também). Ficam 30.
+ * G30: saíram as 4 de /controle/plano-formacoes (a matriz de 27 colunas virou a coluna Progresso e a
+ * edição foi para a linha aberta, medida como "expandida"). Ficam 26.
+ * G30: saíram as 3 de /dashboards, as 4 de /dashboards/compras e de /dashboards/equipe, as 3 de
+ * /dashboards/gcal e as 3 de /mapa-brasil e de /mapa-brasil#lista (as tabelas são o ResponsiveTable;
+ * no Mapa, os cartões por estado só dividem a largura a partir de 1600 px). Ficam 6.
+ * G30: saíram as 4 de /acoes-notificacao e as 2 de /notificacoes-internas. PENDENTES zerou.
  * O ratchet do Vitest (semRolagemHorizontal.pendentes.test.ts) trava a lista: nada novo
  * entra e o tamanho só desce.
  */
 export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
-  '/dashboards': [360, 768, 1024],
-  '/dashboards/compras': [360, 768, 1024, 1280],
-  '/dashboards/equipe': [360, 768, 1024, 1280],
-  '/dashboards/gcal': [360, 768, 1024],
-  '/mapa-brasil': [360, 1024, 1280],
-  '/mapa-brasil#lista': [360, 1024, 1280],
-  '/solicitacoes/bloqueios': [360, 768, 1024, 1280],
-  '/solicitacoes/deslocamentos': [360, 768, 1024, 1280],
-  '/controle/coordenadores': [360, 768, 1024, 1280],
-  '/controle/coordenadores#lista': [360, 768, 1024, 1280],
-  '/controle/coordenadores#area': [360],
-  '/controle/plano-formacoes': [360, 768, 1024, 1280],
-  '/acoes-notificacao': [360, 768, 1024, 1280],
-  '/notificacoes-internas': [360, 768],
-  '/dat/cadastros': [360, 768, 1024, 1280],
 };
 
 /**
@@ -466,8 +545,6 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
  * uma combinação não pode estar nas duas listas.
  */
 export const PENDENTES_SO_LINUX: Readonly<Record<string, readonly Largura[]>> = {
-  // CI de 29/09/2026 (run 36655341855): Top 5 Coordenadores, rolagem interna +18 px.
-  '/dashboards': [1280],
-  // CI de 29/09/2026 (run 36655341855): tabela de eventos, rolagem interna +4 px.
-  '/dashboards/gcal': [1280],
+  // G30 (06/11/2026): saíram /dashboards e /dashboards/gcal a 1280 px (Top 5 Coordenadores, +18 px, e
+  // tabela de eventos, +4 px, na CI de 29/09/2026): as duas tabelas são o ResponsiveTable.
 };

@@ -6,6 +6,9 @@
  * - Filtros de período (date range) e status
  * - Tabela paginada de eventos
  * - Integração com /api/gcal/dashboard/metrics e /api/gcal/dashboard/events
+ *
+ * Sem rolagem horizontal (G30): as duas tabelas são o ResponsiveTable (o que some vai para a
+ * linha expandida) e o Drawer de detalhe ocupa a tela abaixo de 768 px (eram 720 px fixos).
  */
 
 import { useState, useEffect, useMemo, useCallback, type JSX } from 'react';
@@ -14,7 +17,6 @@ import {
   Row,
   Col,
   Statistic,
-  Table,
   Tag,
   Typography,
   Space,
@@ -27,12 +29,13 @@ import {
   Button,
   Dropdown,
   Drawer,
+  Grid,
   Descriptions,
   Timeline,
   Divider,
   Spin,
 } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 import type { TablePaginationConfig } from 'antd/es/table';
 import type { MenuProps } from 'antd';
 import type { Dayjs } from 'dayjs';
@@ -199,6 +202,7 @@ export default function GCalDashboardPage(): JSX.Element {
 
   // Drawer (Issue #98)
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
+  const telas = Grid.useBreakpoint();
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [eventDetail, setEventDetail] = useState<EventDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState<boolean>(false);
@@ -419,12 +423,13 @@ export default function GCalDashboardPage(): JSX.Element {
   ], [dateRange, statusFilter]);
 
   // Columns memoized (§16 Epic #459)
-  const columns: ColumnsType<EventRecord> = useMemo(() => [
+  const columns: ColunaResponsiva<EventRecord>[] = useMemo(() => [
     {
       title: 'ID',
       dataIndex: 'id',
       key: 'id',
-      width: 80,
+      responsive: VISIVEL_A_PARTIR.xl,
+      width: 72,
     },
     {
       title: 'Resumo',
@@ -448,6 +453,7 @@ export default function GCalDashboardPage(): JSX.Element {
       title: 'Última Sincronização',
       dataIndex: 'gcal_last_sync_at',
       key: 'gcal_last_sync_at',
+      responsive: VISIVEL_A_PARTIR.md,
       width: 180,
       render: (datetime: string | null) =>
         datetime ? formatFortaleza(datetime) : '-',
@@ -456,6 +462,7 @@ export default function GCalDashboardPage(): JSX.Element {
       title: 'Erro',
       dataIndex: 'gcal_last_error',
       key: 'gcal_last_error',
+      responsive: VISIVEL_A_PARTIR.lg,
       ellipsis: true,
       render: (error: string | null) =>
         error ? (
@@ -471,7 +478,7 @@ export default function GCalDashboardPage(): JSX.Element {
   ], []);
 
   // Issue #99: Colunas para Top Insights (memoized §16 Epic #459)
-  const topInsightsColumns: ColumnsType<TopInsightItem> = useMemo(() => [
+  const topInsightsColumns: ColunaResponsiva<TopInsightItem>[] = useMemo(() => [
     {
       title: 'Nome',
       dataIndex: 'name',
@@ -482,13 +489,14 @@ export default function GCalDashboardPage(): JSX.Element {
       title: 'Total',
       dataIndex: 'count',
       key: 'count',
-      width: 80,
+      width: 64,
       align: 'center',
     },
     {
       title: 'Publicados',
       dataIndex: 'published',
       key: 'published',
+      responsive: VISIVEL_A_PARTIR.md,
       width: 100,
       align: 'center',
       render: (value: number) => <Text type="success">{value}</Text>,
@@ -497,6 +505,7 @@ export default function GCalDashboardPage(): JSX.Element {
       title: 'Erros',
       dataIndex: 'error',
       key: 'error',
+      responsive: VISIVEL_A_PARTIR.md,
       width: 80,
       align: 'center',
       render: (value: number) => <Text type="danger">{value}</Text>,
@@ -505,7 +514,7 @@ export default function GCalDashboardPage(): JSX.Element {
       title: 'Taxa (%)',
       dataIndex: 'rate',
       key: 'rate',
-      width: 100,
+      width: 80,
       align: 'center',
       render: (rate: number) => {
         const percentage = (rate * 100).toFixed(1);
@@ -728,11 +737,11 @@ export default function GCalDashboardPage(): JSX.Element {
             bordered={false}
             className="mb-6"
           >
-            <Table
-              scroll={{ x: "max-content" }}
+            <ResponsiveTable<TopInsightItem>
               dataSource={topInsights?.items || []}
               columns={topInsightsColumns}
               rowKey="name"
+              nomeDaLinha={(item) => item.name}
               pagination={false}
               size="small"
               loading={insightsLoading}
@@ -745,14 +754,14 @@ export default function GCalDashboardPage(): JSX.Element {
       {/* Tabela de Eventos */}
       <section aria-label="Lista de eventos">
       <Card title="Eventos" bordered={false}>
-        <Table
+        <ResponsiveTable<EventRecord>
           dataSource={events}
           columns={columns}
           rowKey="id"
           loading={tableLoading}
           pagination={pagination}
           onChange={handleTableChange}
-          scroll={{ x: 800 }}
+          nomeDaLinha={(evento) => `evento #${evento.id}`}
           onRow={(record) => ({
             onClick: () => handleRowClick(record),
             style: { cursor: 'pointer' },
@@ -766,7 +775,8 @@ export default function GCalDashboardPage(): JSX.Element {
       <Drawer
         title={`Detalhes do Evento #${selectedEventId}`}
         placement="right"
-        width={720}
+        // Abaixo de md, a tela inteira: 720 px fixos passavam da tela no celular.
+        width={telas.md ? 720 : '100%'}
         onClose={handleDrawerClose}
         open={drawerOpen}
         extra={

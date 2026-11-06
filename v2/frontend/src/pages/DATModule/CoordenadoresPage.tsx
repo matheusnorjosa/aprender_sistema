@@ -5,13 +5,16 @@
  *
  * Interface de gestão de coordenadores e suas áreas de atuação.
  * Alocação por área, projetos e municípios, visualização de carga de trabalho.
+ *
+ * Sem rolagem horizontal (G30): a vista Lista é o ResponsiveTable (colunas por prioridade em
+ * ./Coordenadores/columns); no cartão e em "Por área", a área longa quebra linha em vez de ser
+ * cortada; o cabeçalho e a barra de botões dos filtros quebram linha.
  */
 
 import { useState, useEffect, useCallback, useMemo, type JSX } from 'react';
 import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
 import type { PaginatedResponse, ProjetoOption, MunicipioOption } from '../../types';
 import {
-  Table,
   Button,
   Input,
   Space,
@@ -33,6 +36,7 @@ import {
   Collapse,
   List,
   Switch,
+  Grid,
 } from 'antd';
 import {
   ReloadOutlined,
@@ -72,6 +76,7 @@ import {
   VIEW_MODES,
 } from './Coordenadores/constants';
 import { getColumns, type CoordenadorRecord } from './Coordenadores/columns';
+import ResponsiveTable from '../../components/ResponsiveTable';
 import { getAreaColor, getInitials, groupByArea, type CoordenadorForGroup } from './Coordenadores/helpers';
 import { useAcesso } from '../../contexts/AcessoContext';
 
@@ -128,6 +133,7 @@ export default function CoordenadoresPage(): JSX.Element {
   const [viewMode, setViewMode] = useState<string>(VIEW_MODES.CARDS);
   // O destroy exige `execute_restricted_operations` (o Controle via Excluir e levava 403), como em Compras.
   const podeExcluir = useAcesso().caps.canExecuteRestrictedOperations;
+  const acoesCompactas = !Grid.useBreakpoint().sm;
 
   const {
     data: coordenadores,
@@ -354,8 +360,8 @@ export default function CoordenadoresPage(): JSX.Element {
       onDelete: handleDelete,
       onToggleAtivo: handleToggleAtivo,
       podeExcluir,
-    }),
-    [handleView, handleEdit, handleDelete, handleToggleAtivo, podeExcluir]
+    }, acoesCompactas),
+    [handleView, handleEdit, handleDelete, handleToggleAtivo, podeExcluir, acoesCompactas]
   );
 
   // Card view renderer
@@ -396,18 +402,22 @@ export default function CoordenadoresPage(): JSX.Element {
                 </Avatar>
               }
               title={
-                <div>
+                // Sem <div> em volta: o título do Card.Meta corta com reticências, e elas só
+                // aparecem no texto que é filho direto dele.
+                <>
                   {coord.nome}
                   {coord.ativo === false && (
                     <Tag color="default" style={{ marginLeft: 8 }}>
                       Inativo
                     </Tag>
                   )}
-                </div>
+                </>
               }
               description={
-                <div>
-                  <Tag color={getAreaColor(coord.area)}>{coord.area || 'Sem área'}</Tag>
+                // O detalhe do Card.Meta tem overflow hidden: área e cargo longos quebram linha
+                // (até no meio da palavra, no cartão estreito) em vez de serem cortados.
+                <div style={{ overflowWrap: 'anywhere' }}>
+                  <Tag color={getAreaColor(coord.area)} style={{ whiteSpace: 'normal' }}>{coord.area || 'Sem área'}</Tag>
                   {coord.cargo && <Text type="secondary" style={{ fontSize: 12 }}> - {coord.cargo}</Text>}
                 </div>
               }
@@ -453,8 +463,8 @@ export default function CoordenadoresPage(): JSX.Element {
         <Panel
           key={area}
           header={
-            <Space>
-              <Tag color={getAreaColor(area)}>{area}</Tag>
+            <Space wrap>
+              <Tag color={getAreaColor(area)} style={{ whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{area}</Tag>
               <Text strong>{coords.length}</Text>
               <Text type="secondary">coordenador{coords.length !== 1 ? 'es' : ''}</Text>
             </Space>
@@ -500,7 +510,7 @@ export default function CoordenadoresPage(): JSX.Element {
     <section className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }} aria-labelledby="coordenadores-title">
       {/* Header */}
       <header className="mb-6">
-        <div className="flex justify-between items-start mb-2">
+        <div className="flex flex-wrap justify-between items-start gap-3 mb-2">
           <div>
             <Title level={3} className="m-0" id="coordenadores-title">
               <TeamOutlined className="mr-2" />
@@ -510,7 +520,7 @@ export default function CoordenadoresPage(): JSX.Element {
               Cadastro e alocação de coordenadores por área e projeto
             </Text>
           </div>
-          <Space>
+          <Space wrap>
             <Button.Group>
               <Tooltip title="Cards">
                 <Button
@@ -650,7 +660,7 @@ export default function CoordenadoresPage(): JSX.Element {
             />
           </Col>
           <Col flex="auto">
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
               <Button icon={<ClearOutlined />} onClick={handleClearFilters}>
                 Limpar
               </Button>
@@ -679,12 +689,12 @@ export default function CoordenadoresPage(): JSX.Element {
             </Space>
           }
         >
-          <Table<CoordenadorRecord>
+          <ResponsiveTable<CoordenadorRecord>
             columns={columns}
             dataSource={coordenadores}
             rowKey="id"
             loading={loading}
-            scroll={{ x: 1200 }}
+            nomeDaLinha={(coord) => coord.nome}
             pagination={{
               ...pagination,
               showSizeChanger: true,

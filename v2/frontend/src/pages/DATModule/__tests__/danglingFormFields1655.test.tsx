@@ -70,7 +70,7 @@ describe('#1655: Form.Items dangling foram removidos', () => {
     async () => {
       const user = userEvent.setup();
       render(<MemoryRouter><CadastrosPage /></MemoryRouter>);
-      const btn = await screen.findByLabelText('Editar cadastro', {}, { timeout: 15000 });
+      const btn = await screen.findByLabelText(/^Editar: /, {}, { timeout: 15000 });
       await user.click(btn);
       const dialog = await screen.findByRole('dialog', {}, { timeout: 10000 });
       expect(within(dialog).queryByLabelText('Link da Planilha')).toBeNull();

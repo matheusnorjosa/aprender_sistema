@@ -79,7 +79,7 @@ describe('#1740: botao Excluir do Plano so aparece para operacao restrita', () =
     async () => {
       renderPagina(['execute_restricted_operations', 'access_controle_section']);
 
-      const btn = await screen.findByRole('button', { name: /Excluir plano/i }, { timeout: 15000 });
+      const btn = await screen.findByRole('button', { name: /^Excluir: / }, { timeout: 15000 });
       expect(btn).toBeTruthy();
     },
     20000,
@@ -91,8 +91,8 @@ describe('#1740: botao Excluir do Plano so aparece para operacao restrita', () =
       renderPagina(['access_controle_section', 'create_solicitation']);
 
       // A linha renderiza (o botao Editar aparece sempre); o Excluir deve estar ausente.
-      await screen.findByRole('button', { name: /Editar plano/i }, { timeout: 15000 });
-      expect(screen.queryByRole('button', { name: /Excluir plano/i })).toBeNull();
+      await screen.findByRole('button', { name: /^Editar: / }, { timeout: 15000 });
+      expect(screen.queryByRole('button', { name: /^Excluir: / })).toBeNull();
     },
     20000,
   );

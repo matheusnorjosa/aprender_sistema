@@ -103,7 +103,7 @@ describe('M17-02: editar busca o DETAIL antes de abrir o modal', () => {
           <CadastrosPage />
         </MemoryRouter>,
       );
-      const btn = await screen.findByLabelText('Editar cadastro', {}, { timeout: 15000 });
+      const btn = await screen.findByLabelText(/^Editar: /, {}, { timeout: 15000 });
       await userEvent.click(btn);
       await waitFor(() => expect(getCadastro).toHaveBeenCalledWith(9), { timeout: 10000 });
     },

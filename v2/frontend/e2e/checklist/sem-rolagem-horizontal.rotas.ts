@@ -111,10 +111,42 @@ function expandida(textoDaLinha: string, rotulo: string, larguras?: readonly Lar
 
 export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
   { path: '/', perfil: 'controle', marco: 'Página Inicial' },
-  { path: '/dashboards', perfil: 'superusuario', marco: 'Dashboards e Analises', dados: { em: LINHA, texto: T.pessoa } },
-  { path: '/dashboards/compras', perfil: 'dat', marco: 'Dashboard de Compras', dados: { em: LINHA, texto: T.municipio } },
-  { path: '/dashboards/equipe', perfil: 'dat', marco: 'Dashboard da Equipe', dados: { em: LINHA, texto: T.pessoa } },
-  { path: '/dashboards/gcal', perfil: 'controle', marco: 'Dashboard Google Calendar', dados: { em: LINHA, texto: T.municipio } },
+  // G30: as tabelas dos dashboards e do mapa são o ResponsiveTable; a vista "expandida" é medida
+  // nas larguras em que há coluna escondida (a 1ª linha com o texto do seed).
+  {
+    path: '/dashboards',
+    perfil: 'superusuario',
+    marco: 'Dashboards e Analises',
+    dados: { em: LINHA, texto: T.pessoa },
+    // Posicao (< 576) e Progresso (< 768) vão para a linha expandida.
+    estados: [expandida(T.pessoa, 'Posicao', [360])],
+  },
+  {
+    path: '/dashboards/compras',
+    perfil: 'dat',
+    marco: 'Dashboard de Compras',
+    dados: { em: LINHA, texto: T.municipio },
+    // As duas tabelas escondem "Compras" abaixo de 992 px (pendências: também Itens, Projeto e Última
+    // compra; quem compra mais: Entregues e Comparativo): o rótulo vale para a que tiver a 1ª linha.
+    estados: [expandida(T.municipio, 'Compras', [360, 768])],
+  },
+  {
+    path: '/dashboards/equipe',
+    perfil: 'dat',
+    marco: 'Dashboard da Equipe',
+    dados: { em: LINHA, texto: T.pessoa },
+    // Detalhamento: Horas (< 992) e Municípios (< 1200).
+    estados: [expandida(T.pessoa, 'Municípios', [360, 768, 1024])],
+  },
+  {
+    path: '/dashboards/gcal',
+    perfil: 'controle',
+    marco: 'Dashboard Google Calendar',
+    dados: { em: LINHA, texto: T.municipio },
+    // "Os 5 com mais eventos" esconde Erros (< 768) e Eventos esconde Erro (< 992): "Erro" está na linha
+    // expandida das duas, seja qual for a 1ª linha com o município.
+    estados: [expandida(T.municipio, 'Erro', [360])],
+  },
   {
     path: '/mapa-brasil',
     perfil: 'superusuario',
@@ -122,6 +154,8 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     dados: { em: LINHA, texto: 'BA' },
     estados: [
       { nome: 'lista', clicar: 'label.ant-radio-button-wrapper:has-text("Lista")', dados: { em: '.ant-list-item', texto: T.municipio } },
+      // G30: Detalhes por Estado; Municípios (< 576) e Coordenadores e Compras (< 768).
+      expandida('BA', 'Coordenadores', [360]),
     ],
   },
   {
@@ -464,16 +498,13 @@ export const TELA_LOGIN = 'login';
  * (cartões, "Lista" e "Por área": a área longa quebra linha, e cabeçalho e filtros também). Ficam 30.
  * G30: saíram as 4 de /controle/plano-formacoes (a matriz de 27 colunas virou a coluna Progresso e a
  * edição foi para a linha aberta, medida como "expandida"). Ficam 26.
+ * G30: saíram as 3 de /dashboards, as 4 de /dashboards/compras e de /dashboards/equipe, as 3 de
+ * /dashboards/gcal e as 3 de /mapa-brasil e de /mapa-brasil#lista (as tabelas são o ResponsiveTable;
+ * no Mapa, os cartões por estado só dividem a largura a partir de 1600 px). Ficam 6.
  * O ratchet do Vitest (semRolagemHorizontal.pendentes.test.ts) trava a lista: nada novo
  * entra e o tamanho só desce.
  */
 export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
-  '/dashboards': [360, 768, 1024],
-  '/dashboards/compras': [360, 768, 1024, 1280],
-  '/dashboards/equipe': [360, 768, 1024, 1280],
-  '/dashboards/gcal': [360, 768, 1024],
-  '/mapa-brasil': [360, 1024, 1280],
-  '/mapa-brasil#lista': [360, 1024, 1280],
   '/acoes-notificacao': [360, 768, 1024, 1280],
   '/notificacoes-internas': [360, 768],
 };
@@ -487,8 +518,6 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
  * uma combinação não pode estar nas duas listas.
  */
 export const PENDENTES_SO_LINUX: Readonly<Record<string, readonly Largura[]>> = {
-  // CI de 29/09/2026 (run 36655341855): Top 5 Coordenadores, rolagem interna +18 px.
-  '/dashboards': [1280],
-  // CI de 29/09/2026 (run 36655341855): tabela de eventos, rolagem interna +4 px.
-  '/dashboards/gcal': [1280],
+  // G30 (06/11/2026): saíram /dashboards e /dashboards/gcal a 1280 px (Top 5 Coordenadores, +18 px, e
+  // tabela de eventos, +4 px, na CI de 29/09/2026): as duas tabelas são o ResponsiveTable.
 };

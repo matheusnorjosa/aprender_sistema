@@ -8,6 +8,9 @@
  * - Botao de export CSV
  *
  * Ref: Issue #311 - Substituir mock data por API real
+ *
+ * Sem rolagem horizontal (G30): o Top 5 é o ResponsiveTable (posição a partir de sm, progresso
+ * de md; o que some vai para a linha expandida) e os botões do cabeçalho quebram linha.
  */
 
 import { useState, useEffect, useCallback, type JSX } from 'react';
@@ -16,7 +19,6 @@ import {
   Row,
   Col,
   Statistic,
-  Table,
   Tag,
   Button,
   Typography,
@@ -26,7 +28,7 @@ import {
   Alert,
   Empty,
 } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 import logger from '../../utils/logger';
 import {
   getDashboardOverview,
@@ -128,11 +130,12 @@ export default function DashboardsPage(): JSX.Element {
   const maxCoord = top_coordenadores[0]?.eventos ?? 1;
 
   // Columns for top coordenadores table
-  const columns: ColumnsType<DashboardCoordenadorItem> = [
+  const columns: ColunaResponsiva<DashboardCoordenadorItem>[] = [
     {
       title: 'Posicao',
       key: 'posicao',
-      width: 100,
+      responsive: VISIVEL_A_PARTIR.sm,
+      width: 88,
       render: (_, __, index) => (
         <Tag color={index < 3 ? 'gold' : 'default'}>
           {index + 1}o
@@ -148,12 +151,14 @@ export default function DashboardsPage(): JSX.Element {
       title: 'Eventos',
       dataIndex: 'eventos',
       key: 'eventos',
+      width: 80,
       align: 'right',
       render: (eventos: number) => <Text strong>{eventos}</Text>,
     },
     {
       title: 'Progresso',
       key: 'progresso',
+      responsive: VISIVEL_A_PARTIR.md,
       render: (_, record) => (
         <Progress
           percent={(record.eventos / maxCoord) * 100}
@@ -166,14 +171,14 @@ export default function DashboardsPage(): JSX.Element {
 
   return (
     <section className="p-6" aria-labelledby="dashboards-title">
-      <header className="mb-6 flex justify-between items-center">
+      <header className="mb-6 flex flex-wrap justify-between items-center gap-3">
         <div>
           <Title level={2} id="dashboards-title">Dashboards e Analises</Title>
           <Text type="secondary">
             Visualize metricas detalhadas e relatorios do sistema
           </Text>
         </div>
-        <Space>
+        <Space wrap>
           <Button icon={<ReloadOutlined />} onClick={loadData}>
             Atualizar
           </Button>
@@ -346,12 +351,12 @@ export default function DashboardsPage(): JSX.Element {
             {top_coordenadores.length === 0 ? (
               <Empty description="Nenhum coordenador no periodo" />
             ) : (
-              <Table
-                scroll={{ x: "max-content" }}
+              <ResponsiveTable<DashboardCoordenadorItem>
                 dataSource={top_coordenadores}
                 rowKey="nome"
                 pagination={false}
                 columns={columns}
+                nomeDaLinha={(coordenador) => coordenador.nome}
               />
             )}
           </Card>

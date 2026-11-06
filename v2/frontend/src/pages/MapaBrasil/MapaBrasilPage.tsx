@@ -8,6 +8,10 @@
  * - Toggle Map/List view
  *
  * Estilo: SimpleMaps (flat, clean, hover escurece preenchimento, bordas fixas)
+ *
+ * Sem rolagem horizontal (G30): as tabelas são o ResponsiveTable (o que some vai para a linha
+ * expandida); "Eventos por Estado" e "Detalhes por Estado" só dividem a largura a partir de 1600 px
+ * (na metade da área principal, a partir de 992 px, não cabiam); as etiquetas quebram linha.
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo, MutableRefObject, ChangeEvent, JSX } from 'react';
@@ -19,7 +23,6 @@ import {
   Select,
   DatePicker,
   Button,
-  Table,
   List,
   Typography,
   Space,
@@ -31,7 +34,7 @@ import {
   Statistic,
   Divider,
 } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 import type { RadioChangeEvent } from 'antd/es/radio';
 import type { Dayjs } from 'dayjs';
 import {
@@ -470,7 +473,7 @@ export default function MapaBrasilPage(): JSX.Element {
   );
 
   // Columns for coordenadores table
-  const coordenadoresColumns: ColumnsType<CoordenadorDataType> = [
+  const coordenadoresColumns: ColunaResponsiva<CoordenadorDataType>[] = [
     {
       title: 'Coordenador',
       dataIndex: 'nome',
@@ -481,6 +484,7 @@ export default function MapaBrasilPage(): JSX.Element {
       title: 'Eventos',
       dataIndex: 'eventos',
       key: 'eventos',
+      width: 80,
       align: 'center',
       sorter: (a, b) => a.eventos - b.eventos,
       defaultSortOrder: 'descend',
@@ -490,10 +494,11 @@ export default function MapaBrasilPage(): JSX.Element {
       title: 'Projetos (eventos)',
       dataIndex: 'projetos',
       key: 'projetos',
+      responsive: VISIVEL_A_PARTIR.md,
       render: (projetos: CoordenadorProjetoType[]) => (
         <Space wrap size={[4, 4]}>
           {projetos.map((p) => (
-            <Tag key={p.nome} color="purple" style={{ margin: 0 }}>
+            <Tag key={p.nome} color="purple" style={{ margin: 0, whiteSpace: 'normal' }}>
               {p.nome}: <strong>{p.eventos}</strong>
             </Tag>
           ))}
@@ -504,10 +509,11 @@ export default function MapaBrasilPage(): JSX.Element {
       title: 'Municípios (eventos)',
       dataIndex: 'municipios',
       key: 'municipios',
+      responsive: VISIVEL_A_PARTIR.lg,
       render: (municipios: CoordenadorMunicipioType[]) => (
         <Space wrap size={[4, 4]}>
           {municipios.map((m) => (
-            <Tag key={m.nome} color="green" style={{ margin: 0 }}>
+            <Tag key={m.nome} color="green" style={{ margin: 0, whiteSpace: 'normal' }}>
               {m.nome}: <strong>{m.eventos}</strong>
             </Tag>
           ))}
@@ -517,7 +523,7 @@ export default function MapaBrasilPage(): JSX.Element {
   ];
 
   // Columns for municipios table
-  const municipiosColumns: ColumnsType<MunicipioDataType> = [
+  const municipiosColumns: ColunaResponsiva<MunicipioDataType>[] = [
     {
       title: 'Município',
       dataIndex: 'municipio',
@@ -527,6 +533,7 @@ export default function MapaBrasilPage(): JSX.Element {
       title: 'Eventos',
       dataIndex: 'eventos',
       key: 'eventos',
+      width: 80,
       align: 'center',
       render: (v: number) => <Tag color="blue">{v}</Tag>,
     },
@@ -534,6 +541,8 @@ export default function MapaBrasilPage(): JSX.Element {
       title: 'Coordenadores',
       dataIndex: 'coordenadores',
       key: 'coordenadores',
+      responsive: VISIVEL_A_PARTIR.sm,
+      width: 120,
       align: 'center',
       render: (v: number) => <Tag color="green">{v}</Tag>,
     },
@@ -541,6 +550,8 @@ export default function MapaBrasilPage(): JSX.Element {
       title: 'Projetos',
       dataIndex: 'projetos',
       key: 'projetos',
+      responsive: VISIVEL_A_PARTIR.md,
+      width: 88,
       align: 'center',
       render: (v: number) => <Tag color="purple">{v}</Tag>,
     },
@@ -548,13 +559,15 @@ export default function MapaBrasilPage(): JSX.Element {
       title: 'Compras',
       dataIndex: 'compras',
       key: 'compras',
+      responsive: VISIVEL_A_PARTIR.md,
+      width: 88,
       align: 'center',
       render: (v: number) => <Tag color="orange">{v}</Tag>,
     },
   ];
 
   // Columns for estados table
-  const estadosColumns: ColumnsType<EstadoTableRowType> = [
+  const estadosColumns: ColunaResponsiva<EstadoTableRowType>[] = [
     {
       title: 'Estado',
       dataIndex: 'uf',
@@ -565,6 +578,8 @@ export default function MapaBrasilPage(): JSX.Element {
       title: 'Municípios',
       dataIndex: 'municipiosTotal',
       key: 'municipiosTotal',
+      responsive: VISIVEL_A_PARTIR.sm,
+      width: 96,
       align: 'center',
       render: (total: number) => total,
     },
@@ -573,6 +588,7 @@ export default function MapaBrasilPage(): JSX.Element {
       dataIndex: 'eventos',
       key: 'eventos',
       align: 'center',
+      width: 80,
       render: (eventos: number) => <Tag color="blue">{eventos}</Tag>,
     },
     {
@@ -580,6 +596,8 @@ export default function MapaBrasilPage(): JSX.Element {
       dataIndex: 'coordenadores',
       key: 'coordenadores',
       align: 'center',
+      responsive: VISIVEL_A_PARTIR.md,
+      width: 120,
       render: (coord: number) => <Tag color="green">{coord}</Tag>,
     },
     {
@@ -587,6 +605,8 @@ export default function MapaBrasilPage(): JSX.Element {
       dataIndex: 'compras',
       key: 'compras',
       align: 'center',
+      responsive: VISIVEL_A_PARTIR.md,
+      width: 88,
       render: (compras: number) => <Tag color="orange">{compras}</Tag>,
     },
   ];
@@ -864,7 +884,7 @@ export default function MapaBrasilPage(): JSX.Element {
               <div style={{ textAlign: 'center', marginTop: 16 }}>
                 <Space direction="vertical" size="small">
                   {/* Legenda do mapa - estilo SimpleMaps */}
-                  <Space split="|" size="middle">
+                  <Space split="|" size="middle" wrap>
                     <Text type="secondary">
                       <span style={{
                         display: 'inline-block',
@@ -985,14 +1005,14 @@ export default function MapaBrasilPage(): JSX.Element {
                       }
                     />
                   )}
-                  <Table
-                    scroll={{ x: "max-content" }}
+                  <ResponsiveTable<CoordenadorDataType>
                     size="small"
                     loading={loadingCoordinators}
                     pagination={false}
                     dataSource={coordenadoresData}
                     rowKey="id"
                     columns={coordenadoresColumns}
+                    nomeDaLinha={(coordenador) => coordenador.nome}
                   />
                 </div>
 
@@ -1017,13 +1037,13 @@ export default function MapaBrasilPage(): JSX.Element {
                   <Title level={5} style={{ marginBottom: 12 }}>
                     Detalhes por Município
                   </Title>
-                  <Table
-                    scroll={{ x: "max-content" }}
+                  <ResponsiveTable<MunicipioDataType>
                     size="small"
                     pagination={false}
                     dataSource={municipiosData.filter(m => m.uf === selectedState)}
                     rowKey={(record) => `${record.municipio}-${record.uf}`}
                     columns={municipiosColumns}
+                    nomeDaLinha={(municipio) => `${municipio.municipio} - ${municipio.uf}`}
                   />
                 </div>
               </Card>
@@ -1036,7 +1056,7 @@ export default function MapaBrasilPage(): JSX.Element {
                 renderItem={(item) => (
                   <List.Item
                     extra={
-                      <Space>
+                      <Space wrap size={[4, 4]}>
                         <Tag color="purple">{item.projetos} projetos</Tag>
                         <Tag color="blue">{item.eventos} eventos</Tag>
                         <Tag color="orange">{item.compras} compras</Tag>
@@ -1057,19 +1077,19 @@ export default function MapaBrasilPage(): JSX.Element {
           {/* Estatísticas por Estado */}
           <Row gutter={[16, 16]}>
             {/* Eventos por Estado */}
-            <Col xs={24} lg={12}>
+            <Col xs={24} xxl={12}>
               <Card title="Eventos por Estado" bordered={false} loading={loading} style={{ borderRadius: '12px' }}>
                 <List
                   dataSource={Object.entries(estadosData).sort((a, b) => b[1].eventos - a[1].eventos)}
                   renderItem={([uf, data]) => (
                     <List.Item>
-                      <div className="w-full flex justify-between">
+                      <div className="w-full flex justify-between gap-2">
                         <div>
                           <Text strong>{uf}</Text>
                           <br />
                           <Text type="secondary" style={{ fontSize: 12 }}>{data.municipiosTotal} municípios</Text>
                         </div>
-                        <Space>
+                        <Space wrap size={[4, 4]}>
                           <Tag color="blue">{data.eventos} Eventos</Tag>
                           <Tag color="purple">{data.projetos} Projetos</Tag>
                           <Tag color="orange">{data.compras} Compras</Tag>
@@ -1082,15 +1102,15 @@ export default function MapaBrasilPage(): JSX.Element {
             </Col>
 
             {/* Detalhes por Estado */}
-            <Col xs={24} lg={12}>
+            <Col xs={24} xxl={12}>
               <Card title="Detalhes por Estado" bordered={false} loading={loading} style={{ borderRadius: '12px' }}>
-                <Table
-                  scroll={{ x: "max-content" }}
+                <ResponsiveTable<EstadoTableRowType>
                   dataSource={Object.values(estadosData)}
                   rowKey="uf"
                   pagination={false}
                   size="small"
                   columns={estadosColumns}
+                  nomeDaLinha={(estado) => estado.uf}
                 />
               </Card>
             </Col>

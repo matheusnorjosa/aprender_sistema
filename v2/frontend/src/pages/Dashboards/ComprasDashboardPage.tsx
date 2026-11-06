@@ -2,6 +2,10 @@
  * Dashboard de Compras - DAT
  *
  * Métricas de municípios atendidos, volumes por coleção/produto e ranking de compras.
+ *
+ * Sem rolagem horizontal (G30): as tabelas são o ResponsiveTable (o que some vai para a linha
+ * expandida) e os 5 cartões de indicador só ficam lado a lado a partir de 1600 px (em 1/6 da
+ * largura, o título era cortado).
  */
 
 import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
@@ -16,11 +20,10 @@ import {
   Select,
   Space,
   Spin,
-  Table,
   Tag,
   Typography,
 } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 import {
   AppstoreOutlined,
   BookOutlined,
@@ -256,7 +259,7 @@ export default function ComprasDashboardPage(): JSX.Element {
     { label: 'Compra adicional 3', value: 'adicional_3' },
   ];
 
-  const topMunicipiosColumns: ColumnsType<Record<string, string | number>> = [
+  const topMunicipiosColumns: ColunaResponsiva<Record<string, string | number>>[] = [
     {
       title: 'Município',
       dataIndex: 'municipio',
@@ -272,6 +275,7 @@ export default function ComprasDashboardPage(): JSX.Element {
       title: 'Itens',
       dataIndex: 'quantidade',
       key: 'quantidade',
+      width: 80,
       align: 'right',
       render: (value: number) => formatNumber(value),
     },
@@ -279,6 +283,8 @@ export default function ComprasDashboardPage(): JSX.Element {
       title: 'Entregues',
       dataIndex: 'entregues',
       key: 'entregues',
+      responsive: VISIVEL_A_PARTIR.md,
+      width: 96,
       align: 'right',
       render: (value: number) => formatNumber(value),
     },
@@ -286,12 +292,15 @@ export default function ComprasDashboardPage(): JSX.Element {
       title: 'Compras',
       dataIndex: 'compras',
       key: 'compras',
+      responsive: VISIVEL_A_PARTIR.lg,
+      width: 88,
       align: 'right',
       render: (value: number) => formatNumber(value),
     },
     {
       title: 'Comparativo',
       key: 'comparativo',
+      responsive: VISIVEL_A_PARTIR.xl,
       render: (_: unknown, record) => {
         const maxQuantidade = Math.max(
           ...(data?.top_municipios || []).map((item) => toNumber(item['quantidade'])),
@@ -311,7 +320,7 @@ export default function ComprasDashboardPage(): JSX.Element {
     },
   ];
 
-  const pendenciasColumns: ColumnsType<CompraPendenteItem> = [
+  const pendenciasColumns: ColunaResponsiva<CompraPendenteItem>[] = [
     {
       title: 'Município',
       dataIndex: 'municipio',
@@ -327,11 +336,15 @@ export default function ComprasDashboardPage(): JSX.Element {
       title: 'Projeto',
       dataIndex: 'projeto',
       key: 'projeto',
+      responsive: VISIVEL_A_PARTIR.md,
+      ellipsis: true,
     },
     {
       title: 'Itens',
       dataIndex: 'total_itens',
       key: 'total_itens',
+      responsive: VISIVEL_A_PARTIR.sm,
+      width: 80,
       align: 'right',
       render: (value: number) => formatNumber(value),
     },
@@ -339,6 +352,8 @@ export default function ComprasDashboardPage(): JSX.Element {
       title: 'Compras',
       dataIndex: 'total_compras',
       key: 'total_compras',
+      responsive: VISIVEL_A_PARTIR.lg,
+      width: 88,
       align: 'right',
       render: (value: number) => formatNumber(value),
     },
@@ -346,6 +361,8 @@ export default function ComprasDashboardPage(): JSX.Element {
       title: 'Última compra',
       dataIndex: 'ultima_compra',
       key: 'ultima_compra',
+      responsive: VISIVEL_A_PARTIR.lg,
+      width: 120,
       align: 'right',
       render: (value: string | null) => formatDate(value),
     },
@@ -507,7 +524,7 @@ export default function ComprasDashboardPage(): JSX.Element {
       </Card>
 
       <Row gutter={[16, 16]} className="mb-6">
-        <Col xs={24} sm={12} md={8} lg={4}>
+        <Col xs={24} sm={12} md={8} xxl={4}>
           <Card className="kpi-card kpi-1" bordered={false}>
             <div className="flex items-center justify-between">
               <div>
@@ -523,7 +540,7 @@ export default function ComprasDashboardPage(): JSX.Element {
             </div>
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={8} lg={4}>
+        <Col xs={24} sm={12} md={8} xxl={4}>
           <Card className="kpi-card kpi-2" bordered={false}>
             <div className="flex items-center justify-between">
               <div>
@@ -534,7 +551,7 @@ export default function ComprasDashboardPage(): JSX.Element {
             </div>
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={8} lg={4}>
+        <Col xs={24} sm={12} md={8} xxl={4}>
           <Card className="kpi-card kpi-3" bordered={false}>
             <div className="flex items-center justify-between">
               <div>
@@ -545,7 +562,7 @@ export default function ComprasDashboardPage(): JSX.Element {
             </div>
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={8} lg={4}>
+        <Col xs={24} sm={12} md={8} xxl={4}>
           <Card className="kpi-card kpi-4" bordered={false}>
             <div className="flex items-center justify-between">
               <div>
@@ -556,7 +573,7 @@ export default function ComprasDashboardPage(): JSX.Element {
             </div>
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={8} lg={4}>
+        <Col xs={24} sm={12} md={8} xxl={4}>
           <Card className="kpi-card kpi-5" bordered={false}>
             <div className="flex items-center justify-between">
               <div>
@@ -595,10 +612,10 @@ export default function ComprasDashboardPage(): JSX.Element {
               evento · <Text strong>{formatNumber(pendencias.total_pendentes)} pendentes</Text>
               {' '}({pendencias.percentual_pendentes}%)
             </Text>
-            <Table
-              scroll={{ x: "max-content" }}
+            <ResponsiveTable<CompraPendenteItem>
               dataSource={pendencias.pendentes}
               columns={pendenciasColumns}
+              nomeDaLinha={(item) => `${item.municipio} - ${item.uf} · ${item.projeto}`}
               rowKey={(record) => `${record.municipio_id}-${record.projeto_id}`}
               pagination={{ pageSize: 10, showSizeChanger: false }}
               locale={{ emptyText: 'Sem pendências para os filtros selecionados' }}
@@ -654,10 +671,10 @@ export default function ComprasDashboardPage(): JSX.Element {
               <span className="chart-title">Quem compra mais (Municípios)</span>
             </Space>
           )}>
-            <Table
-              scroll={{ x: "max-content" }}
+            <ResponsiveTable<Record<string, string | number>>
               dataSource={data.top_municipios}
               columns={topMunicipiosColumns}
+              nomeDaLinha={(item) => `${String(item['municipio'])} - ${String(item['uf'])}`}
               rowKey={(record) => `${record['municipio']}-${record['uf']}`}
               pagination={false}
             />

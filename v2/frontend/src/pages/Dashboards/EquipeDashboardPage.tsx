@@ -7,6 +7,9 @@
  * - Seção 3: Qualidade (cards com thresholds visuais)
  *
  * RBAC: policy view_team_dashboard (Diretoria e DAT) na rota (AppRoutes.tsx) e nos três endpoints
+ *
+ * Sem rolagem horizontal (G30): o Detalhamento é o ResponsiveTable (horas a partir de lg,
+ * municípios de xl; o que some vai para a linha expandida) e os controles do cabeçalho quebram linha.
  */
 
 import { useState, useEffect, useCallback, type JSX } from 'react';
@@ -15,7 +18,6 @@ import {
   Row,
   Col,
   Statistic,
-  Table,
   Button,
   Typography,
   Space,
@@ -27,7 +29,7 @@ import {
   Tag,
   message,
 } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 import {
   RiseOutlined,
   CheckCircleOutlined,
@@ -132,11 +134,11 @@ export default function EquipeDashboardPage(): JSX.Element {
   };
 
   // Columns for formadores table
-  const formadoresColumns: ColumnsType<TeamFormadorRecord> = [
+  const formadoresColumns: ColunaResponsiva<TeamFormadorRecord>[] = [
     {
       title: '#',
       key: 'rank',
-      width: 50,
+      width: 48,
       align: 'center',
       render: (_, __, index) => <Text type="secondary">{index + 1}</Text>,
     },
@@ -159,6 +161,7 @@ export default function EquipeDashboardPage(): JSX.Element {
       title: 'Horas',
       dataIndex: 'horas_trabalhadas',
       key: 'horas',
+      responsive: VISIVEL_A_PARTIR.lg,
       width: 80,
       align: 'right',
       sorter: (a, b) => b.horas_trabalhadas - a.horas_trabalhadas,
@@ -168,7 +171,8 @@ export default function EquipeDashboardPage(): JSX.Element {
       title: 'Municípios',
       dataIndex: 'municipios_atendidos',
       key: 'municipios',
-      width: 90,
+      responsive: VISIVEL_A_PARTIR.xl,
+      width: 96,
       align: 'right',
       sorter: (a, b) => b.municipios_atendidos - a.municipios_atendidos,
     },
@@ -198,7 +202,7 @@ export default function EquipeDashboardPage(): JSX.Element {
           </Text>
         </div>
 
-        <Space>
+        <Space wrap>
           <Select
             value={days}
             onChange={setDays}
@@ -329,8 +333,8 @@ export default function EquipeDashboardPage(): JSX.Element {
 
             <Col xs={24} md={12}>
               <Card title="Detalhamento" bordered={false}>
-                <Table
-                  scroll={{ x: "max-content" }}
+                <ResponsiveTable<TeamFormadorRecord>
+                  nomeDaLinha={(formador) => formador.nome}
                   dataSource={formadoresData?.formadores || []}
                   rowKey="id"
                   pagination={{ pageSize: 5, size: 'small' }}

@@ -13,7 +13,7 @@ export const TABELA_ANTD_PADRAO = 'src/components/ResponsiveTable.tsx';
  * Solicitações, 15 depois de Aprovações, Publicar na agenda e Pré-agenda (item 36,
  * 19/10/2026), 13 depois de Gestão de Ações e Registros de Turmas (item 38, 20/10/2026) e 12
  * depois de Gestão de Compras (item 38, 26/10/2026); o G30 (06/11/2026) tira as telas
- * restantes, uma por commit: 11 depois de Bloqueios, 10 depois de Deslocamentos, 9 depois de Cadastros, 8 depois de Coordenadores, 7 depois de Plano Anual.
+ * restantes, uma por commit: 11 depois de Bloqueios, 10 depois de Deslocamentos, 9 depois de Cadastros, 8 depois de Coordenadores, 7 depois de Plano Anual, 2 depois de Dashboards e Mapa.
  * SÓ ENCOLHE. Cada PR do Programa C tira os arquivos que migra (o valor diz qual PR). src/test/lint/tabelaAntdRestrita.test.ts mede quem importa
  * Table em src/ e exige que o conjunto seja exatamente esta lista: arquivo novo
  * reprova (use ResponsiveTable) e entrada que já não importa também (tire-a daqui).
@@ -26,9 +26,4 @@ export const TABELA_ANTD_PADRAO = 'src/components/ResponsiveTable.tsx';
 export const TABELA_ANTD_ALLOWLIST = {
   'src/pages/Controle/AcoesNotificacaoPage.tsx': 'C5 — Notificações',
   'src/pages/Controle/NotificacoesInternasPage.tsx': 'C5 — Notificações',
-  'src/pages/Dashboards/ComprasDashboardPage.tsx': 'C7 — dashboards',
-  'src/pages/Dashboards/DashboardsPage.tsx': 'C7 — dashboards',
-  'src/pages/Dashboards/EquipeDashboardPage.tsx': 'C7 — dashboards',
-  'src/pages/Dashboards/GCalDashboardPage.tsx': 'C7 — dashboards',
-  'src/pages/MapaBrasil/MapaBrasilPage.tsx': 'C7 — mapa',
 };

@@ -26,7 +26,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand, CommandParser
 
 from apps.core.constants import FUNCAO_GROUPS, SETOR_GROUPS
-from apps.core.models import AvailabilityBlock, Compra, Municipio, Projeto, Solicitacao, Usuario
+from apps.core.models import AvailabilityBlock, Municipio, Projeto, Solicitacao, Usuario
 from apps.core.services.functional_permissions_seed import seed_functional_permissions
 
 # Lista canônica completa: todos os grupos seedados (setor + função).
@@ -50,8 +50,6 @@ PERMS_BY_GROUP = {
     "Controle": [
         ("view", Municipio),
         ("view", Projeto),
-        ("view", Compra),
-        ("add", Compra),
         ("add", AvailabilityBlock),
         ("change", AvailabilityBlock),
         ("delete", AvailabilityBlock),

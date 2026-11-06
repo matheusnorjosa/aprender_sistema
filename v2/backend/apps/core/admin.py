@@ -21,7 +21,6 @@ from .models import (
     AuditLog,
     AvailabilityBlock,
     CicloAcoes,
-    Compra,
     Deslocamento,
     FeriadoLocal,
     Municipio,
@@ -249,26 +248,6 @@ class ParticipationAdmin(admin.ModelAdmin):
     list_select_related = ("solicitacao", "usuario")
 
 
-class CompraAdmin(admin.ModelAdmin):
-    list_display = ("codigo", "municipio", "projeto", "quantidade", "data", "uso")
-    list_filter = ("projeto", "data")
-    search_fields = ("codigo", "municipio__nome", "projeto__nome", "uso")
-    autocomplete_fields = ("municipio", "projeto")
-    list_select_related = ("municipio", "projeto")
-    date_hierarchy = "data"
-
-    # Lista antiga de compras fora de uso (G29, decisão do dono de 05/11/2026): a atual é `DATCompra`.
-    # Fica só para consulta até a etapa 2 apagar a tabela (depois de backup e OK do dono).
-    def has_add_permission(self, request: HttpRequest) -> bool:
-        return False
-
-    def has_change_permission(self, request: HttpRequest, obj: Compra | None = None) -> bool:
-        return False
-
-    def has_delete_permission(self, request: HttpRequest, obj: Compra | None = None) -> bool:
-        return False
-
-
 class DeslocamentoAdmin(admin.ModelAdmin):
     list_display = ("usuario", "origem", "destino", "start_date", "end_date")
     list_filter = ("usuario", "start_date")
@@ -445,7 +424,6 @@ admin_site.register(TipoEvento, TipoEventoAdmin)
 admin_site.register(AvailabilityBlock, AvailabilityBlockAdmin)
 admin_site.register(Solicitacao, SolicitacaoAdmin)
 admin_site.register(Participation, ParticipationAdmin)
-admin_site.register(Compra, CompraAdmin)
 admin_site.register(Deslocamento, DeslocamentoAdmin)
 admin_site.register(AcaoDAT, AcaoDATAdmin)
 admin_site.register(AuditLog, AuditLogAdmin)

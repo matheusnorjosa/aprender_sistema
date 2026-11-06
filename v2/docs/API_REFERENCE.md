@@ -625,7 +625,8 @@ Gate em `DATCadastroViewSet.get_permissions` (`views/dat_module.py`).
 A rota é `/api/dat/compras-materiais/` (basename `dat-compra-material`, `v2/backend/apps/core/urls.py`).
 **Não** existe `/api/dat/compras/`. A lista antiga (`Compra`, outro modelo) saiu de uso em
 06/11/2026 (G29): `/api/compras/`, `/api/controle/compras/` e `/api/controle/import-compras/`
-(alias `/api/import-compras/`) respondem 404. A tabela fica até a etapa 2.
+(alias `/api/import-compras/`) respondem 404. A tabela `core_compra` foi apagada na etapa 2
+(migration `0132_apaga_compra_antiga`), com a policy `import_compras`.
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|

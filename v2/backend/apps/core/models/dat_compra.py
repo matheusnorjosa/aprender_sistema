@@ -17,8 +17,7 @@ from django.db import models
 from django.utils import timezone
 
 if TYPE_CHECKING:
-    from apps.core.models.compra import Produto
-    from apps.core.models.organizacao import Municipio, Projeto
+    from apps.core.models.organizacao import Municipio, Produto, Projeto
     from apps.core.models.usuario import Usuario
 
 

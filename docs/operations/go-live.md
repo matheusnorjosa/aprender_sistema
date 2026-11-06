@@ -91,10 +91,10 @@ Ver [Deploy](deploy.md).
 
 ### Compras (fronteira de domínio)
 
-- [ ] `/controle/compras` mostra dados de `core_compra` (com campo `quantidade`).
+- [ ] `/api/controle/compras/` responde 404: a lista antiga `core_compra` foi apagada (G29, migração 0132).
 - [ ] `/dat/compras-materiais` mostra dados de `core_dat_compra` (materiais/estoque DAT).
-- [ ] Criar solicitação aceita apenas município+projeto elegível em `core_compra`.
-- [ ] Alterações em `core_dat_compra` não mudam elegibilidade de solicitação.
+- [ ] Criar solicitação confere a compra em `core_dat_compra` (regra da compra, #2102; par sem compra pede aprovação, #2166).
+- [ ] Alterações em `core_dat_compra` mudam a elegibilidade de solicitação (é a única lista de compras).
 
 ### Técnicas
 

@@ -13,7 +13,6 @@ import pytest
 from apps.core.models import (
     AcaoInstancia,
     AvailabilityBlock,
-    Compra,
     DATAcao,
     DATCadastro,
     DATCompra,
@@ -35,8 +34,6 @@ from apps.core.models import (
 )
 from apps.core.rbac.policies import user_has_policy
 
-SEED_EXTERNAL_HASH = "9" * 64
-SEED_COMPRA_CODE = "MATRIX-PEND-001"
 SEED_DAT_DESCRICAO = "KIT MATRIX CONTRACT"
 SEED_DAT_USERNAME = "dat_matrix@test.com"
 SEED_CONTROLE_USERNAME = "controle_e2e@test.com"
@@ -55,14 +52,12 @@ def clean_contract_seed_state(db):
     _call("seed_rbac", verbosity=0)
 
     DATCompra.objects.filter(descricao_produto=SEED_DAT_DESCRICAO, ano_uso=2026).delete()
-    Compra.objects.filter(external_hash=SEED_EXTERNAL_HASH).delete()
     Municipio.objects.filter(nome="Matrizopolis", uf="BA").delete()
     # EquipeGerencia.usuario é PROTECT: os vínculos (PR 12a) saem antes.
     EquipeGerencia.objects.filter(usuario__username__in=[SEED_DAT_USERNAME, SEED_CONTROLE_USERNAME]).delete()
     Usuario.objects.filter(username__in=[SEED_DAT_USERNAME, SEED_CONTROLE_USERNAME]).delete()
     yield
     DATCompra.objects.filter(descricao_produto=SEED_DAT_DESCRICAO, ano_uso=2026).delete()
-    Compra.objects.filter(external_hash=SEED_EXTERNAL_HASH).delete()
     Municipio.objects.filter(nome="Matrizopolis", uf="BA").delete()
     # EquipeGerencia.usuario é PROTECT: os vínculos (PR 12a) saem antes.
     EquipeGerencia.objects.filter(usuario__username__in=[SEED_DAT_USERNAME, SEED_CONTROLE_USERNAME]).delete()
@@ -87,13 +82,6 @@ class TestSeedFrontendContractDataCommand:
 
         projeto = Projeto.objects.get(codigo="E2E")
         municipio = Municipio.objects.get(nome="Matrizopolis", uf="BA")
-
-        assert Compra.objects.filter(external_hash=SEED_EXTERNAL_HASH).count() == 1
-        compra = Compra.objects.get(external_hash=SEED_EXTERNAL_HASH)
-        assert compra.codigo == SEED_COMPRA_CODE
-        assert compra.quantidade == 15
-        assert compra.projeto_id == projeto.id
-        assert compra.municipio_id == municipio.id
 
         assert (
             DATCompra.objects.filter(
@@ -166,10 +154,6 @@ class TestSeedFrontendContractDataTextosLongos:
                 lambda: [f"{u.first_name} {u.last_name}" for u in Usuario.objects.filter(is_superuser=False)],
             ),
             ("Usuario.cargo", lambda: Usuario.objects.values_list("cargo", flat=True)),
-            (
-                "Compra pendente (município)",
-                lambda: Compra.objects.values_list("municipio__nome", flat=True),
-            ),
             (
                 "DATCompra com Produto (coluna Produto)",
                 lambda: DATCompra.objects.filter(produto__isnull=False).values_list("produto__nome", flat=True),

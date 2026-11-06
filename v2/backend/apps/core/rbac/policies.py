@@ -180,17 +180,10 @@ ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
     # Visualização ampla de disponibilidades — Controle/Gerente/Coord/Apoio.
     "view_all_availability": frozenset({"view_all_availability"}),
     # --- Imports operacionais ---
-    # As três policies abaixo saem no contrato `/api/me/policies/`, mas nenhuma tela nem view as usa:
+    # As duas policies abaixo saem no contrato `/api/me/policies/`, mas nenhuma tela nem view as usa:
     # importar pela tela é só do superusuário (`SuperuserOnly` nas views de import; decisão do dono
     # de 02/10/2026). Ser verdadeira para DAT ou Controle não dá a eles nenhuma importação.
     "import_availability_blocks": frozenset({"import_spreadsheet", "view_all_availability"}),
-    "import_compras": frozenset(
-        {
-            "import_spreadsheet",
-            "manage_purchases_and_materials",
-            "run_daily_operations",
-        }
-    ),
     "import_generic_spreadsheet": frozenset({"import_spreadsheet", "run_daily_operations"}),
     # --- Admin registries (single-cap, mas vira policy pra estabilizar contrato) ---
     "manage_admin_registries": frozenset({"manage_admin_registries"}),
@@ -340,10 +333,6 @@ class CanImportAvailabilityBlocks(_PolicyPermission):
     policy = "import_availability_blocks"
 
 
-class CanImportCompras(_PolicyPermission):
-    policy = "import_compras"
-
-
 class CanImportGenericSpreadsheet(_PolicyPermission):
     policy = "import_generic_spreadsheet"
 
@@ -463,7 +452,6 @@ PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset(
         "publish_setor_solicitacao",
         "view_all_availability",
         "import_availability_blocks",
-        "import_compras",
         "import_generic_spreadsheet",
         "manage_admin_registries",
         "manage_internal_actions",
@@ -827,7 +815,6 @@ __all__ = [
     "CanPublishSetorSolicitacao",
     "CanViewAllAvailability",
     "CanImportAvailabilityBlocks",
-    "CanImportCompras",
     "CanImportGenericSpreadsheet",
     "CanManageAdminRegistries",
     "CanManagePurchasesAndMaterials",

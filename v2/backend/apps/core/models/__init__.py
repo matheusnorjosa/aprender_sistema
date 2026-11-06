@@ -14,7 +14,6 @@ Estrutura:
     ├── organizacao.py       # Municipio, Gerencia, EquipeGerencia, ProjetoGeral, Projeto, TipoEvento, Produto
     ├── solicitacao.py       # Solicitacao, Participation
     ├── agenda.py            # AvailabilityBlock
-    ├── compra.py            # Compra
     ├── workflow.py          # Deslocamento, AcaoDAT
     ├── config.py            # Config
     ├── auditoria.py         # AuditLog
@@ -51,7 +50,6 @@ from apps.core.models.acoes_notificacao import (
 from apps.core.models.acompanhamento import Acompanhamento
 from apps.core.models.agenda import AvailabilityBlock
 from apps.core.models.auditoria import AuditLog
-from apps.core.models.compra import Compra
 from apps.core.models.config import Config
 from apps.core.models.dat_acao import DATAcao
 from apps.core.models.dat_cadastro import DATCadastro
@@ -97,8 +95,6 @@ __all__ = [
     "Participation",
     # Agenda
     "AvailabilityBlock",
-    # Compra
-    "Compra",
     # Workflow
     "Deslocamento",
     "AcaoDAT",

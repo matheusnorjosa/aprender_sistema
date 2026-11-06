@@ -59,7 +59,6 @@ EXPECTED_PUBLIC_POLICY_KEYS_SORTED: list[str] = [
     "create_solicitation_without_purchase",  # PR 7: Nova Solicitação sem compra
     "execute_restricted_operations",  # PR 7: excluir plano de formações
     "import_availability_blocks",
-    "import_compras",
     "import_generic_spreadsheet",
     "manage_admin_registries",
     "manage_internal_actions",

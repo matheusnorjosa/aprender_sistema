@@ -89,7 +89,8 @@ recebem 403. As cargas passam pelo command `import_export_contract`, com ensaio.
 
 `import_spreadsheet` não está em grupo nenhum desde a migration 0126 (PR 10) e é capacidade
 técnica, que nunca entra em pacote (`TECNICAS` em `services/rbac_pacotes.py`). As policies públicas
-`import_availability_blocks`, `import_compras` e `import_generic_spreadsheet` existem para
+`import_availability_blocks` e `import_generic_spreadsheet` (a `import_compras` saiu com a lista antiga
+`Compra`, G29 etapa 2) existem para
 **exposição em `/api/me/policies/`** e não são o gate destes endpoints.
 
 A matriz Grupo × Capability muda só por PR (seed + migration de dados, D21, que substituiu a D17);

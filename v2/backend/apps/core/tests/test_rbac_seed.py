@@ -96,7 +96,7 @@ def test_seed_rbac_assigns_permissions_to_dat(run_seed_rbac):
     dat = Group.objects.get(name="DAT")
     perms = dat.permissions.all()
 
-    # DAT deve ter permissões em Usuario, Municipio, Projeto, Compra, AuditLog, Solicitacao
+    # DAT deve ter permissões em Usuario, Municipio, Projeto, AuditLog, Solicitacao
     perm_codenames = [p.codename for p in perms]
 
     # Usuario (CRUD)
@@ -126,10 +126,6 @@ def test_seed_rbac_assigns_permissions_to_controle(run_seed_rbac):
     # Read em admin models
     assert "view_municipio" in perm_codenames
     assert "view_projeto" in perm_codenames
-    assert "view_compra" in perm_codenames
-
-    # Import Compra
-    assert "add_compra" in perm_codenames
 
     # AvailabilityBlock CRUD
     assert "add_availabilityblock" in perm_codenames

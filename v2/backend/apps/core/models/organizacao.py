@@ -600,7 +600,7 @@ class Produto(models.Model):
 
     Relacionamentos:
         - Produto -> Projeto (many-to-one, obrigatorio)
-        - Compra -> Produto (many-to-one, obrigatorio apos migration)
+        - DATCompra -> Produto (many-to-one, opcional)
 
     Exemplo:
         NL-C1 -> "Novo Lendo - Colecao 1" -> Projeto "Novo Lendo"

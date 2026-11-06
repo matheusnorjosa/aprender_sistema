@@ -72,7 +72,7 @@ Fatos consultados sob demanda (modelos, campos, workflows) — abrir só quando 
 
 - **DAT** (ações, registros, cadastros, coordenadores): `reference/dat-module.md`
 - **PlanoFormacoes** (planos anuais, formações, acompanhamentos, provas): `reference/plano-formacoes.md`
-- **Compras** (Compra histórico, DATCompra operacional, Produto): `reference/compras.md`
+- **Compras** (DATCompra, Produto; a `Compra` antiga foi apagada no G29): `reference/compras.md`
 - **Key Models** (Usuario, Municipio, Projeto, Solicitacao, AvailabilityBlock, AuditLog): `reference/key-models.md`
 
 ## Related Skills

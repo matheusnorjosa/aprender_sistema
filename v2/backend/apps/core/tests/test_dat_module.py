@@ -26,7 +26,6 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.core.models import (
-    Compra,
     DATAcao,
     DATArea,
     DATCadastro,
@@ -696,17 +695,8 @@ class DATCompraAPITests(DATModuleAPITestCase):
         self.assertEqual(data["pendentes"][0]["total_itens"], 20)
         self.assertEqual(data["pendentes"][0]["ultima_compra"], date(2026, 3, 2))
 
-    def test_pendencias_ignoram_a_lista_legada_e_a_compra_que_nao_libera(self):
-        """A lista legada `Compra` não conta; DATCompra inativa ou com quantidade 0 também não."""
-        Compra.objects.create(
-            codigo="CORE-LEGADA",
-            projeto=self.projeto,
-            municipio=self.municipio,
-            quantidade=10,
-            data=date(2026, 3, 1),
-            uso="Fluxo legado",
-            external_hash="c" * 64,
-        )
+    def test_pendencias_ignoram_a_compra_que_nao_libera(self):
+        """DATCompra inativa ou com quantidade 0 não conta."""
         self._dat_compra(self.municipio2, self.projeto, ativo=False)
         self._dat_compra(self.municipio2, self.projeto, quantidade=0, ano_uso=2027)
 

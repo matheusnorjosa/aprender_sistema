@@ -13,8 +13,7 @@ nos direitos do papel de nenhuma persona do seed (o poder vem da lotacao, nao do
 
 from __future__ import annotations
 
-import hashlib
-from datetime import date, datetime, time, timedelta
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -27,7 +26,6 @@ from apps.core.models import (
     AcaoTemplate,
     AvailabilityBlock,
     CicloAcoes,
-    Compra,
     DATAcao,
     DATCadastro,
     DATCompra,
@@ -157,18 +155,6 @@ class Command(BaseCommand):
             status__in=["pendente", "aprovado"],
         ).delete()
 
-        Compra.objects.update_or_create(
-            external_hash="9" * 64,
-            defaults={
-                "codigo": "MATRIX-PEND-001",
-                "projeto": projeto,
-                "municipio": municipio,
-                "quantidade": 15,
-                "data": date(2026, 3, 3),
-                "uso": "Matriz funcional frontend",
-            },
-        )
-
         DATCompra.objects.update_or_create(
             municipio=municipio,
             projeto=projeto,
@@ -184,14 +170,13 @@ class Command(BaseCommand):
             },
         )
 
-        self._semear_textos_longos(projeto_e2e=projeto)
+        self._semear_textos_longos()
 
         self.stdout.write(self.style.SUCCESS("✅ Seed funcional da matriz concluido"))
         self.stdout.write("Usuarios:")
         self.stdout.write("  - controle_e2e@test.com / testpass123 (Controle)")
         self.stdout.write("  - dat_matrix@test.com / testpass123 (DAT)")
         self.stdout.write("Dados-chave:")
-        self.stdout.write("  - core_compra codigo=MATRIX-PEND-001 municipio=Matrizopolis projeto=TESTE E2E")
         self.stdout.write("  - core_dat_compra descricao=KIT MATRIX CONTRACT municipio=Matrizopolis projeto=TESTE E2E")
         self.stdout.write("  - admin_matrix@test.com / testpass123 (superusuario)")
         self.stdout.write("  - textos longos (80+) nas tabelas, prefixo 'Aaa' (spec sem-rolagem-horizontal)")
@@ -203,7 +188,7 @@ class Command(BaseCommand):
             usuario.save(update_fields=["password"])
         return usuario
 
-    def _semear_textos_longos(self, *, projeto_e2e: Projeto) -> None:
+    def _semear_textos_longos(self) -> None:
         """Uma linha com texto longo em cada tabela, visível ao perfil que o spec usa na rota.
 
         Nenhuma linha aponta para Matrizopolis, `dat_matrix` ou `controle_e2e`: o teste do seed
@@ -255,19 +240,6 @@ class Command(BaseCommand):
         )
         tipo_evento, _ = TipoEvento.objects.get_or_create(nome=TIPO_EVENTO_LONGO, defaults={"cor": "#1890ff"})
 
-        # Pendências do dashboard de compras: Compra sem solicitação ativa no par (município, projeto).
-        # Ordena antes de Matrizopolis, que continua na 1a página (10 por página).
-        Compra.objects.update_or_create(
-            external_hash=hashlib.sha256(b"sem-rolagem-horizontal:compra").hexdigest(),
-            defaults={
-                "codigo": "LARGURA-PEND-001",
-                "projeto": projeto_e2e,
-                "municipio": municipio,
-                "quantidade": 3,
-                "data": date(2026, 3, 3),
-                "uso": TEXTO_OBSERVACAO_LONGO,
-            },
-        )
         produto, _ = Produto.objects.update_or_create(
             codigo="AAA-LARGURA-01",
             defaults={"nome": PRODUTO_LONGO, "projeto": projeto, "descricao": TEXTO_OBSERVACAO_LONGO},

@@ -184,7 +184,7 @@ Depois monta o cliente OAuth do operador como o comando (`get_oauth_client_for_u
 4. export do dia;
 5. carga da virada (dry-run, OK e `--apply`; [`imports.spec.md`](imports.spec.md));
 6. A5;
-7. `gcal_adocao` (dry-run, OK e `--apply`);
+7. `conferir_gcal_adocao` (só leitura no Google) e, no mesmo dia, `gcal_adocao --gcal-verificado <arquivo>` (dry-run, OK e `--apply`; o arquivo vale 24 h, decisão D63; [`imports.spec.md`](imports.spec.md));
 8. `gcal_copia` (dry-run) mostrado ao dono;
 9. o dono revisa quem edita a agenda (D7);
 10. cursor com `ativo=True`, `modo=observar` e sem token;

@@ -151,8 +151,9 @@ describe('Dashboards (/dashboards) sem rolagem horizontal (G30)', { timeout: 200
     renderPagina(<DashboardsPage />);
     await screen.findByText('Maria Coordenadora', {}, { timeout: 15000 });
 
-    expect(screen.getByRole('button', { name: /Exportar para CSV/ }).closest('header')).toHaveClass('flex-wrap');
-    expect(screen.getByRole('button', { name: /Exportar para CSV/ }).closest('.ant-space')).toHaveStyle({ flexWrap: 'wrap' });
+    // G20: o "Exportar para CSV" saiu (não fazia nada); o "Atualizar" segue no mesmo cabeçalho.
+    expect(screen.getByRole('button', { name: /Atualizar/ }).closest('header')).toHaveClass('flex-wrap');
+    expect(screen.getByRole('button', { name: /Atualizar/ }).closest('.ant-space')).toHaveStyle({ flexWrap: 'wrap' });
   });
 });
 

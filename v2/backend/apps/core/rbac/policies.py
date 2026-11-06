@@ -740,7 +740,7 @@ def resolve_public_policies(
     Retorna lista ordenada (alfabética) das `PUBLIC_POLICY_KEYS` que o
     usuário possui. Backend de `GET /api/me/policies/`.
 
-    - Anonymous → [] (endpoint trata 401 antes via IsAuthenticated)
+    - Anonymous → [] (endpoint trata antes via IsAuthenticated: 403 NOT_AUTHENTICATED)
     - Superuser → todas as PUBLIC_POLICY_KEYS sorted
     - User regular → subset baseado em capabilities (OR semantics)
 

@@ -15,8 +15,15 @@
 import { test, expect, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { mockChecklistAuthBootstrap, mockChecklistAuthenticated } from './checklist-network-mocks';
-import { entrar, esperarAssentar, verificarTela, vigiarRede } from './sem-rolagem-horizontal.medicao';
-import { ROTAS_MEDIDAS } from './sem-rolagem-horizontal.rotas';
+import {
+  abrir,
+  entrar,
+  esperarAssentar,
+  exigirTrocaDeSenha,
+  verificarTela,
+  vigiarRede,
+} from './sem-rolagem-horizontal.medicao';
+import { MARCO_TROCA_DE_SENHA, ROTAS_MEDIDAS } from './sem-rolagem-horizontal.rotas';
 
 // Já existia antes do C2 (antd 5.29 + rc-select 14.16), registrado em pages.spec.md (C2,
 // Acessibilidade): o Form.Item obrigatório passa `aria-required="true"` ao Select, e o rc-select
@@ -495,6 +502,12 @@ test.describe('Checklist: Acessibilidade — telas do Programa C (axe-core, back
     '/solicitacoes/aprovacoes',
     '/solicitacoes/publicacao',
     '/controle/pre-agenda',
+    // G26 (alinhamento de 05/11): telas alteradas no rumo à liberação. A edição abre a pendente
+    // do próprio coordenador (`abrir` troca o :id, como no spec de rolagem).
+    '/solicitacoes/:id/editar',
+    '/controle/acoes',
+    '/controle/compras',
+    '/dat/registros',
   ];
 
   // O sw.js (modo offline) esconde as requisições dos eventos de rede que `verificarTela` lê.
@@ -504,6 +517,25 @@ test.describe('Checklist: Acessibilidade — telas do Programa C (axe-core, back
     await page.unrouteAll({ behavior: 'ignoreErrors' });
   });
 
+  async function esperarSemViolacoesCriticas(page: Page, tela: string, largura: number): Promise<void> {
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+      .exclude('.ant-spin-fullscreen')
+      .exclude('.ant-spin-text')
+      .analyze();
+    // Telas com Form.Item obrigatório em Select (a Nova Solicitação) caem na exceção registrada
+    // de `semAriaRequiredNaRaizDoSelect`; qualquer outra violação reprova.
+    const critical = results.violations
+      .filter((v) => v.impact === 'critical' || v.impact === 'serious')
+      .map(semAriaRequiredNaRaizDoSelect)
+      .filter((v) => v.nodes.length > 0);
+    const relatorio = critical
+      .map((v) => `[${v.impact}] ${v.id}: ${v.help}\n  ${v.nodes.map((n) => n.target.join(' ')).join('\n  ')}`)
+      .join('\n');
+
+    expect(critical, `violações críticas em ${tela} a ${largura}px:\n${relatorio}`).toHaveLength(0);
+  }
+
   for (const path of TELAS_PROGRAMA_C) {
     for (const largura of [360, 1280]) {
       test(`🔴 ${path} a ${largura}px sem violações críticas de acessibilidade`, async ({ page, baseURL }) => {
@@ -511,27 +543,29 @@ test.describe('Checklist: Acessibilidade — telas do Programa C (axe-core, back
         if (!rota) throw new Error(`${path} não está em ROTAS_MEDIDAS`);
         const rede = vigiarRede(page, baseURL);
         await entrar(page, rota.perfil, largura);
-        await page.goto(path);
+        await abrir(page, rota);
         expect(await verificarTela(page, rota, rede), `a tela ${path} não ficou pronta`).toEqual([]);
-
-        const results = await new AxeBuilder({ page })
-          .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
-          .exclude('.ant-spin-fullscreen')
-          .exclude('.ant-spin-text')
-          .analyze();
-        // Telas com Form.Item obrigatório em Select (a Nova Solicitação) caem na exceção registrada
-        // de `semAriaRequiredNaRaizDoSelect`; qualquer outra violação reprova.
-        const critical = results.violations
-          .filter((v) => v.impact === 'critical' || v.impact === 'serious')
-          .map(semAriaRequiredNaRaizDoSelect)
-          .filter((v) => v.nodes.length > 0);
-        const relatorio = critical
-          .map((v) => `[${v.impact}] ${v.id}: ${v.help}\n  ${v.nodes.map((n) => n.target.join(' ')).join('\n  ')}`)
-          .join('\n');
-
-        expect(critical, `violações críticas em ${path} a ${largura}px:\n${relatorio}`).toHaveLength(0);
+        await esperarSemViolacoesCriticas(page, path, largura);
       });
     }
+  }
+
+  // G26: a troca obrigatória de senha é a primeira tela de todo usuário. Não é rota do AppRoutes:
+  // o /api/me/ real do coordenador com `deve_trocar_senha` (o mesmo de `exigirTrocaDeSenha` do spec
+  // de rolagem) põe a tela no lugar do sistema, sem a casca.
+  for (const largura of [360, 1280]) {
+    test(`🔴 troca obrigatória de senha a ${largura}px sem violações críticas de acessibilidade`, async ({
+      page,
+      baseURL,
+    }) => {
+      const rede = vigiarRede(page, baseURL);
+      await entrar(page, 'coordenador', largura);
+      await exigirTrocaDeSenha(page);
+      await page.goto('/');
+      const alvo = { marco: MARCO_TROCA_DE_SENHA, semCasca: true };
+      expect(await verificarTela(page, alvo, rede), 'a troca de senha não ficou pronta').toEqual([]);
+      await esperarSemViolacoesCriticas(page, 'troca obrigatória de senha', largura);
+    });
   }
 });
 

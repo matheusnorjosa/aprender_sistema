@@ -61,7 +61,7 @@ _PAPEIS_QUE_CONTAM_SEMPRE = (
         ),
         responses={
             200: MeEventSerializer(many=True),
-            401: COMMON_ERROR_RESPONSES[401],
+            403: COMMON_ERROR_RESPONSES[403],
         },
         tags=["me"],
     )
@@ -112,7 +112,7 @@ class MeEventsListView(generics.ListAPIView):
             "esta lista para menu condicional, redirects e mensagens de erro "
             "genéricas (ex: `policies.includes('view_compras_dashboard')`).\n\n"
             "Semântica:\n"
-            "- Anonymous → 401\n"
+            "- Anonymous → 403 (code NOT_AUTHENTICATED)\n"
             "- Authenticated sem capabilities → []\n"
             "- Superuser → todas as PUBLIC_POLICY_KEYS\n"
             "- User regular → subset baseado em capabilities (OR semantics)\n\n"
@@ -125,7 +125,7 @@ class MeEventsListView(generics.ListAPIView):
         # ListSerializer(child=CharField) gera `{type: array, items: {type: string}}`.
         responses={
             200: serializers.ListSerializer(child=serializers.CharField()),
-            401: COMMON_ERROR_RESPONSES[401],
+            403: COMMON_ERROR_RESPONSES[403],
         },
         tags=["me"],
     )
@@ -139,7 +139,7 @@ class MePoliciesView(APIView):
     Response: JSON array de strings, ordenado alfabeticamente.
     Exemplo: `["access_audit_logs", "use_gcal", "view_compras_dashboard"]`
 
-    Permission: `IsAuthenticated`. Anonymous → 401. Superuser bypass.
+    Permission: `IsAuthenticated`. Anonymous → 403 (`NOT_AUTHENTICATED`). Superuser bypass.
 
     Implementação delega para `apps.core.rbac.policies.resolve_public_policies`
     (SSOT). Cache-aware via `user_has_any_perm` — ~15 lookups O(1) por request
@@ -177,7 +177,7 @@ class ChangePasswordView(APIView):
                 name="ChangePasswordResponse",
                 fields={"detail": serializers.CharField()},
             ),
-            401: COMMON_ERROR_RESPONSES[401],
+            403: COMMON_ERROR_RESPONSES[403],
         },
         tags=["me"],
     )
@@ -238,7 +238,7 @@ class MeExportView(APIView):
         description="Baixa o dossiê do titular autenticado como arquivo JSON (art. 18-V).",
         responses={
             (200, "application/json"): OpenApiTypes.BINARY,
-            401: COMMON_ERROR_RESPONSES[401],
+            403: COMMON_ERROR_RESPONSES[403],
         },
         tags=["me"],
     )

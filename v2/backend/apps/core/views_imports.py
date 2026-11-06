@@ -90,7 +90,6 @@ class ControleImportAcoesView(APIView):
         responses={
             200: ImportOperationResponseSerializer,
             400: ImportOperationErrorResponseSerializer,
-            401: COMMON_ERROR_RESPONSES[401],
             403: COMMON_ERROR_RESPONSES[403],
             413: ImportOperationErrorResponseSerializer,
             500: ImportOperationErrorResponseSerializer,
@@ -188,7 +187,6 @@ class DATImportCadastrosView(APIView):
         responses={
             200: ImportOperationResponseSerializer,
             400: ImportOperationErrorResponseSerializer,
-            401: COMMON_ERROR_RESPONSES[401],
             403: COMMON_ERROR_RESPONSES[403],
             413: ImportOperationErrorResponseSerializer,
             500: ImportOperationErrorResponseSerializer,

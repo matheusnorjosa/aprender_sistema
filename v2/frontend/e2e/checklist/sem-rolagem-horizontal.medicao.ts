@@ -253,7 +253,7 @@ async function resolverUrl(page: Page, rota: RotaMedida): Promise<string> {
 }
 
 /** Abre a rota, com o relógio do navegador fixo antes da navegação quando a rota declara `relogio`. */
-async function abrir(page: Page, rota: RotaMedida): Promise<void> {
+export async function abrir(page: Page, rota: RotaMedida): Promise<void> {
   if (rota.relogio) await page.clock.setFixedTime(new Date(rota.relogio));
   await page.goto(await resolverUrl(page, rota));
 }
@@ -368,7 +368,7 @@ export function registrarMatriz(larguras: readonly Largura[]): void {
  * A troca obrigatória de senha (G30): o /api/me/ real do perfil, com `deve_trocar_senha` e um aviso e
  * duas redefinições com o nome longo do seed (o que a tela mostra). O App põe a tela no lugar do sistema.
  */
-async function exigirTrocaDeSenha(page: Page): Promise<void> {
+export async function exigirTrocaDeSenha(page: Page): Promise<void> {
   const por = `${TEXTOS_DO_SEED.pessoa} dos Santos Albuquerque Cavalcanti de Vasconcelos Figueiredo`;
   await page.route(
     (url) => url.pathname === '/api/me/',

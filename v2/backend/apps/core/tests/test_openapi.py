@@ -412,6 +412,37 @@ class TestSchemaErrors(TestCase):
         # If we get here, at least one endpoint should have error docs
         # This test verifies the structure is present
 
+    def test_sem_sessao_documentado_como_403_e_nunca_401(self) -> None:
+        """G31: sem sessão o sistema responde 403 `NOT_AUTHENTICATED` (SessionAuthentication não manda
+        `WWW-Authenticate`), e o schema documenta isso: nenhum endpoint anuncia 401."""
+        anonimo = APIClient().get("/api/me/policies/")
+        self.assertEqual(anonimo.status_code, 403)
+        self.assertEqual(anonimo.json()["code"], "NOT_AUTHENTICATED")
+
+        schema = self.client.get("/api/schema/?format=json").json()
+        com_401 = [
+            f"{metodo.upper()} {caminho}"
+            for caminho, operacoes in schema["paths"].items()
+            for metodo, operacao in operacoes.items()
+            if isinstance(operacao, dict) and "401" in operacao.get("responses", {})
+        ]
+        self.assertEqual(com_401, [], "endpoints que anunciam 401, mas respondem 403 sem sessão")
+
+        for caminho, metodo in [
+            ("/api/me/", "get"),
+            ("/api/me/events/", "get"),
+            ("/api/me/policies/", "get"),
+            ("/api/me/change-password/", "post"),
+            ("/api/me/export/", "get"),
+            ("/api/config/", "get"),
+            ("/api/usuarios/import/", "post"),
+        ]:
+            resposta = schema["paths"][caminho][metodo]["responses"].get("403")
+            self.assertIsNotNone(resposta, f"{metodo.upper()} {caminho} sem 403 documentado")
+            exemplos = resposta["content"]["application/json"]["examples"]
+            codigos = {exemplo["value"]["code"] for exemplo in exemplos.values()}
+            self.assertIn("NOT_AUTHENTICATED", codigos, f"{metodo.upper()} {caminho}: 403 sem o exemplo de sem sessão")
+
 
 class TestSchemaConfiguration(TestCase):
     """Tests for schema configuration."""

@@ -160,7 +160,6 @@ class CurrentUserView(APIView):
         description="Retorna dados do usuário autenticado com grupos e flags RBAC.",
         responses={
             200: CurrentUserSerializer,
-            401: COMMON_ERROR_RESPONSES[401],
             403: COMMON_ERROR_RESPONSES[403],
         },
         tags=["auth"],
@@ -234,7 +233,7 @@ class CurrentUserView(APIView):
         responses={
             200: CurrentUserSerializer,
             400: COMMON_ERROR_RESPONSES[400],
-            401: COMMON_ERROR_RESPONSES[401],
+            403: COMMON_ERROR_RESPONSES[403],
         },
         tags=["me"],
     )

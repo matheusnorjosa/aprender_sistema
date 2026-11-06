@@ -175,7 +175,7 @@ describe('UsuariosPage — alinhamento (lote C)', { timeout: 45000 }, () => {
 
     await waitFor(() => expect(createUser).toHaveBeenCalled(), { timeout: 10000 });
     expect(vi.mocked(createUser).mock.calls[0]![0]).not.toHaveProperty('username');
-  });
+  }, 90000); // preenche o form inteiro: na CI passa de 45 s
 
   test('editar: login travado, e-mail vazio sem obrigar, sem "Permissões efetivas", textos novos', async () => {
     const user = userEvent.setup();

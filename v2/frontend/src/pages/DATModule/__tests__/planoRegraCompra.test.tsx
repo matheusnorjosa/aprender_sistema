@@ -107,7 +107,7 @@ describe('Plano Anual — regra da compra', () => {
         <PlanoFormacoesPage />
       </MemoryRouter>,
     );
-    await user.click(await screen.findByRole('button', { name: /Editar plano/i }, { timeout: 15000 }));
+    await user.click(await screen.findByRole('button', { name: /^Editar: / }, { timeout: 15000 }));
     const dialog = await screen.findByRole('dialog', {}, { timeout: 10000 });
     expect(within(dialog).getByText('Projeto Em Espera', { selector: '.ant-select-selection-item' })).toBeInTheDocument();
   }, 30000);

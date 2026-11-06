@@ -4,7 +4,8 @@
  * Único arquivo que importa `Table` do AntD (lint em eslint.config.js). O padrão:
  * - o tipo não aceita `scroll` nem coluna `fixed`: a largura se resolve por prioridade;
  * - cada coluna declara a partir de que largura aparece (`responsive`, via
- *   VISIVEL_A_PARTIR); sem `responsive`, aparece sempre (identidade, estado e ações);
+ *   VISIVEL_A_PARTIR); sem `responsive`, aparece sempre (identidade, estado e ações), e com
+ *   `VISIVEL_A_PARTIR.detalhe`, nunca: só na linha expandida;
  * - o que está escondido na largura atual aparece na linha expandida, como
  *   `<Descriptions column={1}>`, com o `title` e o `render` da própria coluna: nada some;
  *   o botão que a abre leva o nome da linha (`nomeDaLinha`), "Expandir linha de Maria";
@@ -30,6 +31,8 @@ export const VISIVEL_A_PARTIR = {
   lg: ['lg'], // >= 992 px
   xl: ['xl'], // >= 1200 px
   xxl: ['xxl'], // >= 1600 px
+  // Nunca na linha: só na linha expandida (G30; ex.: a edição célula a célula do Plano Anual).
+  detalhe: [],
 } as const satisfies Record<string, readonly Breakpoint[]>;
 
 export type PrioridadeDaColuna = (typeof VISIVEL_A_PARTIR)[keyof typeof VISIVEL_A_PARTIR];

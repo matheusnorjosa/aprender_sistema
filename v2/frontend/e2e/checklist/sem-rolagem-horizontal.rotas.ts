@@ -239,7 +239,15 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
       },
     ],
   },
-  { path: '/controle/plano-formacoes', perfil: 'controle', marco: 'Plano Anual', dados: { em: LINHA, texto: T.municipio } },
+  {
+    path: '/controle/plano-formacoes',
+    perfil: 'controle',
+    marco: 'Plano Anual',
+    dados: { em: LINHA, texto: T.municipio },
+    // G30: F1-F15, A1-A2 e P1-P3 viraram a coluna Progresso; a edição de cada célula fica na linha
+    // aberta (Formações, Acompanhamentos e Provas nunca entram na linha): há linha expandida em toda largura.
+    estados: [expandida(T.municipio, 'Formações')],
+  },
   { path: '/controle/pre-agenda', perfil: 'controle', marco: 'Pré-agenda', dados: { em: LINHA, texto: T.municipio } },
   { path: '/acoes-notificacao', perfil: 'superusuario', marco: 'Ações Internas', dados: { em: LINHA, texto: T.acao } },
   {
@@ -454,6 +462,8 @@ export const TELA_LOGIN = 'login';
  * G30: saíram as 4 de /solicitacoes/deslocamentos. Ficam 43. A vista "expandida" é medida.
  * G30: saíram as 4 de /dat/cadastros (a "expandida" é medida) e as 9 de /controle/coordenadores
  * (cartões, "Lista" e "Por área": a área longa quebra linha, e cabeçalho e filtros também). Ficam 30.
+ * G30: saíram as 4 de /controle/plano-formacoes (a matriz de 27 colunas virou a coluna Progresso e a
+ * edição foi para a linha aberta, medida como "expandida"). Ficam 26.
  * O ratchet do Vitest (semRolagemHorizontal.pendentes.test.ts) trava a lista: nada novo
  * entra e o tamanho só desce.
  */
@@ -464,7 +474,6 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/dashboards/gcal': [360, 768, 1024],
   '/mapa-brasil': [360, 1024, 1280],
   '/mapa-brasil#lista': [360, 1024, 1280],
-  '/controle/plano-formacoes': [360, 768, 1024, 1280],
   '/acoes-notificacao': [360, 768, 1024, 1280],
   '/notificacoes-internas': [360, 768],
 };

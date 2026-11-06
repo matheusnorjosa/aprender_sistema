@@ -5,6 +5,9 @@
  * de edição inline e o PATCH correspondente.
  *
  * RED no código antigo (células inertes, sem controle de edição acessível).
+ *
+ * G30: as células saíram da linha (a coluna Progresso resume) e ficam na linha aberta; o teste
+ * abre a linha antes de clicar.
  */
 import { describe, expect, test, vi, beforeEach } from 'vitest';
 import { render, screen, within, waitFor } from '@testing-library/react';
@@ -44,6 +47,11 @@ import { getMe } from '../../../api/availability';
 import { updateAcompanhamentoInline, updateProvaInline } from '../../../api/datModule';
 import PlanoFormacoesPage from '../PlanoFormacoesPage';
 
+/** As células de edição ficam na linha aberta (G30): abre a linha do plano. */
+async function abrirLinha(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: /^Expandir linha de / }, { timeout: 15000 }));
+}
+
 function renderPage() {
   return render(
     <MemoryRouter>
@@ -66,6 +74,7 @@ describe('#1913: edição inline de Acompanhamento e Prova', () => {
     async () => {
       const user = userEvent.setup();
       renderPage();
+      await abrirLinha(user);
       const cell = await screen.findByLabelText('Editar acompanhamento primeiro', {}, { timeout: 15000 });
       await user.click(cell);
       const dialog = await screen.findByRole('dialog', {}, { timeout: 10000 });
@@ -89,6 +98,7 @@ describe('#1913: edição inline de Acompanhamento e Prova', () => {
     async () => {
       const user = userEvent.setup();
       renderPage();
+      await abrirLinha(user);
       const cell = await screen.findByLabelText('Editar prova 1', {}, { timeout: 15000 });
       await user.click(cell);
       const dialog = await screen.findByRole('dialog', {}, { timeout: 10000 });

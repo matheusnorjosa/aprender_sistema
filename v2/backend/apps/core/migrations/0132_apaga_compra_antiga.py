@@ -5,6 +5,8 @@ from django.db import migrations
 # G29, etapa 2 (decisão do dono de 05/11/2026): apaga a lista antiga `Compra` (`core_compra`), fora de
 # todas as telas e rotas desde a etapa 1 (#2178). A lista em uso é `DATCompra` (`core_dat_compra`).
 # Nenhuma tabela tem FK para `core_compra`. O reverso recria a tabela VAZIA: o dado só volta do backup.
+# Rollback de imagem para uma versão anterior a esta (que ainda tem o model `Compra`): rodar antes
+# `migrate core 0131`, senão a exclusão de Município/Projeto/Produto dá 500 (o Django consulta `core_compra`).
 
 
 class Migration(migrations.Migration):

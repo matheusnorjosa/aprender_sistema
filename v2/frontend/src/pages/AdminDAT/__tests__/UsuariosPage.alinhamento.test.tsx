@@ -161,13 +161,16 @@ describe('UsuariosPage — alinhamento (lote C)', { timeout: 45000 }, () => {
 
     expect(within(dialog).queryByLabelText(/usuário \(login\)/i)).not.toBeInTheDocument();
     expect(within(dialog).queryByLabelText('Username')).not.toBeInTheDocument();
-    await user.type(within(dialog).getByLabelText('E-mail'), 'nova@example.invalid');
-    await user.type(within(dialog).getByLabelText('CPF'), '10000012120');
+    await user.click(within(dialog).getByLabelText('E-mail'));
+    await user.paste('nova@example.invalid');
+    await user.click(within(dialog).getByLabelText('CPF'));
+    await user.paste('10000012120');
     await user.click(within(dialog).getByRole('combobox', { name: /gerência \(onde trabalha\)/i }));
     await user.click(await screen.findByTitle('Vidas'));
     await user.click(within(dialog).getByRole('combobox', { name: /função \(cargo\)/i }));
     await user.click(await screen.findByTitle('Formador'));
-    await user.type(within(dialog).getByLabelText('Senha'), 'Senha-Forte-2026!');
+    await user.click(within(dialog).getByLabelText('Senha'));
+    await user.paste('Senha-Forte-2026!');
     await user.click(within(dialog).getByRole('button', { name: /^salvar$/i }));
 
     await waitFor(() => expect(createUser).toHaveBeenCalled(), { timeout: 10000 });

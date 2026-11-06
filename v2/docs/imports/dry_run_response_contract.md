@@ -1,5 +1,7 @@
 # Contrato de resposta de dry-run / import — auditoria + proposta
 
+> 🔴 **06/11/2026 (G29, etapa 1):** a importação de compras pela tela saiu com a lista antiga `Compra`. `POST /api/controle/import-compras/` (e o alias `/api/import-compras/`) responde 404; `services/controle_imports.py`, `views_controle_imports.py` e o alvo `make import-compras-dry` não existem mais. A lista de compras é `DATCompra`, carregada pelo export-contract (`dat_compra`). SSOT: [`imports.spec.md`](../specs/backend/imports.spec.md).
+
 Status: **PR 2 — docs-only (sem alteração de runtime)**
 Versão: 2026-07-24 v0.2
 Escopo: auditoria dos 11 services `*_import.py` existentes + proposta de contrato unificado de resposta.

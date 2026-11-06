@@ -46,12 +46,11 @@ Toda importação tem 2 etapas:
 2. **Apply** — só após dry-run sem erros bloqueantes.
 
 > 🔴 **Corrigido em 2026-07-24**: o **ETL legado foi removido**. Nenhum target `make etl-*` existe
-> (`v2/Makefile` — os únicos alvos de import são `import-compras-dry`, `import-acoes-dry`,
-> `import-cadastros-dry`, `:15,56,69,82`), e não há management command `etl_*.py`
+> (`v2/Makefile` — os únicos alvos de import são `import-acoes-dry` e
+> `import-cadastros-dry`; `import-compras-dry` saiu em 06/11/2026, G29), e não há management command `etl_*.py`
 > (`apps/core/management/commands/` — ver §7).
 
 Comandos que **existem hoje**:
-- `make import-compras-dry FILE=...` → `curl POST /api/controle/import-compras/?dry_run=true` (`v2/Makefile:56-67`).
 - `make import-acoes-dry FILE=...` → `POST /api/controle/import-acoes/?dry_run=true` (`v2/Makefile:69-80`).
 - `make import-cadastros-dry FILE=...` → `POST /api/dat/import-cadastros/?dry_run=true` (`v2/Makefile:82-93`).
 - `python manage.py import_export_contract` — dry-run por padrão, `--apply` com allowlist
@@ -161,7 +160,7 @@ Datas de calendário (Solicitação, AvailabilityBlock) **são armazenadas em UT
 | Tipo | Documento | Template CSV | Backend implementado | Endpoint |
 |---|---|---|---|---|
 | Usuários | [usuarios.md](./usuarios.md) | [templates/usuarios.template.csv](./templates/usuarios.template.csv) | ✅ Sim | `POST /api/usuarios/import/` |
-| Produtos / Controle / Compras | [produtos_controle.md](./produtos_controle.md) | [templates/produtos_controle.template.csv](./templates/produtos_controle.template.csv) | ✅ Sim | `POST /api/produtos/import/` + `POST /api/controle/import-compras/` |
+| Produtos / Controle / Compras | [produtos_controle.md](./produtos_controle.md) | [templates/produtos_controle.template.csv](./templates/produtos_controle.template.csv) | ✅ Sim | `POST /api/produtos/import/` (o import de compras saiu em 06/11/2026, G29) |
 | Agenda / Solicitações / Eventos | [agenda_solicitacoes.md](./agenda_solicitacoes.md) | [templates/agenda_solicitacoes.template.csv](./templates/agenda_solicitacoes.template.csv) | ✅ Sim, com PA-01 | `POST /api/solicitacoes/import/` |
 | Disponibilidade / Bloqueios | [disponibilidade.md](./disponibilidade.md) | [templates/disponibilidade.template.csv](./templates/disponibilidade.template.csv) | ✅ Tipos T/P (D pendente) | `POST /api/disponibilidade/import-bloqueios/` (sync) + `POST /api/imports/bloqueios/` (async, ImportJob) |
 
@@ -185,7 +184,6 @@ Para os 4 tipos acima, o backend **já tem implementação funcional** em produ�
 | `produtos_import.py` | `import_produtos_from_file(...)` | `Produto.codigo` | ✅ |
 | `municipios_import.py` | `import_municipios_from_file(...)` | — | ✅ |
 | `equipe_gerencia_import.py` | `import_equipe_gerencia_from_file(...)` | — | ✅ |
-| `controle_imports.py` | `import_compras_from_file(...)` (alimenta **`Compra`**) | SHA1 `external_hash` | ✅ |
 | `controle_acoes_import.py` | `import_acoes_controle(...)` | SHA1 | ✅ |
 | `dat_cadastros_import.py` | `import_dat_cadastros(...)` | SHA1 | ✅ |
 | `deslocamentos_import.py` | `import_deslocamentos(...)` | SHA1 | ✅ |
@@ -225,7 +223,6 @@ Helpers de reconciliação compartilhados em `apps/core/services/resolvers.py`:
 | `POST /api/produtos/import/` | `ImportProdutosView` | `IsAuthenticated + SuperuserOnly` (D20) |
 | `POST /api/municipios/import/` | `ImportMunicipiosView` | `IsAuthenticated + SuperuserOnly` (D20) |
 | `POST /api/equipe-gerencia/import/` | `ImportEquipeGerenciaView` | `IsAuthenticated + SuperuserOnly` (D20) |
-| `POST /api/controle/import-compras/` | `ImportComprasView` | `IsAuthenticated + SuperuserOnly` (D20) |
 | `POST /api/controle/import-acoes/` | `ControleImportAcoesView` | `IsAuthenticated + SuperuserOnly` (D20) |
 | `POST /api/dat/import-cadastros/` | `DATImportCadastrosView` | `IsAuthenticated + SuperuserOnly` (D20) |
 | `POST /api/deslocamentos/import/` | `ImportDeslocamentosView` | `IsAuthenticated + SuperuserOnly` (D20) |
@@ -275,8 +272,8 @@ Comentário do código: **"Fase 2 adicionara: USUARIOS, COMPRAS, ACOES, DESLOCAM
 
 ### Makefile (chama endpoints HTTP via curl)
 
-Targets atuais em `v2/Makefile:15,56,69,82` (`import-compras-dry`, `import-acoes-dry`,
-`import-cadastros-dry`) **chamam `curl` para `/api/<recurso>/import/?dry_run=true`**.
+Targets atuais em `v2/Makefile` (`import-acoes-dry`, `import-cadastros-dry`; `import-compras-dry`
+saiu em 06/11/2026, G29) **chamam `curl` para `/api/<recurso>/import/?dry_run=true`**.
 **Não** existem management commands `etl_*.py` — o ETL legado foi removido. O único management
 command de import é `import_export_contract.py`. Qualquer referência a `make etl-*` em outros docs
 do projeto é histórica e **não funciona**.

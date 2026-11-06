@@ -164,7 +164,8 @@ class TestValidateSetorCanonico:
     @pytest.mark.parametrize("novo", ["Vidas", "Brincando e Aprendendo", "TRÂNSITO LEGAL", ""])
     def test_setor_conhecido_e_aceito(self, novo):
         # SETORES_PRODUTO, valor já em uso em outra gerência ou vazio.
-        _gerencia("G TRANSITO S3", "TRÂNSITO LEGAL")
+        # Inativa: o valor está em uso, e a gerência ativa do setor não conflita (uma por setor, lote C).
+        Gerencia.objects.filter(pk=_gerencia("G TRANSITO S3", "TRÂNSITO LEGAL").pk).update(ativo=False)
         ger = _gerencia("G FLUIR S3 C", "Fluir")
 
         resp = _root_client().patch(f"/api/gerencias/{ger.id}/", {"setor_canonico": novo}, format="json")

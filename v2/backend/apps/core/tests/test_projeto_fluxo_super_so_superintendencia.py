@@ -58,7 +58,7 @@ def test_api_nao_cria_super_fora_de_g1(dat, outra, onde):
     resp = dat.post("/api/projetos/", payload, format="json")
 
     assert resp.status_code == 400, resp.content
-    assert resp.json()["detail"] == _MSG  # a tela (ProjetosPage) mostra o `detail`
+    assert resp.json()["errors"]["gerencia"] == [_MSG]  # lote C: no campo, onde a ProjetosPage o mostra
     assert not Projeto.objects.filter(nome="Trava SUPER nova").exists()
 
 
@@ -80,7 +80,7 @@ def test_api_nao_marca_super_em_projeto_de_outra_gerencia(dat, outra):
     resp = dat.patch(f"/api/projetos/{projeto.id}/", {"fluxo": "SUPER"}, format="json")
 
     assert resp.status_code == 400, resp.content
-    assert resp.json()["detail"] == _MSG
+    assert resp.json()["errors"]["gerencia"] == [_MSG]
     projeto.refresh_from_db()
     assert projeto.fluxo == "NAO_SUPER"
 

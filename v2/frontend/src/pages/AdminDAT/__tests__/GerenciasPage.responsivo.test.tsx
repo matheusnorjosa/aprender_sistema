@@ -176,7 +176,7 @@ describe('GerenciasPage responsiva (C2)', () => {
     const linha = await linhaDaGerencia();
 
     await user.click(within(linha).getByRole('button', { name: `Editar: ${SETOR}` }));
-    const modal = (await screen.findByText('Editar Gerencia', {}, { timeout: 10000 })).closest<HTMLElement>('[role="dialog"]');
+    const modal = (await screen.findByText('Editar Gerência', {}, { timeout: 10000 })).closest<HTMLElement>('[role="dialog"]');
     expect(modal).not.toBeNull();
     expect(within(modal!).getByLabelText('Nome na tela')).toHaveValue(SETOR);
   }, 30000);

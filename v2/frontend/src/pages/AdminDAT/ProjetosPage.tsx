@@ -25,6 +25,7 @@ import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 import { DEFAULT_PAGE_SIZE } from '../../constants';
 import type { ID } from '../../types';
 import { aposConfirmacaoFechar, dialogoDeExclusaoEmUso } from './excluirEmUso';
+import { errosDosCampos, mensagemDoErro } from './usuario_form_helpers';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -51,6 +52,8 @@ interface ProjetoRecord {
   eh_serie?: boolean;
   // Regra da compra: nome geral aceita compra de qualquer projeto da mesma gerência.
   eh_nome_geral?: boolean;
+  // D41: sem compra que o libere em município nenhum, some da Nova Solicitação (etiqueta "Em espera").
+  em_espera?: boolean;
 }
 
 /**
@@ -70,6 +73,9 @@ interface ProjetoFormValues {
 export default function ProjetosPage(): JSX.Element {
   const [projetos, setProjetos] = useState<ProjetoRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  // Motivo da falha ao carregar a lista (null = carregou): o título perde a contagem e a tabela oferece
+  // "Tentar de novo", em vez de "Projetos (0)" (D73).
+  const [erroLista, setErroLista] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [editingProjeto, setEditingProjeto] = useState<ProjetoRecord | null>(null);
@@ -106,6 +112,7 @@ export default function ProjetosPage(): JSX.Element {
       // Note: API returns Projeto with is_active, but component uses ativo field name
       // This is acceptable during migration - will be unified in strict mode phase
       setProjetos(data.results as unknown as ProjetoRecord[]);
+      setErroLista(null);
       setPagination((prev) => ({
         ...prev,
         current,
@@ -113,7 +120,7 @@ export default function ProjetosPage(): JSX.Element {
         total: data.count,
       }));
     } catch (error) {
-      message.error(`Erro ao carregar projetos: ${(error as Error).message}`);
+      setErroLista(mensagemDoErro(error));
     } finally {
       setLoading(false);
     }
@@ -208,15 +215,10 @@ export default function ProjetosPage(): JSX.Element {
       form.resetFields();
       void fetchProjetos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
     } catch (error) {
-      // A trava "SUPER só na Superintendência" volta como erro sem campo (400): mostra junto do
-      // campo Gerência, onde se corrige.
-      const semCampo = (error as { response?: { data?: { errors?: { non_field_errors?: string[] } } } }).response
-        ?.data?.errors?.non_field_errors;
-      if (semCampo?.length) {
-        form.setFields([{ name: 'gerencia', errors: semCampo }]);
-        return;
-      }
-      message.error(`Erro: ${(error as Error).message}`);
+      // D73: cada erro do servidor no campo que o corrige (a trava "SUPER só na Superintendência" vem em
+      // `gerencia`, série com nome geral em `eh_nome_geral`, nome repetido em `nome`) e o motivo no toast.
+      form.setFields(errosDosCampos(error));
+      message.error(`Erro: ${mensagemDoErro(error)}`);
     }
   };
 
@@ -276,6 +278,17 @@ export default function ProjetosPage(): JSX.Element {
               <Tag color="gold" style={{ marginInlineEnd: 0 }}>Nome geral</Tag>
             </div>
           ) : null}
+          {record.em_espera ? (
+            <div>
+              <Tag
+                color="orange"
+                title="Sem compra em município nenhum: não aparece na Nova Solicitação."
+                style={{ marginInlineEnd: 0, color: TEXTO_DA_TAG['orange'] }}
+              >
+                Em espera
+              </Tag>
+            </div>
+          ) : null}
         </div>
       ),
     },
@@ -322,9 +335,10 @@ export default function ProjetosPage(): JSX.Element {
       responsive: VISIVEL_A_PARTIR.xl,
       render: (_, record) => {
         const cor = record.fluxo === 'SUPER' ? 'gold' : 'blue';
+        // D43/D28: desde 03/11, NAO_SUPER em município sem compra vai para aprovação.
         return (
-          <Tag color={cor} style={{ marginInlineEnd: 0, color: TEXTO_DA_TAG[cor] }}>
-            {record.fluxo === 'SUPER' ? 'SUPER (Manual)' : 'NAO_SUPER (Auto)'}
+          <Tag color={cor} className="whitespace-normal" style={{ marginInlineEnd: 0, color: TEXTO_DA_TAG[cor] }}>
+            {record.fluxo === 'SUPER' ? 'SUPER (Manual)' : 'NAO_SUPER (aprovado na criação)'}
           </Tag>
         );
       },
@@ -375,7 +389,8 @@ export default function ProjetosPage(): JSX.Element {
       <Card>
         <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Title level={3} className="m-0" id="projetos-title">
-            Projetos ({pagination.total || 0})
+            {/* Lista que falhou não tem total: "(0)" diria que não há projeto. */}
+            Projetos{erroLista ? '' : ` (${pagination.total || 0})`}
           </Title>
           <div className="flex flex-wrap items-center gap-2">
             <Search
@@ -405,6 +420,8 @@ export default function ProjetosPage(): JSX.Element {
           rowKey="id"
           nomeDaLinha={(projeto) => projeto.nome}
           loading={loading}
+          erro={erroLista}
+          onTentarDeNovo={() => void fetchProjetos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE)}
           onChange={handleTableChange}
           pagination={{
             ...pagination,
@@ -489,7 +506,7 @@ export default function ProjetosPage(): JSX.Element {
           >
             <Radio.Group>
               <Radio value="SUPER">Aprovação Manual</Radio>
-              <Radio value="NAO_SUPER">Auto-aprovado</Radio>
+              <Radio value="NAO_SUPER">Aprovado na criação (sem compra vai para aprovação)</Radio>
             </Radio.Group>
           </Form.Item>
 

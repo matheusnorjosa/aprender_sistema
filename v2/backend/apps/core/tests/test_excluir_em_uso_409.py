@@ -1,7 +1,7 @@
 """
 C2 (Programa C) — excluir registro em uso responde 409 com o motivo, não 500.
 
-As FKs `on_delete=PROTECT` (Solicitacao/Compra → Município, Projeto → Gerência, Compra → Produto,
+As FKs `on_delete=PROTECT` (Solicitacao/DATCompra → Município, Projeto → Gerência, Produto → Projeto,
 Cadastro DAT → Projeto Geral) levantam `ProtectedError`, que o handler de exceção não tratava: a
 tela recebia 500 e mostrava "Erro 500". Agora é 409 dizendo o TIPO de registro que impede a
 exclusão, nunca os registros em si (podem ser de outro setor).
@@ -11,9 +11,6 @@ exclusão, nunca os registros em si (podem ser de outro setor).
 
 from __future__ import annotations
 
-import itertools
-from datetime import date
-
 from django.apps import apps
 from django.db.models import PROTECT, ProtectedError
 from rest_framework.test import APIClient
@@ -22,8 +19,8 @@ import pytest
 
 from apps.core.exceptions import _mensagem_em_uso
 from apps.core.models import (
-    Compra,
     DATCadastro,
+    DATCompra,
     EquipeGerencia,
     Gerencia,
     Municipio,
@@ -35,23 +32,12 @@ from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, Solicita
 
 pytestmark = pytest.mark.django_db
 
-_SEQ = itertools.count(1)
-
 
 def _root_client() -> APIClient:
     # Sem relançar a exceção da view: o teste vê a resposta que a tela recebe (antes, 500).
     client = APIClient(raise_request_exception=False)
     client.force_authenticate(user=UsuarioFactory(superuser=True))
     return client
-
-
-def _compra(**kwargs) -> Compra:
-    n = next(_SEQ)
-    kwargs.setdefault("projeto", ProjetoFactory())
-    kwargs.setdefault("municipio", MunicipioFactory())
-    return Compra.objects.create(
-        codigo=f"C409-{n}", quantidade=1, data=date(2026, 9, 30), uso="Formação", external_hash=f"h409-{n}", **kwargs
-    )
 
 
 def _assert_409_em_uso(resp, tipo: str, *segredos: str) -> None:
@@ -104,16 +90,6 @@ def test_projeto_com_produto_da_409():
     assert Projeto.objects.filter(pk=projeto.pk).exists()
 
 
-def test_produto_com_compra_da_409():
-    produto = Produto.objects.create(codigo="P409", nome="Kit 409", projeto=ProjetoFactory())
-    _compra(produto=produto)
-
-    resp = _root_client().delete(f"/api/produtos/{produto.id}/")
-
-    _assert_409_em_uso(resp, str(Compra._meta.verbose_name_plural))
-    assert Produto.objects.filter(pk=produto.pk).exists()
-
-
 def test_projeto_geral_com_cadastro_dat_da_409():
     projeto_geral = ProjetoGeral.objects.create(nome="PROJETO 409")
     DATCadastro.objects.create(
@@ -130,11 +106,11 @@ def test_varios_tipos_saem_em_ordem_e_sem_repetir():
     municipio = MunicipioFactory()
     SolicitacaoFactory(municipio=municipio)
     SolicitacaoFactory(municipio=municipio)
-    _compra(municipio=municipio)
+    DATCompra.objects.create(municipio=municipio, projeto=ProjetoFactory(), quantidade=1, created_by=UsuarioFactory())
 
     resp = _root_client().delete(f"/api/municipios/{municipio.id}/")
 
-    _assert_409_em_uso(resp, "Compras, Solicitações de Evento")
+    _assert_409_em_uso(resp, "Compras DAT, Solicitações de Evento")
 
 
 def test_excluir_sem_vinculo_continua_204():
@@ -170,7 +146,6 @@ def test_sentinela_todo_model_com_fk_protect_sai_com_acento_no_409():
         "core.AcaoTemplateExecutor": "Executores de Ações Template",
         "core.AvailabilityBlock": "Bloqueios de Disponibilidade",
         "core.CicloAcoes": "Ciclos de Ações",
-        "core.Compra": "Compras",
         "core.DATAcao": "Ações DAT",
         "core.DATCadastro": "Cadastros DAT",
         "core.DATCompra": "Compras DAT",

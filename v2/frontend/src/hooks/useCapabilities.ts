@@ -32,7 +32,6 @@ export interface Capabilities {
   canUseGcal: boolean;
   canViewAllAvailability: boolean;
   canImportAvailabilityBlocks: boolean;
-  canImportCompras: boolean;
   canImportGenericSpreadsheet: boolean;
   canManageAdminRegistries: boolean;
   canManageInternalActions: boolean;
@@ -77,7 +76,6 @@ export function computeCapabilities(policies: readonly string[]): Capabilities {
     canUseGcal: can('use_gcal'),
     canViewAllAvailability: can('view_all_availability'),
     canImportAvailabilityBlocks: can('import_availability_blocks'),
-    canImportCompras: can('import_compras'),
     canImportGenericSpreadsheet: can('import_generic_spreadsheet'),
     canManageAdminRegistries: can('manage_admin_registries'),
     canManageInternalActions: can('manage_internal_actions'),

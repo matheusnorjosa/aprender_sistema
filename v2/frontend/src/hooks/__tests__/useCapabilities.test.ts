@@ -53,13 +53,11 @@ describe('computeCapabilities — flags nomeadas por ator', () => {
   test('DAT → imports + registries + compras dashboard', () => {
     const caps = computeCapabilities([
       'import_availability_blocks',
-      'import_compras',
       'import_generic_spreadsheet',
       'manage_admin_registries',
       'view_compras_dashboard',
     ]);
     expect(caps.canImportAvailabilityBlocks).toBe(true);
-    expect(caps.canImportCompras).toBe(true);
     expect(caps.canImportGenericSpreadsheet).toBe(true);
     expect(caps.canManageAdminRegistries).toBe(true);
     expect(caps.canViewComprasDashboard).toBe(true);
@@ -111,7 +109,6 @@ describe('computeCapabilities — flags nomeadas por ator', () => {
       ['canUseGcal', 'use_gcal'],
       ['canViewAllAvailability', 'view_all_availability'],
       ['canImportAvailabilityBlocks', 'import_availability_blocks'],
-      ['canImportCompras', 'import_compras'],
       ['canImportGenericSpreadsheet', 'import_generic_spreadsheet'],
       ['canManageAdminRegistries', 'manage_admin_registries'],
       ['canManageInternalActions', 'manage_internal_actions'],
@@ -127,8 +124,8 @@ describe('computeCapabilities — flags nomeadas por ator', () => {
       ['canCreateSolicitationWithoutPurchase', 'create_solicitation_without_purchase'],
       ['canManageLotacaoComum', 'manage_lotacao_comum'],
     ];
-    // Uma flag por PUBLIC_POLICY_KEY do backend (test_rbac_policies_contract.py: 28 chaves).
-    expect(CASES).toHaveLength(28);
+    // Uma flag por PUBLIC_POLICY_KEY do backend (test_rbac_policies_contract.py: 27 chaves).
+    expect(CASES).toHaveLength(27);
     const flags = Object.keys(computeCapabilities([])).filter((k) => k.startsWith('can') && k !== 'can');
     expect(flags.sort()).toEqual(CASES.map(([flag]) => String(flag)).sort());
     for (const [flag, policy] of CASES) {

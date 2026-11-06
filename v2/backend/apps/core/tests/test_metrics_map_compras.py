@@ -2,7 +2,7 @@
 Mapa (`GET /api/metrics/map/`): a coluna "Compras" conta a lista atual (G19, decisão do dono 05/11/2026).
 
 Regra (a mesma da criação, `services/compra_elegibilidade.py`):
-- só conta `DATCompra` ativa com `quantidade > 0`; a tabela `Compra` antiga não entra;
+- só conta `DATCompra` ativa com `quantidade > 0`;
 - conta par município × projeto: duas compras do mesmo projeto no mesmo município contam 1;
 - com o filtro de projeto, vale a família da coleção: a compra de outro projeto da mesma coleção
   no município conta 1 para o projeto filtrado (o par é município × projeto filtrado);
@@ -21,7 +21,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, Produto, ProjetoGeral
+from apps.core.models import ProjetoGeral
 from apps.core.tests.factories import (
     MunicipioFactory,
     ProjetoFactory,
@@ -65,26 +65,6 @@ def _get(client, **params):
     by_uf = {item["uf"]: item["compras"] for item in data["by_uf"]}
     by_mun = {item["municipio"]: item["compras"] for item in data["by_municipio"]}
     return data["totals"]["compras"], by_uf, by_mun
-
-
-def test_compra_antiga_sem_datcompra_nao_conta(client_diretoria, cenario):
-    produto = Produto.objects.create(nome="Kit Mapa", codigo="KITMAPA", projeto=cenario["a"])
-    Compra.objects.create(
-        codigo="MAPA-LEG-1",
-        produto=produto,
-        projeto=cenario["a"],
-        municipio=cenario["ce"],
-        quantidade=10,
-        data=timezone.localdate(),
-        uso="Uso 1",
-        external_hash="hash_mapa_legado_1",
-    )
-
-    total, by_uf, by_mun = _get(client_diretoria)
-
-    assert total == 0
-    assert by_uf["CE"] == 0
-    assert by_mun["Cidade Mapa CE"] == 0
 
 
 def test_datcompra_inativa_ou_sem_quantidade_nao_conta(client_diretoria, cenario):

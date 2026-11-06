@@ -81,8 +81,9 @@ compra (`services/compra_elegibilidade.py`), as pendências, o dashboard e o Map
 - contrato: `quantidade`, `quantidade_utilizada`, `valor_unitario` etc.
 
 A lista antiga `core_compra` (`Compra`) saiu de uso em 06/11/2026 (G29, etapa 1): nenhuma rota a lê nem
-a grava (`/api/compras/`, `/api/controle/compras/` e `/api/controle/import-compras/` respondem 404) e o
-Django admin só a consulta. A tabela fica até a etapa 2, depois de backup e OK do dono. Ver
+a grava (`/api/compras/`, `/api/controle/compras/` e `/api/controle/import-compras/` respondem 404).
+Na etapa 2 o model, a tabela, o registro no admin e a policy `import_compras` foram apagados
+(migration `0132_apaga_compra_antiga`). Ver
 `v2/docs/specs/backend/imports.spec.md`.
 
 ## Services

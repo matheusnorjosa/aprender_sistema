@@ -23,7 +23,6 @@ class TestModelsBackwardsCompatibility:
             AcaoDAT,
             AuditLog,
             AvailabilityBlock,
-            Compra,
             Config,
             Deslocamento,
             EquipeGerencia,
@@ -48,7 +47,6 @@ class TestModelsBackwardsCompatibility:
         assert Solicitacao is not None
         assert Participation is not None
         assert AvailabilityBlock is not None
-        assert Compra is not None
         assert Deslocamento is not None
         assert AcaoDAT is not None
         assert Config is not None
@@ -87,13 +85,6 @@ class TestModelsBackwardsCompatibility:
 
         assert AvailabilityBlock is not None
         assert AvailabilityBlock._meta.db_table == "core_availability_block"
-
-    def test_direct_import_compra(self) -> None:
-        """Import direto: from apps.core.models.compra import X"""
-        from apps.core.models.compra import Compra
-
-        assert Compra is not None
-        assert Compra._meta.db_table == "core_compra"
 
     def test_direct_import_workflow(self) -> None:
         """Import direto: from apps.core.models.workflow import X"""

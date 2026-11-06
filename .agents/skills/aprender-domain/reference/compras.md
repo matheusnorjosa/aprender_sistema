@@ -1,22 +1,12 @@
 # Compras (Regras de Negócio)
 
-O sistema possui **dois models de compra** com propósitos distintos.
+A lista de compras é **uma só**: `DATCompra`.
 
-## COMPRA-01: Compra (Histórico ETL)
+## COMPRA-01: Compra antiga (apagada)
 
-**Model**: `Compra` (`apps/core/models/compra.py`)
-**Propósito**: Importação histórica de compras da planilha original
-**Chave natural**: `(codigo + municipio + projeto + data)`
-
-**Campos**:
-- `codigo`: CharField (DEPRECATED - usar FK produto)
-- `produto`: FK → Produto
-- `projeto`: FK → Projeto
-- `municipio`: FK → Municipio
-- `quantidade`: IntegerField
-- `data`: DateField
-- `uso`: TextField (finalidade da compra)
-- `external_hash`: SHA256 para idempotência de import
+A lista antiga `Compra` (tabela `core_compra`, histórico do ETL) saiu de uso no G29, etapa 1 (06/11/2026,
+#2178), e foi apagada na etapa 2 (migration `0132_apaga_compra_antiga`), com a policy `import_compras`.
+Não recrie: compra nova, regra da compra, Mapa e pendências leem `DATCompra`.
 
 ## COMPRA-02: DATCompra (Gestão Operacional)
 

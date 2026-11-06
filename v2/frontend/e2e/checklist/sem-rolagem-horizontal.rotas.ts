@@ -75,6 +75,11 @@ export interface RotaMedida {
   path: string;
   /** Perfil que consegue abrir a rota (e que vê linhas nas tabelas dela). */
   perfil: Perfil;
+  /**
+   * Outros perfis com que a rota também é medida (mesma chave em PENDENTES): tela cujo conteúdo muda
+   * por perfil (G30: os cartões da Home).
+   */
+  outrosPerfis?: readonly Perfil[];
   /** Rota com parâmetro: o spec descobre o id pela API antes de navegar. */
   parametro?: 'solicitacaoEditavel';
   /** Título próprio da tela (h1-h5, heading ou título de Card dentro de `main`). */
@@ -110,7 +115,8 @@ function expandida(textoDaLinha: string, rotulo: string, larguras?: readonly Lar
 }
 
 export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
-  { path: '/', perfil: 'controle', marco: 'Página Inicial' },
+  // G30: os cartões da Home mudam por perfil; medida também com o aprovador e o superusuário.
+  { path: '/', perfil: 'controle', marco: 'Página Inicial', outrosPerfis: ['aprovador', 'superusuario'] },
   // G30: as tabelas dos dashboards e do mapa são o ResponsiveTable; a vista "expandida" é medida
   // nas larguras em que há coluna escondida (a 1ª linha com o texto do seed).
   {
@@ -426,11 +432,11 @@ export function chaveDe(rota: RotaMedida, estado?: EstadoDaTela): string {
  * sai daqui quando passar a ser medido (de preferência no PR do Programa C que mexe na tela).
  */
 export const NAO_MEDIDOS: Readonly<Record<string, string>> = {
-  'Home com outros perfis': 'os cartões da Home mudam por perfil; a rota é medida só com Controle',
   '/controle/plano-formacoes (Calendário e Resumo)': 'placeholders "em desenvolvimento", sem conteúdo',
   '/controle/pre-agenda (modo Google)': 'a tabela de eventos do Google exige OAuth',
-  '/solicitacoes/nova (pergunta de avaliar e avisos de agenda)':
-    'aparecem só depois de escolher projeto, formadores e horário nos ComboBox (lookup assíncrono)',
+  '/solicitacoes/nova (avisos de agenda)':
+    'aparecem só depois de escolher projeto, formadores e um horário com conflito na agenda; a pergunta ' +
+    'de avaliar o formador é medida desde o G30 (#avaliar, com o lookup interceptado)',
   '/mapa-brasil (municípios do estado clicado)': 'exige clicar numa região do mapa',
   '/dat/cadastros (aba AVALIAR)': 'o seed só tem cadastro FORMAR',
   'ImportUploader depois da validação':
@@ -469,8 +475,15 @@ export const ROTAS_NAO_MEDIDAS: Readonly<Record<string, { tipo: 'redirect' | 'al
 export const TELA_LOGIN = 'login';
 
 /**
+ * A troca obrigatória de senha também não é rota do AppRoutes: ocupa o lugar do sistema quando o
+ * /api/me/ diz `deve_trocar_senha` (G30). Medida com o /api/me/ interceptado; sem header com "Sair".
+ */
+export const TELA_TROCA_DE_SENHA = 'troca-de-senha';
+export const MARCO_TROCA_DE_SENHA = 'Defina sua senha';
+
+/**
  * DÍVIDA MEDIDA: rota × largura que TEM rolagem horizontal hoje.
- * Chave = `path` de ROTAS_MEDIDAS (ou TELA_LOGIN).
+ * Chave = `path` de ROTAS_MEDIDAS (ou TELA_LOGIN, TELA_TROCA_DE_SENHA, `/solicitacoes/nova#avaliar`).
  *
  * Cada combinação listada roda com `test.fail`: o teste passa enquanto a tela
  * ainda rola. Quando um PR do Programa C (C1..C7) conserta a tela, o teste

@@ -44,13 +44,9 @@ const LINHA_DE_BASE: ListaPendentes = {
   '/dashboards/gcal': [360, 768, 1024],
   '/mapa-brasil': [360, 1024, 1280],
   '/mapa-brasil#lista': [360, 1024, 1280],
-  '/controle/coordenadores': [360, 768, 1024, 1280],
-  '/controle/coordenadores#lista': [360, 768, 1024, 1280],
-  '/controle/coordenadores#area': [360],
   '/controle/plano-formacoes': [360, 768, 1024, 1280],
   '/acoes-notificacao': [360, 768, 1024, 1280],
   '/notificacoes-internas': [360, 768],
-  '/dat/cadastros': [360, 768, 1024, 1280],
 };
 
 /**
@@ -63,16 +59,16 @@ const LINHA_DE_BASE_SO_LINUX: ListaPendentes = {
 };
 
 /**
- * Tamanho atual de PENDENTES mais PENDENTES_SO_LINUX (43 + 2). Só desce. C0: 126 + 2; o C1
+ * Tamanho atual de PENDENTES mais PENDENTES_SO_LINUX (30 + 2). Só desce. C0: 126 + 2; o C1
  * tirou 9 (as 4 de Usuários e 5 que a sidebar nova liberou a 768 e 1024); o C2 tirou 27 (Admin
  * DAT: grupos, setores, funções, gerências, municípios, produtos e projetos gerais); a tela
  * Projetos (01/10/2026, marca de série) tirou 3; Meus Eventos e Minhas Solicitações (item 36, 19/10/2026) tiraram 4 cada; Aprovações, Publicar na agenda e Pré-agenda (19/10/2026, item 36)
  * tiraram 12; Gestão de Ações e Registros de Turmas (20/10/2026, item 38) tiraram 8; Gestão de Compras (26/10/2026,
  * item 38) tirou 4; a edição de solicitação (03/11/2026, caixa única de coordenadores) tirou 1; o C4
  * (05/11/2026, Grade Mensal em semana abaixo de 1280 px) tirou 3; o G30 (06/11/2026) tirou as 4 de
- * Bloqueios, 4 de Deslocamentos.
+ * Bloqueios, 4 de Deslocamentos, 4 de Cadastros, 9 de Coordenadores.
  */
-const TETO_PENDENTES = 45;
+const TETO_PENDENTES = 32;
 
 const SO_LINUX = ' (só Linux)';
 
@@ -258,6 +254,10 @@ describe('ratchet de PENDENTES: lista real', () => {
   const CONSERTADAS_NO_G30: ListaPendentes = {
     '/solicitacoes/bloqueios': [360, 768, 1024, 1280],
     '/solicitacoes/deslocamentos': [360, 768, 1024, 1280],
+    '/dat/cadastros': [360, 768, 1024, 1280],
+    '/controle/coordenadores': [360, 768, 1024, 1280],
+    '/controle/coordenadores#lista': [360, 768, 1024, 1280],
+    '/controle/coordenadores#area': [360],
   };
   test.each(Object.entries(CONSERTADAS_NO_G30).flatMap(([chave, larguras]) => larguras.map((l) => [chave, l] as const)))(
     '%s @ %ipx, consertada no G30, não volta a PENDENTES',

@@ -5,13 +5,15 @@
  *
  * Workflow FORMAR: Criação Curso → Chaves → Instruções → Envio
  * Workflow AVALIAR: Recebidos → Validados → Importados
+ *
+ * Sem rolagem horizontal (G30): a tabela é o ResponsiveTable (colunas por prioridade em
+ * ./Cadastros/columns) e o cabeçalho e a barra de botões dos filtros quebram linha.
  */
 
 import { useState, useEffect, type JSX } from 'react';
 import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
 import type { PaginatedResponse } from '../../types';
 import {
-  Table,
   Button,
   Input,
   Space,
@@ -28,6 +30,7 @@ import {
   Col,
   Statistic,
   Tabs,
+  Grid,
   Badge,
 } from 'antd';
 import {
@@ -63,7 +66,8 @@ import {
   UF_OPTIONS,
   DEFAULT_FILTERS,
 } from './Cadastros/constants';
-import { getColumnsFormar, getColumnsAvaliar, type ColumnHandlers } from './Cadastros/columns';
+import { getColumnsFormar, getColumnsAvaliar, nomeDoCadastro, type ColumnHandlers } from './Cadastros/columns';
+import ResponsiveTable from '../../components/ResponsiveTable';
 import type { CadastroRecord } from './Cadastros/types';
 import dayjs, { type Dayjs } from 'dayjs';
 
@@ -128,6 +132,7 @@ interface ProjetoGeralOption {
 
 export default function CadastrosPage(): JSX.Element {
   const [activeTab, setActiveTab] = useState<'FORMAR' | 'AVALIAR'>('FORMAR');
+  const acoesCompactas = !Grid.useBreakpoint().sm;
 
   // Options for dropdowns
   const [municipios, setMunicipios] = useState<MunicipioOption[]>([]);
@@ -261,6 +266,8 @@ export default function CadastrosPage(): JSX.Element {
       okText: 'Sim, excluir',
       okType: 'danger',
       cancelText: 'Cancelar',
+      // Ação destrutiva: o foco começa no Cancelar.
+      autoFocusButton: 'cancel',
       onOk: async () => {
         try {
           await deleteCadastro(record.id);
@@ -293,15 +300,15 @@ export default function CadastrosPage(): JSX.Element {
 
   const currentColumns =
     activeTab === 'FORMAR'
-      ? getColumnsFormar(columnHandlers)
-      : getColumnsAvaliar(columnHandlers);
+      ? getColumnsFormar(columnHandlers, acoesCompactas)
+      : getColumnsAvaliar(columnHandlers, acoesCompactas);
   const currentPlataforma = PLATAFORMAS[activeTab];
 
   return (
     <section className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }} aria-labelledby="cadastros-title">
       {/* Header */}
       <header className="mb-6">
-        <div className="flex justify-between items-start mb-2">
+        <div className="flex flex-wrap justify-between items-start gap-3 mb-2">
           <div>
             <Title level={3} className="m-0" id="cadastros-title">
               <CloudServerOutlined className="mr-2" />
@@ -461,7 +468,7 @@ export default function CadastrosPage(): JSX.Element {
           </Col>
         </Row>
         <Divider className="my-4 mb-3" />
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Button icon={<ClearOutlined />} onClick={handleClearFilters}>
             Limpar
           </Button>
@@ -498,12 +505,12 @@ export default function CadastrosPage(): JSX.Element {
           </Button>
         }
       >
-        <Table
+        <ResponsiveTable<CadastroRecord>
           columns={currentColumns}
           dataSource={cadastros}
           rowKey="id"
           loading={loading}
-          scroll={{ x: activeTab === 'FORMAR' ? 1200 : 1100 }}
+          nomeDaLinha={nomeDoCadastro}
           pagination={{
             ...pagination,
             showSizeChanger: true,

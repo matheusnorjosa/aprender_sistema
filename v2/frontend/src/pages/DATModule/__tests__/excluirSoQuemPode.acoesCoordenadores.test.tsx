@@ -147,8 +147,8 @@ describe('Gestão de Coordenadores', { timeout: 45000 }, () => {
     expect(screen.queryByRole('img', { name: 'delete' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText('Visualizar como lista'));
-    const editar = await screen.findByLabelText('Editar coordenador', {}, { timeout: 15000 });
-    expect(screen.queryByLabelText('Excluir coordenador')).not.toBeInTheDocument();
+    const editar = await screen.findByLabelText('Editar: Ana', {}, { timeout: 15000 });
+    expect(screen.queryByLabelText('Excluir: Ana')).not.toBeInTheDocument();
 
     fireEvent.click(editar);
     await screen.findByText('Editar Coordenador');
@@ -161,8 +161,8 @@ describe('Gestão de Coordenadores', { timeout: 45000 }, () => {
     expect(screen.getByRole('img', { name: 'delete' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText('Visualizar como lista'));
-    const editar = await screen.findByLabelText('Editar coordenador', {}, { timeout: 15000 });
-    expect(screen.getByLabelText('Excluir coordenador')).toBeInTheDocument();
+    const editar = await screen.findByLabelText('Editar: Ana', {}, { timeout: 15000 });
+    expect(screen.getByLabelText('Excluir: Ana')).toBeInTheDocument();
 
     fireEvent.click(editar);
     await screen.findByText('Editar Coordenador');

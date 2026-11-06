@@ -46,7 +46,7 @@ vi.mock('../../../api/datModule', () => ({
 import CoordenadoresPage from '../CoordenadoresPage';
 import { getCoordenadorDAT } from '../../../api/datModule';
 
-// A view padrão é CARDS (ícones sem aria-label estável); a tabela expõe "Editar coordenador".
+// A view padrão é CARDS (ícones sem aria-label estável); a tabela expõe "Editar: <nome>" (AcoesLinha, G30).
 async function switchToTable(user: ReturnType<typeof userEvent.setup>): Promise<void> {
   const tableBtn = await screen.findByLabelText('Visualizar como lista', {}, { timeout: 15000 });
   await user.click(tableBtn);
@@ -67,7 +67,7 @@ describe('M18-05 (#1654): editar coordenador busca o DETAIL (não a linha da lis
         </MemoryRouter>,
       );
       await switchToTable(user);
-      const editBtns = await screen.findAllByLabelText('Editar coordenador', {}, { timeout: 15000 });
+      const editBtns = await screen.findAllByLabelText(/^Editar: /, {}, { timeout: 15000 });
       await user.click(editBtns[0]); // Ana (id 11)
       await waitFor(() => expect(getCoordenadorDAT).toHaveBeenCalledWith(11), { timeout: 10000 });
       const obs = await screen.findByLabelText('Observações', {}, { timeout: 10000 });
@@ -86,7 +86,7 @@ describe('M18-05 (#1654): editar coordenador busca o DETAIL (não a linha da lis
         </MemoryRouter>,
       );
       await switchToTable(user);
-      const editBtns = await screen.findAllByLabelText('Editar coordenador', {}, { timeout: 15000 });
+      const editBtns = await screen.findAllByLabelText(/^Editar: /, {}, { timeout: 15000 });
       await user.click(editBtns[0]); // A
       const obs = await screen.findByLabelText('Observações', {}, { timeout: 10000 });
       await waitFor(() => expect(obs).toHaveValue('OBS_DETALHE_A'), { timeout: 10000 });
@@ -99,7 +99,7 @@ describe('M18-05 (#1654): editar coordenador busca o DETAIL (não a linha da lis
       await user.click(screen.getByRole('button', { name: /cancelar/i }));
 
       // reabre a edição, agora em B (detail de B tem observacoes vazia)
-      const editBtns2 = await screen.findAllByLabelText('Editar coordenador', {}, { timeout: 10000 });
+      const editBtns2 = await screen.findAllByLabelText(/^Editar: /, {}, { timeout: 10000 });
       await user.click(editBtns2[1]); // B
       const obsB = await screen.findByLabelText('Observações', {}, { timeout: 10000 });
       await waitFor(() => expect(obsB).toHaveValue(''), { timeout: 10000 }); // RED sem resetFields (retém SENTINELA_A)

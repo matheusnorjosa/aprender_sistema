@@ -1,16 +1,22 @@
 /**
  * Column definitions for CadastrosPage
  * Issue #303: Split large DATModule pages
+ *
+ * Sem rolagem horizontal (G30, padrão responsivo): colunas do ResponsiveTable. Sempre na linha o
+ * município (identidade) e as ações (AcoesLinha; no celular, o menu "Mais ações"); a Coleção sobe
+ * a partir de sm, as etapas de md, o link de lg e as contagens (FORMAR) e o Progresso (AVALIAR) só
+ * de xxl. O que some vai para a linha expandida, onde as etapas continuam clicáveis.
  */
 
 import { Space, Tag, Typography, Tooltip, Button, Steps } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
 import {
   EditOutlined,
   DeleteOutlined,
   LinkOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../../components/ResponsiveTable';
+import { AcoesLinha, larguraAcoesLinha } from '../../../components/AcoesLinha';
 import { PLATAFORMAS } from './constants';
 import { renderStatusIcon, getStepStatus, getCurrentStep } from './helpers';
 import type { CadastroRecord } from './types';
@@ -26,26 +32,52 @@ export interface ColumnHandlers {
   onDelete: (record: CadastroRecord) => void;
 }
 
+/** Quem a linha representa: nomeia o expandir e as ações ("Editar: Fortaleza - CE · Coleção X"). */
+export function nomeDoCadastro(record: CadastroRecord): string {
+  return `${record.municipio_nome} - ${record.uf} · ${record.projeto_geral_nome}`;
+}
+
+/** A coleção pode ter nome longo: a tag quebra linha em vez de passar da célula. */
+const TAG_QUEBRA = { whiteSpace: 'normal', overflowWrap: 'anywhere' } as const;
+
+function colunaAcoes(
+  { onEdit, onDelete }: ColumnHandlers,
+  acoesCompactas: boolean,
+): ColunaResponsiva<CadastroRecord> {
+  return {
+    title: 'Ações',
+    key: 'acoes',
+    width: larguraAcoesLinha(2, acoesCompactas),
+    render: (_, record) => (
+      <AcoesLinha
+        compacto={acoesCompactas}
+        alvo={nomeDoCadastro(record)}
+        acoes={[
+          { chave: 'editar', rotulo: 'Editar', icone: <EditOutlined />, onClick: () => onEdit(record) },
+          {
+            chave: 'excluir',
+            rotulo: 'Excluir',
+            icone: <DeleteOutlined />,
+            onClick: () => onDelete(record),
+            perigo: true,
+          },
+        ]}
+      />
+    ),
+  };
+}
+
 /**
  * Creates column definitions for FORMAR platform
  * @param handlers - Event handlers object
  * @returns Column definitions
  */
-export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: ColumnHandlers): ColumnsType<CadastroRecord> {
+export function getColumnsFormar(handlers: ColumnHandlers, acoesCompactas = false): ColunaResponsiva<CadastroRecord>[] {
+  const { onQuickStatusUpdate } = handlers;
   return [
-    {
-      title: 'Coleção',
-      dataIndex: 'projeto_geral_nome',
-      key: 'projeto',
-      width: 120,
-      fixed: 'left',
-      render: (nome: string) => <Tag color="blue">{nome}</Tag>,
-    },
     {
       title: 'Município - UF',
       key: 'municipio_uf',
-      width: 180,
-      fixed: 'left',
       render: (_, record) => (
         <Text strong>
           {record.municipio_nome} - {record.uf}
@@ -53,9 +85,17 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
       ),
     },
     {
+      title: 'Coleção',
+      dataIndex: 'projeto_geral_nome',
+      key: 'projeto',
+      responsive: VISIVEL_A_PARTIR.sm,
+      render: (nome: string) => <Tag color="blue" style={TAG_QUEBRA}>{nome}</Tag>,
+    },
+    {
       title: 'Alunos',
       dataIndex: 'quantidade_alunos',
       key: 'alunos',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 80,
       align: 'right',
       render: (val: number | undefined) => val?.toLocaleString('pt-BR') || '-',
@@ -64,6 +104,7 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
       title: 'Profs.',
       dataIndex: 'quantidade_professores',
       key: 'professores',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 80,
       align: 'right',
       render: (val: number | undefined) => val?.toLocaleString('pt-BR') || '-',
@@ -72,6 +113,7 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
       title: 'Códs',
       dataIndex: 'quantidade_codigos',
       key: 'codigos',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 70,
       align: 'center',
       render: (val: number | undefined) => (val ? <Tag>{val}</Tag> : '-'),
@@ -79,7 +121,8 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
     {
       title: 'Criação Curso',
       key: 'criacao_curso',
-      width: 110,
+      responsive: VISIVEL_A_PARTIR.md,
+      width: 96,
       align: 'center',
       render: (_, record) => {
         const handleToggle = () => {
@@ -92,6 +135,7 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
           <div
             className="cursor-pointer"
             role="button"
+            aria-label="Criação Curso: clique para alterar status"
             tabIndex={0}
             onClick={handleToggle}
             onKeyDown={(e) => {
@@ -115,7 +159,8 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
     {
       title: 'Chaves',
       key: 'chaves',
-      width: 100,
+      responsive: VISIVEL_A_PARTIR.md,
+      width: 96,
       align: 'center',
       render: (_, record) => {
         const handleToggle = () => {
@@ -128,6 +173,7 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
           <div
             className="cursor-pointer"
             role="button"
+            aria-label="Chaves: clique para alterar status"
             tabIndex={0}
             onClick={handleToggle}
             onKeyDown={(e) => {
@@ -149,7 +195,8 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
     {
       title: 'Instruções',
       key: 'instrucoes',
-      width: 100,
+      responsive: VISIVEL_A_PARTIR.md,
+      width: 96,
       align: 'center',
       render: (_, record) => {
         const handleToggle = () => {
@@ -162,6 +209,7 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
           <div
             className="cursor-pointer"
             role="button"
+            aria-label="Instruções: clique para alterar status"
             tabIndex={0}
             onClick={handleToggle}
             onKeyDown={(e) => {
@@ -183,7 +231,8 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
     {
       title: 'Envio',
       key: 'envio',
-      width: 100,
+      responsive: VISIVEL_A_PARTIR.md,
+      width: 96,
       align: 'center',
       render: (_, record) => {
         const handleToggle = () => {
@@ -196,6 +245,7 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
           <div
             className="cursor-pointer"
             role="button"
+            aria-label="Envio: clique para alterar status"
             tabIndex={0}
             onClick={handleToggle}
             onKeyDown={(e) => {
@@ -217,6 +267,7 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
     {
       title: 'Link',
       key: 'link',
+      responsive: VISIVEL_A_PARTIR.lg,
       width: 60,
       align: 'center',
       render: (_, record) =>
@@ -235,35 +286,7 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
           '-'
         ),
     },
-    {
-      title: 'Ações',
-      key: 'acoes',
-      width: 100,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="Editar">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => onEdit(record)}
-              aria-label="Editar cadastro"
-            />
-          </Tooltip>
-          <Tooltip title="Excluir">
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => onDelete(record)}
-              aria-label="Excluir cadastro"
-            />
-          </Tooltip>
-        </Space>
-      ),
-    },
+    colunaAcoes(handlers, acoesCompactas),
   ];
 }
 
@@ -272,21 +295,12 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
  * @param handlers - Event handlers object
  * @returns Column definitions
  */
-export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }: ColumnHandlers): ColumnsType<CadastroRecord> {
+export function getColumnsAvaliar(handlers: ColumnHandlers, acoesCompactas = false): ColunaResponsiva<CadastroRecord>[] {
+  const { onQuickStatusUpdate } = handlers;
   return [
-    {
-      title: 'Coleção',
-      dataIndex: 'projeto_geral_nome',
-      key: 'projeto',
-      width: 120,
-      fixed: 'left',
-      render: (nome: string) => <Tag color="green">{nome}</Tag>,
-    },
     {
       title: 'Município - UF',
       key: 'municipio_uf',
-      width: 180,
-      fixed: 'left',
       render: (_, record) => (
         <Text strong>
           {record.municipio_nome} - {record.uf}
@@ -294,9 +308,17 @@ export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }: Col
       ),
     },
     {
+      title: 'Coleção',
+      dataIndex: 'projeto_geral_nome',
+      key: 'projeto',
+      responsive: VISIVEL_A_PARTIR.sm,
+      render: (nome: string) => <Tag color="green" style={TAG_QUEBRA}>{nome}</Tag>,
+    },
+    {
       title: 'Recebidos',
       key: 'recebidos',
-      width: 120,
+      responsive: VISIVEL_A_PARTIR.md,
+      width: 96,
       render: (_, record) => {
         const handleToggle = () => {
           const newStatus =
@@ -309,6 +331,7 @@ export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }: Col
             <div
               className="cursor-pointer"
               role="button"
+              aria-label="Recebidos: clique para alterar status"
               tabIndex={0}
               onClick={handleToggle}
               onKeyDown={(e) => {
@@ -329,7 +352,8 @@ export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }: Col
     {
       title: 'Validados',
       key: 'validados',
-      width: 120,
+      responsive: VISIVEL_A_PARTIR.md,
+      width: 96,
       render: (_, record) => {
         const handleToggle = () => {
           const newStatus =
@@ -342,6 +366,7 @@ export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }: Col
             <div
               className="cursor-pointer"
               role="button"
+              aria-label="Validados: clique para alterar status"
               tabIndex={0}
               onClick={handleToggle}
               onKeyDown={(e) => {
@@ -362,7 +387,8 @@ export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }: Col
     {
       title: 'Importados',
       key: 'importados',
-      width: 120,
+      responsive: VISIVEL_A_PARTIR.md,
+      width: 96,
       render: (_, record) => {
         const handleToggle = () => {
           const newStatus =
@@ -375,6 +401,7 @@ export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }: Col
             <div
               className="cursor-pointer"
               role="button"
+              aria-label="Importados: clique para alterar status"
               tabIndex={0}
               onClick={handleToggle}
               onKeyDown={(e) => {
@@ -395,6 +422,7 @@ export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }: Col
     {
       title: 'Progresso',
       key: 'progresso',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 300,
       render: (_, record) => {
         const etapas = PLATAFORMAS.AVALIAR.etapas;
@@ -415,6 +443,7 @@ export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }: Col
     {
       title: 'Link',
       key: 'link',
+      responsive: VISIVEL_A_PARTIR.lg,
       width: 60,
       align: 'center',
       render: (_, record) =>
@@ -433,34 +462,6 @@ export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }: Col
           '-'
         ),
     },
-    {
-      title: 'Ações',
-      key: 'acoes',
-      width: 100,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="Editar">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => onEdit(record)}
-              aria-label="Editar avaliação"
-            />
-          </Tooltip>
-          <Tooltip title="Excluir">
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => onDelete(record)}
-              aria-label="Excluir avaliação"
-            />
-          </Tooltip>
-        </Space>
-      ),
-    },
+    colunaAcoes(handlers, acoesCompactas),
   ];
 }

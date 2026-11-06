@@ -344,6 +344,8 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     perfil: 'dat',
     marco: 'Gestão de Cadastros em Plataformas',
     dados: { em: LINHA, texto: T.municipio },
+    // G30: Alunos, Profs. e Códs. só entram na linha de xxl: há linha expandida em toda largura.
+    estados: [expandida(T.municipio, 'Alunos')],
   },
   { path: '/dat/importacoes', perfil: 'superusuario', marco: 'DAT > Importações' },
   {
@@ -450,6 +452,8 @@ export const TELA_LOGIN = 'login';
  * G30 (06/11/2026): saíram as 4 de /solicitacoes/bloqueios (ResponsiveTable; a lista divide a
  * largura com o formulário só a partir de 1600 px). Ficam 47. A vista "expandida" é medida a 360.
  * G30: saíram as 4 de /solicitacoes/deslocamentos. Ficam 43. A vista "expandida" é medida.
+ * G30: saíram as 4 de /dat/cadastros (a "expandida" é medida) e as 9 de /controle/coordenadores
+ * (cartões, "Lista" e "Por área": a área longa quebra linha, e cabeçalho e filtros também). Ficam 30.
  * O ratchet do Vitest (semRolagemHorizontal.pendentes.test.ts) trava a lista: nada novo
  * entra e o tamanho só desce.
  */
@@ -460,13 +464,9 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/dashboards/gcal': [360, 768, 1024],
   '/mapa-brasil': [360, 1024, 1280],
   '/mapa-brasil#lista': [360, 1024, 1280],
-  '/controle/coordenadores': [360, 768, 1024, 1280],
-  '/controle/coordenadores#lista': [360, 768, 1024, 1280],
-  '/controle/coordenadores#area': [360],
   '/controle/plano-formacoes': [360, 768, 1024, 1280],
   '/acoes-notificacao': [360, 768, 1024, 1280],
   '/notificacoes-internas': [360, 768],
-  '/dat/cadastros': [360, 768, 1024, 1280],
 };
 
 /**

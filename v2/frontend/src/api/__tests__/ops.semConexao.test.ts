@@ -8,10 +8,10 @@ import { describe, test, expect, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/mocks/server';
 import { apiUrl } from '../../test/mocks/handlers';
-import { importCompras } from '../ops';
+import { importAcoes } from '../ops';
 
-const URL_DO_IMPORT = '/controle/import-compras/';
-const planilha = (): File => new File(['a;b\n1;2'], 'compras.csv', { type: 'text/csv' });
+const URL_DO_IMPORT = '/controle/import-acoes/';
+const planilha = (): File => new File(['a;b\n1;2'], 'acoes.csv', { type: 'text/csv' });
 
 describe('postMultipart (importações) — sem conexão', () => {
   beforeEach(() => {
@@ -21,13 +21,13 @@ describe('postMultipart (importações) — sem conexão', () => {
   test('controle: com rede, o upload chega ao servidor e devolve o resultado', async () => {
     server.use(http.post(apiUrl(URL_DO_IMPORT), () => HttpResponse.json({ created: 2, updated: 0, errors: [] })));
 
-    await expect(importCompras(planilha())).resolves.toMatchObject({ created: 2 });
+    await expect(importAcoes(planilha())).resolves.toMatchObject({ created: 2 });
   });
 
   test('sem rede: "Sem conexão com o servidor." (não "Failed to fetch")', async () => {
     server.use(http.post(apiUrl(URL_DO_IMPORT), () => HttpResponse.error()));
 
-    await expect(importCompras(planilha())).rejects.toThrow('Sem conexão com o servidor.');
+    await expect(importAcoes(planilha())).rejects.toThrow('Sem conexão com o servidor.');
   });
 
   test('resposta OFFLINE do service worker: "Sem conexão com o servidor." (não "HTTP 503: ")', async () => {
@@ -37,6 +37,6 @@ describe('postMultipart (importações) — sem conexão', () => {
       ),
     );
 
-    await expect(importCompras(planilha())).rejects.toThrow('Sem conexão com o servidor.');
+    await expect(importAcoes(planilha())).rejects.toThrow('Sem conexão com o servidor.');
   });
 });

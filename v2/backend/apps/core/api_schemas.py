@@ -8,7 +8,7 @@ Provides standardized response schemas and examples for API documentation.
 
 from __future__ import annotations
 
-from rest_framework import serializers
+from rest_framework import serializers  # type: ignore[attr-defined]
 
 from drf_spectacular.utils import OpenApiExample, OpenApiResponse, inline_serializer
 

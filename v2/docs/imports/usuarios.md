@@ -140,7 +140,7 @@ normalize_cpf(cpf) + "|" + normalize_email(email)
 
 ### Comportamento real do service (lido em código)
 
-- **Idempotência**: por CPF (campo unique); conta cujo login já é o CPF da linha também conta como existente.
+- **Idempotência**: por CPF (campo unique). CPF da linha que já é o login de uma conta com outro CPF vira a pendência `login_de_outra_conta`, sem gravar.
 - **Login**: a conta criada nasce com `username = cpf` (lote C, 06/11/2026); antes vinha do e-mail ou era `user_<cpf>`.
 - **Pendências sem CPF**: nenhuma pendência traz o CPF (a `linha` identifica o caso); `outros.row` sai com o CPF trocado por `<cpf>`.
 - **Transação**: `transaction.atomic()` externa para dry-run rollback + `transaction.atomic()` interno por linha (savepoint-per-row, padrão ASQ-016).

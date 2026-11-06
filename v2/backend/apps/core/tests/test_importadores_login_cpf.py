@@ -2,7 +2,7 @@
 Importações pela tela (lote C do alinhamento, 06/11/2026): login = CPF e CPF fora da resposta.
 
 - O importador de usuários cria a conta com `username = cpf` (D14), com e sem e-mail; antes o login vinha
-  do e-mail ou era `user_<cpf>`. Conta cujo login já é o CPF cai em "existente" (nunca ganha sufixo).
+  do e-mail ou era `user_<cpf>`. CPF que já é o login de conta com outro CPF vira pendência, sem gravar.
 - As pendências do importador de usuários e o ensaio do importador de vínculos não trazem o CPF (D15).
 
 Os CPFs aqui são sintéticos.
@@ -46,18 +46,23 @@ def test_importar_sem_email_cria_o_login_igual_ao_cpf(tmp_path):
     assert Usuario.objects.get(cpf="10000005673").username == "10000005673"
 
 
-def test_conta_cujo_login_ja_e_o_cpf_cai_em_existente(tmp_path):
-    # O CPF mudou pela tela antes do lote C e o login ficou com o CPF antigo.
+def test_cpf_que_e_login_de_conta_com_outro_cpf_vira_pendencia_sem_gravar(tmp_path):
+    # O CPF mudou pela tela antes do lote C e o login ficou com o CPF antigo. A linha com o CPF antigo pode
+    # ser de outra pessoa (o CPF foi corrigido por estar errado): não junta, não cria, vira pendência.
     antiga = UsuarioFactory(username="10000006300", cpf="10000007110", first_name="Antigo", last_name="Nome")
-    path = _csv(tmp_path, "cpf,nome\n10000006300,Novo Nome\n")
+    path = _csv(tmp_path, "cpf,nome,is_active\n10000006300,Novo Nome,0\n")
 
     resultado = import_usuarios_from_file(path=path, dry_run=False)
 
     assert resultado["stats"]["created"] == 0
-    assert resultado["stats"]["updated"] == 1
+    assert resultado["stats"]["updated"] == 0
+    assert resultado["stats"]["skipped"]["login_de_outra_conta"] == 1
+    pendencia = resultado["pendencias"]["login_de_outra_conta"][0]
+    assert pendencia["linha"] == 1
+    assert "10000006300" not in json.dumps(resultado["pendencias"])
     antiga.refresh_from_db()
-    assert antiga.first_name == "Novo"
-    assert not Usuario.objects.filter(username__startswith="10000006300_").exists()
+    assert (antiga.first_name, antiga.is_active) == ("Antigo", True)
+    assert Usuario.objects.filter(cpf="10000006300").count() == 0
 
 
 def test_pendencias_do_importador_de_usuarios_nao_trazem_o_cpf(tmp_path):

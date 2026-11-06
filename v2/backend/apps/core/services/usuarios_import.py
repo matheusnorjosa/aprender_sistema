@@ -72,12 +72,19 @@ def import_usuarios_from_file(*, path: str, dry_run: bool = True, actor: Any = N
         "grupos_ignorados": 0,
         "grupos_desconhecidos": 0,
         "reativacao_bloqueada": 0,
-        "skipped": {"cpf_invalid": 0, "nome_missing": 0, "superuser_protected": 0, "other": 0},
+        "skipped": {
+            "cpf_invalid": 0,
+            "nome_missing": 0,
+            "superuser_protected": 0,
+            "login_de_outra_conta": 0,
+            "other": 0,
+        },
     }
     pendencias: dict[str, list[dict[str, Any]]] = {
         "cpf_invalid": [],
         "nome_missing": [],
         "superuser_protected": [],
+        "login_de_outra_conta": [],
         "grupos_ignorados": [],
         "grupos_desconhecidos": [],
         "reativacao_bloqueada": [],
@@ -309,9 +316,20 @@ def _process_row(
     is_active = row.get("is_active", True)
     grupos_str = row.get("grupos", "").strip()
 
-    # Verificar existencia por CPF (idempotencia). D14: o login e o CPF; conta cujo login ja e este CPF
-    # (o CPF mudou e o login ficou) e a mesma pessoa: cai em existente, nunca ganha login com sufixo.
-    existing = Usuario.objects.filter(cpf=cpf).first() or Usuario.objects.filter(username=cpf).first()
+    # Verificar existencia por CPF (idempotencia)
+    existing = Usuario.objects.filter(cpf=cpf).first()
+
+    # D14: o login e o CPF. Se este CPF ja e o login de uma conta com OUTRO CPF (o CPF foi trocado pela tela
+    # e o login ficou), a linha pode ser de outra pessoa: nao junta nem cria; vira pendencia para o DAT.
+    if existing is None and Usuario.objects.filter(username=cpf).exists():
+        stats["skipped"]["login_de_outra_conta"] += 1
+        pendencias["login_de_outra_conta"].append(
+            {
+                "linha": linha_num,
+                "erro": "Este CPF ja e o login de outra conta; confira o CPF da planilha e o da conta.",
+            }
+        )
+        return
 
     # P0-0 (Tier-0, auditoria 2026-07-17): importacao em lote NUNCA altera conta
     # superuser (senha/is_active/grupos/cadastrais). Um CSV nao e caminho

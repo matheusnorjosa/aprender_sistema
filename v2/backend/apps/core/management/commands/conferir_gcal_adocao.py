@@ -10,8 +10,10 @@ Decisão do dono D63 (20/10/2026): a adoção só grava o id depois de conferir 
 está confirmado e tem a mesma data (em America/Fortaleza) que o evento do sistema. Os candidatos são os do
 `gcal_adocao` (`ExportContractImporter.candidatos_gcal_adocao`, mesma regra). Para cada um, só GET na agenda
 da organização (`GCAL_OAUTH_CALENDAR_ID`; vazio ou 'primary' é erro). Erro de leitura (403, 5xx, timeout)
-não aprova. O arquivo `--saida` traz só os aprovados: {solicitacao_id: {event_id, verificado_em,
-inicio_google}}. A saída só traz contagens por motivo e s<id>: nada de título, nome, e-mail ou CPF.
+não aprova, e `dateTime` sem fuso também (o fuso do servidor não decide o dia). O arquivo `--saida` traz só
+os aprovados: {solicitacao_id: {event_id, verificado_em, inicio_google}}; o antigo é apagado antes de tudo e o
+novo é gravado de uma vez (temporário + os.replace), então a conferência que falha não deixa arquivo. A saída
+só traz contagens por motivo e s<id>: nada de título, nome, e-mail ou CPF.
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportArgumentType=false
@@ -21,7 +23,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import date, datetime
+import tempfile
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -30,7 +32,7 @@ from django.core.management.base import BaseCommand, CommandError, CommandParser
 from django.utils import timezone
 
 from apps.core.models import Usuario
-from apps.core.services.export_contract_importer import ExportContractImporter
+from apps.core.services.export_contract_importer import ExportContractImporter, data_inicio_google
 from apps.core.services.gcal_client_factory import get_oauth_client_for_user
 
 logger = logging.getLogger(__name__)
@@ -46,21 +48,34 @@ MOTIVOS = (
 )
 
 
-def _data_inicio(evento: dict[str, Any]) -> tuple[date, str]:
-    """Data de início do evento do Google em Fortaleza e o valor lido. Evento de dia inteiro vem em `date`."""
+def _inicio_bruto(evento: dict[str, Any]) -> str:
+    """O início que o Google devolveu: `start.dateTime` ou, no evento de dia inteiro, `start.date`."""
     start = evento.get("start") or {}
-    if start.get("dateTime"):
-        bruto = str(start["dateTime"])
-        return datetime.fromisoformat(bruto).astimezone(_FORTALEZA).date(), bruto
-    bruto = str(start["date"])
-    return date.fromisoformat(bruto), bruto
+    bruto = start.get("dateTime") or start.get("date")
+    if not bruto:
+        raise ValueError("evento sem start")
+    return str(bruto)
+
+
+def _gravar(caminho: str, dados: dict[str, Any]) -> None:
+    """Grava o JSON de uma vez: temporário no mesmo diretório e `os.replace`."""
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(caminho)), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(dados, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, caminho)
+    except BaseException:
+        os.unlink(tmp)
+        raise
 
 
 class Command(BaseCommand):
     help = (
         "Confere no Google (só GET) os Event IDs que a adoção da virada gravaria e grava o arquivo que o "
         "--gcal-verificado do import_export_contract exige. Nunca escreve no Google. Montar o cliente pode "
-        "renovar o token do operador (grava a credencial e um AuditLog GOOGLE_REFRESH_TOKEN), como no uso normal."
+        "renovar o token do operador (grava a credencial e um AuditLog GOOGLE_REFRESH_TOKEN) e, no "
+        "invalid_grant, desconectar a conta Google dele (apaga a credencial e grava GOOGLE_DISCONNECT), como "
+        "no uso normal."
     )
 
     def add_arguments(self, parser: CommandParser) -> None:
@@ -69,6 +84,9 @@ class Command(BaseCommand):
         parser.add_argument("--operador", type=int, required=True, help="Id do usuário cuja conta Google lê.")
 
     def handle(self, *args: Any, **options: Any) -> None:
+        # Antes de qualquer checagem: a conferência que falha não pode deixar o arquivo de outra rodada.
+        if os.path.exists(options["saida"]):
+            os.remove(options["saida"])
         agenda = str(getattr(settings, "GCAL_OAUTH_CALENDAR_ID", "") or "")
         if not agenda or agenda == "primary":
             raise CommandError("GCAL_OAUTH_CALENDAR_ID vazio ou 'primary': a conferência só lê a agenda da organização")
@@ -99,7 +117,8 @@ class Command(BaseCommand):
                 elif evento.get("status") != "confirmed":
                     motivo = "nao_confirmado"
                 else:
-                    dia, bruto = _data_inicio(evento)
+                    bruto = _inicio_bruto(evento)
+                    dia = data_inicio_google(bruto)
                     motivo = "aprovado" if dia == timezone.localtime(inicio, _FORTALEZA).date() else "outra_data"
                     if motivo == "aprovado":
                         aprovados[str(sid)] = {
@@ -112,8 +131,7 @@ class Command(BaseCommand):
                 motivo = "erro_de_leitura"
             ids[motivo].append(f"s{sid}")
 
-        with open(options["saida"], "w", encoding="utf-8") as f:
-            json.dump(aprovados, f, ensure_ascii=False, indent=2)
+        _gravar(options["saida"], aprovados)
 
         out = self.stdout
         out.write(f"conferidos={len(candidatos)} aprovados={len(aprovados)} saida={options['saida']}")

@@ -1005,6 +1005,7 @@ _MOTIVOS_NAO_ADOTA = (
     "sem_conferencia_no_google",
     "conferencia_com_outro_id",
     "conferencia_vencida",
+    "conferencia_outra_data",
 )
 
 # Quanto tempo vale a conferência no Google: o bastante para conferir e adotar no mesmo dia; depois disso o
@@ -1012,9 +1013,24 @@ _MOTIVOS_NAO_ADOTA = (
 GCAL_CONFERENCIA_VALIDADE = timedelta(hours=24)
 
 
-def _motivo_conferencia(conferido: Any, eid: str, agora: datetime) -> str | None:
+def data_inicio_google(bruto: str) -> date:
+    """Data em America/Fortaleza do início que o Google devolveu: `start.date` (dia inteiro) ou
+    `start.dateTime` com fuso. ValueError se ilegível ou sem fuso (o fuso do servidor não decide o dia)."""
+    try:
+        return date.fromisoformat(bruto)
+    except ValueError:
+        pass
+    dt = datetime.fromisoformat(bruto)
+    if dt.tzinfo is None:
+        raise ValueError("início do Google sem fuso")
+    return dt.astimezone(_FORTALEZA_TZ).date()
+
+
+def _motivo_conferencia(conferido: Any, eid: str, agora: datetime, inicio: datetime) -> str | None:
     """Por que a conferência no Google (entrada do arquivo do `conferir_gcal_adocao`) não libera a adoção
-    deste id, ou None. Data ilegível, sem fuso ou fora da janela conta como vencida."""
+    deste id, ou None. Data da conferência ilegível, sem fuso ou fora da janela conta como vencida. O início
+    no Google tem de cair no mesmo dia que o `inicio` do evento lido agora: outra carga pode tê-lo movido
+    depois da conferência. Início ausente, ilegível ou sem fuso também não libera."""
     if not isinstance(conferido, dict):
         return "sem_conferencia_no_google"
     if conferido.get("event_id") != eid:
@@ -1025,6 +1041,12 @@ def _motivo_conferencia(conferido: Any, eid: str, agora: datetime) -> str | None
         return "conferencia_vencida"
     if em.tzinfo is None or not agora - GCAL_CONFERENCIA_VALIDADE <= em <= agora:
         return "conferencia_vencida"
+    try:
+        dia_google = data_inicio_google(str(conferido.get("inicio_google") or ""))
+    except ValueError:
+        return "conferencia_outra_data"
+    if dia_google != timezone.localtime(inicio, _FORTALEZA_TZ).date():
+        return "conferencia_outra_data"
     return None
 
 
@@ -3056,7 +3078,8 @@ class ExportContractImporter:
         Decisão D63 (20/10): só grava o id que o `conferir_gcal_adocao` achou no Google confirmado e na
         mesma data, há menos de `GCAL_CONFERENCIA_VALIDADE`. Com o arquivo (`gcal_verificado`), o evento
         que passa na regra e não bate com ele fica travado: `sem_conferencia_no_google`,
-        `conferencia_com_outro_id` ou `conferencia_vencida`. Sem o arquivo, o dry-run classifica como
+        `conferencia_com_outro_id`, `conferencia_vencida` ou `conferencia_outra_data` (o início conferido
+        no Google não cai no dia do evento lido na hora da escrita). Sem o arquivo, o dry-run classifica como
         antes e avisa na `nota`; a escrita sem ele é recusada em `_apply_create_only`."""
         tally: dict[str, Any] = dict.fromkeys(
             ("would_create", "would_update", "would_skip_same", "protected_diff", "would_reject"), 0
@@ -3105,7 +3128,7 @@ class ExportContractImporter:
                     logs, admin = logs_idx.get(sol.id, []), sol.id in admin_idx
                 motivo = self._motivo_nao_adota(sol, r, eid, usados, (logs, admin), parts, parts_csv, cpf_idx)
                 if motivo is None and self.gcal_verificado is not None:
-                    motivo = _motivo_conferencia(self.gcal_verificado.get(str(sol.id)), eid, agora)
+                    motivo = _motivo_conferencia(self.gcal_verificado.get(str(sol.id)), eid, agora, sol.inicio)
             if motivo is not None or sol is None:
                 motivos[motivo or "evento_inexistente"] = motivos.get(motivo or "evento_inexistente", 0) + 1
                 tally["would_skip_same"] += 1

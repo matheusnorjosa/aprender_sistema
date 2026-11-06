@@ -14,7 +14,8 @@ Uso:
         --allow-entity solicitacao --allow-entity participation
     # adoção do Event ID do Google (depois do A5), sozinha, com o arquivo da conferência no Google:
     python manage.py conferir_gcal_adocao --path ... --saida /tmp/conferido.json --operador <id>
-    python manage.py import_export_contract --path ... --mode virada --apply --allow-entity gcal_adocao         --gcal-verificado /tmp/conferido.json
+    python manage.py import_export_contract --path ... --mode virada --apply --allow-entity gcal_adocao \
+        --gcal-verificado /tmp/conferido.json
 
 Segurança:
 - sem `--apply` → dry-run (só classifica).

@@ -36,6 +36,7 @@ from apps.core.services.gcal.utils import _payload_hash
 from apps.core.tests.test_export_contract_importer_virada import (  # noqa: F401 (fixtures)
     _CPF_F1,
     _CPF_F2,
+    FUTURO,
     _existente,
     _export,
     _log_tela,
@@ -278,7 +279,19 @@ def _arquivo_do_caso(caso: str, s: Solicitacao) -> dict[str, dict[str, str]]:
         return _conferido(s, quando=agora + timedelta(hours=1))
     if caso == "sem_fuso":
         return _conferido(s, quando=agora.replace(tzinfo=None))
-    return {str(s.id): {"event_id": EID, "verificado_em": "ontem"}}
+    if caso == "data_ilegivel":
+        return {str(s.id): {"event_id": EID, "verificado_em": "ontem"}}
+    arquivo = _conferido(s)
+    inicio_google = {
+        "inicio_outra_data": (s.inicio + timedelta(days=1)).isoformat(),
+        "inicio_ilegivel": "amanhã cedo",
+        "inicio_sem_fuso": s.inicio.replace(tzinfo=None).isoformat(),
+    }.get(caso)
+    if inicio_google is None:
+        del arquivo[str(s.id)]["inicio_google"]
+    else:
+        arquivo[str(s.id)]["inicio_google"] = inicio_google
+    return arquivo
 
 
 @pytest.mark.parametrize(
@@ -290,6 +303,10 @@ def _arquivo_do_caso(caso: str, s: Solicitacao) -> dict[str, dict[str, str]]:
         ("no_futuro", "conferencia_vencida"),
         ("sem_fuso", "conferencia_vencida"),
         ("data_ilegivel", "conferencia_vencida"),
+        ("inicio_outra_data", "conferencia_outra_data"),
+        ("inicio_ilegivel", "conferencia_outra_data"),
+        ("inicio_sem_fuso", "conferencia_outra_data"),
+        ("inicio_ausente", "conferencia_outra_data"),
     ],
 )
 def test_d63_conferencia_que_nao_bate_nao_adota(tmp_path, m, caso, motivo):
@@ -346,3 +363,27 @@ def test_d63_arquivo_ilegivel_e_command_error(tmp_path, m):
                 *("--path", path, "--mode", "virada", "--apply", "--allow-entity", "gcal_adocao"),
                 *("--gcal-verificado", alvo),
             )
+
+
+def test_d63_evento_movido_depois_da_conferencia_nao_adota(tmp_path, m):
+    """A conferência aprovou o evento no dia D1; outra carga da virada o moveu para D2 no sistema dentro das
+    24 h. O CSV e o sistema dizem D2, mas o Google (conferido) está em D1: a adoção não grava."""
+    s = _pronto(m)
+    conferido = _conferido(s)
+    d2 = (FUTURO + timedelta(days=1)).isoformat()
+    path = _export(tmp_path, [_linha(data=d2)])
+    ExportContractImporter(path=path, mode="virada", apply=True, allow=("solicitacao", "participation")).run()
+    s.refresh_from_db()
+    assert timezone.localtime(s.inicio).date().isoformat() == d2
+    report = _adocao(path, conferido)
+    assert report["applied"]["gcal_adocao"] == 0
+    assert report["por_entidade"]["gcal_adocao"]["skip_reasons"]["conferencia_outra_data"] == 1
+    s.refresh_from_db()
+    assert s.external_event_id is None and s.publicado_fora_do_sistema is True
+
+
+def test_d63_inicio_google_de_dia_inteiro_na_mesma_data_adota(tmp_path, m):
+    s = _pronto(m)
+    conferido = _conferido(s)
+    conferido[str(s.id)]["inicio_google"] = FUTURO.isoformat()
+    assert _adocao(_export(tmp_path, [_linha()]), conferido)["applied"]["gcal_adocao"] == 1

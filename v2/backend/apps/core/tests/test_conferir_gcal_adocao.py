@@ -217,3 +217,46 @@ def test_conferencia_sem_agenda_da_organizacao_e_command_error(tmp_path, m, agen
             "conferir_gcal_adocao",
             *("--path", path, "--saida", str(tmp_path / "c.json"), "--operador", str(m.coord.id)),
         )
+
+
+def _um_evento(tmp_path, m, evento: Any) -> tuple[str, dict[str, Any], Solicitacao]:
+    """Um evento pronto (08h-12h do dia FUTURO) conferido contra `evento` (o que o Google devolve)."""
+    s = _existente(m, "EV1", publicado_fora_do_sistema=True)
+    path = _export(tmp_path, [_linha("EV1", "id1")])
+    saida = tmp_path / "um.json"
+    out = _conferir(m, path, str(saida), _google({"id1": evento}))
+    return out, json.loads(saida.read_text(encoding="utf-8")), s
+
+
+@pytest.mark.parametrize(
+    ("evento", "motivo"),
+    [
+        (_evento(f"{DIA}T08:00:00-03:00", status="tentative"), "nao_confirmado"),
+        ({"id": "x", "start": {"dateTime": f"{DIA}T08:00:00-03:00"}}, "nao_confirmado"),
+        ({"id": "x", "status": "confirmed", "start": {"date": DIA}}, "aprovado"),
+        ({"id": "x", "status": "confirmed", "start": {"date": DIA_SEGUINTE}}, "outra_data"),
+        ({"id": "x", "status": "confirmed"}, "erro_de_leitura"),
+        ({"id": "x", "status": "confirmed", "start": {}}, "erro_de_leitura"),
+        # Sem fuso não dá para saber o dia: não usa o fuso do servidor.
+        (_evento(f"{DIA}T08:00:00"), "erro_de_leitura"),
+    ],
+)
+def test_conferencia_status_e_formas_do_inicio(tmp_path, m, evento, motivo):
+    out, arquivo, s = _um_evento(tmp_path, m, evento)
+    assert f"{motivo}: 1 [s{s.id}]" in out
+    assert (str(s.id) in arquivo) is (motivo == "aprovado")
+
+
+def test_conferencia_que_falha_nao_deixa_o_arquivo_velho(tmp_path, m):
+    path, _ = _cenario(tmp_path, m)
+    saida = tmp_path / "c.json"
+    _conferir(m, path, str(saida), _google(_GOOGLE))
+    assert json.loads(saida.read_text(encoding="utf-8"))
+    with pytest.raises(CommandError):
+        _conferir(m, path, str(saida), _google(_GOOGLE, acessivel=False))
+    assert not saida.exists()
+    _conferir(m, path, str(saida), _google(_GOOGLE))
+    with override_settings(GCAL_OAUTH_CALENDAR_ID=""), pytest.raises(CommandError):
+        call_command("conferir_gcal_adocao", *("--path", path, "--saida", str(saida), "--operador", str(m.coord.id)))
+    assert not saida.exists()
+    assert [p.name for p in tmp_path.iterdir() if p.suffix != ".json" and p.is_file()] == []

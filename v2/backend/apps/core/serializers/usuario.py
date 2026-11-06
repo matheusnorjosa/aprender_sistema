@@ -212,6 +212,9 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
     def to_representation(self, instance: Any) -> dict[str, Any]:
         data = super().to_representation(instance)
         data["equipe_administrativa"] = tem_equipe_administrativa(instance)
+        # D15: o e-mail de reserva `<cpf>@placeholder.local` (e e-mail que leve CPF) chega vazio; a tela
+        # mostra "Sem e-mail" e o form vem vazio para o DAT preencher. O salvar sem e-mail mantém o gravado.
+        data["email"] = email_sem_cpf(instance.email) or ""
         return data
 
     def validate_gerencia_id(self, value: Any) -> Any:
@@ -294,6 +297,8 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             "password": {"write_only": True},
             "cpf": {"write_only": True},  # LGPD: don't expose full CPF in responses
+            # D14: o login é o CPF; ao criar, o servidor o grava (`_login_igual_ao_cpf`).
+            "username": {"required": False},
         }
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
@@ -385,7 +390,36 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         ):
             raise serializers.ValidationError({"gerencia_id": "Escolha a gerência da equipe administrativa."})
 
+        self._login_igual_ao_cpf(attrs_typed)
         return attrs
+
+    def _login_igual_ao_cpf(self, attrs: dict[str, object]) -> None:
+        """D14: o login é o CPF (lote C do alinhamento, 06/11/2026).
+
+        Criar grava `username = cpf` (o login pedido é ignorado). Trocar o CPF leva o login junto quando ele
+        era o CPF antigo e o pedido não o troca por outro; vai no mesmo `update`, então na mesma transação e
+        no mesmo registro de auditoria (`campos`). Login que já é de outra conta: 400 no CPF (o banco
+        recusaria com 500).
+        """
+        instance: Any = self.instance
+        cpf = attrs.get("cpf")
+        if not cpf:
+            return
+        if instance is None:
+            attrs["username"] = cpf
+        elif (
+            cpf != instance.cpf
+            and instance.username == instance.cpf
+            and attrs.get("username", instance.username) == instance.username
+        ):
+            attrs["username"] = cpf
+        else:
+            return
+        outras = get_user_model().objects.filter(username=attrs["username"])
+        if instance is not None:
+            outras = outras.exclude(pk=instance.pk)
+        if outras.exists():
+            raise serializers.ValidationError({"cpf": "Este CPF já é o login de outra conta."})
 
     def validate_group_ids(self, value: list[Group]) -> list[Group]:
         """

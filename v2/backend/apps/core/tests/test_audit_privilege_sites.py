@@ -270,7 +270,8 @@ class TestUsuarioCadastralViaREST:
             )
         assert resp.status_code == 201, resp.content
         log = AuditLog.objects.filter(action="CREATE", model_name="Usuario").latest("created_at")
-        assert log.details["target_username"] == "novo_m0703"
+        # D14: o login nasce igual ao CPF; o registro o guarda mascarado.
+        assert log.details["target_username"] == "<cpf>"
         assert "target_user_id" in log.details
 
     def test_update_cadastral_audita_sem_pii(

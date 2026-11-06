@@ -35,8 +35,8 @@ def redact_cpf(value: Any) -> Any:
     return _CPF_RE.sub(_CPF_PLACEHOLDER, value)
 
 
-# Login que o importador de usuários dá à linha sem e-mail: `user_<cpf>` ou `user_<cpf>_N`
-# (services/usuarios_import.py). O `_` cola no CPF e o `_CPF_RE` não o acha.
+# Login que o importador de usuários dava à linha sem e-mail até 06/11/2026 (desde então o login é o
+# CPF): `user_<cpf>` ou `user_<cpf>_N`. Contas antigas podem tê-lo. O `_` cola no CPF e o `_CPF_RE` não o acha.
 _LOGIN_USER_CPF_RE = re.compile(r"^user_\d{11}(?=(?:_\d+)?$)")
 
 
@@ -53,7 +53,7 @@ def email_de_reserva(email: str) -> bool:
 
 
 def email_sem_cpf(email: str | None) -> str | None:
-    """E-mail para mostrar fora da administração de contas: None se for o de reserva ou levar CPF."""
+    """E-mail para mostrar na tela, inclusive na administração de contas: None se for o de reserva ou levar CPF."""
     if not email or email_de_reserva(email) or redact_cpf(email) != email:
         return None
     return email

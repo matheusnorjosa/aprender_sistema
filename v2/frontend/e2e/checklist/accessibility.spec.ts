@@ -574,7 +574,7 @@ test.describe('Checklist: Acessibilidade — opções que não carregaram (C2, a
       const alvo = { ...rota, redeEsperada: [/^500 \/api\/rbac\/meta\//] };
       expect(await verificarTela(page, alvo, rede), 'a tela de Gerências não ficou pronta').toEqual([]);
 
-      await page.getByRole('button', { name: /Nova Gerencia/ }).click();
+      await page.getByRole('button', { name: /Nova Gerência/ }).click();
       const modal = page.getByRole('dialog');
       const alerta = modal.getByRole('alert').filter({ hasText: 'Não foi possível carregar os setores.' });
       await expect(alerta).toBeVisible();

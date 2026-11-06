@@ -308,7 +308,7 @@ class TestFormularioDeUsuarios:
         )
 
         assert resp.status_code == status.HTTP_201_CREATED, resp.data
-        assert _ativos(Usuario.objects.get(username="novo_eq")) == {(vidas.id, "EQUIPE")}
+        assert _ativos(Usuario.objects.get(email="novo_eq@example.invalid")) == {(vidas.id, "EQUIPE")}
 
     def test_leitura_mostra_o_papel(self, root, vidas):
         alvo = _pessoa("form_le")

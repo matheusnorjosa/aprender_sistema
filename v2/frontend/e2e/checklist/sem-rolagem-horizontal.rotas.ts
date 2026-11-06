@@ -304,7 +304,7 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
   {
     path: '/dat/admin/gerencias',
     perfil: 'dat',
-    marco: 'Gerencias',
+    marco: 'Gerências',
     dados: { em: LINHA, texto: T.gerencia },
     // C2: Rótulo nas planilhas só entra na linha a partir de 1600 px: há linha expandida em toda largura.
     estados: [expandida(T.gerencia, 'Rótulo nas planilhas')],

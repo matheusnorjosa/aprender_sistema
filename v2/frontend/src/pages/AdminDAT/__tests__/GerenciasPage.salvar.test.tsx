@@ -58,7 +58,7 @@ async function linha(nome = SETOR, acao = 'Editar'): Promise<HTMLElement> {
 
 async function abrirEditar(user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> {
   await user.click(within(await linha()).getByRole('button', { name: `Editar: ${SETOR}` }));
-  return (await screen.findByText('Editar Gerencia', {}, { timeout: 10000 })).closest<HTMLElement>('[role="dialog"]')!;
+  return (await screen.findByText('Editar Gerência', {}, { timeout: 10000 })).closest<HTMLElement>('[role="dialog"]')!;
 }
 
 describe('GerenciasPage: salvar e excluir (C2)', () => {
@@ -326,6 +326,6 @@ describe('GerenciasPage: salvar e excluir (C2)', () => {
     expect(alerta.closest('[role="alert"]')).toHaveTextContent('Você não tem permissão para realizar esta ação.');
     expect(screen.queryByText('Não há dados')).not.toBeInTheDocument();
     // Sem número no título: "(0)" diria que não há gerência.
-    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent(/^Gerencias$/);
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent(/^Gerências$/);
   }, 30000);
 });

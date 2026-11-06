@@ -6,7 +6,7 @@
  *   (todo projeto pertence a uma gerência — decisão do dono 29/09).
  * - Edição: pré-preenchido com a gerência atual (inativa aparece pelo rótulo, não pelo id); não é
  *   obrigatório, para projeto antigo sem gerência continuar salvando.
- * - 400 da trava (erro sem campo) aparece junto do campo Gerência e some ao abrir outro projeto.
+ * - 400 da trava (no campo `gerencia` desde o lote C) aparece junto do campo Gerência e some ao abrir outro projeto.
  * - Lista de gerências indisponível: o modal diz o motivo e que sem ela não dá para criar.
  */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
@@ -120,7 +120,8 @@ describe('ProjetosPage — gerência do projeto (trava SUPER, 30/09)', () => {
       status: 400,
       response: {
         status: 400,
-        data: { detail: MSG_TRAVA, code: 'VALIDATION_ERROR', errors: { non_field_errors: [MSG_TRAVA] } },
+        // Lote C (06/11/2026): a trava vem no campo `gerencia`.
+        data: { detail: 'Erro de validação.', code: 'VALIDATION_ERROR', errors: { gerencia: [MSG_TRAVA] } },
       },
     });
     vi.mocked(createProjeto).mockRejectedValueOnce(erro);

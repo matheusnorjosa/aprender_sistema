@@ -1,7 +1,8 @@
 /**
- * Admin DAT - Gerencias
+ * Admin DAT - Gerências
  *
- * CRUD de gerencias organizacionais com setor e status ativo.
+ * CRUD de gerências organizacionais com setor e status ativo. Cada setor tem uma gerência só (D03, D74): o
+ * servidor recusa a segunda gerência ativa do mesmo setor, e o motivo aparece no campo.
  *
  * Padrão responsivo (Programa C, C2): lista enxuta no ResponsiveTable. Sempre na linha o
  * setor (rótulo de tela), Situação e as ações; as demais colunas sobem por largura e o que some
@@ -175,10 +176,10 @@ export default function GerenciasPage(): JSX.Element {
       if (!editingGerencia) payload.nome = values.nome;
       if (editingGerencia) {
         await updateGerencia(editingGerencia.id, payload);
-        message.success('Gerencia atualizada com sucesso');
+        message.success('Gerência atualizada com sucesso');
       } else {
         await createGerencia(payload);
-        message.success('Gerencia criada com sucesso');
+        message.success('Gerência criada com sucesso');
       }
       setModalVisible(false);
       form.resetFields();
@@ -234,7 +235,7 @@ export default function GerenciasPage(): JSX.Element {
       onOk: async () => {
         try {
           await deleteGerencia(gerencia.id);
-          message.success('Gerencia excluida com sucesso');
+          message.success('Gerência excluída com sucesso');
           void fetchGerencias(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
         } catch (error) {
           const emUso = dialogoDeExclusaoEmUso({ erro: error, ...saida });
@@ -326,7 +327,7 @@ export default function GerenciasPage(): JSX.Element {
 
   return (
     <section className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }} aria-labelledby="gerencias-title">
-      <nav className="mb-4" aria-label="Navegacao">
+      <nav className="mb-4" aria-label="Navegação">
         <Link to="/dat/admin">&larr; Voltar para Admin DAT</Link>
       </nav>
 
@@ -334,7 +335,7 @@ export default function GerenciasPage(): JSX.Element {
         <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Title level={3} className="m-0" id="gerencias-title">
             {/* Lista que falhou não tem total: "(0)" diria que não há gerência. */}
-            Gerencias{erroLista ? '' : ` (${pagination.total || 0})`}
+            Gerências{erroLista ? '' : ` (${pagination.total || 0})`}
           </Title>
           <div className="flex flex-wrap items-center gap-2">
             <Search
@@ -353,7 +354,7 @@ export default function GerenciasPage(): JSX.Element {
               Atualizar
             </Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-              Nova Gerencia
+              Nova Gerência
             </Button>
           </div>
         </header>
@@ -376,9 +377,9 @@ export default function GerenciasPage(): JSX.Element {
         />
       </Card>
 
-      {/* Modal Criar/Editar Gerencia */}
+      {/* Modal Criar/Editar Gerência */}
       <Modal
-        title={editingGerencia ? 'Editar Gerencia' : 'Nova Gerencia'}
+        title={editingGerencia ? 'Editar Gerência' : 'Nova Gerência'}
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
         onOk={() => form.submit()}
@@ -406,7 +407,7 @@ export default function GerenciasPage(): JSX.Element {
             name="nome"
             label="Código interno"
             extra={editingGerencia ? 'Chave técnica do sistema; não é alterada pela tela.' : undefined}
-            rules={[{ required: true, message: 'Código interno e obrigatorio' }]}
+            rules={[{ required: true, message: 'Código interno é obrigatório' }]}
           >
             <Input placeholder="Ex: GERENCIA 4" disabled={!!editingGerencia} />
           </Form.Item>
@@ -415,7 +416,7 @@ export default function GerenciasPage(): JSX.Element {
             name="nome_setor"
             label="Rótulo nas planilhas"
             extra="Como o setor aparece nas planilhas importadas (usado para casar a importação)."
-            rules={[{ required: true, message: 'Rótulo nas planilhas e obrigatorio' }]}
+            rules={[{ required: true, message: 'Rótulo nas planilhas é obrigatório' }]}
           >
             <Input placeholder="Ex: ACerta" />
           </Form.Item>
@@ -441,13 +442,13 @@ export default function GerenciasPage(): JSX.Element {
 
           <Form.Item
             name="descricao"
-            label="Descricao"
+            label="Descrição"
           >
-            <Input.TextArea rows={3} placeholder="Descricao da gerencia" />
+            <Input.TextArea rows={3} placeholder="Descrição da gerência" />
           </Form.Item>
 
           <Form.Item name="ativo" valuePropName="checked" initialValue={true}>
-            <Checkbox>Gerencia ativa</Checkbox>
+            <Checkbox>Gerência ativa</Checkbox>
           </Form.Item>
 
           <Form.Item

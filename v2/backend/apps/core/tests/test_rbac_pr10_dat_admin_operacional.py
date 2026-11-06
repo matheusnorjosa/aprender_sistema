@@ -403,7 +403,7 @@ class TestSegregacaoPorHistorico:
             format="json",
         )
         assert resp.status_code == 201, resp.content
-        autor = Usuario.objects.get(username="nova_pr10")
+        autor = Usuario.objects.get(cpf="52998224725")
         resp = _approve(dat, _pendente_super(g1, autor=autor))
         assert resp.status_code == 403 and resp.data["code"] == ALTERED
 

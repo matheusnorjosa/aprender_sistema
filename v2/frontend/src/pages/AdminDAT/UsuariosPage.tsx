@@ -42,17 +42,17 @@ import { Link } from 'react-router';
 import { checkAuth } from '../../api/auth';
 import { listUsers, getUserPolicies, createUser, updateUser, deleteUser, resetUserPassword, listGroups, getRBACMeta, listGerencias } from '../../api/adminDAT';
 import {
+  avisoDoPacote,
   buildUsuarioPayload,
+  funcaoSoDoSuperusuario,
   funcoesProntasParaSalvar,
-  gerenciaDaPacote,
-  gruposAposSalvar,
   lotacaoObrigatoria,
   mensagemDoErro,
   motivoDaLotacaoTravada,
   nomeDe,
   resumoDoMenu,
 } from './usuario_form_helpers';
-import type { PermissaoFuncional, RBACMetaPayload, GerenciaRecord } from '../../api/adminDAT';
+import type { RBACMetaPayload, GerenciaRecord } from '../../api/adminDAT';
 import { importUsuarios } from '../../api/ops';
 import type { ImportResult } from '../../api/ops';
 import ImportUploader from '../../components/ImportUploader';
@@ -212,12 +212,11 @@ const corDaFuncao = (nome: string): string => (nome === 'Superusuário' || nome 
 
 interface DetalheUsuarioProps {
   usuario: UserRecord;
-  setores: string[];
   funcoes: string[];
 }
 
 /** Detalhe por assunto (Drawer): o que não cabe na grade, inteiro e sem corte. */
-function DetalheUsuario({ usuario, setores, funcoes }: DetalheUsuarioProps): JSX.Element {
+function DetalheUsuario({ usuario, funcoes }: DetalheUsuarioProps): JSX.Element {
   const lotacao = usuario.gerencia_atual;
   return (
     <div className="flex flex-col gap-6">
@@ -227,7 +226,7 @@ function DetalheUsuario({ usuario, setores, funcoes }: DetalheUsuarioProps): JSX
         column={1}
         items={[
           { key: 'nome', label: 'Nome', children: nomeDe(usuario) },
-          { key: 'email', label: 'E-mail', children: usuario.email || '-' },
+          { key: 'email', label: 'E-mail', children: usuario.email || 'Sem e-mail' },
           {
             key: 'cpf',
             label: 'CPF',
@@ -251,7 +250,7 @@ function DetalheUsuario({ usuario, setores, funcoes }: DetalheUsuarioProps): JSX
                 { key: 'setor', label: 'Setor', children: lotacao.rotulo },
                 { key: 'papel', label: 'Papel', children: PAPEL[lotacao.papel] ?? lotacao.papel },
               ]
-            : [{ key: 'setor', label: 'Setor', children: <Etiquetas nomes={setores} cor={corDoSetor} /> }]
+            : [{ key: 'setor', label: 'Setor', children: 'Sem lotação' }]
         }
       />
       <Descriptions
@@ -286,14 +285,14 @@ interface GroupRecord {
   id: ID;
   name: string;
   permissions?: string[];
-  permissoes_funcionais?: PermissaoFuncional[];
 }
 
 /**
  * User form values interface
  */
 interface UserFormValues {
-  username: string;
+  // Só leitura, na edição: o login é o CPF (D14) e o Salvar não o manda.
+  username?: string;
   email: string;
   first_name?: string | undefined;
   last_name?: string | undefined;
@@ -369,10 +368,11 @@ export default function UsuariosPage(): JSX.Element {
   // Nome como link na cor da marca: o azul padrão do link do AntD dá 4,1:1 no branco (WCAG
   // pede 4,5:1); colorPrimary troca sozinho para o verde claro no tema escuro.
   const { token } = theme.useToken();
-  // Bug 3 fix (2026-04-27): CPF é write-only por LGPD (serializer), então API
-  // nunca retorna o CPF raw — apenas `cpf_masked`. No modo edit, manter o
-  // campo disabled mostrando o mascarado, e exigir clique em "Alterar CPF"
-  // para liberar nova entrada. Submit omite `cpf` do payload se locked.
+  // Bug 3 fix (2026-04-27): o campo `cpf` é write-only por LGPD (serializer): a resposta traz
+  // `cpf_masked`. O login (`username`), que é o CPF, chega inteiro ao DAT por decisão do dono
+  // (05/11/2026); a tela o mostra mascarado (`loginDeTela`). No modo edit, manter o campo CPF
+  // disabled mostrando o mascarado, e exigir clique em "Alterar CPF" para liberar nova entrada.
+  // Submit omite `cpf` do payload se locked; trocar o CPF leva o login junto no servidor.
   const [cpfEditUnlocked, setCpfEditUnlocked] = useState(false);
   const [grupos, setGrupos] = useState<GroupRecord[]>([]);
   const [gerencias, setGerencias] = useState<GerenciaRecord[]>([]);
@@ -405,10 +405,6 @@ export default function UsuariosPage(): JSX.Element {
   });
   const selectedFuncaoIds = Form.useWatch('funcao_ids', form) || [];
 
-  const setorGroupsSet = useMemo(
-    () => new Set(rbacMeta?.setor_groups || []),
-    [rbacMeta]
-  );
   const funcaoGroupsSet = useMemo(
     () => new Set(rbacMeta?.funcao_groups || []),
     [rbacMeta]
@@ -432,12 +428,17 @@ export default function UsuariosPage(): JSX.Element {
     return options;
   }, [gerencias, editingUser, currentIsSuperuser]);
 
+  // D10: para quem não é superusuário, a função sem papel na gerência (ex.: Assistente Administrativo) fica
+  // bloqueada, não escondida: o servidor recusa dar ou tirar.
   const funcaoOptions = useMemo(
     () => grupos
       .filter((g) => funcaoGroupsSet.has(g.name))
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map((g) => ({ label: g.name, value: g.id })),
-    [grupos, funcaoGroupsSet]
+      .map((g) => {
+        const bloqueada = !currentIsSuperuser && funcaoSoDoSuperusuario(g.name);
+        return { label: bloqueada ? `${g.name} (só o superusuário)` : g.name, value: g.id, disabled: bloqueada };
+      }),
+    [grupos, funcaoGroupsSet, currentIsSuperuser]
   );
 
   /**
@@ -495,7 +496,7 @@ export default function UsuariosPage(): JSX.Element {
       setGerencias(gerenciasData.results);
     } catch (error) {
       logger.error('Erro ao carregar contexto RBAC:', error);
-      message.error('Erro ao carregar metadados RBAC');
+      message.error('Não foi possível carregar as funções e setores');
     }
   };
 
@@ -592,6 +593,7 @@ export default function UsuariosPage(): JSX.Element {
 
     form.setFieldsValue({
       username: user.username,
+      // E-mail de reserva chega vazio do servidor (D15): o campo vem vazio para o DAT preencher.
       email: user.email,
       first_name: user.first_name,
       last_name: user.last_name,
@@ -681,10 +683,8 @@ export default function UsuariosPage(): JSX.Element {
     }
   };
 
-  const setoresDe = (record: UserRecord): string[] =>
-    record.gerencia_atual
-      ? [record.gerencia_atual.rotulo]
-      : (record.groups || []).filter((g) => setorGroupsSet.has(g));
+  // D03: o setor é o da lotação vigente; grupo de setor sem vínculo não dá poder e não aparece.
+  const setoresDe = (record: UserRecord): string[] => (record.gerencia_atual ? [record.gerencia_atual.rotulo] : []);
   const funcoesDe = (record: UserRecord): string[] => (record.groups || []).filter((g) => funcaoGroupsSet.has(g));
 
   // C1: lista enxuta, por prioridade de largura (VISIVEL_A_PARTIR). O que some da linha vai
@@ -716,14 +716,21 @@ export default function UsuariosPage(): JSX.Element {
       sorter: true,
       sortOrder: ordem.coluna === 'email' ? ordem.sentido : null,
       responsive: VISIVEL_A_PARTIR.md,
+      // E-mail de reserva chega vazio do servidor (D15).
+      render: (_, record) => record.email || <Text type="secondary">Sem e-mail</Text>,
     },
     {
-      // PR A: setor = gerência da lotação vigente (EquipeGerencia), pelo nome de tela.
-      // Sem vínculo (Controle, DAT, Diretoria operam por grupo), cai para os grupos de setor.
+      // PR A: setor = gerência da lotação vigente (EquipeGerencia), pelo nome de tela. Sem vínculo,
+      // "Sem lotação": desde o PR 12 o poder vem só da lotação, e o grupo de setor é etiqueta (D03).
       title: 'Setor',
       key: 'setor',
       responsive: VISIVEL_A_PARTIR.lg,
-      render: (_, record) => <Etiquetas nomes={setoresDe(record)} cor={corDoSetor} />,
+      render: (_, record) =>
+        record.gerencia_atual ? (
+          <Etiquetas nomes={setoresDe(record)} cor={corDoSetor} />
+        ) : (
+          <Text type="secondary">Sem lotação</Text>
+        ),
     },
     {
       title: 'Função',
@@ -875,7 +882,7 @@ export default function UsuariosPage(): JSX.Element {
         }
       >
         {detalheUser ? (
-          <DetalheUsuario usuario={detalheUser} setores={setoresDe(detalheUser)} funcoes={funcoesDe(detalheUser)} />
+          <DetalheUsuario usuario={detalheUser} funcoes={funcoesDe(detalheUser)} />
         ) : null}
       </Drawer>
 
@@ -895,23 +902,27 @@ export default function UsuariosPage(): JSX.Element {
           autoComplete="off"
           onFinish={handleSave}
         >
-          <Form.Item
-            name="username"
-            label="Username"
-            rules={[{ required: true, message: 'Username é obrigatório' }]}
-            // Na edição (campo travado) o login, que é o CPF, aparece mascarado; o form guarda
-            // o valor real, e o Salvar manda o que sempre mandou.
-            getValueProps={(valor?: string) => ({ value: editingUser && valor ? loginDeTela(valor) : valor })}
-          >
-            <Input placeholder="Ex: joao.silva" disabled={!!editingUser} />
-          </Form.Item>
+          {/* D14: o login é o CPF. Ao criar, o servidor o grava; trocar o CPF o leva junto. Só aparece na
+              edição, travado e mascarado (`loginDeTela`); o Salvar não o manda. */}
+          {editingUser ? (
+            <Form.Item
+              name="username"
+              label="Usuário (login)"
+              extra="É o CPF: muda junto quando o CPF muda."
+              getValueProps={(valor?: string) => ({ value: valor ? loginDeTela(valor) : valor })}
+            >
+              <Input disabled />
+            </Form.Item>
+          ) : null}
 
           <Form.Item
             name="email"
-            label="Email"
+            label="E-mail"
+            // Na edição não é obrigatório: a conta importada sem e-mail chega com o campo vazio (D15), e o
+            // Salvar sem e-mail mantém o gravado.
             rules={[
-              { required: true, message: 'Email é obrigatório' },
-              { type: 'email', message: 'Email inválido' },
+              ...(editingUser ? [] : [{ required: true, message: 'E-mail é obrigatório' }]),
+              { type: 'email' as const, message: 'E-mail inválido' },
             ]}
           >
             <Input placeholder="usuario@example.com" />
@@ -1007,7 +1018,7 @@ export default function UsuariosPage(): JSX.Element {
             showIcon
             className="mb-4"
             message="Como configurar"
-            description="Gerência define onde a pessoa atua (o setor é atribuído automaticamente). Função define o que a pessoa pode fazer no sistema."
+            description="Gerência define onde a pessoa atua (o setor é atribuído automaticamente). Gerência e papel na gerência definem o que a pessoa pode fazer. Função é só o cargo."
           />
 
           {travaDoDat ? <Alert type="warning" showIcon className="mb-4" message={travaDoDat} /> : null}
@@ -1036,8 +1047,8 @@ export default function UsuariosPage(): JSX.Element {
 
           <Form.Item
             name="funcao_ids"
-            label="Função (o que pode fazer)"
-            tooltip="Papel da pessoa no processo"
+            label="Função (cargo)"
+            tooltip="Formador, Coordenador, Apoio de Coordenação e Gerente viram o papel da pessoa na gerência."
             // P0-1 Tier-0 (D-1=2a): membership segue o mesmo gate (ver gerencia_id acima).
             // #2071: obrigatória só ao criar (na edição, o DAT não tem função).
             rules={obrigatorio.funcao ? [{ required: true, message: 'Selecione pelo menos uma função' }] : []}
@@ -1057,7 +1068,7 @@ export default function UsuariosPage(): JSX.Element {
           <Form.Item
             name="equipe_administrativa"
             valuePropName="checked"
-            extra="Na gerência do DAT ou do Controle, dá o pacote do setor, inclusive aprovar solicitações. Nas demais, só registra que a pessoa trabalha nesta gerência."
+            extra="Na gerência do DAT ou do Controle, dá o pacote do setor, inclusive aprovar solicitações; na da Diretoria, supervisão e painéis, sem aprovar. Nas demais, só registra que a pessoa trabalha nesta gerência."
           >
             <Checkbox disabled={!editaLotacao}>Equipe administrativa</Checkbox>
           </Form.Item>
@@ -1109,43 +1120,10 @@ export default function UsuariosPage(): JSX.Element {
                 </div>
               )}
               {(() => {
-                // #2071: espelha o Salvar do backend (grupos que ficam + funções + setor
-                // da gerência só quando ela muda).
-                const selectedGroups = gruposAposSalvar({
-                  grupos,
-                  idsAtuais: editingUser?.group_ids_display || [],
-                  funcoes: funcaoGroupsSet,
-                  funcaoIds: selectedFuncaoIds,
-                  gerencia: gerencias.find((ger) => ger.id === selectedGerenciaId),
-                  gerenciaAnterior: gerencias.find((ger) => ger.id === editingUser?.gerencia_atual?.gerencia_id),
-                });
-                const labels = new Set<string>();
-                selectedGroups.forEach((group) => {
-                  (group.permissoes_funcionais || []).forEach((permissao) => labels.add(permissao.label));
-                });
-                // PR 11: o pacote do DAT e do Controle vem do vínculo, não de grupo; a soma acima não o vê.
-                const avisoPacote = gerenciaDaPacote(gerencias.find((ger) => ger.id === selectedGerenciaId)) ? (
-                  <Alert
-                    type="warning"
-                    showIcon
-                    className="mt-2"
-                    message="Nesta gerência, Equipe e Gerente recebem o pacote do setor, inclusive aprovar solicitações."
-                  />
-                ) : null;
-                // Sem permissão de grupo, a linha não dizia nada ("sem permissões específicas
-                // definidas"); o que a pessoa vê fica na linha "O que vê no menu hoje".
-                if (labels.size === 0) return avisoPacote;
-                return (
-                  <div>
-                    <Text strong>Permissões efetivas: </Text>
-                    <Tag color="purple">{labels.size} permissão(ões)</Tag>
-                    {Array.from(labels).sort().slice(0, 6).map((label) => (
-                      <Tag key={label} color="purple">{label}</Tag>
-                    ))}
-                    {labels.size > 6 ? <Tag>+{labels.size - 6}</Tag> : null}
-                    {avisoPacote}
-                  </div>
-                );
+                // PR 11: o pacote do DAT, do Controle e da Diretoria vem do vínculo (Equipe ou Gerente). Desde
+                // o PR 12 grupo não dá poder: o que a pessoa pode fazer está em "O que vê no menu hoje".
+                const aviso = avisoDoPacote(gerencias.find((ger) => ger.id === selectedGerenciaId));
+                return aviso ? <Alert type="warning" showIcon className="mt-2" message={aviso} /> : null;
               })()}
             </Space>
           </Card>
@@ -1178,7 +1156,7 @@ export default function UsuariosPage(): JSX.Element {
           type="info"
           showIcon
           className="mb-4"
-          message="A nova senha entra em vigor imediatamente."
+          message="A senha nova vale na hora e destrava o login. No próximo acesso a pessoa terá de escolher a própria senha e verá que você a redefiniu."
         />
         <Form
           form={resetForm}

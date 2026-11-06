@@ -12,6 +12,8 @@ from __future__ import annotations
 from typing import Any
 
 from django.db import transaction
+from django.db.models import Value
+from django.db.models.functions import Coalesce, NullIf
 from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.constants import SETORES_PRODUTO
@@ -21,6 +23,7 @@ from apps.core.rbac.helpers import (
     MSG_FLUXO_SUPER_SO_NA_SUPERINTENDENCIA,
     fluxo_super_fora_da_superintendencia,
 )
+from apps.core.services.compra_elegibilidade import projetos_liberados
 from apps.core.services.equipe_gerencia import SETORES_RESERVADOS, grupos_com_capacidade
 from apps.core.services.equipe_gerencia_import import gerencia_reservada
 from apps.core.services.rbac_pacotes import PERFIL_PERMITIDO
@@ -107,6 +110,17 @@ class ProjetoSerializer(serializers.ModelSerializer):
     # PR 7 (2026-04-30): explícito + required=True (não consome default do
     # model). DRF respeita choices e devolve 400 com mensagem padrão.
     fluxo = serializers.ChoiceField(choices=Projeto.FLUXO_CHOICES, required=True)
+    # D41 (lote C, 06/11/2026): sem compra que o libere em município nenhum, o projeto some da Nova
+    # Solicitação; a tela mostra a etiqueta "Em espera".
+    em_espera = serializers.SerializerMethodField()
+
+    def get_em_espera(self, obj: Projeto) -> bool:
+        """Uma consulta por requisição (o contexto é o mesmo para a lista toda), sem N+1."""
+        liberados: set[int] | None = self.context.get("_projetos_liberados")
+        if liberados is None:
+            liberados = set(projetos_liberados(Projeto.objects.all()).values_list("pk", flat=True))
+            self.context["_projetos_liberados"] = liberados
+        return obj.pk not in liberados
 
     def get_setor_efetivo(self, obj: Projeto) -> str:
         """Setor EFETIVO para EXIBIÇÃO: campo canônico do model (`Projeto.setor`, do de-para v15)
@@ -132,6 +146,7 @@ class ProjetoSerializer(serializers.ModelSerializer):
             "eh_serie",
             "eh_nome_geral",
             "is_test",
+            "em_espera",
         ]
         # sem_operacao: autoritativo do import (#1897), sem entrada-direta → read-only.
         read_only_fields = ["id", "sem_operacao"]
@@ -140,20 +155,22 @@ class ProjetoSerializer(serializers.ModelSerializer):
         """Regra do dono (30/09): fluxo SUPER só em projeto da gerência Superintendência (g1).
 
         Vale quando o payload grava `fluxo` ou `gerencia` (estado final = payload + instância); um
-        PATCH só de outros campos não é barrado por dado antigo. Erro sem campo → vira o `detail`
-        da resposta, que a ProjetosPage mostra.
+        PATCH só de outros campos não é barrado por dado antigo. O erro vem no campo `gerencia`, onde a
+        ProjetosPage o mostra; o de série com nome geral, em `eh_nome_geral` (lote C, 06/11/2026).
         """
         if "fluxo" in attrs or "gerencia" in attrs:
             instance = getattr(self, "instance", None)
             fluxo = attrs.get("fluxo", getattr(instance, "fluxo", None))
             gerencia = attrs.get("gerencia", getattr(instance, "gerencia", None))
             if fluxo_super_fora_da_superintendencia(fluxo, gerencia):
-                raise serializers.ValidationError(MSG_FLUXO_SUPER_SO_NA_SUPERINTENDENCIA)
+                raise serializers.ValidationError({"gerencia": MSG_FLUXO_SUPER_SO_NA_SUPERINTENDENCIA})
         # Regra da compra: a constraint `projeto_serie_nao_e_nome_geral` vira 400, não 500.
         instance = getattr(self, "instance", None)
         eh_serie = attrs.get("eh_serie", getattr(instance, "eh_serie", False))
         if eh_serie and attrs.get("eh_nome_geral", getattr(instance, "eh_nome_geral", False)):
-            raise serializers.ValidationError("Série não pode ser nome geral: desmarque uma das duas.")
+            raise serializers.ValidationError(
+                {"eh_nome_geral": "Série não pode ser nome geral: desmarque uma das duas."}
+            )
         return attrs
 
     @transaction.atomic
@@ -231,6 +248,48 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
 
     def get_lotacao_reservada(self, obj: Gerencia) -> bool:
         return gerencia_reservada(obj)
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        """Cada setor tem uma gerência só (D03, D74; lote C, 06/11/2026).
+
+        Gerência ATIVA (estado final = payload + instância) não pode ter o `setor_canonico` (não vazio) nem o
+        rótulo de tela (`nome_exibicao` ou, vazio, `nome_setor`; sem diferenciar maiúsculas) de OUTRA gerência
+        ativa. O erro vem no campo que o define. Confere ao criar, ao reativar e quando o setor ou o rótulo
+        mudam: salvar sem mudá-los não é barrado por dado antigo (a tela reenvia tudo). Sem constraint no
+        banco por agora (só depois de medir).
+        """
+        instance: Any = self.instance
+
+        def final(campo: str, padrao: Any) -> Any:
+            return attrs.get(campo, getattr(instance, campo) if instance is not None else padrao)
+
+        if not final("ativo", True):
+            return attrs
+        novo = instance is None or not instance.ativo
+        outras = Gerencia.objects.filter(ativo=True)
+        if instance is not None:
+            outras = outras.exclude(pk=instance.pk)
+        setor = (final("setor_canonico", "") or "").strip()
+        conferir_setor = setor and (novo or setor != instance.setor_canonico)
+        outra = outras.filter(setor_canonico=setor).first() if conferir_setor else None
+        campo = "setor_canonico"
+        if outra is None:
+            nome_exibicao = (final("nome_exibicao", "") or "").strip()
+            rotulo = nome_exibicao or (final("nome_setor", "") or "").strip()
+            campo = "nome_exibicao" if nome_exibicao else "nome_setor"
+            conferir_rotulo = rotulo and (novo or rotulo.casefold() != instance.rotulo.strip().casefold())
+            outra = (
+                outras.annotate(_rotulo=Coalesce(NullIf("nome_exibicao", Value("")), "nome_setor"))
+                .filter(_rotulo__iexact=rotulo)
+                .first()
+                if conferir_rotulo
+                else None
+            )
+        if outra is not None:
+            raise serializers.ValidationError(
+                {campo: f"Já existe a gerência {outra.rotulo} para este setor. Cada setor tem uma gerência só."}
+            )
+        return attrs
 
     def validate_nome(self, value: str) -> str:
         """PR B1 (anti-escalada): `nome` da gerência aprovadora é chave de autorização.

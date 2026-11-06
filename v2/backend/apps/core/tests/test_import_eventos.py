@@ -756,3 +756,32 @@ class TestEventosImportAvailabilityAndReimport:
         # NAO removido, apenas reportado
         assert Participation.objects.filter(solicitacao=sol, usuario=formador1_user).exists()
         assert len(result["pendencias"]["orfaos"]) == 1
+
+    def test_orfao_sem_nome_aparece_pelo_id_e_nunca_pelo_login(
+        self, coordenador_user, municipio, projeto_nao_super, tipo_evento
+    ):
+        """Lote C (06/11/2026): sem nome, a prévia usava o username, que é o CPF (D15)."""
+        sem_nome = UsuarioFactory(
+            username="10000012120", cpf="10000012120", email="sem.nome@example.invalid", first_name="", last_name=""
+        )
+        d = date.today() + timedelta(days=90)
+        com_ele = (
+            "municipio,projeto,tipo_evento,data,hora_inicio,hora_fim,coordenador,formador1\n"
+            f"{municipio.nome},{projeto_nao_super.nome},{tipo_evento.nome},{d.isoformat()},"
+            f"08:00,12:00,{coordenador_user.email},{sem_nome.email}\n"
+        )
+        csv1 = _write_csv(com_ele)
+        import_eventos_from_file(path=csv1, dry_run=False)
+        Path(csv1).unlink(missing_ok=True)
+
+        sem_ele = (
+            "municipio,projeto,tipo_evento,data,hora_inicio,hora_fim,coordenador\n"
+            f"{municipio.nome},{projeto_nao_super.nome},{tipo_evento.nome},{d.isoformat()},"
+            f"08:00,12:00,{coordenador_user.email}\n"
+        )
+        csv2 = _write_csv(sem_ele)
+        result = import_eventos_from_file(path=csv2, dry_run=True)
+        Path(csv2).unlink(missing_ok=True)
+
+        assert [o["nome"] for o in result["pendencias"]["orfaos"]] == [f"Usuario #{sem_nome.pk}"]
+        assert "10000012120" not in str(result)

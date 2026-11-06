@@ -37,6 +37,7 @@ import pandas as pd
 from apps.core.imports.normalization import norm_text, normalize_active_flag, normalize_blank, normalize_cpf_digits
 from apps.core.imports.row_errors import registrar_erro_import
 from apps.core.models import EquipeGerencia, Gerencia, Usuario
+from apps.core.pii import redact_cpf, redact_login_identifier
 from apps.core.rbac.helpers import GERENCIA_APROVADORA_NOME
 from apps.core.services.rbac_pacotes import PACOTE, PAPEIS_COM_PACOTE, PERFIL_PERMITIDO
 from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
@@ -150,7 +151,7 @@ def import_equipe_gerencia_from_file(*, path: str, dry_run: bool = True) -> dict
                     {
                         "linha": idx,
                         "erro": registrar_erro_import(importer="equipe_gerencia", linha=idx),
-                        "row": str(row),
+                        "row": redact_cpf(str(row)),
                     }
                 )
 
@@ -445,9 +446,10 @@ def _process_row(
                 "linha": linha_num,
                 "setor": setor,
                 "papel": papel,
-                "usuario_nome": row.get("usuario_nome", "").strip(),
-                "usuario_email": row.get("usuario_email", "").strip(),
-                "usuario_cpf": row.get("usuario_cpf", "").strip(),
+                # D15: a tela imprime o ensaio; sem CPF em nenhuma grafia, nem no e-mail de reserva.
+                "usuario_nome": redact_cpf(row.get("usuario_nome", "").strip()),
+                "usuario_email": redact_cpf(row.get("usuario_email", "").strip()),
+                "usuario_cpf": redact_login_identifier(row.get("usuario_cpf", "").strip()),
             }
         )
         return
@@ -462,7 +464,7 @@ def _process_row(
                 {
                     "linha": linha_num,
                     "setor": setor,
-                    "usuario_nome": row.get("usuario_nome", "").strip(),
+                    "usuario_nome": redact_cpf(row.get("usuario_nome", "").strip()),
                     "erro": "APOIO requer coordenador_supervisor valido",
                 }
             )

@@ -101,7 +101,7 @@ def test_conta_nova_criada_com_senha_nao_ganha_aviso(dat):
         format="json",
     )
     assert resp.status_code == 201, resp.content
-    assert _me(Usuario.objects.get(username="conta_nova"))["aviso_senha_redefinida"] is None
+    assert _me(Usuario.objects.get(cpf="10000000009"))["aviso_senha_redefinida"] is None
 
 
 def test_quem_troca_a_propria_senha_pela_rota_admin_nao_ganha_aviso():
@@ -213,7 +213,7 @@ def test_historico_fica_de_fora_criacao_de_conta_propria_troca_e_mais_de_30_dias
         format="json",
     )
     assert resp.status_code == 201, resp.content
-    assert _me(Usuario.objects.get(username="conta_nova"))["redefinicoes_senha"] == []
+    assert _me(Usuario.objects.get(cpf="10000000009"))["redefinicoes_senha"] == []
 
     alvo = UsuarioFactory()
     _redefinir(dat, alvo)

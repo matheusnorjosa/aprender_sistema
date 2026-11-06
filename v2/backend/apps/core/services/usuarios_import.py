@@ -1,7 +1,8 @@
 """
 Service para importacao de Usuarios via upload.
 
-Padrao: dry_run + CPF para idempotencia (campo unico).
+Padrao: dry_run + CPF para idempotencia (campo unico). O login da conta criada e o CPF (D14). As
+pendencias nao trazem o CPF (D15): a linha basta para achar o caso na planilha.
 
 Colunas esperadas:
 - cpf (obrigatorio): 11 digitos com digitos verificadores mod-11 validos
@@ -23,7 +24,6 @@ Colunas esperadas:
 from __future__ import annotations
 
 import logging
-import re
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +35,7 @@ import pandas as pd
 from apps.core.imports.normalization import normalize_active_flag, normalize_blank, normalize_cpf_digits
 from apps.core.imports.row_errors import registrar_erro_import
 from apps.core.models import AuditLog, Usuario
+from apps.core.pii import redact_cpf
 from apps.core.services.audit import registrar_auditoria
 from apps.core.validators import CPF_ABSENT, CPF_VALID, classify_cpf
 
@@ -100,7 +101,7 @@ def import_usuarios_from_file(*, path: str, dry_run: bool = True, actor: Any = N
                     {
                         "linha": idx,
                         "erro": registrar_erro_import(importer="usuarios", linha=idx),
-                        "row": str(row),
+                        "row": redact_cpf(str(row)),
                     }
                 )
 
@@ -243,30 +244,6 @@ def _parse_name(nome: str) -> tuple[str, str]:
     return first_name, last_name
 
 
-def _generate_username(cpf: str, email: str) -> str:
-    """Gera username unico a partir do email ou CPF."""
-    if email and "@" in email:
-        base = email.split("@")[0]
-        # Limpar caracteres invalidos
-        base = re.sub(r"[^\w.]", "", base)
-        if base:
-            # Verificar se ja existe
-            username = base
-            counter = 1
-            while Usuario.objects.filter(username=username).exists():
-                username = f"{base}{counter}"
-                counter += 1
-            return username
-
-    # Fallback: usar CPF
-    username = f"user_{cpf}"
-    counter = 1
-    while Usuario.objects.filter(username=username).exists():
-        username = f"user_{cpf}_{counter}"
-        counter += 1
-    return username
-
-
 def _actor_pode_atribuir_grupos(actor: Any) -> bool:
     """Atribuir grupo e conceder privilegio, entao e exclusivo de superusuario.
 
@@ -307,7 +284,6 @@ def _process_row(
         pendencias["cpf_invalid"].append(
             {
                 "linha": linha_num,
-                "cpf": cpf_raw,
                 "status": cpf_status,
                 "erro": motivo,
             }
@@ -321,7 +297,6 @@ def _process_row(
         pendencias["nome_missing"].append(
             {
                 "linha": linha_num,
-                "cpf": cpf,
                 "erro": "Nome obrigatorio",
             }
         )
@@ -334,8 +309,9 @@ def _process_row(
     is_active = row.get("is_active", True)
     grupos_str = row.get("grupos", "").strip()
 
-    # Verificar existencia por CPF (idempotencia)
-    existing = Usuario.objects.filter(cpf=cpf).first()
+    # Verificar existencia por CPF (idempotencia). D14: o login e o CPF; conta cujo login ja e este CPF
+    # (o CPF mudou e o login ficou) e a mesma pessoa: cai em existente, nunca ganha login com sufixo.
+    existing = Usuario.objects.filter(cpf=cpf).first() or Usuario.objects.filter(username=cpf).first()
 
     # P0-0 (Tier-0, auditoria 2026-07-17): importacao em lote NUNCA altera conta
     # superuser (senha/is_active/grupos/cadastrais). Um CSV nao e caminho
@@ -345,7 +321,6 @@ def _process_row(
         pendencias["superuser_protected"].append(
             {
                 "linha": linha_num,
-                "cpf": cpf,
                 "erro": "Conta de superusuario nao pode ser alterada por importacao.",
             }
         )
@@ -362,7 +337,6 @@ def _process_row(
         pendencias["grupos_ignorados"].append(
             {
                 "linha": linha_num,
-                "cpf": cpf,
                 "grupos": grupos_str,
                 "erro": "Coluna 'grupos' ignorada: atribuicao de grupo e exclusiva de superusuario.",
             }
@@ -383,7 +357,6 @@ def _process_row(
             pendencias["grupos_desconhecidos"].append(
                 {
                     "linha": linha_num,
-                    "cpf": cpf,
                     "grupos": grupos_desconhecidos,
                     "erro": "Grupo nao encontrado; os demais grupos da linha foram aplicados.",
                 }
@@ -431,7 +404,6 @@ def _process_row(
                 pendencias["reativacao_bloqueada"].append(
                     {
                         "linha": linha_num,
-                        "cpf": cpf,
                         "erro": "Usuario inativo NAO reativado por importacao (reativar e acao humana).",
                     }
                 )
@@ -452,13 +424,11 @@ def _process_row(
             _assign_groups(existing, grupos_encontrados, actor=actor)
 
     else:
-        # Criar novo usuario
-        username = _generate_username(cpf, email)
-
+        # Criar novo usuario (D14: login = CPF)
         if not dry_run:
             usuario = Usuario.objects.create(
                 cpf=cpf,
-                username=username,
+                username=cpf,
                 email=email if email else f"{cpf}@placeholder.local",
                 first_name=first_name,
                 last_name=last_name,

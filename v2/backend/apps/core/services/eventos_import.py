@@ -728,7 +728,8 @@ def _sync_participations(
                 "linha": linha_num,
                 "solicitacao_id": solicitacao.pk,
                 "usuario_id": p.usuario_id,
-                "nome": (str(p.usuario.get_full_name() or p.usuario.username) if p.usuario else None),
+                # Sem nome, o id (como `Usuario.__str__`): o username é o CPF (D15).
+                "nome": (str(p.usuario.get_full_name() or f"Usuario #{p.usuario_id}") if p.usuario else None),
                 "role": p.role,
             }
         )

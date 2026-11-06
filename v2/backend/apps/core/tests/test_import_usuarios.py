@@ -471,7 +471,7 @@ class TestImportGrupoGateTier0:
         ignorados = result["pendencias"]["grupos_ignorados"]
         assert len(ignorados) == 1
         assert ignorados[0]["linha"] == 1
-        assert ignorados[0]["cpf"] == "10000005673"
+        assert "cpf" not in ignorados[0]  # D15: a linha basta; o CPF não volta na resposta
         assert "Superintendência" in ignorados[0]["grupos"]
         assert result["stats"]["grupos_ignorados"] == 1
 

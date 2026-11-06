@@ -180,7 +180,10 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     path: '/solicitacoes/bloqueios',
     perfil: 'coordenador',
     marco: 'Gerenciar Disponibilidade',
-    dados: { em: LINHA, texto: T.motivoBloqueio },
+    // G30: o Motivo só entra na linha a partir de md; o status (o seed é aprovado) fica na linha
+    // em toda largura. A 360 px, o motivo longo do seed é medido na linha expandida.
+    dados: { em: LINHA, texto: 'Aprovado' },
+    estados: [expandida('Aprovado', T.motivoBloqueio, [360])],
   },
   { path: '/solicitacoes/deslocamentos', perfil: 'controle', marco: 'Deslocamentos', dados: { em: LINHA, texto: T.municipio } },
   {
@@ -436,6 +439,8 @@ export const TELA_LOGIN = 'login';
  * C4, Grade Mensal (05/11/2026, semana com ‹ › abaixo de 1280 px): saíram as 3 de
  * /solicitacoes/disponibilidade. Ficam 51. A Grade com evento todo dia (#com-evento) e o detalhe
  * do dia (#detalhe) são medidos nas 4 larguras e não rolam.
+ * G30 (06/11/2026): saíram as 4 de /solicitacoes/bloqueios (ResponsiveTable; a lista divide a
+ * largura com o formulário só a partir de 1600 px). Ficam 47. A vista "expandida" é medida a 360.
  * O ratchet do Vitest (semRolagemHorizontal.pendentes.test.ts) trava a lista: nada novo
  * entra e o tamanho só desce.
  */
@@ -446,7 +451,6 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/dashboards/gcal': [360, 768, 1024],
   '/mapa-brasil': [360, 1024, 1280],
   '/mapa-brasil#lista': [360, 1024, 1280],
-  '/solicitacoes/bloqueios': [360, 768, 1024, 1280],
   '/solicitacoes/deslocamentos': [360, 768, 1024, 1280],
   '/controle/coordenadores': [360, 768, 1024, 1280],
   '/controle/coordenadores#lista': [360, 768, 1024, 1280],

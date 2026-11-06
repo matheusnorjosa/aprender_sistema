@@ -96,7 +96,7 @@ export default function Disponibilidade(): JSX.Element {
 
       <Row gutter={[16, 16]}>
           {/* Card de Criacao */}
-          <Col xs={24} lg={12}>
+          <Col xs={24} xxl={12}>
             <article aria-label="Criar novo bloqueio">
               <Card title="Criar Bloqueio" bordered={false}>
                 <BlockForm onSubmit={handleCreate} />
@@ -105,7 +105,7 @@ export default function Disponibilidade(): JSX.Element {
           </Col>
 
           {/* Card de Listagem */}
-          <Col xs={24} lg={12}>
+          <Col xs={24} xxl={12}>
             <article aria-label="Lista de meus bloqueios">
               <Card title="Meus Bloqueios" bordered={false}>
                 {loading ? (

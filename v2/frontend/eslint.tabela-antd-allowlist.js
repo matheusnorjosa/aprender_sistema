@@ -12,7 +12,8 @@ export const TABELA_ANTD_PADRAO = 'src/components/ResponsiveTable.tsx';
  * 20 depois de Projetos (01/10/2026), 19 depois de Meus Eventos, 18 depois de Minhas
  * Solicitações, 15 depois de Aprovações, Publicar na agenda e Pré-agenda (item 36,
  * 19/10/2026), 13 depois de Gestão de Ações e Registros de Turmas (item 38, 20/10/2026) e 12
- * depois de Gestão de Compras (item 38, 26/10/2026).
+ * depois de Gestão de Compras (item 38, 26/10/2026); o G30 (06/11/2026) tira as telas
+ * restantes, uma por commit: 11 depois de Bloqueios.
  * SÓ ENCOLHE. Cada PR do Programa C tira os arquivos que migra (o valor diz qual PR). src/test/lint/tabelaAntdRestrita.test.ts mede quem importa
  * Table em src/ e exige que o conjunto seja exatamente esta lista: arquivo novo
  * reprova (use ResponsiveTable) e entrada que já não importa também (tire-a daqui).
@@ -23,7 +24,6 @@ export const TABELA_ANTD_PADRAO = 'src/components/ResponsiveTable.tsx';
  * @type {Readonly<Record<string, string>>}
  */
 export const TABELA_ANTD_ALLOWLIST = {
-  'src/components/MyBlocksTable.tsx': 'C3 — Bloqueios',
   'src/pages/Deslocamentos/DeslocamentosPage.tsx': 'C3 — Deslocamentos',
   'src/pages/Controle/AcoesNotificacaoPage.tsx': 'C5 — Notificações',
   'src/pages/Controle/NotificacoesInternasPage.tsx': 'C5 — Notificações',

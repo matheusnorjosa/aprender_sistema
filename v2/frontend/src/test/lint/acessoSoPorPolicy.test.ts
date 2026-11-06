@@ -55,12 +55,12 @@ const ALLOWLIST: Readonly<Record<string, { motivo: string; leituras: number }>> 
   'hooks/useIdentity.ts': { motivo: 'exibição: rótulo de papel (badge) a partir de setor/função', leituras: 7 },
   'pages/Perfil/PerfilPage.tsx': { motivo: 'exibição: o titular vê as próprias funções (o setor vem da lotação)', leituras: 1 },
   'pages/AdminDAT/UsuariosPage.tsx': {
-    motivo: 'cadastro: setores, funções e superusuário de OUTRO usuário',
-    leituras: 8,
+    motivo: 'cadastro: funções e superusuário de OUTRO usuário',
+    leituras: 6,
   },
   'pages/AdminDAT/usuario_form_helpers.ts': {
     motivo: 'cadastro: monta o payload (superusuário, funções) de OUTRO usuário',
-    leituras: 4,
+    leituras: 2,
   },
 };
 

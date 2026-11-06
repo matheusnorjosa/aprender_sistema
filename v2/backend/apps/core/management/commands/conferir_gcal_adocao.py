@@ -63,6 +63,7 @@ def _gravar(caminho: str, dados: dict[str, Any]) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(dados, f, ensure_ascii=False, indent=2)
+        os.chmod(tmp, 0o644)  # mkstemp cria 0600; a adoção pode rodar com outro usuário
         os.replace(tmp, caminho)
     except BaseException:
         os.unlink(tmp)
@@ -80,10 +81,15 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument("--path", required=True, help="Diretório do export-contract (o mesmo da adoção).")
-        parser.add_argument("--saida", required=True, help="Arquivo JSON a gravar com os ids aprovados.")
+        parser.add_argument(
+            "--saida", required=True, help="Arquivo .json a gravar com os ids aprovados (apagado no início)."
+        )
         parser.add_argument("--operador", type=int, required=True, help="Id do usuário cuja conta Google lê.")
 
     def handle(self, *args: Any, **options: Any) -> None:
+        # Só apaga o que pode ser saída da conferência: um erro de digitação não leva outro arquivo.
+        if not str(options["saida"]).endswith(".json"):
+            raise CommandError("--saida precisa terminar em .json")
         # Antes de qualquer checagem: a conferência que falha não pode deixar o arquivo de outra rodada.
         if os.path.exists(options["saida"]):
             os.remove(options["saida"])

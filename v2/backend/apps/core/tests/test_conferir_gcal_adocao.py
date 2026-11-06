@@ -260,3 +260,21 @@ def test_conferencia_que_falha_nao_deixa_o_arquivo_velho(tmp_path, m):
         call_command("conferir_gcal_adocao", *("--path", path, "--saida", str(saida), "--operador", str(m.coord.id)))
     assert not saida.exists()
     assert [p.name for p in tmp_path.iterdir() if p.suffix != ".json" and p.is_file()] == []
+
+
+def test_saida_que_nao_e_json_e_recusada_sem_apagar_nada(tmp_path, m):
+    # Revisão rodada 2: o apagar-no-início não pode levar um arquivo qualquer por erro de digitação.
+    path, _ = _cenario(tmp_path, m)
+    outro = tmp_path / "outro.txt"
+    outro.write_text("não é da conferência", encoding="utf-8")
+    with pytest.raises(CommandError):
+        _conferir(m, path, str(outro), _google(_GOOGLE))
+    assert outro.read_text(encoding="utf-8") == "não é da conferência"
+
+
+def test_arquivo_da_conferencia_nasce_legivel_para_outro_usuario(tmp_path, m):
+    # mkstemp cria 0600; a adoção pode rodar com outro usuário no container.
+    path, _ = _cenario(tmp_path, m)
+    saida = tmp_path / "c.json"
+    _conferir(m, path, str(saida), _google(_GOOGLE))
+    assert saida.stat().st_mode & 0o777 == 0o644

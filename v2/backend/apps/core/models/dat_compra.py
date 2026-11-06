@@ -58,7 +58,7 @@ class DATCompra(models.Model):
     )
     produto: models.ForeignKey[Produto | None] = models.ForeignKey(  # type: ignore[assignment]
         "core.Produto",
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name="dat_compras",

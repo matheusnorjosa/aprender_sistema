@@ -2,9 +2,9 @@
 C2 (Programa C) — excluir registro em uso responde 409 com o motivo, não 500.
 
 As FKs `on_delete=PROTECT` (Solicitacao/DATCompra → Município, Projeto → Gerência, Produto → Projeto,
-Cadastro DAT → Projeto Geral) levantam `ProtectedError`, que o handler de exceção não tratava: a
-tela recebia 500 e mostrava "Erro 500". Agora é 409 dizendo o TIPO de registro que impede a
-exclusão, nunca os registros em si (podem ser de outro setor).
+DATCompra → Produto, Cadastro DAT → Projeto Geral) levantam `ProtectedError`, que o handler de exceção
+não tratava: a tela recebia 500 e mostrava "Erro 500". Agora é 409 dizendo o TIPO de registro que
+impede a exclusão, nunca os registros em si (podem ser de outro setor).
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOptionalSubscript=false
@@ -88,6 +88,36 @@ def test_projeto_com_produto_da_409():
 
     _assert_409_em_uso(resp, str(Produto._meta.verbose_name_plural), "Kit Projeto 409")
     assert Projeto.objects.filter(pk=projeto.pk).exists()
+
+
+def test_produto_com_compra_dat_da_409_e_nao_solta_o_vinculo():
+    """Decisão do dono (06/11/2026): produto em compra não some da compra em silêncio (antes, SET_NULL)."""
+    projeto = ProjetoFactory()
+    produto = Produto.objects.create(codigo="P409-COMPRA", nome="Kit Compra 409", projeto=projeto)
+    compra = DATCompra.objects.create(
+        municipio=MunicipioFactory(),
+        projeto=projeto,
+        produto=produto,
+        descricao_produto="Compra Sigilosa 409",
+        quantidade=1,
+        created_by=UsuarioFactory(),
+    )
+
+    resp = _root_client().delete(f"/api/produtos/{produto.id}/")
+
+    _assert_409_em_uso(resp, "Compras DAT", "Compra Sigilosa 409")
+    assert Produto.objects.filter(pk=produto.pk).exists()
+    compra.refresh_from_db()
+    assert compra.produto_id == produto.pk
+
+
+def test_produto_sem_compra_continua_204():
+    produto = Produto.objects.create(codigo="P409-LIVRE", nome="Kit Livre 409", projeto=ProjetoFactory())
+
+    resp = _root_client().delete(f"/api/produtos/{produto.id}/")
+
+    assert resp.status_code == 204
+    assert not Produto.objects.filter(pk=produto.pk).exists()
 
 
 def test_projeto_geral_com_cadastro_dat_da_409():

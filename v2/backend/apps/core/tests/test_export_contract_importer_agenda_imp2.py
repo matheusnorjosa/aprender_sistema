@@ -364,7 +364,7 @@ def test_dry_run_fim_antes_do_inicio_e_rejeitado_como_no_apply(tmp_path, masters
     dry, applied = _dry_e_apply(_export(tmp_path, sols, [_part("EV900300")]))
     assert dry["solicitacao"]["would_create"] == applied["solicitacao"] == 0
     assert dry["solicitacao"]["would_reject"] == 1
-    assert dry["solicitacao"]["reject_reasons"] == {"fim_antes_do_inicio": 1}
+    assert dry["solicitacao"]["reject_reasons"] == {"fim_antes_do_inicio": 1, "solicitante_cpf_sem_cadastro": 0}
     assert dry["participation"]["would_create"] == applied["participation"] == 0
     assert dry["participation"]["would_reject"] == 1
 

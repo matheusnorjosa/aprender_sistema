@@ -139,12 +139,14 @@ def _sol(**kw: str) -> dict[str, str]:
     return base
 
 
-def _part(evento_id: str, cpf: str = _CPF_F1, role: str = "FORMADOR", nome: str = "") -> dict[str, str]:
+def _part(
+    evento_id: str, cpf: str = _CPF_F1, role: str = "FORMADOR", nome: str = "", email: str = ""
+) -> dict[str, str]:
     return {
         "evento_id": evento_id,
         "usuario": nome,
         "usuario_cpf": cpf,
-        "usuario_email": "",
+        "usuario_email": email,
         "role": role,
         "match_procedencia": "cpf" if cpf else "",
     }
@@ -565,6 +567,88 @@ def test_25b_formador_que_nao_resolve_bloqueia_a_saida(tmp_path, m):
     _virada(path)
     assert _formadores(s) == {"form1", "form2"}, "ninguém sai; o nome solto não entra"
     assert not Participation.objects.filter(solicitacao=s, guest_nome="Pessoa Sem Cadastro").exists()
+
+
+# ---------- #2035 / #1658(C): pessoa pelo CPF (decisão do dono, 07/11/2026) ----------
+_CPF_SEM_CADASTRO = "12345678909"
+
+
+def test_virada_formador_com_email_do_ex_titular_entra_pelo_cpf(tmp_path, m):
+    """E-mail de cargo troca de dono: a linha traz o e-mail de quem saiu e o CPF de quem está. Vale o CPF."""
+    s = _existente(m, formadores=(m.f1,))
+    path = _export(tmp_path, [_sol()], [_part("EV1", _CPF_F2, email="inativo@example.invalid")])
+    assert _dry(path)["formador_inativo"] == 0
+    _virada(path)
+    assert _formadores(s) == {"form2"}
+
+
+def test_virada_dry_run_conta_participante_email_cpf_divergente(tmp_path, m):
+    _existente(m, formadores=(m.f1,))
+    path = _export(tmp_path, [_sol()], [_part("EV1", _CPF_F2, email="inativo@example.invalid")])
+    report = ExportContractImporter(path=path, mode="virada").run()
+    assert report["participante_email_cpf_divergente"] == 1
+    texto = json.dumps(report, default=str)
+    assert _CPF_F2 not in texto
+    assert "inativo@" not in texto
+
+
+def test_virada_formador_com_cpf_sem_match_nao_troca_por_homonimo(tmp_path, m):
+    """CPF válido que não existe no sistema não cai para e-mail nem nome: ninguém sai, ninguém entra."""
+    s = _existente(m, formadores=(m.f1,))
+    homonimo = UsuarioFactory(username="u2", first_name="Pessoa", last_name="Homonima")
+    linha = _part("EV1", _CPF_SEM_CADASTRO, nome="Pessoa Homonima", email="form3@example.invalid")
+    path = _export(tmp_path, [_sol()], [linha])
+    assert _dry(path)["remocao_bloqueada_resolucao"] == 1
+    _virada(path)
+    assert _formadores(s) == {"form1"}
+    assert not Participation.objects.filter(solicitacao=s, usuario__in=(homonimo, m.f3)).exists()
+
+
+def test_virada_formador_com_cpf_de_dv_errado_entra_pelo_email(tmp_path, m):
+    """Sem CPF válido vale o e-mail: o form1 continua resolvido e o form3, que a planilha tirou, sai."""
+    s = _existente(m, formadores=(m.f1, m.f3))
+    dv_errado = _CPF_F1[:-1] + str((int(_CPF_F1[-1]) + 1) % 10)
+    path = _export(tmp_path, [_sol()], [_part("EV1", dv_errado, email="form1@example.invalid"), _part("EV1", _CPF_F2)])
+    assert _dry(path)["remocao_bloqueada_resolucao"] == 0
+    _virada(path)
+    assert _formadores(s) == {"form1", "form2"}
+
+
+def test_virada_convidado_com_cpf_sem_cadastro_nao_entra(tmp_path, m):
+    """Ninguém entra pela linha de CPF sem cadastro: nem em dobro de quem já é convidado, nem como nome solto."""
+    s = _existente(m)
+    Participation.objects.create(solicitacao=s, usuario=m.f2, role="CONVIDADO")
+    linhas = [
+        _part("EV1", _CPF_SEM_CADASTRO, role="CONVIDADO", nome="Form Dois", email="form2@example.invalid"),
+        _part("EV1", "98765432100", role="CONVIDADO", nome="Outra Pessoa"),  # válido, sem cadastro
+    ]
+    _virada(_export(tmp_path, [_sol()], linhas))
+    convidados = Participation.objects.filter(solicitacao=s, role="CONVIDADO")
+    assert list(convidados.values_list("usuario__username", "guest_nome")) == [("form2", "")]
+
+
+def test_virada_texto_do_comando_mostra_a_divergencia(tmp_path, m):
+    _existente(m, formadores=(m.f1,))
+    path = _export(tmp_path, [_sol()], [_part("EV1", _CPF_F2, email="inativo@example.invalid")])
+    out = io.StringIO()
+    call_command("import_export_contract", "--path", path, "--mode", "virada", stdout=out)
+    assert f"participante_email_cpf_divergente=1 pares=['u{m.inativo.id}→u{m.f2.id}']" in out.getvalue()
+
+
+def test_virada_evento_novo_de_dono_sem_cadastro_nao_nasce_e_o_existente_segue(tmp_path, m):
+    """Decisão do dono (07/11/2026): o evento NOVO de dono com CPF válido sem cadastro não nasce e vai para a
+    lista; o existente do mesmo dono segue o caminho de antes (linha que só acha o evento)."""
+    _existente(m)
+    linhas = [
+        _sol(solicitante_cpf=_CPF_SEM_CADASTRO),
+        _sol(evento_id="EV-N", solicitante_cpf=_CPF_SEM_CADASTRO),
+    ]
+    path = _export(tmp_path, linhas)
+    tally = ExportContractImporter(path=path, mode="virada").run()["por_entidade"]["solicitacao"]
+    assert tally["solicitante_cpf_sem_cadastro_eventos"] == ["EV-N"]
+    assert tally["virada"]["existente_linha_incompleta"] == {"chave_sem_par": 1}
+    _virada(path)
+    assert list(Solicitacao.objects.values_list("external_hash", flat=True)) == ["EV1"]
 
 
 # ---------- 14. passado novo ----------

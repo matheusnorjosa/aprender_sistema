@@ -6,7 +6,8 @@ Fixtures sintéticos (sem PII real). Contratos exercidos:
 - status via `resolve_initial_status` (PA-01: SUPER/desconhecido → pendente; NAO_SUPER → aprovado).
 - NK = `_compute_external_hash` (mun,proj,tipo,data,hora_ini,hora_fim,segmento) — idempotente.
 - participation liga por `evento_hash_natural` → `solicitacao.external_hash`; resolve usuario
-  EMAIL-first → CPF → nome; sem match e com nome → `guest_nome` (preserva, não descarta).
+  CPF → e-mail → nome (CPF válido sem cadastro não cai para e-mail nem nome, #2035/#1658); sem match
+  e com nome → `guest_nome` (preserva, não descarta).
 - papel vem do CSV (derivado de POSIÇÃO pela planilha), NUNCA do cargo do usuário.
 """
 
@@ -14,9 +15,13 @@ Fixtures sintéticos (sem PII real). Contratos exercidos:
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 from datetime import date, time
 from typing import Any
+
+from django.core.management import call_command
 
 import pytest
 
@@ -140,6 +145,110 @@ def test_apply_participation_name_only_preserves_guest_nome(tmp_path):
     assert p.guest_nome == "Fulana Que Saiu"
 
 
+# ── #2035 / #1658(C): pessoa pelo CPF (decisão do dono, 07/11/2026) ──
+
+
+def test_participante_email_de_cargo_e_cpf_divergem_vale_o_cpf(tmp_path):
+    """E-mail de cargo (coordenacaoNN@) troca de dono e não identifica a pessoa: com CPF, vale o CPF."""
+    mun, proj, tipo, _coord = _masters()
+    dono_do_email = UsuarioFactory(username="ua", cpf="52998224725", email="coordenacao21@example.invalid")
+    pelo_cpf = UsuarioFactory(username="ub", cpf="39053344705", email="ub@example.invalid")
+    eh = _hash(mun, proj, tipo)
+    part = f"{PART_HEADER}\n{eh},Pessoa B,PESSOA B,39053344705,coordenacao21@example.invalid,FORMADOR\n"
+    path = _write_export(tmp_path, {"solicitacao": _sol_row(ehash=eh), "participation": part})
+    r = ExportContractImporter(path=path, apply=True, allow=("solicitacao", "participation")).run()
+    assert Participation.objects.filter(solicitacao__external_hash=eh, usuario=pelo_cpf, role="FORMADOR").exists()
+    assert not Participation.objects.filter(usuario=dono_do_email).exists()
+    assert r["participante_email_cpf_divergente"] == 1
+
+
+def test_email_repetido_cai_para_o_cpf(tmp_path):
+    """Guarda: duas contas com o mesmo e-mail não derrubam a carga; a linha liga pelo CPF."""
+    mun, proj, tipo, _coord = _masters()
+    UsuarioFactory(username="r1", cpf="52998224725", email="repetido@example.invalid")
+    certo = UsuarioFactory(username="r2", cpf="39053344705", email="repetido@example.invalid")
+    eh = _hash(mun, proj, tipo)
+    part = f"{PART_HEADER}\n{eh},Pessoa R,PESSOA R,39053344705,repetido@example.invalid,FORMADOR\n"
+    path = _write_export(tmp_path, {"solicitacao": _sol_row(ehash=eh), "participation": part})
+    ExportContractImporter(path=path, apply=True, allow=("solicitacao", "participation")).run()
+    assert Participation.objects.filter(solicitacao__external_hash=eh, usuario=certo, role="FORMADOR").exists()
+
+
+@pytest.mark.parametrize("email", ["", "p3@x.com"], ids=["so_nome", "email_de_outra_conta"])
+def test_participation_create_cpf_sem_match_vira_guest_nome(tmp_path, email):
+    """CPF válido que não existe no sistema: não cai para e-mail nem nome; o nome fica como guest_nome."""
+    mun, proj, tipo, _coord = _masters()
+    homonimo = UsuarioFactory(username="p3", cpf="52998224725", email="p3@x.com", first_name="Pessoa", last_name="Tres")
+    eh = _hash(mun, proj, tipo)
+    part = f"{PART_HEADER}\n{eh},Pessoa Tres,PESSOA TRES,12345678909,{email},FORMADOR\n"
+    path = _write_export(tmp_path, {"solicitacao": _sol_row(ehash=eh), "participation": part})
+    dry = ExportContractImporter(path=path).run()
+    assert dry["participante_cpf_sem_cadastro"] == 1
+    assert dry["participante_cpf_sem_cadastro_email_resolveria"] == (1 if email else 0)
+    # As contas que o e-mail ligaria saem só por id interno, para o dono conferir.
+    assert dry["participante_cpf_sem_cadastro_email_contas"] == ([f"u{homonimo.id}"] if email else [])
+    ExportContractImporter(path=path, apply=True, allow=("solicitacao", "participation")).run()
+    assert not Participation.objects.filter(usuario=homonimo).exists()
+    p = Participation.objects.get(solicitacao__external_hash=eh, role="FORMADOR", usuario__isnull=True)
+    assert p.guest_nome == "Pessoa Tres"
+
+
+@pytest.mark.parametrize("cpf", ["39053344706", "00000000000"], ids=["dv_errado", "placeholder"])
+def test_participante_cpf_invalido_liga_pelo_email(tmp_path, cpf):
+    """Sem CPF válido (dígito verificador errado ou placeholder), vale o e-mail, como antes do #2035."""
+    mun, proj, tipo, _coord = _masters()
+    pessoa = UsuarioFactory(username="ub", cpf="39053344705", email="ub@example.invalid")
+    eh = _hash(mun, proj, tipo)
+    part = f"{PART_HEADER}\n{eh},Pessoa B,PESSOA B,{cpf},ub@example.invalid,FORMADOR\n"
+    path = _write_export(tmp_path, {"solicitacao": _sol_row(ehash=eh), "participation": part})
+    ExportContractImporter(path=path, apply=True, allow=("solicitacao", "participation")).run()
+    assert Participation.objects.filter(solicitacao__external_hash=eh, usuario=pessoa, role="FORMADOR").exists()
+
+
+def test_dry_run_create_only_conta_divergencia_como_o_apply(tmp_path):
+    """O dono aprova pelo dry-run: ele mostra os mesmos pares (só ids) que o apply vai gravar."""
+    mun, proj, tipo, _coord = _masters()
+    dono_do_email = UsuarioFactory(username="ua", cpf="52998224725", email="coordenacao21@example.invalid")
+    pelo_cpf = UsuarioFactory(username="ub", cpf="39053344705", email="ub@example.invalid")
+    eh = _hash(mun, proj, tipo)
+    part = f"{PART_HEADER}\n{eh},Pessoa B,PESSOA B,39053344705,coordenacao21@example.invalid,FORMADOR\n"
+    path = _write_export(tmp_path, {"solicitacao": _sol_row(ehash=eh), "participation": part})
+    dry = ExportContractImporter(path=path).run()
+    applied = ExportContractImporter(path=path, apply=True, allow=("solicitacao", "participation")).run()
+    par = [f"u{dono_do_email.id}→u{pelo_cpf.id}"]
+    assert dry["participante_email_cpf_divergente"] == applied["participante_email_cpf_divergente"] == 1
+    assert dry["participante_email_cpf_divergente_pares"] == applied["participante_email_cpf_divergente_pares"] == par
+
+
+def test_divergencia_conta_pares_distintos_e_ignora_mesma_conta(tmp_path):
+    """E-mail e CPF da mesma conta não contam; o mesmo par em duas linhas conta uma vez."""
+    mun, proj, tipo, _coord = _masters()
+    UsuarioFactory(username="ua", cpf="52998224725", email="coordenacao21@example.invalid")
+    UsuarioFactory(username="ub", cpf="39053344705", email="ub@example.invalid")
+    UsuarioFactory(username="uc", cpf="86288366757", email="uc@example.invalid")
+    eh = _hash(mun, proj, tipo)
+    part = (
+        f"{PART_HEADER}\n"
+        f"{eh},Pessoa C,PESSOA C,86288366757,uc@example.invalid,FORMADOR\n"
+        f"{eh},Pessoa B,PESSOA B,39053344705,coordenacao21@example.invalid,FORMADOR\n"
+        f"{eh},Pessoa B,PESSOA B,39053344705,coordenacao21@example.invalid,CONVIDADO\n"
+    )
+    path = _write_export(tmp_path, {"solicitacao": _sol_row(ehash=eh), "participation": part})
+    r = ExportContractImporter(path=path, apply=True, allow=("solicitacao", "participation")).run()
+    assert r["participante_email_cpf_divergente"] == 1
+
+
+def test_email_e_cpf_da_mesma_conta_nao_conta_divergencia(tmp_path):
+    mun, proj, tipo, _coord = _masters()
+    UsuarioFactory(username="uc", cpf="86288366757", email="uc@example.invalid")
+    eh = _hash(mun, proj, tipo)
+    part = f"{PART_HEADER}\n{eh},Pessoa C,PESSOA C,86288366757,uc@example.invalid,FORMADOR\n"
+    path = _write_export(tmp_path, {"solicitacao": _sol_row(ehash=eh), "participation": part})
+    r = ExportContractImporter(path=path, apply=True, allow=("solicitacao", "participation")).run()
+    assert r["participante_email_cpf_divergente"] == 0
+    assert r["participante_email_cpf_divergente_pares"] == []
+
+
 def test_apply_participation_role_from_csv_not_cargo(tmp_path):
     """Papel vem do CSV (posição), não do cargo: pessoa de cargo coordenação em vaga FORMADOR."""
     mun, proj, tipo, _coord = _masters()
@@ -254,6 +363,234 @@ def test_apply_solicitacao_falls_back_to_solicitante_email(tmp_path):
     path = _write_export(tmp_path, {"solicitacao": csv})
     ExportContractImporter(path=path, apply=True, allow=("solicitacao",)).run()
     assert Solicitacao.objects.get().usuario_id == coord.id, "resolve por solicitante_email"
+
+
+def test_solicitante_cpf_sem_cadastro_nao_cai_para_o_email_de_cargo(tmp_path):
+    """#2035: coordenadora nova sem conta usando o coordenacaoNN@ de quem saiu. O CPF válido sem cadastro deixa
+    a pessoa de fora (decisão do dono, 07/11/2026): o evento não nasce com o ex-titular como dono e coordenador."""
+    _masters()
+    dono_do_email = UsuarioFactory(username="donocargo", cpf="52998224725", email="coordenacao21@example.invalid")
+    sol = _sol_row_v16(
+        solicitante_cpf="12345678909", solicitante_email="coordenacao21@example.invalid", evento_id="EVT-S"
+    )
+    part = f"{PART_HEADER}\nEVT-S,Pessoa Nova,PESSOA NOVA,12345678909,coordenacao21@example.invalid,COORDENADOR\n"
+    path = _write_export(tmp_path, {"solicitacao": sol, "participation": part})
+    dry = ExportContractImporter(path=path).run()["por_entidade"]["solicitacao"]
+    assert dry["would_reject"] == 1
+    assert dry["reject_reasons"]["solicitante_cpf_sem_cadastro"] == 1
+    assert dry["solicitante_cpf_sem_cadastro_eventos"] == ["EVT-S"], "lista para o dono decidir no ensaio"
+    ExportContractImporter(path=path, apply=True, allow=("solicitacao", "participation")).run()
+    assert not Solicitacao.objects.filter(usuario=dono_do_email).exists()
+    assert not Participation.objects.filter(solicitacao__external_hash="EVT-S").exists()
+
+
+def test_solicitante_cpf_sem_cadastro_nao_usa_o_coordenador_cpf(tmp_path):
+    """O fallback cru (`coordenador_cpf`) também não dá o evento novo a outra pessoa: não cria e lista."""
+    _mun, _proj, _tipo, coord = _masters()
+    sol = _sol_row_v16(solicitante_cpf="12345678909", coordenador_cpf=coord.cpf, evento_id="EVT-G")
+    path = _write_export(tmp_path, {"solicitacao": sol})
+    dry = ExportContractImporter(path=path).run()["por_entidade"]["solicitacao"]
+    assert dry["would_create"] == 0
+    assert dry["reject_reasons"]["solicitante_cpf_sem_cadastro"] == 1
+    assert dry["solicitante_cpf_sem_cadastro_eventos"] == ["EVT-G"]
+    r = ExportContractImporter(path=path, apply=True, allow=("solicitacao",)).run()
+    assert r["applied"]["solicitacao"] == 0
+    assert Solicitacao.objects.count() == 0
+
+
+@pytest.mark.parametrize(
+    ("municipio", "esperado"),
+    [("Cidade X", 1), ("Cidade Inexistente", 0)],
+    ids=["so_falta_o_dono", "falta_o_municipio"],
+)
+def test_motivo_solicitante_cpf_sem_cadastro_so_quando_e_o_motivo_real(tmp_path, municipio, esperado):
+    """Sem e-mail nem coordenador_cpf o dono não resolve; o motivo só conta se o resto da linha resolve."""
+    _masters()
+    sol = _sol_row_v16(solicitante_cpf="12345678909", evento_id="EVT-M").replace("Cidade X", municipio)
+    path = _write_export(tmp_path, {"solicitacao": sol})
+    dry = ExportContractImporter(path=path).run()["por_entidade"]["solicitacao"]
+    assert dry["would_reject"] == 1
+    assert dry["reject_reasons"]["solicitante_cpf_sem_cadastro"] == esperado
+    assert dry["solicitante_cpf_sem_cadastro_eventos"] == (["EVT-M"] if esperado else [])
+
+
+def test_texto_do_comando_lista_os_eventos_de_dono_sem_cadastro(tmp_path):
+    _masters()
+    sol = _sol_row_v16(solicitante_cpf="12345678909", solicitante_email="coord1@x.com", evento_id="EVT-T")
+    path = _write_export(tmp_path, {"solicitacao": sol})
+    out = io.StringIO()
+    call_command("import_export_contract", "--path", path, stdout=out)
+    assert "solicitante_cpf_sem_cadastro_eventos=['EVT-T']" in out.getvalue()
+
+
+# Contrato com segmento_norm e evento_ids_anteriores (v35), para o evento que já existe.
+_COLS_2035 = [
+    "evento_id",
+    "municipio",
+    "uf",
+    "projeto",
+    "tipo_evento",
+    "data",
+    "hora_inicio",
+    "hora_fim",
+    "segmento",
+    "segmento_norm",
+    "solicitante_cpf",
+    "solicitante_email",
+    "evento_ids_anteriores",
+]
+
+
+def _sol_2035(**kw: str) -> dict[str, str]:
+    base = {
+        "evento_id": "EVT-E",
+        "municipio": "Cidade X",
+        "uf": "CE",
+        "projeto": "Projeto X",
+        "tipo_evento": "Formacao",
+        "data": "2026-05-10",
+        "hora_inicio": "09:00",
+        "hora_fim": "12:00",
+        "segmento": "Fund I",
+        "segmento_norm": "",
+        "solicitante_cpf": "11144477735",
+        "solicitante_email": "",
+        "evento_ids_anteriores": "[]",
+    }
+    base.update(kw)
+    return base
+
+
+def _csv(cols: list[str], rows: list[dict[str, str]]) -> str:
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=cols, lineterminator="\n")
+    w.writeheader()
+    w.writerows(rows)
+    return buf.getvalue()
+
+
+@pytest.mark.parametrize(
+    ("evento_id", "anteriores", "rekey"),
+    [("EVT-E", "[]", 0), ("EVT-NOVO-ID", '["EVT-E"]', 1)],
+    ids=["mesmo_id", "id_antigo"],
+)
+def test_existente_com_dono_sem_cadastro_segue_como_antes(tmp_path, evento_id, anteriores, rekey):
+    """Create-only: a recusa do dono de CPF sem cadastro vale só para evento NOVO. O que já existe segue como
+    antes (skip, reconcile do segmento_norm, re-chave pelo id antigo), sem trocar o dono."""
+    _mun, _proj, _tipo, coord = _masters()
+    criar = tmp_path / "criar"
+    criar.mkdir()
+    ExportContractImporter(
+        path=_write_export(criar, {"solicitacao": _csv(_COLS_2035, [_sol_2035()])}),
+        apply=True,
+        allow=("solicitacao",),
+    ).run()
+    linha = _sol_2035(
+        evento_id=evento_id,
+        evento_ids_anteriores=anteriores,
+        solicitante_cpf="12345678909",
+        solicitante_email="coord1@x.com",
+        segmento_norm="Anos Iniciais",
+    )
+    path = _write_export(tmp_path, {"solicitacao": _csv(_COLS_2035, [linha])})
+    dry = ExportContractImporter(path=path).run()["por_entidade"]["solicitacao"]
+    assert (dry["would_reject"], dry["would_skip_same"], dry["would_rekey"]) == (0, 1, rekey)
+    assert dry["reject_reasons"]["solicitante_cpf_sem_cadastro"] == 0
+    assert dry["solicitante_cpf_sem_cadastro_eventos"] == []
+    r = ExportContractImporter(path=path, apply=True, allow=("solicitacao",)).run()
+    assert r["applied"]["solicitacao__segmento_norm_reconciled"] == 1
+    assert r["applied"].get("solicitacao__rechaveada", 0) == rekey
+    sol = Solicitacao.objects.get()
+    assert (sol.external_hash, sol.segmento_norm, sol.usuario_id) == (evento_id, "Anos Iniciais", coord.id)
+
+
+@pytest.mark.parametrize("papel", ["participante", "solicitante"])
+def test_conta_com_cpf_invalido_gravado_nao_vence_o_email(tmp_path, papel):
+    """Só CPF válido consulta o índice: a conta que tem gravado um CPF de dígito errado não ganha a linha que traz
+    esse CPF e o e-mail de outra conta; vale o e-mail."""
+    mun, proj, tipo, _coord = _masters()
+    errada = UsuarioFactory(username="dv", cpf="39053344706", email="dv@example.invalid")
+    pelo_email = UsuarioFactory(username="ub", cpf="52998224725", email="ub@example.invalid")
+    if papel == "participante":
+        eh = _hash(mun, proj, tipo)
+        part = f"{PART_HEADER}\n{eh},Pessoa B,PESSOA B,39053344706,ub@example.invalid,FORMADOR\n"
+        path = _write_export(tmp_path, {"solicitacao": _sol_row(ehash=eh), "participation": part})
+        ExportContractImporter(path=path, apply=True, allow=("solicitacao", "participation")).run()
+        formadores = Participation.objects.filter(role="FORMADOR")
+        assert list(formadores.values_list("usuario_id", flat=True)) == [pelo_email.id]
+    else:
+        sol = _sol_row_v16(solicitante_cpf="39053344706", solicitante_email="ub@example.invalid", evento_id="EVT-V")
+        path = _write_export(tmp_path, {"solicitacao": sol})
+        ExportContractImporter(path=path, apply=True, allow=("solicitacao",)).run()
+        assert Solicitacao.objects.get().usuario_id == pelo_email.id
+    assert not Participation.objects.filter(usuario=errada).exists()
+
+
+@pytest.mark.parametrize("email", ["", "ninguem@example.invalid"], ids=["sem_email", "email_sem_conta"])
+def test_conta_com_cpf_de_dv_errado_gravado_liga_sem_email_resolvivel(tmp_path, email):
+    """#2035 (e): a conta que tem gravado um CPF de dígito errado não some. Sem e-mail que resolva, a linha com
+    esse CPF, igual ao do cadastro, liga a ela (participante e solicitante); o evento existente segue skip e
+    reconcile."""
+    mun, proj, tipo, _coord = _masters()
+    errada = UsuarioFactory(username="dv", cpf="39053344706", email="dv@example.invalid")
+    eh = _hash(mun, proj, tipo)
+    part = f"{PART_HEADER}\n{eh},Pessoa D,PESSOA D,39053344706,{email},FORMADOR\n"
+    path = _write_export(tmp_path, {"solicitacao": _sol_row(ehash=eh), "participation": part})
+    ExportContractImporter(path=path, apply=True, allow=("solicitacao", "participation")).run()
+    formadores = Participation.objects.filter(role="FORMADOR")
+    assert list(formadores.values_list("usuario_id", flat=True)) == [errada.id]
+    Participation.objects.all().delete()
+    Solicitacao.objects.all().delete()
+
+    criar = tmp_path / "criar"
+    criar.mkdir()
+    linha = _sol_2035(solicitante_cpf="39053344706", solicitante_email=email)
+    r = ExportContractImporter(
+        path=_write_export(criar, {"solicitacao": _csv(_COLS_2035, [linha])}), apply=True, allow=("solicitacao",)
+    ).run()
+    assert r["apply_solicitante_cpf_sem_cadastro_eventos"] == []
+    assert Solicitacao.objects.get().usuario_id == errada.id
+    de_novo = tmp_path / "de_novo"
+    de_novo.mkdir()
+    path = _write_export(de_novo, {"solicitacao": _csv(_COLS_2035, [linha | {"segmento_norm": "Anos Iniciais"}])})
+    dry = ExportContractImporter(path=path).run()["por_entidade"]["solicitacao"]
+    assert (dry["would_reject"], dry["would_skip_same"], dry["would_create"]) == (0, 1, 0)
+    r = ExportContractImporter(path=path, apply=True, allow=("solicitacao",)).run()
+    assert r["applied"]["solicitacao__segmento_norm_reconciled"] == 1
+    sol = Solicitacao.objects.get()
+    assert (sol.segmento_norm, sol.usuario_id) == ("Anos Iniciais", errada.id)
+
+
+@pytest.mark.parametrize("email", ["coord1@x.com", ""], ids=["email_resolve", "sem_fallback"])
+def test_apply_lista_os_eventos_que_nao_criou_por_dono_sem_cadastro(tmp_path, email):
+    """#2035: o apply publica a lista real dos `evento_id` que não criou porque o dono tem CPF válido sem
+    cadastro; é a mesma lista do dry-run, e o comando a imprime."""
+    _masters()
+    sol = _sol_row_v16(solicitante_cpf="12345678909", solicitante_email=email, evento_id="EVT-A")
+    path = _write_export(tmp_path, {"solicitacao": sol})
+    dry = ExportContractImporter(path=path).run()
+    r = ExportContractImporter(path=path, apply=True, allow=("solicitacao",)).run()
+    assert r["applied"]["solicitacao"] == 0
+    assert r["apply_solicitante_cpf_sem_cadastro_eventos"] == ["EVT-A"]
+    assert dry["por_entidade"]["solicitacao"]["solicitante_cpf_sem_cadastro_eventos"] == ["EVT-A"]
+    assert dry["apply_solicitante_cpf_sem_cadastro_eventos"] == [], "o dry-run não aplica"
+    out = io.StringIO()
+    call_command("import_export_contract", "--path", path, "--apply", "--allow-entity", "solicitacao", stdout=out)
+    assert "apply_solicitante_cpf_sem_cadastro_eventos=['EVT-A']" in out.getvalue()
+    assert Solicitacao.objects.count() == 0
+
+
+def test_acumuladores_zeram_a_cada_run(tmp_path):
+    """O mesmo importador rodado de novo não carrega a contagem da rodada anterior."""
+    mun, proj, tipo, _coord = _masters()
+    eh = _hash(mun, proj, tipo)
+    part = f"{PART_HEADER}\n{eh},Pessoa Tres,PESSOA TRES,12345678909,,FORMADOR\n"
+    imp = ExportContractImporter(
+        path=_write_export(tmp_path, {"solicitacao": _sol_row(ehash=eh), "participation": part})
+    )
+    assert imp.run()["participante_cpf_sem_cadastro"] == 1
+    UsuarioFactory(username="p3", cpf="12345678909")
+    assert imp.run()["participante_cpf_sem_cadastro"] == 0
 
 
 def test_apply_solicitacao_stamps_solicitante_procedencia(tmp_path):
@@ -438,3 +775,14 @@ def test_participation_coord_acompanha_do_csv_e_recusado_com_motivo(tmp_path):
     ExportContractImporter(path=path, apply=True, allow=("solicitacao", "participation")).run()
     assert Solicitacao.objects.filter(external_hash=eh).exists()
     assert not Participation.objects.filter(role="COORD_ACOMPANHA").exists()
+
+
+def test_texto_do_comando_mostra_as_contas_que_o_email_ligaria(tmp_path):
+    mun, proj, tipo, _coord = _masters()
+    homonimo = UsuarioFactory(username="p3", cpf="52998224725", email="p3@x.com")
+    eh = _hash(mun, proj, tipo)
+    part = f"{PART_HEADER}\n{eh},Pessoa Tres,PESSOA TRES,12345678909,p3@x.com,FORMADOR\n"
+    path = _write_export(tmp_path, {"solicitacao": _sol_row(ehash=eh), "participation": part})
+    out = io.StringIO()
+    call_command("import_export_contract", "--path", path, stdout=out)
+    assert f"participante_cpf_sem_cadastro=1 (e-mail resolveria 1: ['u{homonimo.id}'])" in out.getvalue()

@@ -8,6 +8,9 @@ Uso:
     # apply create-only de entidades EXPLICITAMENTE permitidas (futuro):
     python manage.py import_export_contract --path ... --apply --allow-entity dat_area
 
+    # contas antes dos eventos, numa execução própria: dry-run, OK do dono, depois o apply de usuario
+    python manage.py import_export_contract --path ... --apply --allow-entity usuario
+
     # carga da virada (uma só): dry-run, depois apply com solicitacao + participation
     python manage.py import_export_contract --path ... --mode virada
     python manage.py import_export_contract --path ... --mode virada --apply \
@@ -23,6 +26,9 @@ Segurança:
 - modo `create-only`: só insere would_create; nunca atualiza; nunca sobrescreve campo protegido.
 - modo `virada`: atualiza o evento existente que ninguém mexeu pela tela (plano de 16/10/2026); exige
   `solicitacao` e `participation` juntos, ou `gcal_adocao` sozinha. A carga nunca chama o Google.
+- contas primeiro (#2035): a entidade `usuario` entra antes, numa execução própria (dry-run → OK →
+  `--apply --allow-entity usuario`), e só depois o ensaio e a carga de `solicitacao` + `participation`. O
+  dry-run dos eventos só conhece as contas que já estão no banco; nessa ordem ele bate com o apply.
 - `gcal_adocao --apply` exige `--gcal-verificado` (decisão D63): só adota o id que o
   `conferir_gcal_adocao` achou confirmado e na mesma data no Google há menos de 24 h; o resto fica travado.
 """
@@ -187,11 +193,30 @@ class Command(BaseCommand):
                     )
                 if v.get("projetos_nao_resolvidos"):
                     self.stdout.write(f"    projetos_nao_resolvidos={v['projetos_nao_resolvidos']}")
+                if v.get("solicitante_cpf_sem_cadastro_eventos"):
+                    # #2035: evento novo de dono sem conta, para o dono decidir no ensaio (só o evento_id)
+                    self.stdout.write(
+                        f"    solicitante_cpf_sem_cadastro_eventos={v['solicitante_cpf_sem_cadastro_eventos']}"
+                    )
         for ent in ("solicitacao", "gcal_adocao"):
             v = report["por_entidade"].get(ent) or {}
             if v.get("virada"):
                 self.stdout.write(f"    [{ent}] virada={v['virada']}")
             if v.get("existente_fora_do_csv"):
                 self.stdout.write(f"    [{ent}] existente_fora_do_csv={v['existente_fora_do_csv']}")
+        if report["participante_email_cpf_divergente"] or report["participante_cpf_sem_cadastro"]:
+            # #2035: pessoa pelo CPF; só ids e contagens, para o dono conferir antes do --apply
+            self.stdout.write(
+                f"  participante_email_cpf_divergente={report['participante_email_cpf_divergente']}"
+                + f" pares={report['participante_email_cpf_divergente_pares']}"
+                + f" participante_cpf_sem_cadastro={report['participante_cpf_sem_cadastro']}"
+                + f" (e-mail resolveria {report['participante_cpf_sem_cadastro_email_resolveria']}:"
+                + f" {report['participante_cpf_sem_cadastro_email_contas']})"
+            )
         if report["applied"]:
             self.stdout.write(self.style.SUCCESS(f"  applied({report['mode']})={report['applied']}"))
+        if report["apply_solicitante_cpf_sem_cadastro_eventos"]:
+            # #2035: o que o apply não criou porque o dono tem CPF válido sem cadastro (só o evento_id)
+            self.stdout.write(
+                f"  apply_solicitante_cpf_sem_cadastro_eventos={report['apply_solicitante_cpf_sem_cadastro_eventos']}"
+            )

@@ -301,11 +301,11 @@ Não é auditoria — não tem usuário, não tem histórico e o arquivo seguint
 
 | Risco | Severidade | Mitigação **real hoje** |
 |---|---|---|
-| **Município homônimo em UF diferente** | Média (residual) | ✅ Não grava errado — desde o #2003 homônimo entre UFs é ambíguo → `None` → pendência `municipios`. Residual: a UF é lida e descartada, então o homônimo não se resolve nem com a UF certa — [#1635](https://github.com/matheusnorjosa/aprender_sistema/issues/1635) |
+| **Município homônimo em UF diferente** | obsoleto (G29) | não se aplica mais a este import: o import de compras saiu no #2178 e a lista antiga `Compra` foi apagada (migração 0132, 06/11/2026); a [#1635](https://github.com/matheusnorjosa/aprender_sistema/issues/1635) foi fechada como not planned. Era: desde o #2003 homônimo entre UFs é ambíguo → `None` → pendência `municipios`, mas a UF era lida e descartada. O resíduo vivo, em `resolve_municipio` (imports de ações, cadastros DAT e eventos), está em `ISS-1635a` do [`ACHADOS_REAIS.md`](../audits/ACHADOS_REAIS.md) |
 | **Quantidade vazia/negativa/decimal aceita no preview** | obsoleto (G29) | não se aplica mais: a lista antiga `Compra` foi apagada (migração 0132, 06/11/2026) e a issue foi fechada como not planned. Era: vazio vira `0` e passa ([#1634](https://github.com/matheusnorjosa/aprender_sistema/issues/1634)) |
 | **Data ausente gravada como `None`** | obsoleto (G29) | não se aplica mais: a lista antiga `Compra` foi apagada (migração 0132, 06/11/2026) e a issue foi fechada como not planned. Era: `data` não está na validação bloqueante (#1634) |
 | **`Compra.produto` nunca preenchido** | obsoleto (G29) | não se aplica mais: a lista antiga `Compra` foi apagada (migração 0132, 06/11/2026) e a issue foi fechada como not planned. Era: não há FK no `defaults` (#1635) |
-| **Reimport com `quantidade` corrigida duplica a linha** | **P1 vivo** | ❌ **Nenhuma** — `quantidade` e `uso` estão dentro do hash ([#1633](https://github.com/matheusnorjosa/aprender_sistema/issues/1633)) |
+| **Reimport com `quantidade` corrigida duplica a linha** | obsoleto (G29) | não se aplica mais: a lista antiga `Compra` foi apagada (migração 0132, 06/11/2026); a issue segue aberta, com proposta de fechar. Era: `quantidade` e `uso` estão dentro do hash ([#1633](https://github.com/matheusnorjosa/aprender_sistema/issues/1633)) |
 | `F` mal preenchido ou trocado entre linhas | Alta | ❌ Nenhuma — o código não resolve nada; só é gravado como texto |
 | Produto com nome variante (acento, caixa) | Média | ⚠️ Parcial — `norm_text` + `_infer_projeto_from_produto`; se falhar, vira `pendencias.projetos` |
 | Apply sem rastro de auditoria | Alta | ❌ Nenhuma — só o JSON sobrescrevível em `out_etl/` (§11) |

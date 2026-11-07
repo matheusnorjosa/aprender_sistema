@@ -31,6 +31,7 @@ const { acaoRow, registroRow } = vi.hoisted(() => ({
     status_contato: 'pendente',
     status_reuniao: 'pendente',
     status_entrega: 'pendente',
+    observacao_carta: 'Carta entregue na secretaria',
   },
   registroRow: {
     id: 9,
@@ -163,10 +164,10 @@ describe('Gestão de Ações sem rolagem horizontal', () => {
   });
 });
 
-// Lote D (D2): DATAcao não tem `area` nem `observacoes` (só observacao_carta/contato/reuniao/entrega,
-// fora da lista). As duas colunas ficavam vazias em qualquer largura e saem da tela.
-describe('Gestão de Ações sem as colunas vazias Área e Observações', { timeout: 20000 }, () => {
-  test('a 360 px: a linha expandida não mostra Área nem Observações', async () => {
+// Lote D (D2, caminho B do dono): "Observações" mostra a observação da carta (`observacao_carta`,
+// vinda da planilha). "Área" segue fora: DATAcao não tem esse campo.
+describe('Gestão de Ações: Observações com a observação da carta, sem Área', { timeout: 20000 }, () => {
+  test('a 360 px: a linha expandida mostra Observações com a observação da carta e não mostra Área', async () => {
     definirLarguraTela(360);
     const user = userEvent.setup();
     renderPagina('acoes');
@@ -175,18 +176,20 @@ describe('Gestão de Ações sem as colunas vazias Área e Observações', { tim
     await user.click(within(linha).getByRole('button', { name: `Expandir linha de ${ACAO}` }));
     const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
     expect(expandida.getByText('Progresso')).toBeInTheDocument();
+    expect(expandida.getByText('Observações')).toBeInTheDocument();
+    expect(expandida.getByText('Carta entregue na secretaria')).toBeInTheDocument();
     expect(expandida.queryByText('Área')).toBeNull();
-    expect(expandida.queryByText('Observações')).toBeNull();
   });
 
-  test('a 1700 px: nenhum cabeçalho Área nem Observações', async () => {
+  test('a 1700 px: cabeçalho Observações com a observação da carta na linha; nenhum cabeçalho Área', async () => {
     definirLarguraTela(1700);
     renderPagina('acoes');
-    await linhaPelaAcao(`Editar: ${ACAO}`);
+    const linha = await linhaPelaAcao(`Editar: ${ACAO}`);
 
     expect(cabecalhos()).toContain('Progresso');
+    expect(cabecalhos()).toContain('Observações');
+    expect(within(linha).getByText('Carta entregue na secretaria')).toBeInTheDocument();
     expect(cabecalhos()).not.toContain('Área');
-    expect(cabecalhos()).not.toContain('Observações');
   });
 });
 

@@ -93,6 +93,8 @@ interface AcaoRecord {
   data_contato?: string | null;
   data_reuniao?: string | null;
   data_entrega?: string | null;
+  // Observação da carta (read-only na list; vem da planilha) — coluna Observações (lote D, D2)
+  observacao_carta?: string;
 }
 
 interface AcaoFormValues {
@@ -487,6 +489,19 @@ export default function AcoesPage(): JSX.Element {
           />
         );
       },
+    },
+    {
+      title: 'Observações',
+      dataIndex: 'observacao_carta',
+      key: 'observacao_carta',
+      responsive: VISIVEL_A_PARTIR.xxl,
+      width: 200,
+      ellipsis: { showTitle: false },
+      render: (val: string | undefined) => (
+        <Tooltip title={val}>
+          <Text type="secondary">{val || '-'}</Text>
+        </Tooltip>
+      ),
     },
     {
       title: 'Ações',

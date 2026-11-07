@@ -802,6 +802,18 @@ def _conta(c: dict[str, Any], chave: str, sub: str | None = None) -> None:
         c[chave][sub] = c[chave].get(sub, 0) + 1
 
 
+def _cpf_sem_cadastro(cpf: str, cpf_idx: dict[str, int]) -> bool:
+    """CPF válido (dígito verificador, sem placeholder) que não existe no sistema. Decisão do dono (07/11/2026,
+    #2035): a pessoa fica de fora, sem cair para e-mail nem nome. CPF inválido não conta: aí vale o e-mail."""
+    return cpf not in cpf_idx and is_valid_cpf(cpf)
+
+
+def _conta_do_cpf_invalido(cpf: str, cpf_idx: dict[str, int]) -> int | None:
+    """Conta que tem gravado este CPF de dígito errado (#2035): ele não vence o e-mail, mas a conta não some e
+    vale depois dele, só com o CPF igual ao do cadastro. Placeholder (dígito repetido) não liga ninguém."""
+    return cpf_idx.get(cpf) if classify_cpf(cpf) == CPF_INVALID else None
+
+
 def _tem_ip(details: dict[str, Any]) -> bool:
     """ip = texto não vazio. Os scripts gravam a chave com `None` (não é pessoa)."""
     ip = details.get("ip_address")
@@ -1086,6 +1098,12 @@ class ExportContractImporter:
         self._sol_existente: set[str] | None = None
         self._sol_passado_novo: set[str] = set()
         self._criadas_nesta_execucao: set[str] = set()
+        # #2035: `evento_id` que o apply não criou porque o dono tem CPF válido sem cadastro (lista real do apply).
+        self._apply_sem_cadastro_eventos: list[str] = []
+        # #2035: pares (u<id> do e-mail, u<id> do CPF) em que a linha de participante aponta duas pessoas.
+        self._email_cpf_divergente: set[tuple[int, int]] = set()
+        # #2035: CPF válido sem cadastro → ids das contas que o e-mail da linha ligaria (só saem os u<id>).
+        self._cpf_sem_cadastro: dict[str, set[int]] = {}
         # Modo virada: o que o apply contou (mesmo formato do classify) e quantos eventos mudou.
         self._virada_aplicada: dict[str, Any] | None = None
         self._virada_atualizadas = 0
@@ -1148,21 +1166,40 @@ class ExportContractImporter:
         """Pessoa dona do evento (v16.4, RELAY 57), já resolvida pelo sheets em `solicitante_cpf` (cascata
         coluna_n + escada-2-tokens + inferência). Fallback: `solicitante_email` (mesma pessoa) e, por fim,
         `coordenador_cpf` cru (fixtures/legado). Retorna o Usuario.id ou None. É gravada em `usuario` E
-        `coordenador` (decisão a). NÃO gateia por cargo/papel."""
+        `coordenador` (decisão a). NÃO gateia por cargo/papel.
+
+        CPF válido consulta o índice primeiro (#2035). CPF de dígito errado não vence o e-mail, mas a conta que o
+        tem gravado não some: vale depois do e-mail, só igual ao do cadastro (`_conta_do_cpf_invalido`); o
+        `coordenador_cpf` segue a mesma regra. O CPF válido sem cadastro segue o fallback aqui para achar o
+        dono do evento que JÁ existe, que o create-only não troca; o evento NOVO desse dono não nasce (decisão
+        do dono, 07/11/2026): quem recusa é o classify (`reject_reasons.solicitante_cpf_sem_cadastro`) e o
+        `_apply_solicitacao`."""
         cpf = normalize_cpf_digits(r.get("solicitante_cpf") or "")
-        if len(cpf) == 11:
-            uid = cpf_idx.get(cpf)
-            if uid is not None:
-                return uid
+        if is_valid_cpf(cpf) and cpf in cpf_idx:
+            return cpf_idx[cpf]
         email = (r.get("solicitante_email") or "").strip()
         if email:
             u = resolve_user_by_email(email)
             if u is not None:
                 return u.id
+        uid = _conta_do_cpf_invalido(cpf, cpf_idx)
+        if uid is not None:
+            return uid
         fb = normalize_cpf_digits(r.get("coordenador_cpf") or "")
-        if len(fb) == 11:
-            return cpf_idx.get(fb)
-        return None
+        return cpf_idx.get(fb) if is_valid_cpf(fb) else _conta_do_cpf_invalido(fb, cpf_idx)
+
+    def _so_falta_o_dono(
+        self,
+        r: dict[str, str],
+        mun_idx: dict[tuple[str, str], int],
+        tipo_idx: dict[str, int],
+        cpf_idx: dict[str, int],
+    ) -> bool:
+        """Dono com CPF válido sem cadastro numa linha que, fora o dono, resolve (#2035). Classify e apply usam a
+        mesma regra para a linha cuja chave não resolve, e o motivo só conta quando é o motivo real."""
+        return _cpf_sem_cadastro(normalize_cpf_digits(r.get("solicitante_cpf") or ""), cpf_idx) and (
+            self._resolve_solicitacao_key(r, mun_idx, tipo_idx, cpf_idx, dono=0) is not None
+        )
 
     def _resolve_solicitacao_key(
         self,
@@ -1170,6 +1207,7 @@ class ExportContractImporter:
         mun_idx: dict[tuple[str, str], int],
         tipo_idx: dict[str, int],
         cpf_idx: dict[str, int],
+        dono: int | None = None,
     ) -> tuple[int, int, int, date, time, time, str, int, str] | None:
         """Resolve os campos-chave de uma linha de solicitacao (FKs + hora + solicitante).
         Retorna (mun_id, proj_id, tipo_id, data, hora_ini, hora_fim, segmento, coord_id, ext_hash) ou
@@ -1177,7 +1215,8 @@ class ExportContractImporter:
         inválida, ou solicitante — `usuario` NOT NULL — não resolvido). Identidade (external_hash) = o
         `evento_id` estável do CSV; fallback `evento_hash_natural` (join intra-entrega) e
         `_compute_external_hash` (ADR-012) quando ausentes. Solicitante (dono) via `_resolve_solicitante`
-        (`solicitante_cpf`→`solicitante_email`→`coordenador_cpf`)."""
+        (`solicitante_cpf`→`solicitante_email`→`coordenador_cpf`); `dono` dado pula essa resolução (o classify
+        usa para saber se só o dono falta na linha)."""
         # v16.2: linha incompleta (sem hora/dados essenciais, `linha_completa=false`) = fora de escopo do
         # import — NÃO inventa hora (RELAY 54). Coluna ausente (fixtures/CSV antigo) → trata como completa.
         lc = r.get("linha_completa")
@@ -1189,7 +1228,7 @@ class ExportContractImporter:
         data_ev = _parse_iso_date(r.get("data"))
         hora_ini = _parse_hora(r.get("hora_inicio"))
         hora_fim = _parse_hora(r.get("hora_fim"))
-        coord_id = self._resolve_solicitante(r, cpf_idx)
+        coord_id = self._resolve_solicitante(r, cpf_idx) if dono is None else dono
         if mun_id is None or proj_id is None or tipo_id is None or coord_id is None:
             return None
         if data_ev is None or hora_ini is None or hora_fim is None:
@@ -1706,7 +1745,16 @@ class ExportContractImporter:
             # re-chaveia (entrada contraditória); o contador só deixa visível para corrigir na planilha.
             tally["rekey_contraditorio"] = 0
             skip_reasons = {"evento_passado_novo": 0, "apagado_no_sistema": 0}
-            reject_reasons = {"fim_antes_do_inicio": 0}
+            # `solicitante_cpf_sem_cadastro` (#2035): evento NOVO recusado porque o dono tem CPF válido sem conta
+            # (o resto da linha resolve); os `evento_id` vão em `solicitante_cpf_sem_cadastro_eventos`.
+            reject_reasons = {"fim_antes_do_inicio": 0, "solicitante_cpf_sem_cadastro": 0}
+            sem_cadastro_eventos: list[str] = []
+
+            def recusa_dono(ext_hash: str) -> None:
+                reject_reasons["solicitante_cpf_sem_cadastro"] += 1
+                if ext_hash:
+                    sem_cadastro_eventos.append(ext_hash)
+
             ids_proprios = _ids_proprios(rows)
             bloqueados = set(ids_proprios)
             hoje = _hoje()
@@ -1737,8 +1785,15 @@ class ExportContractImporter:
             for r in rows:
                 key = self._resolve_solicitacao_key(r, mun_idx, tipo_idx, cpf_idx)
                 ext_hash = key[-1] if key is not None else _identidade_da_linha(r)
+                # #2035: dono de CPF válido sem cadastro. O evento existente segue como antes (dono pelo
+                # fallback, que o create-only não troca); só o NOVO é recusado, e com esse motivo só quando o
+                # resto da linha resolve.
+                dono_sem_cadastro = _cpf_sem_cadastro(normalize_cpf_digits(r.get("solicitante_cpf") or ""), cpf_idx)
+                so_falta_o_dono = key is None and self._so_falta_o_dono(r, mun_idx, tipo_idx, cpf_idx)
                 if key is None and not (virada and ext_hash):
                     tally["would_reject"] += 1
+                    if so_falta_o_dono and ext_hash not in atual:
+                        recusa_dono(ext_hash)
                     continue
                 proprio = (r.get("evento_id") or "").strip()
                 if any(
@@ -1791,6 +1846,8 @@ class ExportContractImporter:
                     tally["would_rekey"] += 1
                 if key is None and not existe:
                     tally["would_reject"] += 1  # linha incompleta só serve para achar o evento existente
+                    if so_falta_o_dono:
+                        recusa_dono(ext_hash)
                     continue
                 if existe:
                     if ext_hash not in self._sol_criaria:
@@ -1827,6 +1884,11 @@ class ExportContractImporter:
                     tally["would_reject"] += 1
                     reject_reasons["fim_antes_do_inicio"] += 1
                     continue
+                elif key is not None and dono_sem_cadastro:
+                    # Evento novo de dono sem conta não nasce (decisão do dono, 07/11/2026): lista para o ensaio.
+                    tally["would_reject"] += 1
+                    recusa_dono(ext_hash)
+                    continue
                 elif key is not None:
                     self._sol_criaria[ext_hash] = key[7]
                     atual[ext_hash] = None
@@ -1841,6 +1903,7 @@ class ExportContractImporter:
                     tally["would_create_cancelada"] += 1
             tally["skip_reasons"] = skip_reasons
             tally["reject_reasons"] = reject_reasons
+            tally["solicitante_cpf_sem_cadastro_eventos"] = sorted(sem_cadastro_eventos)
             if virada:
                 tally["virada"] = contagem
                 # Evento de prod que a planilha não traz mais (nem como id antigo): só conta, por quando ×
@@ -1884,13 +1947,14 @@ class ExportContractImporter:
                     tally["would_reject"] += 1
                     reject_reasons["coord_acompanha_do_csv"] += 1
                 elif ehash in self._sol_criaria:
-                    if role == Participation.Role.COORDENADOR:
-                        cpf_idx = self._usuario_cpf_index() if cpf_idx is None else cpf_idx
-                        u = self._resolve_participante(r, cpf_idx)
-                        if u is not None and u.id == self._sol_criaria[ehash]:
-                            tally["would_skip_same"] += 1
-                            skip_reasons["coordenador_solicitante"] += 1
-                            continue
+                    # Resolve toda linha, como o apply: o dry-run conta as mesmas divergências e CPFs sem
+                    # cadastro (#2035) que o apply vai gravar.
+                    cpf_idx = self._usuario_cpf_index() if cpf_idx is None else cpf_idx
+                    u = self._resolve_participante(r, cpf_idx)
+                    if role == Participation.Role.COORDENADOR and u is not None and u.id == self._sol_criaria[ehash]:
+                        tally["would_skip_same"] += 1
+                        skip_reasons["coordenador_solicitante"] += 1
+                        continue
                     tally["would_create"] += 1
                 elif ehash in existentes:
                     tally["would_skip_same"] += 1
@@ -2128,9 +2192,16 @@ class ExportContractImporter:
             _parse_iso_date(r.get("data_compra")),
         )
 
+    def _zerar_contagem_de_pessoas(self) -> None:
+        """Os acumuladores do #2035 valem por rodada: o relatório não carrega contagem de outra."""
+        self._email_cpf_divergente = set()
+        self._cpf_sem_cadastro = {}
+
     def run(self) -> dict[str, Any]:
         manifest = self._read_manifest()
         apply_blocked = bool(self.apply) and not self.allow
+        self._zerar_contagem_de_pessoas()
+        self._apply_sem_cadastro_eventos = []
 
         por_entidade: dict[str, Any] = {}
         for name in ENTITY_ORDER:
@@ -2147,6 +2218,8 @@ class ExportContractImporter:
         # ── escrita (create-only) — só se apply + allowlist; NÃO exercida no skeleton ──
         applied: dict[str, int] = {}
         if self.apply and self.allow and self.mode in ("create-only", "virada"):
+            # O relatório do apply conta o que o apply resolveu, não o classify.
+            self._zerar_contagem_de_pessoas()
             applied = self._apply_create_only()
 
         return {
@@ -2158,6 +2231,18 @@ class ExportContractImporter:
             "manifest": manifest,
             "por_entidade": por_entidade,
             "applied": applied,
+            # Pares distintos u<id>→u<id> (e-mail × CPF) em que valeu o CPF; só ids internos, sem dado pessoal.
+            "participante_email_cpf_divergente": len(self._email_cpf_divergente),
+            "participante_email_cpf_divergente_pares": [f"u{a}→u{b}" for a, b in sorted(self._email_cpf_divergente)],
+            # CPF válido sem cadastro (a pessoa fica de fora), quantos deles o e-mail da linha resolveria e a quais
+            # contas (só u<id>).
+            "participante_cpf_sem_cadastro": len(self._cpf_sem_cadastro),
+            "participante_cpf_sem_cadastro_email_resolveria": sum(1 for v in self._cpf_sem_cadastro.values() if v),
+            "participante_cpf_sem_cadastro_email_contas": [
+                f"u{i}" for i in sorted(set[int]().union(*self._cpf_sem_cadastro.values()))
+            ],
+            # `evento_id` que o apply NÃO criou porque o dono tem CPF válido sem cadastro (vazio sem apply).
+            "apply_solicitante_cpf_sem_cadastro_eventos": sorted(self._apply_sem_cadastro_eventos),
             "protected_fields": {k: sorted(v) for k, v in PROTECTED_FIELDS.items()},
             **({"virada_aplicada": self._virada_aplicada} if self.mode == "virada" else {}),
         }
@@ -2623,6 +2708,9 @@ class ExportContractImporter:
         for r in rows:
             key = self._resolve_solicitacao_key(r, mun_idx, tipo_idx, cpf_idx)
             if key is None and not (virada and _identidade_da_linha(r)):
+                ident = _identidade_da_linha(r)
+                if ident and ident not in existing and self._so_falta_o_dono(r, mun_idx, tipo_idx, cpf_idx):
+                    self._apply_sem_cadastro_eventos.append(ident)  # #2035: como o classify
                 continue  # would_reject (FK/hora/coordenador não resolvido)
             # Linha incompleta, no modo virada: só serve para achar o evento existente (plano, item 8).
             ext_hash = key[-1] if key is not None else _identidade_da_linha(r)
@@ -2673,6 +2761,8 @@ class ExportContractImporter:
                 )
                 rechaveadas += 1
             if key is None and ext_hash not in existing:
+                if self._so_falta_o_dono(r, mun_idx, tipo_idx, cpf_idx):
+                    self._apply_sem_cadastro_eventos.append(ext_hash)  # #2035: como o classify
                 continue
             if ext_hash in existing:
                 sid, cur_sn = existing[ext_hash]
@@ -2706,6 +2796,10 @@ class ExportContractImporter:
             fim = timezone.make_aware(datetime.combine(data_ev, hora_fim), _FORTALEZA_TZ)
             if fim <= inicio:
                 continue  # constraint solicitacao_fim_gt_inicio: linha inconsistente
+            if _cpf_sem_cadastro(normalize_cpf_digits(r.get("solicitante_cpf") or ""), cpf_idx):
+                # #2035: evento novo de dono com CPF válido sem cadastro não nasce; vai para a lista do apply.
+                self._apply_sem_cadastro_eventos.append(ext_hash)
+                continue
             cancelado = _to_bool(r.get("cancelado"))
             marca = virada and _marca_da_linha(r)
             if marca:
@@ -3025,6 +3119,10 @@ class ExportContractImporter:
                 if _map_participation_role(linha.get("role")) != Participation.Role.CONVIDADO:
                     continue
                 u = self._resolve_participante(linha, ctx["cpf_idx"])
+                if u is None and _cpf_sem_cadastro(
+                    normalize_cpf_digits(linha.get("usuario_cpf") or ""), ctx["cpf_idx"]
+                ):
+                    continue  # #2035: ninguém entra pela linha de CPF sem cadastro (nem em dobro, como nome solto)
                 ident = (u.id, "") if u is not None else (None, (linha.get("usuario") or "").strip()[:200])
                 if ident == (None, "") or ident in conv_atuais:
                     continue
@@ -3328,8 +3426,16 @@ class ExportContractImporter:
         )
 
     def _resolve_participante(self, r: dict[str, str], cpf_idx: dict[str, int]) -> Usuario | None:
-        """EMAIL-first (`resolve_user_by_email`, exato, sem filtro is_active — inclui inativos, RELAY 50)
-        → CPF (`usuario_cpf`) → nome (escada determinística #1643). Papel/cargo NUNCA gateiam a resolução.
+        """CPF (`usuario_cpf`) → e-mail (`resolve_user_by_email`, exato, sem filtro is_active —
+        inclui inativos, RELAY 50) → nome (escada determinística #1643). Papel/cargo NUNCA gateiam a resolução.
+
+        CPF primeiro (#2035, decisão do dono 07/11/2026): o e-mail de cargo (coordenacaoNN@) troca de dono e
+        não identifica a pessoa. Se o e-mail aponta outra conta, vale o CPF e o par entra em
+        `_email_cpf_divergente`. CPF válido (dígito verificador) que não existe no sistema devolve None, sem
+        cair para e-mail nem nome (#1658, mesma regra do #1849), e entra em `_cpf_sem_cadastro`: na virada o
+        FORMADOR vira `remocao_bloqueada_resolucao` e o CONVIDADO não entra; no create, `guest_nome`. CPF
+        inválido não vence o e-mail: ordem e-mail → CPF de dígito errado igual ao gravado numa conta
+        (`_conta_do_cpf_invalido`; placeholder não liga ninguém) → nome.
 
         Guarda de relay (v16.4/RELAY 57): se o sheets emite `match_procedencia` e ele vem VAZIO, a fonte
         JÁ tentou CPF/e-mail + escada-2-tokens e se absteve — o resolver-por-nome (Degrau 2, token-subset)
@@ -3337,16 +3443,23 @@ class ExportContractImporter:
         por nome nesse caso → vira `guest_nome` (preserva quem saiu). Coluna ausente (fixtures/CSV antigo) =
         sem sinal → mantém o fallback por nome."""
         email = (r.get("usuario_email") or r.get("email") or r.get("convidados_emails") or "").strip()
-        if email:
-            first = email.replace(";", ",").split(",")[0].strip()
-            u = resolve_user_by_email(first)
-            if u is not None:
-                return u
+        por_email = resolve_user_by_email(email.replace(";", ",").split(",")[0].strip()) if email else None
         cpf = normalize_cpf_digits(r.get("usuario_cpf") or "")
-        if len(cpf) == 11:
-            uid = cpf_idx.get(cpf)
-            if uid is not None:
-                return Usuario.objects.filter(id=uid).first()
+        uid = cpf_idx.get(cpf) if is_valid_cpf(cpf) else None
+        if uid is not None:
+            if por_email is not None and por_email.id != uid:
+                self._email_cpf_divergente.add((por_email.id, uid))
+            return Usuario.objects.filter(id=uid).first()
+        if _cpf_sem_cadastro(cpf, cpf_idx):
+            contas = self._cpf_sem_cadastro.setdefault(cpf, set())
+            if por_email is not None:
+                contas.add(por_email.id)
+            return None
+        if por_email is not None:
+            return por_email
+        uid = _conta_do_cpf_invalido(cpf, cpf_idx)
+        if uid is not None:
+            return Usuario.objects.filter(id=uid).first()
         match_proc = r.get("match_procedencia")
         if match_proc is not None and not match_proc.strip():
             return None  # fonte abstém-se → não fuzzy-match por nome → guest_nome
@@ -3359,7 +3472,7 @@ class ExportContractImporter:
         """Create-only de Participation. Liga por `evento_id` (fallback `evento_hash_natural`) →
         `solicitacao.external_hash`, e SÓ a evento criado nesta execução (IMP-2, decisão do dono 14/10/2026):
         evento que já existia, ou re-chaveado, não ganha nem perde participante (fica para a virada).
-        Papel vem do CSV (POSIÇÃO), NUNCA do cargo. Usuário resolvido EMAIL-first → CPF → nome; sem match
+        Papel vem do CSV (POSIÇÃO), NUNCA do cargo. Usuário resolvido CPF → e-mail → nome; sem match
         mas com nome → `guest_nome` (preserva quem saiu, MARCA não descarta). Sem solicitacao ou papel
         inválido → pula. Dedup existence-based (por-usuário e nome-only), índices atualizados in-memory."""
         sol_idx = dict(

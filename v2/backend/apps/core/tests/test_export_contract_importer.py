@@ -205,7 +205,14 @@ def test_todas_as_entidades_do_contrato_estao_implementadas(tmp_path):
 def test_report_has_no_pii(tmp_path):
     path = _write_export(tmp_path, {"dat_area": "nome,descricao\nA,d\n"})
     report = ExportContractImporter(path=path).run()
+    # Os nomes das chaves do #2035 citam "cpf", mas os valores são contagens e ids; o que se procura é dado pessoal.
     blob = json.dumps(report).lower()
+    for chave in (
+        "participante_email_cpf_divergente",
+        "participante_cpf_sem_cadastro",
+        "apply_solicitante_cpf_sem_cadastro_eventos",
+    ):
+        blob = blob.replace(chave, "")
     for token in ("cpf", "telefone", "@"):
         assert token not in blob
 

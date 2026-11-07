@@ -14,6 +14,7 @@ from typing import Any
 from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.models import DATCompra
+from apps.core.services.compra_elegibilidade import produto_cabe_na_compra
 
 
 class DATCompraSerializer(serializers.ModelSerializer["DATCompra"]):
@@ -105,10 +106,10 @@ class DATCompraSerializer(serializers.ModelSerializer["DATCompra"]):
             errors["valor_unitario"] = "Valor unitário não pode ser negativo."
         if produto is None and not (descricao_produto or "").strip():
             errors["descricao_produto"] = "Informe um produto cadastrado ou uma descrição do produto."
-        if produto is not None and projeto is not None and produto.projeto_id != projeto.id:
+        if produto is not None and projeto is not None and not produto_cabe_na_compra(produto.projeto, projeto):
             errors["produto"] = (
                 f"O produto '{produto}' pertence ao projeto '{produto.projeto}', "
-                f"diferente do projeto da compra ('{projeto}')."
+                f"que não é o projeto da compra ('{projeto}') nem da mesma coleção."
             )
 
         if errors:

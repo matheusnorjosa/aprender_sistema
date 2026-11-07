@@ -159,8 +159,13 @@ class DATCompraProdutoDaMesmaColecaoTests(DATModuleAPITestCase):
 
     def _compra(self, produto):
         return DATCompra.objects.create(
-            municipio=self.municipio, projeto=self.livro1, produto=produto,
-            quantidade=10, quantidade_utilizada=0, valor_unitario=Decimal("5.00"), ano_uso=2026,
+            municipio=self.municipio,
+            projeto=self.livro1,
+            produto=produto,
+            quantidade=10,
+            quantidade_utilizada=0,
+            valor_unitario=Decimal("5.00"),
+            ano_uso=2026,
             created_by=self.dat_user,
         )
 
@@ -177,8 +182,15 @@ class DATCompraProdutoDaMesmaColecaoTests(DATModuleAPITestCase):
         self.client.force_authenticate(user=self.dat_user)
         r = self.client.post(
             COMPRAS_URL,
-            {"municipio": self.municipio.id, "projeto": self.livro1.id, "produto": self.produto_livro2.id,
-             "quantidade": 10, "quantidade_utilizada": 0, "valor_unitario": "5.00", "ano_uso": 2026},
+            {
+                "municipio": self.municipio.id,
+                "projeto": self.livro1.id,
+                "produto": self.produto_livro2.id,
+                "quantidade": 10,
+                "quantidade_utilizada": 0,
+                "valor_unitario": "5.00",
+                "ano_uso": 2026,
+            },
             format="json",
         )
         assert r.status_code == status.HTTP_201_CREATED, f"recusou: {r.data}"
@@ -187,8 +199,39 @@ class DATCompraProdutoDaMesmaColecaoTests(DATModuleAPITestCase):
         self.client.force_authenticate(user=self.dat_user)
         r = self.client.post(
             COMPRAS_URL,
-            {"municipio": self.municipio.id, "projeto": self.livro1.id, "produto": self.produto_outra.id,
-             "quantidade": 10, "quantidade_utilizada": 0, "valor_unitario": "5.00", "ano_uso": 2026},
+            {
+                "municipio": self.municipio.id,
+                "projeto": self.livro1.id,
+                "produto": self.produto_outra.id,
+                "quantidade": 10,
+                "quantidade_utilizada": 0,
+                "valor_unitario": "5.00",
+                "ano_uso": 2026,
+            },
+            format="json",
+        )
+        assert r.status_code == status.HTTP_400_BAD_REQUEST
+        assert "produto" in _errs(r)
+
+    def test_dois_projetos_sem_colecao_nao_casam(self):
+        """Armadilha do NULL: produto de outro projeto, os dois sem coleção, continua 400."""
+        uid = uuid.uuid4().hex[:6]
+        sem1 = ProjetoFactory(nome=f"Sem colecao 1 {uid}", codigo=f"S1{uid[:4]}", fluxo="NAO_SUPER")
+        sem2 = ProjetoFactory(nome=f"Sem colecao 2 {uid}", codigo=f"S2{uid[:4]}", fluxo="NAO_SUPER")
+        assert sem1.projeto_geral_id is None and sem2.projeto_geral_id is None
+        produto = Produto.objects.create(codigo=f"S2P-{uid}", nome="Produto Sem Colecao", projeto=sem2)
+        self.client.force_authenticate(user=self.dat_user)
+        r = self.client.post(
+            COMPRAS_URL,
+            {
+                "municipio": self.municipio.id,
+                "projeto": sem1.id,
+                "produto": produto.id,
+                "quantidade": 10,
+                "quantidade_utilizada": 0,
+                "valor_unitario": "5.00",
+                "ano_uso": 2026,
+            },
             format="json",
         )
         assert r.status_code == status.HTTP_400_BAD_REQUEST

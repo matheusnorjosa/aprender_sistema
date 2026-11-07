@@ -147,7 +147,7 @@ Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NA
 
 **Helpers** (não-DRF): `user_has_any_perm(user, *codenames)`, `user_has_all_perms(...)`, `user_has_policy(user, key)`, `user_is_gerente_superintendencia(user)`, `user_can_delegate_availability_block(user)`, `user_can_delegate_deslocamento(user, alvo)`, `user_e_coordenador(user)` e, no modelo, `EquipeGerencia.gerencias_com_papel(usuario, papeis)` (PR 8) e `EquipeGerencia.gerencias_de_atuacao(usuario)` (PR 9).
 
-**Endpoint**: `GET /api/me/policies/` (`IsAuthenticated`) → array JSON ordenado das `PUBLIC_POLICY_KEYS` que o usuário possui (subset de `ACCESS_POLICIES`). Anonymous → 401; superuser → todas as públicas; regular → subset (OR). Consumido pelo frontend para menu condicional/redirects.
+**Endpoint**: `GET /api/me/policies/` (`IsAuthenticated`) → array JSON ordenado das `PUBLIC_POLICY_KEYS` que o usuário possui (subset de `ACCESS_POLICIES`). Anonymous → 403 com `code: NOT_AUTHENTICATED` (o schema OpenAPI documenta o 403, não 401); superuser → todas as públicas; regular → subset (OR). Consumido pelo frontend para menu condicional/redirects.
 
 **Setores (13)** e **Funções (5)**: SSOT em `SETOR_GROUPS` / `FUNCAO_GROUPS` (`apps/core/constants.py`). Funções: Formador, Coordenador, Apoio de Coordenação, Gerente, Assistente Administrativo.
 

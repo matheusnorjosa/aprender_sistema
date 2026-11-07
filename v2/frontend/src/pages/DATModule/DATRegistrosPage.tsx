@@ -66,6 +66,7 @@ import {
 } from './DATRegistros/constants';
 import { getColumns, nomeDoRegistro, type DATRegistroRecord } from './DATRegistros/columns';
 import ResponsiveTable from '../../components/ResponsiveTable';
+import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 
 const { Title, Text } = Typography;
 
@@ -405,6 +406,7 @@ export default function DATRegistrosPage(): JSX.Element {
               </Text>
             </div>
             <Select
+              aria-label="Região"
               style={{ width: '100%' }}
               placeholder="Todas"
               allowClear
@@ -420,6 +422,7 @@ export default function DATRegistrosPage(): JSX.Element {
               </Text>
             </div>
             <Select
+              aria-label="UF"
               style={{ width: '100%' }}
               placeholder="Todos"
               allowClear
@@ -436,6 +439,7 @@ export default function DATRegistrosPage(): JSX.Element {
               </Text>
             </div>
             <Select
+              aria-label="Município"
               style={{ width: '100%' }}
               placeholder="Buscar município..."
               allowClear
@@ -453,6 +457,7 @@ export default function DATRegistrosPage(): JSX.Element {
               </Text>
             </div>
             <Select
+              aria-label="Coleção"
               style={{ width: '100%' }}
               placeholder="Todos"
               allowClear
@@ -468,6 +473,7 @@ export default function DATRegistrosPage(): JSX.Element {
               </Text>
             </div>
             <Select
+              aria-label="Usa AVALIAR"
               style={{ width: '100%' }}
               placeholder="Todos"
               allowClear
@@ -486,6 +492,7 @@ export default function DATRegistrosPage(): JSX.Element {
               </Text>
             </div>
             <Select
+              aria-label="Status Geral"
               style={{ width: '100%' }}
               placeholder="Todos"
               allowClear
@@ -590,10 +597,10 @@ export default function DATRegistrosPage(): JSX.Element {
           </Space>
           <Divider type="vertical" />
           <Space>
-            <Tag color="green">Chaves Geradas</Tag>
+            <Tag color="green" style={{ color: TEXTO_DA_TAG['green'] }}>Chaves Geradas</Tag>
           </Space>
           <Space>
-            <Tag color="gold">Chaves Pendentes</Tag>
+            <Tag color="gold" style={{ color: TEXTO_DA_TAG['gold'] }}>Chaves Pendentes</Tag>
           </Space>
         </Space>
       </Card>

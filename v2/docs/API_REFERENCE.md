@@ -939,8 +939,7 @@ GET /api/solicitacoes/?page=2
 | 201 | Criado com sucesso |
 | 202 | Aceito (processamento assíncrono) |
 | 400 | Erro de validação |
-| 401 | Não autenticado |
-| 403 | Sem permissão |
+| 403 | Sem sessão (`code: NOT_AUTHENTICATED`) ou sem permissão (`code: PERMISSION_DENIED`). A API não responde 401: a única autenticação é a de sessão, que não manda `WWW-Authenticate`, e o DRF devolve 403 |
 | 404 | Não encontrado |
 | 409 | Conflito (ex: evento já publicado; excluir registro em uso: o `ProtectedError` vira 409 `CONFLICT` com os tipos de registro vinculados no `detail`, nunca os registros) |
 | 429 | Rate limit excedido |

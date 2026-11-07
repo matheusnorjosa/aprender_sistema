@@ -11,7 +11,7 @@
  * cortada; o cabeçalho e a barra de botões dos filtros quebram linha.
  */
 
-import { useState, useEffect, useCallback, useMemo, type JSX } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type JSX } from 'react';
 import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
 import type { PaginatedResponse, ProjetoOption, MunicipioOption } from '../../types';
 import {
@@ -201,6 +201,8 @@ export default function CoordenadoresPage(): JSX.Element {
   const [viewingCoordenador, setViewingCoordenador] = useState<CoordenadorRecord | null>(null);
   const [alocacoes, setAlocacoes] = useState<AlocacaoRecord[]>([]);
   const [loadingAlocacoes, setLoadingAlocacoes] = useState<boolean>(false);
+  // Nº do pedido de alocações mais recente: resposta de pedido anterior (outro coordenador) é descartada.
+  const pedidoAlocacoesRef = useRef(0);
 
   const [form] = Form.useForm<CoordenadorFormValues>();
 
@@ -230,17 +232,20 @@ export default function CoordenadoresPage(): JSX.Element {
     void loadOptions();
   }, []);
 
-  // Load alocações for detail view
+  // Load alocações for detail view. Lote D (ART-D1b): só o pedido mais recente grava a lista,
+  // senão a resposta atrasada do coordenador A sobrescreve a do B no modal.
   const loadAlocacoes = async (coordenadorId: number) => {
+    const pedido = ++pedidoAlocacoesRef.current;
+    setAlocacoes([]);
     setLoadingAlocacoes(true);
     try {
       const data = await getCoordenadorAlocacoes(coordenadorId);
-      setAlocacoes(data as unknown as AlocacaoRecord[]);
+      if (pedido === pedidoAlocacoesRef.current) setAlocacoes(data as unknown as AlocacaoRecord[]);
     } catch (error) {
       logger.error('Erro ao carregar alocações:', error);
-      setAlocacoes([]);
+      if (pedido === pedidoAlocacoesRef.current) setAlocacoes([]);
     } finally {
-      setLoadingAlocacoes(false);
+      if (pedido === pedidoAlocacoesRef.current) setLoadingAlocacoes(false);
     }
   };
 

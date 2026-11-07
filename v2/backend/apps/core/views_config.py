@@ -88,7 +88,6 @@ def _config_atual() -> dict[str, Any]:
     description="Retorna configurações consolidadas em formato flat para uso do frontend.",
     responses={
         200: ConfigSerializer,
-        401: COMMON_ERROR_RESPONSES[401],
         403: COMMON_ERROR_RESPONSES[403],
     },
     tags=["config"],
@@ -104,7 +103,6 @@ def _config_atual() -> dict[str, Any]:
     responses={
         200: ConfigSerializer,
         400: COMMON_ERROR_RESPONSES[400],
-        401: COMMON_ERROR_RESPONSES[401],
         403: COMMON_ERROR_RESPONSES[403],
     },
     tags=["config"],

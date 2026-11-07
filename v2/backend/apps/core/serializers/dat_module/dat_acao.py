@@ -103,4 +103,7 @@ class DATAcaoListSerializer(serializers.ModelSerializer["DATAcao"]):
             "etapa_atual",
             "prioridade",
             "ativo",
+            # Coluna "Observações" da Gestão de Ações (lote D, D2): observação da carta, vinda da planilha
+            "observacao_carta",
         ]
+        read_only_fields = ["observacao_carta"]

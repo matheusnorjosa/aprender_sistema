@@ -8,7 +8,9 @@ Provides standardized response schemas and examples for API documentation.
 
 from __future__ import annotations
 
-from drf_spectacular.utils import OpenApiExample, OpenApiResponse
+from rest_framework import serializers  # type: ignore[attr-defined]
+
+from drf_spectacular.utils import OpenApiExample, OpenApiResponse, inline_serializer
 
 # ============================================================================
 # ERROR RESPONSE SCHEMAS
@@ -31,37 +33,31 @@ ERROR_400_RESPONSE = OpenApiResponse(
     ],
 )
 
-ERROR_401_RESPONSE = OpenApiResponse(
-    description="Autenticação necessária",
-    examples=[
-        OpenApiExample(
-            "Unauthorized",
-            value={
-                "error": {
-                    "code": "UNAUTHORIZED",
-                    "message": "Autenticação necessária",
-                    "details": {},
-                    "request_id": "550e8400-e29b-41d4-a716-446655440000",
-                }
-            },
-        )
-    ],
-)
-
+# Sem sessão também é 403, não 401 (G31): a única autenticação é a SessionAuthentication, que não
+# manda `WWW-Authenticate`, e o DRF devolve 403 com o código NOT_AUTHENTICATED. Os exemplos são o
+# corpo real do `custom_exception_handler` (`{"code", "detail"}`); sem `response` o drf-spectacular
+# descarta os exemplos.
 ERROR_403_RESPONSE = OpenApiResponse(
-    description="Permissão negada",
+    response=inline_serializer(
+        name="ErroSemSessaoOuPermissao",
+        fields={"code": serializers.CharField(), "detail": serializers.CharField()},
+    ),
+    description="Sem sessão (code NOT_AUTHENTICATED) ou sem permissão (code PERMISSION_DENIED)",
     examples=[
         OpenApiExample(
-            "Forbidden",
+            "Sem sessão",
             value={
-                "error": {
-                    "code": "FORBIDDEN",
-                    "message": "Você não tem permissão para acessar este recurso",
-                    "details": {},
-                    "request_id": "550e8400-e29b-41d4-a716-446655440000",
-                }
+                "code": "NOT_AUTHENTICATED",
+                "detail": "As credenciais de autenticação não foram fornecidas.",
             },
-        )
+        ),
+        OpenApiExample(
+            "Sem permissão",
+            value={
+                "code": "PERMISSION_DENIED",
+                "detail": "Você não tem permissão para realizar esta ação.",
+            },
+        ),
     ],
 )
 
@@ -136,7 +132,6 @@ ERROR_503_RESPONSE = OpenApiResponse(
 # Common error responses for reuse
 COMMON_ERROR_RESPONSES = {
     400: ERROR_400_RESPONSE,
-    401: ERROR_401_RESPONSE,
     403: ERROR_403_RESPONSE,
     404: ERROR_404_RESPONSE,
     429: ERROR_429_RESPONSE,

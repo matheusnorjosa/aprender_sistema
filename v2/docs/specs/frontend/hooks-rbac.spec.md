@@ -94,7 +94,7 @@ Interface publica dos hooks:
 - `useCapabilities(policies: readonly string[]): Capabilities` — `can(key)` + 27 flags `can*` 1:1 com as policy keys (PR 7: `canAccessMonthlyAvailability`, `canAccessAvailabilityBlocks`, `canAccessTravel`, `canExecuteRestrictedOperations`, `canCreateSolicitationWithoutPurchase`; 17/10/2026: `canManageLotacaoComum`). Sem `user`.
 - `useIdentity(user: CurrentUser | null): Identity` — flags de setor/funcao + `displayName` + `badge`. **Display-only.**
 - `useGoogleGuard({ googleStatus, returnTo })` (**export default**) `: { requireGoogleConnection, handleGoogleError, isConnected }`.
-- `useGoogleIntegration(): { status, loading, error, fetchStatus, disconnect }`.
+- `useGoogleIntegration(): { status, loading, error, fetchStatus, disconnect }`. Quando o backend responde `disconnected=false` (Google não confirmou a revogação), `disconnect()` devolve `{ success: false, error }` com a mensagem do backend e mantém o status conectado.
 
 Guard de rota (componente, nao hook):
 

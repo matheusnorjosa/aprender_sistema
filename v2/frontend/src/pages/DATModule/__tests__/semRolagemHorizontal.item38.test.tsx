@@ -8,6 +8,7 @@
  * some vai para a linha expandida.
  */
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, test, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 
@@ -30,6 +31,7 @@ const { acaoRow, registroRow } = vi.hoisted(() => ({
     status_contato: 'pendente',
     status_reuniao: 'pendente',
     status_entrega: 'pendente',
+    observacao_carta: 'Carta entregue na secretaria',
   },
   registroRow: {
     id: 9,
@@ -159,6 +161,35 @@ describe('Gestão de Ações sem rolagem horizontal', () => {
     act(() => definirLarguraTela(360));
 
     expect(cabecalhos()).toEqual(['Município - UF', 'Ações']);
+  });
+});
+
+// Lote D (D2, caminho B do dono): "Observações" mostra a observação da carta (`observacao_carta`,
+// vinda da planilha). "Área" segue fora: DATAcao não tem esse campo.
+describe('Gestão de Ações: Observações com a observação da carta, sem Área', { timeout: 20000 }, () => {
+  test('a 360 px: a linha expandida mostra Observações com a observação da carta e não mostra Área', async () => {
+    definirLarguraTela(360);
+    const user = userEvent.setup();
+    renderPagina('acoes');
+    const linha = await linhaPelaAcao(`Mais ações: ${ACAO}`);
+
+    await user.click(within(linha).getByRole('button', { name: `Expandir linha de ${ACAO}` }));
+    const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
+    expect(expandida.getByText('Progresso')).toBeInTheDocument();
+    expect(expandida.getByText('Observações')).toBeInTheDocument();
+    expect(expandida.getByText('Carta entregue na secretaria')).toBeInTheDocument();
+    expect(expandida.queryByText('Área')).toBeNull();
+  });
+
+  test('a 1700 px: cabeçalho Observações com a observação da carta na linha; nenhum cabeçalho Área', async () => {
+    definirLarguraTela(1700);
+    renderPagina('acoes');
+    const linha = await linhaPelaAcao(`Editar: ${ACAO}`);
+
+    expect(cabecalhos()).toContain('Progresso');
+    expect(cabecalhos()).toContain('Observações');
+    expect(within(linha).getByText('Carta entregue na secretaria')).toBeInTheDocument();
+    expect(cabecalhos()).not.toContain('Área');
   });
 });
 

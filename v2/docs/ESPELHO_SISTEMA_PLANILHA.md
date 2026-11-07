@@ -1,7 +1,7 @@
 ---
 title: Espelho Sistema × Planilha
 status: living
-last_verified: 2026-11-04
+last_verified: 2026-11-06
 owner: backend
 sources_of_truth:
   - v2/backend/apps/core/models/organizacao.py
@@ -51,7 +51,7 @@ Rótulos, como na `REFERENCIA-DOMINIO.md`: **MEDIDO** (contado no código/banco,
 
 - `Projeto.projeto_geral` → `ProjetoGeral` (família); `Projeto.gerencia` → `Gerencia` (o setor).
 - `Produto.projeto` → `Projeto`.
-- `Produto` carrega o tipo (Aluno/Professor) que alimenta o cálculo de códigos do DAT.
+- O tipo (Aluno/Professor) que alimenta o cálculo de códigos do DAT fica na compra (`DATCompra.tipo`); o `Produto` não tem tipo.
 
 > ⚠️ **Coleção = família (decisão do dono, P1, 05/10/2026):** coleção é a obra, que no sistema
 > é o `ProjetoGeral`. O model `Colecao` e a FK `Produto.colecao` (vazios em produção) saíram na
@@ -141,7 +141,7 @@ Registro durável da verificação adversarial de 2026-08-26 (11 afirmações de
 | **`DATCoordenador`** | cadastro paralelo: 12 campos de conteúdo, **sem FK de identidade** para `Usuario`. Refatorar p/ `(usuario_fk, area)` resolvendo por CPF (épico #1833) | "o importer preenche todos" — **falso**; grava 4 (`_apply_dat_coordenador` em `export_contract_importer.py`) |
 | `AcaoDAT` | endpoint `/dat/acoes/` é candidato a deprecação (nenhuma tela React lê) | comentário "LEGACY" está **certo**; o model **é escrito** pelo import (`_process_row` em `dat_cadastros_import.py`); são 2 serializers, não 1 |
 | `DATCompra` | só `valor_unitario`/`qtd_utilizada` são digitação manual | `quantidade` **é importada e load-bearing** no cálculo de códigos. Manter |
-| `DATFormacao` | só "sem importador em lote" | 29 campos (não 24); CRUD vivo; domínio distinto. Manter |
+| ~~`DATFormacao`~~ | **removido depois**: o model saiu na migração `0109` (#1978); a formação real vive em `PlanoFormacoes` | na época: 29 campos (não 24), CRUD vivo, domínio distinto |
 | pares status/data (`dat_registro.py`) | **manter os 7** | conflacionou `DATRegistro` (emite 7) com `DATCadastro` (4 colunas) |
 
 ### 3.3 🔴 REFUTADO — NÃO AGIR

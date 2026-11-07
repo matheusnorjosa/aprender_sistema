@@ -122,7 +122,7 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
   {
     path: '/dashboards',
     perfil: 'superusuario',
-    marco: 'Dashboards e Analises',
+    marco: 'Dashboards e Análises',
     dados: { em: LINHA, texto: T.pessoa },
     // Posicao (< 576) e Progresso (< 768) vão para a linha expandida.
     estados: [expandida(T.pessoa, 'Posicao', [360])],

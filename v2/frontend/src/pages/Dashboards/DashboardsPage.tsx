@@ -5,7 +5,6 @@
  * - KPI cards (Eventos Futuros, Aprovados, Total Participantes, Aprovacoes Pendentes)
  * - Grafico de barras: Eventos por Fluxo
  * - Grafico de pizza: Eventos por Setor
- * - Botao de export CSV
  *
  * Ref: Issue #311 - Substituir mock data por API real
  *
@@ -42,7 +41,6 @@ import {
   ClockCircleOutlined,
   BarChartOutlined,
   PieChartOutlined,
-  DownloadOutlined,
   RiseOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
@@ -53,6 +51,12 @@ const { Title, Text } = Typography;
 const FLUXO_COLORS: Record<string, string> = {
   SUPER: '#1890ff',
   NAO_SUPER: '#52c41a',
+};
+
+// Rótulo do fluxo na tela (G20): o código (NAO_SUPER) não aparece cru.
+const FLUXO_ROTULO: Record<string, string> = {
+  SUPER: 'Superintendência',
+  NAO_SUPER: 'Não Superintendência',
 };
 
 const GERENCIA_COLORS = ['#1890ff', '#52c41a', '#faad14', '#f5222d', '#722ed1'];
@@ -80,11 +84,6 @@ export default function DashboardsPage(): JSX.Element {
   useEffect(() => {
     void loadData();
   }, [loadData]);
-
-  const handleExportCSV = () => {
-    // TODO: Implementar export real
-    logger.debug('Export CSV solicitado');
-  };
 
   // Loading state
   if (loading) {
@@ -118,7 +117,7 @@ export default function DashboardsPage(): JSX.Element {
   if (!data) {
     return (
       <div className="p-6">
-        <Empty description="Nenhum dado disponivel" />
+        <Empty description="Nenhum dado disponível" />
       </div>
     );
   }
@@ -173,21 +172,14 @@ export default function DashboardsPage(): JSX.Element {
     <section className="p-6" aria-labelledby="dashboards-title">
       <header className="mb-6 flex flex-wrap justify-between items-center gap-3">
         <div>
-          <Title level={2} id="dashboards-title">Dashboards e Analises</Title>
+          <Title level={2} id="dashboards-title">Dashboards e Análises</Title>
           <Text type="secondary">
-            Visualize metricas detalhadas e relatorios do sistema
+            Visualize métricas detalhadas e relatórios do sistema
           </Text>
         </div>
         <Space wrap>
           <Button icon={<ReloadOutlined />} onClick={loadData}>
             Atualizar
-          </Button>
-          <Button
-            type="primary"
-            icon={<DownloadOutlined />}
-            onClick={handleExportCSV}
-          >
-            Exportar para CSV
           </Button>
         </Space>
       </header>
@@ -250,7 +242,7 @@ export default function DashboardsPage(): JSX.Element {
           >
             <Statistic
               title={
-                <span style={{ color: 'white' }}>Aprovacoes Pendentes</span>
+                <span style={{ color: 'white' }}>Aprovações Pendentes</span>
               }
               value={kpis.aprovacoes_pendentes}
               prefix={<ClockCircleOutlined />}
@@ -262,27 +254,27 @@ export default function DashboardsPage(): JSX.Element {
       </section>
 
       {/* Graficos */}
-      <section aria-label="Graficos de analise">
+      <section aria-label="Gráficos de análise">
       <Row gutter={[16, 16]} className="mb-6">
         {/* Eventos por Fluxo */}
         <Col xs={24} md={12}>
           <Card
             title={
               <Space>
-                <BarChartOutlined /> Eventos por Fluxo (ultimos 30 dias)
+                <BarChartOutlined /> Eventos por Fluxo (últimos 30 dias)
               </Space>
             }
             bordered={false}
           >
             {por_fluxo.length === 0 ? (
-              <Empty description="Nenhum evento no periodo" />
+              <Empty description="Nenhum evento no período" />
             ) : (
               <Space direction="vertical" style={{ width: '100%' }} size="large">
                 {por_fluxo.map((item) => (
                   <div key={item.fluxo}>
                     <div className="flex justify-between mb-2">
                       <Tag color={FLUXO_COLORS[item.fluxo] || '#666'}>
-                        {item.fluxo}
+                        {FLUXO_ROTULO[item.fluxo] ?? item.fluxo}
                       </Tag>
                       <Text strong>{item.quantidade} eventos</Text>
                     </div>
@@ -303,13 +295,13 @@ export default function DashboardsPage(): JSX.Element {
           <Card
             title={
               <Space>
-                <PieChartOutlined /> Eventos por Gerencia (ultimos 30 dias)
+                <PieChartOutlined /> Eventos por Gerência (últimos 30 dias)
               </Space>
             }
             bordered={false}
           >
             {por_gerencia.length === 0 ? (
-              <Empty description="Nenhum evento no periodo" />
+              <Empty description="Nenhum evento no período" />
             ) : (
               <Space
                 direction="vertical"

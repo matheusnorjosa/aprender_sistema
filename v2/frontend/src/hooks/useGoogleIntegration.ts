@@ -128,7 +128,16 @@ const useGoogleIntegration = (): UseGoogleIntegrationReturn => {
     setError(null);
 
     try {
-      await fetchAPI('/integrations/google/disconnect/', { method: 'POST' });
+      const data = await fetchAPI<{ message?: string; disconnected?: boolean }>('/integrations/google/disconnect/', {
+        method: 'POST',
+      });
+
+      // Google não confirmou a revogação: a credencial continua no banco, então o status não muda.
+      if (data?.disconnected === false) {
+        const msg = data.message ?? 'Não foi possível desconectar a conta Google. Tente de novo.';
+        setError(msg);
+        return { success: false, error: msg };
+      }
 
       // Atualizar estado local
       setStatus({ ...EMPTY_STATUS });

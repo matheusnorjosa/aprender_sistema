@@ -650,9 +650,6 @@ class TestGoogleOAuthEndpoints:
         - Credencial removida do banco
         - AuditLog com action=GOOGLE_DISCONNECT
         - Google API /revoke chamada (mock)
-
-        Nota: Mensagem pode variar se GCAL_CLIENT='fake' (falha ao revogar no Google).
-        O importante é que a credencial seja removida localmente.
         """
         client = APIClient()
         client.force_authenticate(user=usuario_controle)
@@ -663,8 +660,8 @@ class TestGoogleOAuthEndpoints:
         # Disconnect
         response = client.post("/api/integrations/google/disconnect/")
         assert response.status_code == http_status.HTTP_200_OK
+        assert response.data["disconnected"] is True
 
-        # Mensagem pode ser "desconectada com sucesso" ou "removida localmente"
         message = response.data["message"].lower()
         assert any(
             keyword in message for keyword in ["desconectada", "removida", "sucesso"]
@@ -683,6 +680,44 @@ class TestGoogleOAuthEndpoints:
         # Validar chamada à API Google /revoke
         assert mock_post.called, "Deve chamar API Google /revoke"
         assert "revoke" in mock_post.call_args[0][0], "Deve chamar endpoint /revoke"
+
+    @patch("apps.core.services.oauth.token_manager.requests.post")
+    @patch("apps.core.services.oauth.token_manager.decrypt_token", return_value="ref")
+    def test_disconnect_google_nao_confirma_mantem_conectada(
+        self, _mock_decrypt, mock_post, usuario_controle, google_oauth_credential
+    ):
+        """S4b / M12-11: Google não confirma a revogação → a resposta diz que a conta continua conectada."""
+        client = APIClient()
+        client.force_authenticate(user=usuario_controle)
+        mock_post.return_value = MagicMock(status_code=500)
+
+        response = client.post("/api/integrations/google/disconnect/")
+
+        assert response.status_code == http_status.HTTP_200_OK
+        assert mock_post.call_count == 1, "o ramo remoto precisa ter rodado"
+        assert response.data["disconnected"] is False
+        message = response.data["message"].lower()
+        assert "removida" not in message
+        assert "continua conectada" in message
+        assert GoogleOAuthCredential.objects.filter(user=usuario_controle).exists()
+        assert not AuditLog.objects.filter(usuario=usuario_controle, action="GOOGLE_DISCONNECT").exists()
+
+    @patch("apps.core.services.oauth.token_manager.AuditLog.objects.create", side_effect=RuntimeError("audit"))
+    @patch("apps.core.services.oauth.token_manager.requests.post")
+    @patch("apps.core.services.oauth.token_manager.decrypt_token", return_value="ref")
+    def test_disconnect_credencial_apagada_mas_audit_falha_diz_desconectada(
+        self, _mock_decrypt, mock_post, _mock_audit, usuario_controle, google_oauth_credential
+    ):
+        """revoke_token devolve False porque o AuditLog falhou depois do delete: a resposta segue o banco."""
+        client = APIClient()
+        client.force_authenticate(user=usuario_controle)
+        mock_post.return_value = MagicMock(status_code=200)
+
+        response = client.post("/api/integrations/google/disconnect/")
+
+        assert response.status_code == http_status.HTTP_200_OK
+        assert response.data["disconnected"] is True
+        assert not GoogleOAuthCredential.objects.filter(user=usuario_controle).exists()
 
 
 # ============================================================================
@@ -1262,7 +1297,7 @@ class TestViewsOAuthCoverage:
     @patch("apps.core.views_oauth.revoke_token")
     def test_google_oauth_disconnect_revoke_fails(self, mock_revoke, usuario_controle, google_oauth_credential):
         """
-        Linhas 433-440: Disconnect quando revoke_token retorna False.
+        Disconnect quando revoke_token retorna False e a credencial fica no banco.
 
         Nota: Patch deve ser no módulo views_oauth onde a função é usada.
         """
@@ -1275,8 +1310,9 @@ class TestViewsOAuthCoverage:
         response = client.post("/api/integrations/google/disconnect/")
 
         assert response.status_code == http_status.HTTP_200_OK
-        # Quando revoke falha, mensagem inclui "falha ao revogar"
-        assert "falha ao revogar" in response.data["message"].lower()
+        # Credencial preservada → a resposta diz que a conta continua conectada
+        assert response.data["disconnected"] is False
+        assert "continua conectada" in response.data["message"].lower()
 
     def test_google_oauth_disconnect_not_found(self, usuario_controle):
         """

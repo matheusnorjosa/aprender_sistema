@@ -666,7 +666,7 @@ export default function PreAgendaPage(): JSX.Element {
     },
     {
       title: 'Tipo',
-      dataIndex: 'tipo',
+      dataIndex: 'tipo_evento_nome',
       key: 'tipo',
       responsive: VISIVEL_A_PARTIR.lg,
       ellipsis: true,

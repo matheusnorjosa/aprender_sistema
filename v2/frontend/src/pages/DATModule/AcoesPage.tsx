@@ -93,9 +93,8 @@ interface AcaoRecord {
   data_contato?: string | null;
   data_reuniao?: string | null;
   data_entrega?: string | null;
-  // Referenciados pela tabela/form mas ausentes do serializer atual (podem vir undefined)
-  area?: string | null;
-  observacoes?: string | null;
+  // Observação da carta (read-only na list; vem da planilha) — coluna Observações (lote D, D2)
+  observacao_carta?: string;
 }
 
 interface AcaoFormValues {
@@ -103,7 +102,6 @@ interface AcaoFormValues {
   projeto: number;
   coordenador: number | null;
   ano?: number | null;
-  area?: string | null;
   status_carta?: string;
   status_contato?: string;
   status_reuniao?: string;
@@ -112,7 +110,6 @@ interface AcaoFormValues {
   data_contato?: Dayjs | null;
   data_reuniao?: Dayjs | null;
   data_entrega?: Dayjs | null;
-  observacoes?: string | null;
 }
 
 interface AcoesFilters {
@@ -388,13 +385,6 @@ export default function AcoesPage(): JSX.Element {
       ellipsis: true,
     },
     {
-      title: 'Área',
-      dataIndex: 'area',
-      key: 'area',
-      responsive: VISIVEL_A_PARTIR.xxl,
-      width: 100,
-    },
-    {
       title: (
         <Tooltip title="Carta Enviada">
           <Space>
@@ -491,6 +481,7 @@ export default function AcoesPage(): JSX.Element {
         const progress = calculateProgress(record);
         return (
           <Progress
+            aria-label={`Progresso: ${progress}%`}
             percent={progress}
             size="small"
             status={progress === 100 ? 'success' : 'active'}
@@ -501,12 +492,12 @@ export default function AcoesPage(): JSX.Element {
     },
     {
       title: 'Observações',
-      dataIndex: 'observacoes',
-      key: 'observacoes',
+      dataIndex: 'observacao_carta',
+      key: 'observacao_carta',
       responsive: VISIVEL_A_PARTIR.xxl,
       width: 200,
       ellipsis: { showTitle: false },
-      render: (val: string | null) => (
+      render: (val: string | undefined) => (
         <Tooltip title={val}>
           <Text type="secondary">{val || '-'}</Text>
         </Tooltip>
@@ -629,6 +620,7 @@ export default function AcoesPage(): JSX.Element {
               </Text>
             </div>
             <Select
+              aria-label="UF"
               style={{ width: '100%' }}
               placeholder="Todos"
               allowClear
@@ -645,6 +637,7 @@ export default function AcoesPage(): JSX.Element {
               </Text>
             </div>
             <Select
+              aria-label="Município"
               style={{ width: '100%' }}
               placeholder="Buscar município..."
               allowClear
@@ -662,6 +655,7 @@ export default function AcoesPage(): JSX.Element {
               </Text>
             </div>
             <Select
+              aria-label="Projeto"
               style={{ width: '100%' }}
               placeholder="Todos"
               allowClear
@@ -679,6 +673,7 @@ export default function AcoesPage(): JSX.Element {
               </Text>
             </div>
             <Select
+              aria-label="Coordenador"
               style={{ width: '100%' }}
               placeholder="Todos"
               allowClear
@@ -696,6 +691,7 @@ export default function AcoesPage(): JSX.Element {
               </Text>
             </div>
             <Select
+              aria-label="Status"
               style={{ width: '100%' }}
               placeholder="Todos"
               allowClear

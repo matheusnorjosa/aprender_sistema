@@ -10,7 +10,7 @@ vi.mock('../../services/syncChannel', () => ({
   syncChannel: { publish: vi.fn(), subscribe: vi.fn(() => () => {}) },
 }));
 
-import { updateCadastroEtapa } from '../datModule';
+import { getCoordenadorAlocacoes, updateCadastroEtapa } from '../datModule';
 
 type RequestLog = { url: string; method: string; body?: unknown };
 
@@ -35,5 +35,16 @@ describe('datModule API (MSW)', () => {
     expect(response).toEqual(payload);
     expect(requests).toHaveLength(1);
     expect(requests[0].body).toEqual({ etapa: 'chaves', status: 'concluido' });
+  });
+
+  test('getCoordenadorAlocacoes devolve as ações do objeto {acoes,total_acoes} (M18-04)', async () => {
+    const acao = { id: 1, projeto_nome: 'P', municipio_nome: 'M' };
+    server.use(
+      http.get(apiUrl('/dat/coordenadores/5/alocacoes/'), () =>
+        HttpResponse.json({ acoes: [acao], total_acoes: 1 }),
+      ),
+    );
+
+    expect(await getCoordenadorAlocacoes(5)).toEqual([acao]);
   });
 });

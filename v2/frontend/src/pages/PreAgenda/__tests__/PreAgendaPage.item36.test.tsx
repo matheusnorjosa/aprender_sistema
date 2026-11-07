@@ -69,7 +69,7 @@ const row = (overrides: Record<string, unknown> = {}) => ({
   id: 1,
   municipio_nome: 'Fortaleza',
   projeto_nome: 'Projeto Teste',
-  tipo: 'Formação',
+  tipo_evento_nome: 'Formação',
   gcal_status: 'NONE',
   external_event_id: null,
   meet_link: null,
@@ -311,6 +311,20 @@ describe('PreAgendaPage — sem rolagem horizontal', () => {
       expect(within(linha).getByText(texto)).toBeInTheDocument();
     }
     expect(container.querySelector('.ant-table-content')?.getAttribute('style') ?? '').not.toMatch(/overflow/);
+  });
+
+  test('a 1280 px, a coluna Tipo mostra o tipo de evento (tipo_evento_nome), não o campo livre tipo (#1974)', async () => {
+    mockRows([
+      row({ id: 1, municipio_nome: 'Crato', tipo_evento_nome: 'Formação Continuada', tipo: null }),
+      row({ id: 2, municipio_nome: 'Sobral', tipo_evento_nome: 'Visita Técnica', tipo: 'Texto livre' }),
+    ]);
+    render(<PreAgendaPage />);
+    const linhaCrato = (await screen.findByText('Crato')).closest('tr') as HTMLElement;
+    const linhaSobral = screen.getByText('Sobral').closest('tr') as HTMLElement;
+
+    expect(within(linhaCrato).getByText('Formação Continuada')).toBeInTheDocument();
+    expect(within(linhaSobral).getByText('Visita Técnica')).toBeInTheDocument();
+    expect(screen.queryByText('Texto livre')).not.toBeInTheDocument();
   });
 
   test('a 360 px: só o Evento e as ações; o resto na linha expandida', async () => {

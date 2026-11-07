@@ -421,3 +421,32 @@ def test_apply_plano_reconcile_empty_array_does_not_wipe(tmp_path):
     ).run()
     assert _coord_ids(PlanoFormacoes.objects.get()) == [a.id]  # preservado
     assert "plano_formacao__coordenadores_reconciled" not in r["applied"]
+
+
+# --------------- plano sem ano (#906): ano vazio ou inválido não vira plano de ano nulo ---------------
+# A NK é (municipio, projeto, ano). Plano sem ano nasceria ao lado do plano com ano do mesmo par e
+# puxaria as filhas para o lugar errado. Sem ano legível → would_reject(ano_ausente), e o apply não cria.
+
+
+def test_classify_plano_sem_ano_rejeita_ano_ausente(tmp_path):
+    path = _setup(tmp_path, "Cidade X,CIDADE X,CE,Proj X,Proj X,,workbook,false,,,,0,0,0")
+    r = ExportContractImporter(path=path).run()["por_entidade"]["plano_formacao"]
+    assert r["would_create"] == 0
+    assert r["would_reject"] == 1
+    assert r["reject_reasons"]["ano_ausente"] == 1
+
+
+def test_classify_plano_ano_invalido_rejeita(tmp_path):
+    path = _setup(tmp_path, "Cidade X,CIDADE X,CE,Proj X,Proj X,abc,workbook,false,,,,0,0,0")
+    r = ExportContractImporter(path=path).run()["por_entidade"]["plano_formacao"]
+    assert r["would_create"] == 0
+    assert r["would_reject"] == 1
+    assert r["reject_reasons"]["ano_ausente"] == 1
+
+
+def test_apply_plano_sem_ano_nao_cria(tmp_path):
+    actor = _actor()
+    path = _setup(tmp_path, "Cidade X,CIDADE X,CE,Proj X,Proj X,,workbook,false,,,,0,0,0")
+    r = ExportContractImporter(path=path, apply=True, allow=("plano_formacao",), actor=actor).run()
+    assert r["applied"]["plano_formacao"] == 0
+    assert PlanoFormacoes.objects.count() == 0

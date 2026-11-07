@@ -332,12 +332,12 @@ def test_classify_plano_formacao_skip_create_reject(tmp_path):
     mun_a = MunicipioFactory(nome="Cidade Plano Um", uf="CE", ativo=True)
     MunicipioFactory(nome="Cidade Plano Dois", uf="CE", ativo=True)
     proj = ProjetoFactory(nome="Proj Plano Teste", fluxo="NAO_SUPER")
-    PlanoFormacoes.objects.create(municipio=mun_a, projeto=proj, created_by=creator)
+    PlanoFormacoes.objects.create(municipio=mun_a, projeto=proj, ano=2026, created_by=creator)
     csv = (
-        "municipio,uf,projeto,coordenador\n"
-        "Cidade Plano Um,CE,Proj Plano Teste,Coord Um\n"
-        "Cidade Plano Dois,CE,Proj Plano Teste,Coord Dois\n"
-        "Cidade Fantasma ZZZ,CE,Proj Plano Teste,Coord Tres\n"
+        "municipio,uf,projeto,coordenador,ano\n"
+        "Cidade Plano Um,CE,Proj Plano Teste,Coord Um,2026\n"
+        "Cidade Plano Dois,CE,Proj Plano Teste,Coord Dois,2026\n"
+        "Cidade Fantasma ZZZ,CE,Proj Plano Teste,Coord Tres,2026\n"
     )
     r = ExportContractImporter(path=_write_export(tmp_path, {"plano_formacao": csv})).run()["por_entidade"][
         "plano_formacao"

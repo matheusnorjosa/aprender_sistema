@@ -1080,6 +1080,9 @@ class ExportContractImporter:
         self._dat_uso_projetos: set[str] | None = None
         # IMP-2: previsão do classify de solicitacao (para o de participation) e o que o apply criou.
         self._sol_criaria: dict[str, int] = {}  # external_hash → id do coordenador solicitante
+        # Planos que o classify de plano_formacao prevê criar (mun_id, proj_id, ano): a filha desses
+        # planos é would_create no dry-run, como no apply (ENTITY_ORDER cria o plano antes).
+        self._plano_criaria: set[tuple[int, int, int]] = set()
         self._sol_existente: set[str] | None = None
         self._sol_passado_novo: set[str] = set()
         self._criadas_nesta_execucao: set[str] = set()
@@ -1417,23 +1420,34 @@ class ExportContractImporter:
                 tally[st] += 1
 
         elif name == "plano_formacao":
-            # NK = (municipio_id, projeto_id, ano); `ano` DECLARADO do workbook (coluna `ano`, nullable=pendente).
+            # NK = (municipio_id, projeto_id, ano); `ano` DECLARADO do workbook (coluna `ano`). Vazio/inválido
+            # → reject `ano_ausente` (#906: plano de ano nulo nasceria ao lado do plano com ano do par).
             # `sem_plano` (TOTAL 0 + sem data) = linha reservada → reject VISÍVEL (não é plano; mantém a
             # reconciliação, não some calado). FK não-resolvido → would_reject. Não lê coordenador (PII).
             mun_idx = self._municipio_index()
             existing = set(PlanoFormacoes.objects.values_list("municipio_id", "projeto_id", "ano"))
+            reasons = {"ano_ausente": 0}
+            self._plano_criaria = set()
             for r in rows:
                 if _to_bool(r.get("sem_plano")):
                     tally["would_reject"] += 1
+                    continue
+                ano = _parse_int(r.get("ano"))
+                if ano is None:
+                    tally["would_reject"] += 1
+                    reasons["ano_ausente"] += 1
                     continue
                 mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
                 proj_id = self.resolve_projeto(r.get("projeto") or "")
                 if mun_id is None or proj_id is None:
                     tally["would_reject"] += 1
                     continue
-                nk = (mun_id, proj_id, _parse_int(r.get("ano")))
+                nk = (mun_id, proj_id, ano)
                 st, _ = diff_and_classify({} if nk in existing else None, {}, protected)
                 tally[st] += 1
+                if nk not in existing:
+                    self._plano_criaria.add(nk)
+            tally["reject_reasons"] = reasons
 
         elif name == "dat_acao":
             # NK = (municipio_id, projeto_id, ano) — decisão B (anual). ano = cohort derivado da data
@@ -1891,46 +1905,82 @@ class ExportContractImporter:
 
         elif name == "formacao":
             # Filha de PlanoFormacoes. NK (plano_id, numero_formacao); plano pai resolvido por
-            # (municipio, projeto[, ano derivado de data_formacao.year]). Plano/FK ausente ou numero
-            # fora de 1..15 (CheckConstraint) → would_reject. Existence-based.
+            # (municipio, projeto, ano) via `_resolve_plano_id` (coluna `ano`; sem ela, data → par único).
+            # Plano/FK ausente ou numero fora de 1..15 (CheckConstraint) → would_reject. Existence-based.
             mun_idx = self._municipio_index()
             existing = set(Formacao.objects.values_list("plano_id", "numero_formacao"))
+            reasons = {"ano_ausente": 0, "plano_do_ano_ausente": 0}
             for r in rows:
                 plano_id = self._resolve_plano_id(r, mun_idx, "data_formacao")
                 numero = _parse_int(r.get("numero_formacao"))
+                if (
+                    plano_id is None
+                    and not (numero is None or not (1 <= numero <= 15))
+                    and self._plano_nasce_na_carga(r, mun_idx)
+                ):
+                    tally["would_create"] += 1
+                    continue
                 if plano_id is None or numero is None or not (1 <= numero <= 15):
                     tally["would_reject"] += 1
+                    motivo = self._motivo_filha_sem_plano(r, mun_idx) if plano_id is None else None
+                    if motivo:
+                        reasons[motivo] += 1
                     continue
                 st, _ = diff_and_classify({} if (plano_id, numero) in existing else None, {}, protected)
                 tally[st] += 1
+            tally["reject_reasons"] = reasons
 
         elif name == "acompanhamento":
             # Filha de PlanoFormacoes. NK (plano_id, tipo); tipo ∈ {primeiro, segundo} (choices, sem
             # CheckConstraint no BD → guard aqui p/ não gravar valor fora do domínio). Existence-based.
             mun_idx = self._municipio_index()
             existing = set(Acompanhamento.objects.values_list("plano_id", "tipo"))
+            reasons = {"ano_ausente": 0, "plano_do_ano_ausente": 0}
             for r in rows:
                 plano_id = self._resolve_plano_id(r, mun_idx, "data_acompanhamento")
                 tipo = (r.get("tipo") or "").strip().lower()
+                if (
+                    plano_id is None
+                    and not (tipo not in _ACOMPANHAMENTO_TIPOS)
+                    and self._plano_nasce_na_carga(r, mun_idx)
+                ):
+                    tally["would_create"] += 1
+                    continue
                 if plano_id is None or tipo not in _ACOMPANHAMENTO_TIPOS:
                     tally["would_reject"] += 1
+                    motivo = self._motivo_filha_sem_plano(r, mun_idx) if plano_id is None else None
+                    if motivo:
+                        reasons[motivo] += 1
                     continue
                 st, _ = diff_and_classify({} if (plano_id, tipo) in existing else None, {}, protected)
                 tally[st] += 1
+            tally["reject_reasons"] = reasons
 
         elif name == "prova":
             # Filha de PlanoFormacoes. NK (plano_id, numero_prova); numero ∈ 1..3 (CheckConstraint).
             # Existence-based.
             mun_idx = self._municipio_index()
             existing = set(Prova.objects.values_list("plano_id", "numero_prova"))
+            reasons = {"ano_ausente": 0, "plano_do_ano_ausente": 0}
             for r in rows:
                 plano_id = self._resolve_plano_id(r, mun_idx, "data_prova")
                 numero = _parse_int(r.get("numero_prova"))
+                if (
+                    plano_id is None
+                    and not (numero is None or not (1 <= numero <= 3))
+                    and self._plano_nasce_na_carga(r, mun_idx)
+                ):
+                    tally["would_create"] += 1
+                    continue
                 if plano_id is None or numero is None or not (1 <= numero <= 3):
                     tally["would_reject"] += 1
+                    motivo = self._motivo_filha_sem_plano(r, mun_idx) if plano_id is None else None
+                    if motivo:
+                        reasons[motivo] += 1
                     continue
                 st, _ = diff_and_classify({} if (plano_id, numero) in existing else None, {}, protected)
                 tally[st] += 1
+            tally["reject_reasons"] = reasons
 
         elif name == "availability_block":
             # Bloco de disponibilidade de formador. usuario por CPF (FK PROTECT NOT NULL → sem match
@@ -1981,9 +2031,11 @@ class ExportContractImporter:
         (municipio, projeto, ano).
 
         `ano` vem da coluna `ano` do CSV da filha — o MESMO dado do pai (contrato v16.7/RELAY 31),
-        não derivado. Fallback p/ contratos antigos/fixtures: ano derivado de `date_field.year` (as
-        datas da fonte vêm DD/MM sem ano → derivação NÃO é confiável para planos de outros anos, por
-        isso a coluna explícita); depois o ÚNICO plano do par (golden 1:1).
+        não derivado. Com a coluna no CSV, vale só o plano daquele ano: vazia/ilegível ou declarada
+        sem plano do ano → None (#906/#1832; nunca o plano de outro ano nem o do par único). Só o CSV
+        SEM a coluna (contratos antigos/fixtures) usa o fallback: ano derivado de `date_field.year`
+        (as datas da fonte vêm DD/MM sem ano → derivação NÃO é confiável para planos de outros anos);
+        depois o ÚNICO plano do par (golden 1:1).
 
         Fail-safe: par (mun, proj) com planos em anos distintos e `ano` desconhecido → ambíguo →
         None (rejeita a filha, não chuta um plano arbitrário). Co-liderança no MESMO (mun, proj,
@@ -1994,16 +2046,43 @@ class ExportContractImporter:
         if mun_id is None or proj_id is None:
             return None
         qs = PlanoFormacoes.objects.filter(municipio_id=mun_id, projeto_id=proj_id)
-        ano = _parse_int(r.get("ano"))
-        if ano is None:
-            d = _parse_iso_date(r.get(date_field))
-            ano = d.year if d is not None else None
+        if "ano" in r:
+            ano_col = _parse_int(r["ano"])
+            if ano_col is None:
+                return None
+            return qs.filter(ano=ano_col).values_list("id", flat=True).first()  # UniqueConstraint → ≤1
+        d = _parse_iso_date(r.get(date_field))
+        ano = d.year if d is not None else None
         if ano is not None:
             matched = qs.filter(ano=ano).values_list("id", flat=True).first()  # UniqueConstraint → ≤1
             if matched is not None:
                 return matched
         ids = list(qs.values_list("id", flat=True)[:2])
         return ids[0] if len(ids) == 1 else None
+
+    def _plano_nasce_na_carga(self, r: dict[str, str], mun_idx: dict[tuple[str, str], int]) -> bool:
+        """A filha declara um ano cujo plano o classify de plano_formacao prevê criar no mesmo pacote."""
+        if "ano" not in r or not self._plano_criaria:
+            return False
+        ano = _parse_int(r["ano"])
+        mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
+        proj_id = self.resolve_projeto(r.get("projeto") or "")
+        if ano is None or mun_id is None or proj_id is None:
+            return False
+        return (mun_id, proj_id, ano) in self._plano_criaria
+
+    def _motivo_filha_sem_plano(self, r: dict[str, str], mun_idx: dict[tuple[str, str], int]) -> str | None:
+        """Motivo do reject da filha cujo plano pai não resolveu, quando o CSV tem a coluna `ano`:
+        `ano_ausente` (vazia/ilegível) ou `plano_do_ano_ausente` (declarada, FK ok, sem plano do ano nem
+        no banco nem no plano_formacao do mesmo pacote). Sem a coluna → None (sem motivo)."""
+        if "ano" not in r:
+            return None
+        if _parse_int(r["ano"]) is None:
+            return "ano_ausente"
+        mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
+        if mun_id is None or self.resolve_projeto(r.get("projeto") or "") is None:
+            return None
+        return "plano_do_ano_ausente"
 
     def _deslocamento_fields(
         self, r: dict[str, str], cpf_idx: dict[str, int]
@@ -2444,7 +2523,8 @@ class ExportContractImporter:
     def _apply_plano_formacao(self, rows: list[dict[str, str]]) -> tuple[int, int]:
         """Create-only do PLANO + reconcile do M2M `coordenadores` em plano JÁ existente.
 
-        NK (municipio, projeto, ano); `ano` DECLARADO do workbook; `sem_plano` (reserva) é pulado.
+        NK (municipio, projeto, ano); `ano` DECLARADO do workbook (vazio/inválido → pulado, #906);
+        `sem_plano` (reserva) é pulado.
         Coordenadores = as PESSOAS que coordenaram, N:N por co-liderança (RELAY 32/34): `coordenadores_cpf`
         (array) com fallback `coordenador_cpf`, cada CPF → `Usuario` (sem fallback email/nome; ausente/
         inválido/sem match é descartado, #1849). `ch_estudo`/`ch_total`/`ch_anual` semeados na criação.
@@ -2466,6 +2546,8 @@ class ExportContractImporter:
             if mun_id is None or proj_id is None:
                 continue  # FK não-resolvida (municipio/projeto)
             ano = _parse_int(r.get("ano"))
+            if ano is None:
+                continue  # ano vazio/inválido → não cria plano de ano nulo nem reconcilia (#906)
             coord_ids = self._resolve_coordenador_ids(r, usuario_idx)
             existing = PlanoFormacoes.objects.filter(municipio_id=mun_id, projeto_id=proj_id, ano=ano).first()
             if existing is not None:
@@ -3323,7 +3405,7 @@ class ExportContractImporter:
 
     def _apply_formacao(self, rows: list[dict[str, str]]) -> int:
         """Create-only de Formacao (filha de PlanoFormacoes). Plano pai via `_resolve_plano_id`
-        (municipio, projeto[, ano de data_formacao]). NK (plano_id, numero_formacao); numero fora de
+        (municipio, projeto, ano; ver o resolver). NK (plano_id, numero_formacao); numero fora de
         1..15 (CheckConstraint) → skip (não estoura IntegrityError na transação). modalidade fora do
         domínio → default presencial; carga_horaria vazia → default do model. Sem created_by no
         model → não exige actor."""
@@ -3354,7 +3436,7 @@ class ExportContractImporter:
 
     def _apply_acompanhamento(self, rows: list[dict[str, str]]) -> int:
         """Create-only de Acompanhamento (filha de PlanoFormacoes). Plano pai via `_resolve_plano_id`
-        (municipio, projeto[, ano de data_acompanhamento]). NK (plano_id, tipo); tipo fora de
+        (municipio, projeto, ano; ver o resolver). NK (plano_id, tipo); tipo fora de
         {primeiro, segundo} → skip (choices, sem CheckConstraint no BD). `realizado` = default False
         (o contrato não traz sinal de realizado). Sem created_by no model → não exige actor."""
         mun_idx = self._municipio_index()
@@ -3378,7 +3460,7 @@ class ExportContractImporter:
 
     def _apply_prova(self, rows: list[dict[str, str]]) -> int:
         """Create-only de Prova (filha de PlanoFormacoes). Plano pai via `_resolve_plano_id`
-        (municipio, projeto[, ano de data_prova]). NK (plano_id, numero_prova); numero fora de 1..3
+        (municipio, projeto, ano; ver o resolver). NK (plano_id, numero_prova); numero fora de 1..3
         (CheckConstraint) → skip. `realizada` fica no default False: o `marcado` (X na célula) significa
         **não se aplica** (o projeto não faz prova — RELAY 33), NÃO realizado; a fonte não tem coluna de
         "aconteceu" em nenhuma aba, então `marcado` é lido e deliberadamente descartado (mesmo padrão do

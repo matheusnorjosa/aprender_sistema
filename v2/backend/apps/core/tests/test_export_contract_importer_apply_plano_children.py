@@ -3,8 +3,10 @@ Tests do APPLY (create-only) das filhas de PlanoFormacoes no export-contract:
 `formacao`, `acompanhamento`, `prova`.
 
 Contrato (travado com o pipeline sheets.banco): cada filha herda o plano pai — resolvido por
-(municipio, projeto[, ano]); o CSV da filha NÃO traz `ano` (deriva-se da data quando há múltiplos
-planos do par). NK: Formacao (plano, numero_formacao); Acompanhamento (plano, tipo);
+(municipio, projeto, ano). O CSV da filha traz a coluna `ano` (o mesmo dado do pai, v16.7/RELAY 31):
+vazia → reject `ano_ausente`; declarada sem plano daquele ano → reject `plano_do_ano_ausente`, nunca o
+plano de outro ano (#906/#1832). Só o CSV SEM a coluna (contrato antigo) cai no ano da data e depois
+no par único. NK: Formacao (plano, numero_formacao); Acompanhamento (plano, tipo);
 Prova (plano, numero_prova). Sem plano pai / FK não-resolvida / numero fora de faixa / tipo fora do
 domínio → would_reject. Sem `created_by` no model → apply NÃO exige actor.
 
@@ -273,3 +275,106 @@ def test_apply_prova_not_marcado_realizada_false(tmp_path):
     path = _write_export(tmp_path, {"prova": f"{PROVA_HEADER}\n{row}\n"})
     ExportContractImporter(path=path, apply=True, allow=("prova",)).run()
     assert Prova.objects.get().realizada is False
+
+
+# ─────────────────────────── coluna `ano` na filha (#906/#1832) ───────────────────────────
+# Com a coluna `ano` no CSV, o plano pai é o daquele ano ou nenhum: vazia → ano_ausente; declarada sem
+# plano do ano → plano_do_ano_ausente. Nunca cai no ano da data nem no plano único do par.
+
+_FILHAS = {
+    "formacao": (FORMACAO_HEADER, "Cidade X,CIDADE X,CE,Proj X,Proj X,1,2026-03-15,4,presencial", Formacao),
+    "acompanhamento": (ACOMP_HEADER, "Cidade X,CIDADE X,CE,Proj X,Proj X,primeiro,2026-03-15", Acompanhamento),
+    "prova": (PROVA_HEADER, "Cidade X,CIDADE X,CE,Proj X,Proj X,1,2026-03-15,false,", Prova),
+}
+
+
+def _filha_com_ano(tmp_path, entidade: str, ano: str) -> str:
+    header, row, _ = _FILHAS[entidade]
+    return _write_export(tmp_path, {entidade: f"{header},ano\n{row},{ano}\n"})
+
+
+@pytest.mark.parametrize("entidade", list(_FILHAS))
+def test_filha_coluna_ano_vazia_nao_cai_no_plano_do_par(tmp_path, entidade):
+    """Só existe o plano 2026 e a data é 2026, mas a coluna `ano` veio vazia → não anexa."""
+    _plano(2026)
+    path = _filha_com_ano(tmp_path, entidade, "")
+    dry = ExportContractImporter(path=path).run()["por_entidade"][entidade]
+    assert dry["would_create"] == 0
+    assert dry["would_reject"] == 1
+    assert dry["reject_reasons"]["ano_ausente"] == 1
+    r = ExportContractImporter(path=path, apply=True, allow=(entidade,)).run()
+    assert r["applied"][entidade] == 0
+    assert _FILHAS[entidade][2].objects.count() == 0
+
+
+@pytest.mark.parametrize("entidade", list(_FILHAS))
+def test_filha_ano_declarado_sem_plano_do_ano_nao_cai_no_par_unico(tmp_path, entidade):
+    """Só existe o plano 2026 e a filha declara 2027 → não cai no plano único do par."""
+    _plano(2026)
+    path = _filha_com_ano(tmp_path, entidade, "2027")
+    dry = ExportContractImporter(path=path).run()["por_entidade"][entidade]
+    assert dry["would_create"] == 0
+    assert dry["would_reject"] == 1
+    assert dry["reject_reasons"]["plano_do_ano_ausente"] == 1
+    r = ExportContractImporter(path=path, apply=True, allow=(entidade,)).run()
+    assert r["applied"][entidade] == 0
+    assert _FILHAS[entidade][2].objects.count() == 0
+
+
+def test_classify_formacao_ano_explicito_sem_plano_nao_casa_outro_ano(tmp_path):
+    """Formacao nº 1 existe no plano 2026; a linha declara 2025 → reject, não would_skip_same (#1832)."""
+    plano = _plano(2026)
+    Formacao.objects.create(plano=plano, numero_formacao=1)
+    path = _filha_com_ano(tmp_path, "formacao", "2025")
+    r = ExportContractImporter(path=path).run()["por_entidade"]["formacao"]
+    assert r["would_skip_same"] == 0
+    assert r["would_reject"] == 1
+
+
+def test_cascata_plano_sem_ano_nao_contamina_plano_de_outro_ano(tmp_path):
+    """Plano sem ano no CSV + formação com `ano` vazio: nem nasce plano nulo, nem a formação vai ao 2026."""
+    plano = _plano(2026)
+    plano_csv = (
+        "municipio,municipio_norm,uf,projeto,projeto_norm,ano,sem_plano\nCidade X,CIDADE X,CE,Proj X,Proj X,,false\n"
+    )
+    header, row, _ = _FILHAS["formacao"]
+    path = _write_export(tmp_path, {"plano_formacao": plano_csv, "formacao": f"{header},ano\n{row},\n"})
+    ExportContractImporter(path=path, apply=True, allow=("plano_formacao", "formacao"), actor=plano.created_by).run()
+    assert PlanoFormacoes.objects.count() == 1
+    assert Formacao.objects.filter(plano=plano).count() == 0
+
+
+def test_apply_formacao_sem_coluna_ano_usa_par_unico(tmp_path):
+    """CSV sem a coluna `ano` (contrato antigo): data 2027 sem plano 2027 → cai no plano único do par."""
+    plano = _plano(2026)
+    row = "Cidade X,CIDADE X,CE,Proj X,Proj X,1,2027-03-15,4,presencial"
+    path = _write_export(tmp_path, {"formacao": f"{FORMACAO_HEADER}\n{row}\n"})
+    r = ExportContractImporter(path=path, apply=True, allow=("formacao",)).run()
+    assert r["applied"]["formacao"] == 1
+    assert Formacao.objects.get().plano_id == plano.id
+
+
+@pytest.mark.parametrize("com_plano_2026", [False, True])
+@pytest.mark.parametrize("entidade", list(_FILHAS))
+def test_cascata_filha_do_plano_que_nasce_na_mesma_carga(tmp_path, entidade, com_plano_2026):
+    """Plano 2027 e filha 2027 no MESMO pacote: o dry-run diz would_create (não plano_do_ano_ausente),
+    como o apply faz, e a filha vai para o plano 2027, nunca para o 2026 do par."""
+    if com_plano_2026:
+        actor = _plano(2026).created_by
+    else:
+        actor = UsuarioFactory(cpf="11144477735")
+        MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+        ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    plano_csv = (
+        "municipio,municipio_norm,uf,projeto,projeto_norm,ano,sem_plano\n"
+        "Cidade X,CIDADE X,CE,Proj X,Proj X,2027,false\n"
+    )
+    header, row, modelo = _FILHAS[entidade]
+    path = _write_export(tmp_path, {"plano_formacao": plano_csv, entidade: f"{header},ano\n{row},2027\n"})
+    dry = ExportContractImporter(path=path).run()["por_entidade"][entidade]
+    assert dry["would_create"] == 1
+    assert dry["would_reject"] == 0
+    assert dry["reject_reasons"]["plano_do_ano_ausente"] == 0
+    ExportContractImporter(path=path, apply=True, allow=("plano_formacao", entidade), actor=actor).run()
+    assert modelo.objects.count() == 1
+    assert modelo.objects.get().plano.ano == 2027

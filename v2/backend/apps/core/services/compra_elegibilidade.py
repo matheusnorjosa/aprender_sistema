@@ -70,6 +70,18 @@ def _q_libera(projeto: Projeto) -> Q:
     return q
 
 
+def produto_cabe_na_compra(produto_projeto: Projeto, compra_projeto: Projeto) -> bool:
+    """O produto de `produto_projeto` pode estar numa compra de `compra_projeto`: mesmo projeto ou mesma coleção.
+
+    O import liga o produto só pelo código, e o código é da coleção (outro livro da mesma série). Nunca
+    compara NULL com NULL: dois projetos sem coleção só casam se forem o mesmo (#1632, lote E1).
+    """
+    if produto_projeto.pk == compra_projeto.pk:
+        return True
+    colecao = produto_projeto.projeto_geral_id  # type: ignore[attr-defined]
+    return colecao is not None and colecao == compra_projeto.projeto_geral_id  # type: ignore[attr-defined]
+
+
 def par_liberado(municipio_id: int, projeto: Projeto) -> bool:
     """O par (município, projeto) tem compra que o libere."""
     return _compras_validas().filter(_q_libera(projeto), municipio_id=municipio_id).exists()

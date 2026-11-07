@@ -130,3 +130,66 @@ class DATCompraInvariantesAPITests(DATModuleAPITestCase):
         assert (
             r.data["kpis"]["total_disponivel"] == soma_linhas
         ), f"dashboard={r.data['kpis']['total_disponivel']} != soma_das_linhas={soma_linhas}"
+
+
+class DATCompraProdutoDaMesmaColecaoTests(DATModuleAPITestCase):
+    """#1632 (lote E1): a compra ligada a produto de OUTRO livro da MESMA coleção é legítima.
+
+    Em produção (07/11) 1.902 das 2.041 compras com produto estão assim (o import liga o produto
+    só pelo código). A validação exigia produto.projeto == compra.projeto e, como valida o estado
+    efetivo, recusava com 400 qualquer edição dessas compras pela tela.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        from apps.core.models import ProjetoGeral
+
+        uid = uuid.uuid4().hex[:6]
+        cls.colecao = ProjetoGeral.objects.create(nome=f"Colecao E1 {uid}")
+        cls.colecao_outra = ProjetoGeral.objects.create(nome=f"Colecao E1 outra {uid}")
+        cls.livro1 = ProjetoFactory(nome=f"Livro 1 {uid}", codigo=f"L1{uid[:4]}", fluxo="NAO_SUPER")
+        cls.livro2 = ProjetoFactory(nome=f"Livro 2 {uid}", codigo=f"L2{uid[:4]}", fluxo="NAO_SUPER")
+        cls.livro_outra = ProjetoFactory(nome=f"Livro X {uid}", codigo=f"LX{uid[:4]}", fluxo="NAO_SUPER")
+        for p, c in ((cls.livro1, cls.colecao), (cls.livro2, cls.colecao), (cls.livro_outra, cls.colecao_outra)):
+            p.projeto_geral = c
+            p.save(update_fields=["projeto_geral"])
+        cls.produto_livro2 = Produto.objects.create(codigo=f"E1-{uid}", nome="Produto Livro 2", projeto=cls.livro2)
+        cls.produto_outra = Produto.objects.create(codigo=f"E1X-{uid}", nome="Produto Outra", projeto=cls.livro_outra)
+
+    def _compra(self, produto):
+        return DATCompra.objects.create(
+            municipio=self.municipio, projeto=self.livro1, produto=produto,
+            quantidade=10, quantidade_utilizada=0, valor_unitario=Decimal("5.00"), ano_uso=2026,
+            created_by=self.dat_user,
+        )
+
+    def test_patch_de_compra_com_produto_da_mesma_colecao_passa(self):
+        """Editar só a quantidade utilizada de uma compra assim deve dar 200 (antes: 400)."""
+        compra = self._compra(self.produto_livro2)
+        self.client.force_authenticate(user=self.dat_user)
+        r = self.client.patch(f"{COMPRAS_URL}{compra.id}/", {"quantidade_utilizada": 2}, format="json")
+        assert r.status_code == status.HTTP_200_OK, f"recusou: {r.status_code} {r.data}"
+        compra.refresh_from_db()
+        assert compra.quantidade_utilizada == 2
+
+    def test_post_com_produto_da_mesma_colecao_passa(self):
+        self.client.force_authenticate(user=self.dat_user)
+        r = self.client.post(
+            COMPRAS_URL,
+            {"municipio": self.municipio.id, "projeto": self.livro1.id, "produto": self.produto_livro2.id,
+             "quantidade": 10, "quantidade_utilizada": 0, "valor_unitario": "5.00", "ano_uso": 2026},
+            format="json",
+        )
+        assert r.status_code == status.HTTP_201_CREATED, f"recusou: {r.data}"
+
+    def test_post_com_produto_de_outra_colecao_continua_400(self):
+        self.client.force_authenticate(user=self.dat_user)
+        r = self.client.post(
+            COMPRAS_URL,
+            {"municipio": self.municipio.id, "projeto": self.livro1.id, "produto": self.produto_outra.id,
+             "quantidade": 10, "quantidade_utilizada": 0, "valor_unitario": "5.00", "ano_uso": 2026},
+            format="json",
+        )
+        assert r.status_code == status.HTTP_400_BAD_REQUEST
+        assert "produto" in _errs(r)

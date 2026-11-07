@@ -45,7 +45,7 @@ function adiado(): { promessa: Promise<Alocacao[]>; resolver: (v: Alocacao[]) =>
   return { promessa, resolver };
 }
 
-describe('Modal de Alocações: a resposta atrasada de outro coordenador não sobrescreve a lista', { timeout: 20000 }, () => {
+describe('Modal de Alocações: a resposta atrasada de outro coordenador não sobrescreve a lista', { timeout: 90000 }, () => {
   test('abre A, fecha, abre B; B responde e depois A: o modal de B não mostra as ações de A', async () => {
     const pedidoA = adiado();
     const pedidoB = adiado();

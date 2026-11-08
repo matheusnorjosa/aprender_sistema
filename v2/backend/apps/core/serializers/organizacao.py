@@ -27,6 +27,7 @@ from apps.core.services.compra_elegibilidade import projetos_liberados
 from apps.core.services.equipe_gerencia import SETORES_RESERVADOS, grupos_com_capacidade
 from apps.core.services.equipe_gerencia_import import gerencia_reservada
 from apps.core.services.rbac_pacotes import PERFIL_PERMITIDO
+from apps.core.services.solicitacao_projetos import mudanca_de_grupo_bloqueada
 
 
 class MunicipioSerializer(serializers.ModelSerializer):
@@ -157,6 +158,9 @@ class ProjetoSerializer(serializers.ModelSerializer):
         Vale quando o payload grava `fluxo` ou `gerencia` (estado final = payload + instância); um
         PATCH só de outros campos não é barrado por dado antigo. O erro vem no campo `gerencia`, onde a
         ProjetosPage o mostra; o de série com nome geral, em `eh_nome_geral` (lote C, 06/11/2026).
+
+        #2036, regra 10: mudar o valor da gerência ou do fluxo de projeto que está em evento de dois
+        projetos dá 400 no campo `gerencia` (`mudanca_de_grupo_bloqueada`).
         """
         if "fluxo" in attrs or "gerencia" in attrs:
             instance = getattr(self, "instance", None)
@@ -164,6 +168,11 @@ class ProjetoSerializer(serializers.ModelSerializer):
             gerencia = attrs.get("gerencia", getattr(instance, "gerencia", None))
             if fluxo_super_fora_da_superintendencia(fluxo, gerencia):
                 raise serializers.ValidationError({"gerencia": MSG_FLUXO_SUPER_SO_NA_SUPERINTENDENCIA})
+            # #2036, regra 10: projeto em evento com outro não muda de gerência nem de fluxo.
+            if instance is not None:
+                bloqueio = mudanca_de_grupo_bloqueada(instance, gerencia_id=getattr(gerencia, "pk", None), fluxo=fluxo)
+                if bloqueio:
+                    raise serializers.ValidationError({"gerencia": bloqueio})
         # Regra da compra: a constraint `projeto_serie_nao_e_nome_geral` vira 400, não 500.
         instance = getattr(self, "instance", None)
         eh_serie = attrs.get("eh_serie", getattr(instance, "eh_serie", False))

@@ -35,6 +35,11 @@ from .models import (
     Usuario,
 )
 from .rbac.helpers import MSG_FLUXO_SUPER_SO_NA_SUPERINTENDENCIA, fluxo_super_fora_da_superintendencia
+from .services.solicitacao_projetos import (
+    MSG_SEGUNDO_SEM_PRIMEIRO,
+    mudanca_de_grupo_bloqueada,
+    par_de_projetos_invalido,
+)
 from .utils.csv_sanitize import sanitize_csv_value
 
 # pyright: reportMissingTypeArgument=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false
@@ -185,10 +190,19 @@ class ProjetoAdminForm(forms.ModelForm):  # type: ignore[type-arg]
         fields = "__all__"
 
     def clean(self) -> dict[str, Any]:
-        """Regra do dono (30/09): fluxo SUPER só em projeto da gerência Superintendência."""
+        """Regra do dono (30/09): fluxo SUPER só em projeto da gerência Superintendência.
+
+        #2036, regra 10: projeto em evento de dois projetos não muda de gerência nem de fluxo. O erro vai
+        no campo que mudou. `self.instance` ainda tem os valores gravados (o form só os copia depois do clean).
+        """
         cleaned: dict[str, Any] = super().clean() or {}
         if fluxo_super_fora_da_superintendencia(cleaned.get("fluxo"), cleaned.get("gerencia")):
             self.add_error("fluxo", MSG_FLUXO_SUPER_SO_NA_SUPERINTENDENCIA)
+        if self.instance.pk and "fluxo" in cleaned and "gerencia" in cleaned:
+            gerencia_id = getattr(cleaned["gerencia"], "pk", None)
+            bloqueio = mudanca_de_grupo_bloqueada(self.instance, gerencia_id=gerencia_id, fluxo=cleaned["fluxo"])
+            if bloqueio:
+                self.add_error("gerencia" if gerencia_id != self.instance.gerencia_id else "fluxo", bloqueio)
         return cleaned
 
 
@@ -213,7 +227,29 @@ class AvailabilityBlockAdmin(admin.ModelAdmin):
     date_hierarchy = "inicio"
 
 
+class SolicitacaoAdminForm(forms.ModelForm):  # type: ignore[type-arg]
+    """#2036: trocar o `projeto` de evento de dois projetos confere o par (regra 2). Sem isso, o mesmo
+    projeto do 2º daria IntegrityError (500) e um projeto de outra gerência furaria a regra. O `projeto_2`
+    é somente leitura aqui; ele muda pela API (PR 4) ou pela carga da virada."""
+
+    class Meta:  # type: ignore[misc]
+        model = Solicitacao
+        fields = "__all__"
+
+    def clean(self) -> dict[str, Any]:
+        cleaned: dict[str, Any] = super().clean() or {}
+        outro = self.instance.projeto_2
+        if outro is None or "projeto" not in self.changed_data or "projeto" not in cleaned:
+            return cleaned
+        projeto = cleaned["projeto"]
+        erro = MSG_SEGUNDO_SEM_PRIMEIRO if projeto is None else par_de_projetos_invalido(projeto, outro)
+        if erro:
+            self.add_error("projeto", erro)
+        return cleaned
+
+
 class SolicitacaoAdmin(admin.ModelAdmin):
+    form = SolicitacaoAdminForm
     list_display = (
         "usuario",
         "tipo_evento",
@@ -230,7 +266,7 @@ class SolicitacaoAdmin(admin.ModelAdmin):
         "observacoes",
     )
     list_filter = ("status", "tipo_evento", "created_at")
-    readonly_fields = ("created_at", "updated_at", "external_event_id")
+    readonly_fields = ("created_at", "updated_at", "external_event_id", "projeto_2")
     date_hierarchy = "inicio"
 
 

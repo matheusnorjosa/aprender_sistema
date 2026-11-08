@@ -220,6 +220,7 @@ continua sendo a ferramenta de consulta, mas deixou de ser a única barreira.
 - ✅ [#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620) — **resolvido no #2021**:
   import de eventos aplica o hard gate de disponibilidade a evento futuro (histórico entra sem checar).
 - ✅ [#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628) — **resolvido no #2021**
-  (itens 2/3/4): reimport não sobrescreve mais decisão humana e reporta diff real. Item 1 (hash) pendente.
+  (itens 2/3/4): reimport não sobrescreve mais decisão humana e reporta diff real. Item 1 (hash) sem
+  objeto: a importação de eventos pela tela saiu em 07/11/2026 e o #1628 foi fechado.
 
 Documento vivo: [audits/ACHADOS_REAIS.md](./audits/ACHADOS_REAIS.md).

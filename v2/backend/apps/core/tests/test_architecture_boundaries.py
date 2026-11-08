@@ -34,7 +34,7 @@ def test_dat_ingest_module_removed() -> None:
 # usa get_or_create; sem ele a banned-list fica desdentada (medido na Onda 2).
 #
 # Writers fora do caminho canonico, registrados como divida conhecida:
-# - services/eventos_import.py (import de eventos, superficie viva ImportEventosView) -- #1884
+# - services/eventos_import.py (import de eventos; sem rota desde o #1628, sai depois da virada) -- #1884
 #   (alvo do D8/Onda 4).
 # - services/export_contract_importer.py (import export-contract; bypass DELIBERADO de RD --
 #   importa historico, nao booking: decisao D2/#1620, epico invariantes #1659) -- #1896.

@@ -62,7 +62,6 @@ MATRIX_ENDPOINT_COVERAGE: dict[str, list[str]] = {
         "/api/dat/import-cadastros/",
         "/api/disponibilidade/import-bloqueios/",
         "/api/deslocamentos/import/",
-        "/api/solicitacoes/import/",
         "/api/usuarios/import/",
         "/api/produtos/import/",
         "/api/municipios/import/",
@@ -114,7 +113,6 @@ RBAC_MATRIX_EXEMPT_PREFIXES: dict[str, str] = {
     "/api/municipios/import/": "Import síncrono — cobertura própria",
     "/api/usuarios/import/": "Import síncrono — cobertura própria",
     "/api/dat/import-cadastros/": "Import síncrono — cobertura própria",
-    "/api/solicitacoes/import/": "Import síncrono — cobertura própria",
     # ── ASQ-005 async ────────────────────────────────────────────────────
     "/api/imports/": "ASQ-005 async (regime separado #778)",
     # ── GCal management (escopo paralelo) ─────────────────────────────────

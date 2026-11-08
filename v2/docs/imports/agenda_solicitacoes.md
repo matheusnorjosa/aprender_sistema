@@ -1,5 +1,7 @@
 # Importação: Agenda / Solicitações / Eventos
 
+> 🔴 **07/11/2026 (#1628):** a importação de eventos pela tela saiu. `POST /api/solicitacoes/import/` não grava mais (405; o GET dá 404); `views_import_eventos.py` e o cartão "Importar EVENTOS" de DAT > Importações não existem mais. Depois da virada, o evento nasce só pela Nova Solicitação e pela carga única do export-contract. `services/eventos_import.py` fica até a limpeza depois da virada (a carga usa `_compute_external_hash`). O que segue descreve o serviço e o histórico. SSOT: [`imports.spec.md`](../specs/backend/imports.spec.md).
+
 Status: PR 1 — contrato fechado, **backend implementado**; **§9 e §10 descreviam garantias que não existem** (revisto 2026-07-24)
 Versão: 2026-07-24 v0.3
 Template: [templates/agenda_solicitacoes.template.csv](./templates/agenda_solicitacoes.template.csv)
@@ -207,9 +209,9 @@ As colunas `cancelar` e `atualizar` **não são lidas pelo service**: `_normaliz
 | **Service de import** | `apps/core/services/eventos_import.py` | `import_eventos_from_file(*, path: str, dry_run: bool = True) -> dict`. Status inicial vem de `resolve_initial_status(projeto=projeto)` (`:497`) — **só o `fluxo` decide, a data não** (`:23`). Cria 1 `Participation(role='COORDENADOR')` + até 5 `Participation(role='FORMADOR')`. Idempotência por `external_hash` SHA-1. Timezone `America/Fortaleza` (`:55`). | ✅ **já implementado** |
 | Resolvers usados | `apps/core/services/resolvers.py` | `resolve_municipio`, `resolve_projeto`, `resolve_tipo_evento`, `resolve_user_by_email`, `resolve_user_by_name` | ✅ existe |
 | Service availability | `solicitacao_availability.check_solicitacao_availability()` | RD-01..08 — ✅ **#2021**: chamado pelo import p/ evento **FUTURO** (conflito → pendência `availability`, não grava); histórico entra sem checar (decisão do dono) — `M08-12` / [#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620) | ✅ existe e usado (futuro) |
-| **Endpoint síncrono** | `POST /api/solicitacoes/import/` (`ImportEventosView` em `apps/core/views_import_eventos.py`) | dry_run via query param; multipart `file=` no body | ✅ **já funciona** |
+| **Endpoint síncrono** | ~~`POST /api/solicitacoes/import/` (`ImportEventosView`)~~ | saiu em 07/11/2026 (#1628) | ❌ removido |
 | Endpoint async | (não implementado para eventos) | ASQ-005 Fase 2 migrará | ⏳ Fase 2 do `ImportJob` |
-| Gate RBAC efetivo | `IsAuthenticated + SuperuserOnly` (`ImportEventosView`) | Só superusuário (D20, decisão do dono 02/10/2026); nenhuma capability abre, o DAT recebe 403. `import_spreadsheet` saiu do grupo DAT na migration 0126 (PR 10) | ✅ aplicado |
+| Gate RBAC efetivo (até 07/11/2026) | `IsAuthenticated + SuperuserOnly` (`ImportEventosView`, removida no #1628) | Só superusuário (D20, decisão do dono 02/10/2026); nenhuma capability abre, o DAT recebe 403. `import_spreadsheet` saiu do grupo DAT na migration 0126 (PR 10) | ✅ aplicado |
 | Endpoint manual (1 a 1) | `POST /api/solicitacoes/` (`SolicitacaoViewSet.create`) | Para criação não-bulk; usa `HasPerm("create_solicitation")` | ✅ existe |
 | AuditLog action | **(nenhuma)** | 🔴 O import síncrono **não grava `AuditLog`**. `AuditLog.Action` (`apps/core/models/auditoria.py:72-73`) só tem `IMPORT_JOB_COMPLETED`/`IMPORT_JOB_FAILED`, emitidos no caminho async (`apps/core/tasks.py:634,669`), que hoje cobre apenas `bloqueios` | ❌ não existe |
 

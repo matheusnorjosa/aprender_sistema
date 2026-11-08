@@ -51,7 +51,6 @@ vi.mock('../../api/ops', () => ({
   importCadastros: vi.fn(),
   importDeslocamentos: vi.fn(),
   importEquipeGerencia: vi.fn(),
-  importEventos: vi.fn(),
   importMunicipios: vi.fn(),
   importProdutos: vi.fn(),
   importUsuarios: vi.fn(),

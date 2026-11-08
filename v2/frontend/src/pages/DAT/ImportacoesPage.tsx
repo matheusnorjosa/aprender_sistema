@@ -3,14 +3,16 @@
  *
  * Plano DAT-Imports (2026-04-29) — PR-B (1º).
  *
- * Centraliza os 9 fluxos de upload de planilha do projeto em uma única
+ * Centraliza os 8 fluxos de upload de planilha do projeto em uma única
  * página, organizados por categoria. Substitui (em passos seguintes — PR-D)
  * os botões espalhados em ControlePage, ComprasPage, Disponibilidade e
  * DeslocamentosPage.
  *
  * Categorias:
  * - Cadastros base: Usuários, Municípios, Coleções, Cadastros DAT, Vínculos
- * - Operacional: Ações, Eventos, Produtos (a lista antiga de compras saiu de uso: G29, 05/11/2026)
+ * - Operacional: Ações, Produtos (a lista antiga de compras saiu de uso: G29, 05/11/2026; a
+ *   importação de eventos saiu no #1628, 07/11/2026: o evento nasce pela Nova Solicitação e pela
+ *   carga única da virada)
  * - Disponibilidade: Bloqueios, Deslocamentos
  *
  * Acesso: só superusuário (`podeImportarPelaTela` em AppRoutes; decisão do dono de 02/10/2026).
@@ -33,7 +35,6 @@ import {
   importCadastros,
   importDeslocamentos,
   importEquipeGerencia,
-  importEventos,
   importMunicipios,
   importProdutos,
   importUsuarios,
@@ -73,7 +74,7 @@ function toApplyResult(result: ImportResult): ApplyResult {
 }
 
 /**
- * Configuração canônica dos 9 cards de importação.
+ * Configuração canônica dos 8 cards de importação.
  *
  * Cada card recebe label, description e os callbacks de dry-run/apply ligados
  * a uma função existente em `api/ops.ts`. Mudar conteúdo de um card não
@@ -119,13 +120,6 @@ const OPERACIONAL: ImportCard[] = [
     label: 'Importar AÇÕES',
     description: 'CSV/XLSX de Ações de Controle (Município, Projeto, Coordenador, Datas, Observação)',
     importFn: importAcoes,
-  },
-  {
-    key: 'eventos',
-    label: 'Importar EVENTOS',
-    description:
-      'CSV/XLSX: municipio, projeto, tipo_evento, data, hora_inicio, hora_fim, coordenador, formador1-5',
-    importFn: importEventos,
   },
   {
     key: 'produtos',
@@ -204,7 +198,7 @@ export default function ImportacoesPage(): JSX.Element {
 
       <ImportSection
         title="Operacional"
-        description="Importações operacionais (ações, eventos, produtos)."
+        description="Importações operacionais (ações, produtos)."
         cards={OPERACIONAL}
       />
 

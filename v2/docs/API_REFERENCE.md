@@ -733,11 +733,13 @@ Importação pela tela é só do superusuário (decisão do dono, 02/10/2026): n
 | `/api/municipios/import/` | `IsAuthenticated` + `SuperuserOnly` |
 | `/api/equipe-gerencia/import/` | `IsAuthenticated` + `SuperuserOnly` |
 | `/api/dat/import-cadastros/` | `IsAuthenticated` + `SuperuserOnly` |
-| `/api/solicitacoes/import/` | `IsAuthenticated` + `SuperuserOnly` |
 | `/api/produtos/import/` | `IsAuthenticated` + `SuperuserOnly` |
 | `/api/deslocamentos/import/` | `IsAuthenticated` + `SuperuserOnly` |
 | `/api/disponibilidade/import-bloqueios/` | `IsAuthenticated` + `SuperuserOnly` |
 | `/api/controle/import-acoes/` | `IsAuthenticated` + `SuperuserOnly` |
+
+A importação de eventos pela tela saiu em 07/11/2026 (#1628): `POST /api/solicitacoes/import/` não grava mais
+(a URL cai no detalhe do router de solicitações e responde 405; o GET responde 404).
 
 Imports assíncronos (ASQ-005): `POST /api/imports/bloqueios/`
 (`IsAuthenticated` + `SuperuserOnly`), `GET /api/imports/` e

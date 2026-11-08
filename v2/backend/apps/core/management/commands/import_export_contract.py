@@ -234,6 +234,9 @@ class Command(BaseCommand):
                     self.stdout.write(
                         f"    solicitante_cpf_sem_cadastro_eventos={v['solicitante_cpf_sem_cadastro_eventos']}"
                     )
+                if v.get("conjunto_incompleto_eventos"):
+                    # #2036: evento de dois projetos que fica com um, com o motivo (só evento_id ou s<id>)
+                    self.stdout.write(f"    conjunto_incompleto_eventos={v['conjunto_incompleto_eventos']}")
                 if v.get("lotacao_perdida_contas"):
                     # #1658: quem a regra antiga lotaria e a nova deixa de fora (só u<id>), para o dono no ensaio
                     self.stdout.write(f"    lotacao_perdida_contas={v['lotacao_perdida_contas']}")
@@ -259,3 +262,6 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"  apply_solicitante_cpf_sem_cadastro_eventos={report['apply_solicitante_cpf_sem_cadastro_eventos']}"
             )
+        if report["apply_conjunto_incompleto_eventos"]:
+            # #2036: o que o apply deixou com um projeto só, para o dono (só evento_id ou s<id>)
+            self.stdout.write(f"  apply_conjunto_incompleto_eventos={report['apply_conjunto_incompleto_eventos']}")

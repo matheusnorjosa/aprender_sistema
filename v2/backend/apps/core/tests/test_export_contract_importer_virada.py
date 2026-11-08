@@ -37,12 +37,18 @@ from django.utils import timezone
 
 import pytest
 
-from apps.core.models import AuditLog, Municipio, TipoEvento, Usuario
+from apps.core.models import AuditLog, Gerencia, Municipio, TipoEvento, Usuario
 from apps.core.models.solicitacao import Participation, Solicitacao
 from apps.core.services import export_contract_importer
 from apps.core.services.export_contract_importer import ExportContractImporter
 from apps.core.services.solicitacao_publish import motivo_nao_publicavel
-from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, TipoEventoFactory, UsuarioFactory
+from apps.core.tests.factories import (
+    GerenciaFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -73,6 +79,7 @@ _SOL_COLS = [
     "na_agenda_google",
     "external_event_id",
     "external_event_id_confianca",
+    "projetos",
 ]
 _PART_COLS = ["evento_id", "usuario", "usuario_cpf", "usuario_email", "role", "match_procedencia"]
 _CPF_COORD = "11144477735"
@@ -113,6 +120,27 @@ def m():
     return _M
 
 
+@pytest.fixture
+def g():
+    """#2036: projetos SUPER da Superintendência (os pares da planilha), a série do Catavento e um de outra
+    gerência (par inválido)."""
+    sup, _ = Gerencia.objects.get_or_create(nome="SUPERINTENDENCIA", defaults={"nome_setor": "Super"})
+
+    class _G:
+        uni = ProjetoFactory(nome="UNI DUNI TÊ", fluxo="SUPER", gerencia=sup)
+        cat = ProjetoFactory(nome="Cataventos", fluxo="SUPER", gerencia=sup)
+        miu = ProjetoFactory(nome="Projeto Miudezas e Descobertas", fluxo="SUPER", gerencia=sup)
+        serie = ProjetoFactory(nome="PROJETO CATAVENTO 2", fluxo="SUPER", gerencia=sup)
+        fora = ProjetoFactory(nome="Projeto Outra Gerencia", fluxo="SUPER", gerencia=GerenciaFactory())
+
+    return _G
+
+
+def _par(*nomes: str) -> str:
+    """Coluna `projetos` do solicitacao.csv: array JSON com os nomes da planilha."""
+    return json.dumps(list(nomes), ensure_ascii=False)
+
+
 def _sol(**kw: str) -> dict[str, str]:
     base = {
         "evento_id": "EV1",
@@ -134,6 +162,7 @@ def _sol(**kw: str) -> dict[str, str]:
         "na_agenda_google": "",
         "external_event_id": "",
         "external_event_id_confianca": "",
+        "projetos": "",
     }
     base.update(kw)
     return base
@@ -489,15 +518,33 @@ def test_12c_projeto_diferente_sem_disciplina_nao_troca_e_conta(tmp_path, m):
     assert s.projeto_id == m.nao_super.id
 
 
-def test_29_petrolina_projeto_decidido_pelo_dono_fica(tmp_path, m):
-    miudezas = ProjetoFactory(nome="Projeto Miudezas e Descobertas", fluxo="NAO_SUPER")
-    ProjetoFactory(nome="UNI DUNI TÊ", fluxo="NAO_SUPER")
-    s = _existente(m, projeto=miudezas)
-    path = _export(tmp_path, [_sol(projeto="UNI DUNI TÊ")])
-    assert _dry(path)["projeto_diverge"] == 1
+@pytest.mark.parametrize(
+    "log",
+    [
+        None,
+        # o script de Petrolina (#1288-1290) grava `de`/`para` com projeto_id e horário: trava os dois
+        {"de": {"projeto_id": 1, "inicio": "a"}, "para": {"projeto_id": 2, "inicio": "b"}},
+        {"motivo": "sem dizer o campo"},  # log sem campos: trava todos os dados
+    ],
+    ids=["sem_log", "script_mudou_o_projeto", "log_sem_campos"],
+)
+def test_29_petrolina_fica_com_os_dois_projetos(tmp_path, m, g, log):
+    """Decisão 5 do dono (#2036): o evento mantém Miudezas, que ele escolheu, e ganha UNI DUNI TÊ na outra vaga.
+    A trava de projeto do script não segura o 2º; o evento fica visível no ensaio por evento."""
+    s = _existente(m, projeto=g.miu)
+    if log is not None:
+        AuditLog.objects.create(
+            action="UPDATE", model_name="Solicitacao", details={"script": "x", "solicitacao_id": s.id, **log}
+        )
+    path = _export(tmp_path, [_sol(projeto="UNI DUNI TÊ", projetos=_par("UNI DUNI TÊ", "MIUDEZAS E DESCOBERTAS"))])
+    dry = _dry(path)
+    assert dry["projeto_diverge"] == 0, "linha de dois projetos não passa pelo ramo da disciplina"
+    assert dry["conjunto_preenchido"] == 1
+    assert dry["conjunto_preenchido_sobre_trava"] == ({} if log is None else {f"s{s.id}": 1})
     _virada(path)
     s.refresh_from_db()
-    assert s.projeto_id == miudezas.id
+    assert (s.projeto_id, s.projeto_2_id) == (g.miu.id, g.uni.id)
+    assert s.status == "aprovado"
 
 
 def test_29b_disciplina_que_casa_nao_tira_o_evento_de_projeto_fora_do_agrupador(tmp_path, m):
@@ -1220,3 +1267,224 @@ def test_campos_do_google_lidos_nao_aparecem_como_ignorados(tmp_path, m):
     for lido in ("external_event_id", "external_event_id_confianca", "na_agenda_google"):
         assert lido not in tally["ignored_fields"]
     assert "aprovado" in tally["ignored_fields"], "coluna que ninguém lê continua listada"
+
+
+# ---------- #2036: evento de dois projetos (coluna `projetos`) ----------
+def _combo_existente(m, g, ext: str = "EV1", **kw: Any) -> Solicitacao:
+    return _existente(m, ext, projeto=g.uni, **kw)
+
+
+def _linha_combo(*nomes: str, **kw: str) -> dict[str, str]:
+    nomes = nomes or ("UNI DUNI TÊ", "Cataventos")
+    return _sol(projeto=nomes[0], projetos=_par(*nomes), **kw)
+
+
+def test_2036_linha_de_dois_projetos_cria_as_duas_vagas(tmp_path, m, g):
+    path = _export(tmp_path, [_linha_combo(evento_id="EVC")])
+    tally = ExportContractImporter(path=path, mode="virada").run()["por_entidade"]["solicitacao"]
+    assert "projetos" not in tally["ignored_fields"], "a coluna `projetos` é lida"
+    assert tally["virada"]["conjunto_criado"] == 1
+    assert tally["conjunto_incompleto_eventos"] == []
+    report = _virada(path)
+    assert report["virada_aplicada"]["conjunto_criado"] == 1
+    s = Solicitacao.objects.get(external_hash="EVC")
+    assert (s.projeto_id, s.projeto_2_id) == (g.uni.id, g.cat.id)
+    assert s.status == "pendente", "SUPER nasce pendente (PA-01)"
+
+
+def test_2036_nome_com_virgula_nao_se_parte(tmp_path, m, g):
+    sup = Gerencia.objects.get(nome="SUPERINTENDENCIA")
+    ecs = ProjetoFactory(nome="ESCREVER, COMUNICAR E SER", fluxo="SUPER", gerencia=sup)
+    loc = ProjetoFactory(nome="LER, OUVIR E CONTAR", fluxo="SUPER", gerencia=sup)
+    rows = [
+        _linha_combo("ESCREVER, COMUNICAR E SER", "LER, OUVIR E CONTAR", evento_id="EVC"),
+        _linha_combo("ESCREVER, COMUNICAR E SER", evento_id="EVU"),
+    ]
+    report = _virada(_export(tmp_path, rows))
+    assert report["apply_conjunto_incompleto_eventos"] == []
+    combo = Solicitacao.objects.get(external_hash="EVC")
+    assert (combo.projeto_id, combo.projeto_2_id) == (ecs.id, loc.id)
+    unico = Solicitacao.objects.get(external_hash="EVU")
+    assert (unico.projeto_id, unico.projeto_2_id) == (ecs.id, None)
+
+
+def test_2036_cataventos_nao_vira_a_serie(tmp_path, m, g):
+    _virada(_export(tmp_path, [_linha_combo(evento_id="EVC")]))
+    s = Solicitacao.objects.get(external_hash="EVC")
+    assert s.projeto_2_id == g.cat.id
+    assert s.projeto_2_id != g.serie.id, "Cataventos é o projeto Cataventos, não PROJETO CATAVENTO 2"
+
+
+def test_2036_super_aprovado_que_ganha_o_segundo_continua_aprovado(tmp_path, m, g):
+    """Decisão do dono: o 2º que a carga recupera da planilha não volta o evento para aprovação (como o D4 da
+    cópia do Google), e a carga conta à parte."""
+    s = _combo_existente(m, g)
+    path = _export(tmp_path, [_linha_combo()])
+    dry = _dry(path)
+    assert dry["conjunto_preenchido"] == 1
+    assert dry["conjunto_sem_reaprovacao"] == 1
+    assert dry["super_volta_pendente"] == 0
+    _virada(path)
+    s.refresh_from_db()
+    assert (s.projeto_id, s.projeto_2_id, s.status) == (g.uni.id, g.cat.id, "aprovado")
+    log = AuditLog.objects.get(action="UPDATE", details__modo="virada")
+    assert log.details["changed_fields"] == {"projeto_2_id": {"old": None, "new": g.cat.id}}
+    assert log.details["mudou_material_sem_reaprovacao"] is True
+    assert "reaprovacao" not in log.details
+
+
+def test_2036_super_aprovado_com_data_mudada_volta_pelo_horario_e_nao_pelo_segundo(tmp_path, m, g):
+    s = _combo_existente(m, g)
+    path = _export(tmp_path, [_linha_combo(hora_inicio="09:00")])
+    dry = _dry(path)
+    assert (dry["super_volta_pendente"], dry["conjunto_sem_reaprovacao"]) == (1, 0)
+    _virada(path)
+    s.refresh_from_db()
+    assert (s.projeto_2_id, s.status) == (g.cat.id, "pendente")
+    log = AuditLog.objects.get(action="UPDATE", details__modo="virada")
+    assert set(log.details["reaprovacao"]["campos"]) == {"inicio"}
+
+
+@pytest.mark.parametrize(
+    ("preparo", "motivo"),
+    [
+        ("pessoa", "conjunto_nao_aplicado:pessoa"),
+        ("publicado", "conjunto_nao_aplicado:publicado"),
+        ("data_suspeita", "conjunto_nao_aplicado:data_suspeita"),
+    ],
+)
+def test_2036_evento_que_a_carga_nao_completa_vai_para_a_lista(tmp_path, m, g, preparo, motivo):
+    s = _combo_existente(m, g, **({"gcal_status": "PUBLISHED"} if preparo == "publicado" else {}))
+    if preparo == "pessoa":
+        _log_tela(s)
+    data = "2029-01-10" if preparo == "data_suspeita" else FUTURO_ISO
+    path = _export(tmp_path, [_linha_combo(data=data)])
+    esperado = [{"evento": f"s{s.id}", "motivo": motivo}]
+    tally = ExportContractImporter(path=path, mode="virada").run()["por_entidade"]["solicitacao"]
+    assert tally["conjunto_incompleto_eventos"] == esperado
+    assert tally["virada"]["conjunto_preenchido"] == 0
+    report = _virada(path)
+    assert report["apply_conjunto_incompleto_eventos"] == esperado
+    s.refresh_from_db()
+    assert s.projeto_2_id is None
+
+
+def test_2036_evento_que_ja_tem_os_dois_nao_vai_para_a_lista(tmp_path, m, g):
+    s = _combo_existente(m, g, projeto_2=g.cat)
+    _log_tela(s)
+    tally = ExportContractImporter(path=_export(tmp_path, [_linha_combo()]), mode="virada").run()
+    assert tally["por_entidade"]["solicitacao"]["conjunto_incompleto_eventos"] == []
+
+
+def test_2036_projeto_do_evento_fora_do_par_vai_para_a_lista(tmp_path, m, g):
+    s = _existente(m, projeto=m.super)
+    path = _export(tmp_path, [_linha_combo()])
+    tally = ExportContractImporter(path=path, mode="virada").run()["por_entidade"]["solicitacao"]
+    assert tally["conjunto_incompleto_eventos"] == [
+        {"evento": f"s{s.id}", "motivo": "conjunto_nao_aplicado:projeto_fora_do_conjunto"}
+    ]
+    assert tally["virada"]["projeto_diverge"] == 0
+    _virada(path)
+    s.refresh_from_db()
+    assert (s.projeto_id, s.projeto_2_id) == (m.super.id, None)
+
+
+def test_2036_segundo_fora_do_catalogo_entra_com_um_e_vai_para_a_lista(tmp_path, m, g):
+    path = _export(tmp_path, [_linha_combo("UNI DUNI TÊ", "Projeto Que Nao Existe", evento_id="EVC")])
+    esperado = [{"evento": "EVC", "motivo": "conjunto_nao_resolve"}]
+    tally = ExportContractImporter(path=path, mode="virada").run()["por_entidade"]["solicitacao"]
+    assert tally["conjunto_incompleto_eventos"] == esperado
+    assert tally["virada"]["conjunto_criado"] == 0
+    report = _virada(path)
+    assert report["apply_conjunto_incompleto_eventos"] == esperado
+    s = Solicitacao.objects.get(external_hash="EVC")
+    assert (s.projeto_id, s.projeto_2_id) == (g.uni.id, None)
+
+
+def test_2036_par_invalido_entra_com_um_e_vai_para_a_lista(tmp_path, m, g):
+    """Regra 2: os dois da mesma gerência e do mesmo fluxo. Evento novo nasce com o 1º; o existente não muda."""
+    s = _combo_existente(m, g)
+    rows = [
+        _linha_combo("UNI DUNI TÊ", "Projeto Outra Gerencia"),
+        _linha_combo("UNI DUNI TÊ", "Projeto Outra Gerencia", evento_id="EVC"),
+    ]
+    path = _export(tmp_path, rows)
+    esperado = [
+        {"evento": "EVC", "motivo": "conjunto_invalido"},
+        {"evento": f"s{s.id}", "motivo": "conjunto_invalido"},
+    ]
+    tally = ExportContractImporter(path=path, mode="virada").run()["por_entidade"]["solicitacao"]
+    assert tally["conjunto_incompleto_eventos"] == esperado
+    report = _virada(path)
+    assert report["apply_conjunto_incompleto_eventos"] == esperado
+    novo = Solicitacao.objects.get(external_hash="EVC")
+    assert (novo.projeto_id, novo.projeto_2_id) == (g.uni.id, None)
+    s.refresh_from_db()
+    assert s.projeto_2_id is None
+
+
+def test_2036_linha_incompleta_preenche_o_evento_existente(tmp_path, m, g):
+    s = _combo_existente(m, g, status="pendente")
+    path = _export(tmp_path, [_linha_combo(linha_completa="false", hora_inicio="")])
+    dry = _dry(path)
+    assert dry["existente_linha_incompleta"] == {"linha_incompleta": 1}
+    assert dry["conjunto_preenchido"] == 1
+    _virada(path)
+    s.refresh_from_db()
+    assert s.projeto_2_id == g.cat.id
+
+
+def test_2036_dry_run_igual_ao_apply_e_segunda_execucao_idempotente(tmp_path, m, g):
+    a = _combo_existente(m, g, "EV1")
+    b = _combo_existente(m, g, "EV2", status="pendente")
+    _log_tela(b)
+    rows = [
+        _linha_combo(evento_id="EV1"),
+        _linha_combo(evento_id="EV2"),
+        _linha_combo(evento_id="EVC"),
+        _linha_combo("UNI DUNI TÊ", "Projeto Que Nao Existe", evento_id="EVX"),
+    ]
+    path = _export(tmp_path, rows)
+    n_logs = AuditLog.objects.count()
+    tally = ExportContractImporter(path=path, mode="virada").run()["por_entidade"]["solicitacao"]
+    assert AuditLog.objects.count() == n_logs
+    a.refresh_from_db()
+    assert a.projeto_2_id is None, "o dry-run não escreve"
+    report = _virada(path)
+    assert report["virada_aplicada"] == tally["virada"]
+    assert report["apply_conjunto_incompleto_eventos"] == tally["conjunto_incompleto_eventos"]
+    assert (tally["virada"]["conjunto_preenchido"], tally["virada"]["conjunto_criado"]) == (1, 1)
+
+    estado = sorted(Solicitacao.objects.values_list("external_hash", "projeto_id", "projeto_2_id", "status"))
+    n_logs = AuditLog.objects.count()
+    segundo = _virada(path)
+    assert sorted(Solicitacao.objects.values_list("external_hash", "projeto_id", "projeto_2_id", "status")) == estado
+    assert AuditLog.objects.count() == n_logs
+    assert segundo["virada_aplicada"]["conjunto_preenchido"] == 0
+    assert segundo["applied"]["solicitacao"] == 0
+
+
+def test_2036_disciplina_nao_leva_o_projeto_para_a_outra_vaga(tmp_path, m):
+    """Linha de um projeto num evento que já tem dois: o ramo da disciplina não põe nas duas vagas o mesmo
+    projeto (a constraint daria IntegrityError e desfaria a carga inteira)."""
+    s = _existente(m, projeto=m.superativar, projeto_2=m.sup_ling, status="pendente")
+    _virada(_export(tmp_path, [_sol(projeto="Superativar", disciplina="LING")]))
+    s.refresh_from_db()
+    assert (s.projeto_id, s.projeto_2_id) == (m.superativar.id, m.sup_ling.id)
+
+
+def test_2036_comando_em_texto_mostra_a_lista(tmp_path, m, g):
+    s = _combo_existente(m, g)
+    _log_tela(s)
+    path = _export(tmp_path, [_linha_combo()])
+    out = io.StringIO()
+    call_command("import_export_contract", "--path", path, "--mode", "virada", stdout=out)
+    assert f"conjunto_incompleto_eventos=[{{'evento': 's{s.id}'" in out.getvalue()
+    out = io.StringIO()
+    call_command(
+        "import_export_contract",
+        *("--path", path, "--mode", "virada", "--apply"),
+        *("--allow-entity", "solicitacao", "--allow-entity", "participation"),
+        stdout=out,
+    )
+    assert f"apply_conjunto_incompleto_eventos=[{{'evento': 's{s.id}'" in out.getvalue()

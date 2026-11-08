@@ -90,6 +90,7 @@ from apps.core.services.export_contract_projeto_resolver import (
 )
 from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
 from apps.core.services.solicitacao_create import resolve_initial_status
+from apps.core.services.solicitacao_projetos import ids_dos_projetos, par_de_projetos_invalido
 from apps.core.utils.cache_utils import invalidate_availability_cache
 from apps.core.validators import CPF_ABSENT, CPF_INVALID, classify_cpf, is_valid_cpf
 
@@ -231,6 +232,8 @@ _CONSUMED_FIELDS: dict[str, frozenset[str]] = {
             "na_agenda_google",
             "external_event_id",
             "external_event_id_confianca",
+            # #2036: evento de dois projetos (array JSON; `_conjunto_da_linha`)
+            "projetos",
         }
     ),
     "participation": frozenset(
@@ -856,12 +859,19 @@ _CONTADORES_VIRADA = (
     "marca_fora_do_sistema",
     "fim_antes_do_inicio",
     "repetido_no_arquivo",
+    # #2036: evento de dois projetos. Criado com os dois, existente que ganhou o 2º, e o SUPER aprovado que
+    # ganhou o 2º e continua aprovado (decisão do dono: o 2º recuperado da planilha não volta para aprovação).
+    "conjunto_criado",
+    "conjunto_preenchido",
+    "conjunto_sem_reaprovacao",
 )
 _CONTADORES_VIRADA_POR_CHAVE = (
     "would_update_virada",
     "fora_do_escopo",
     "existente_linha_incompleta",
     "data_suspeita",
+    # #2036: `s<id>` que ganhou o 2º apesar da trava de projeto de um script (Petrolina, decisão 5), para o ensaio
+    "conjunto_preenchido_sobre_trava",
 )
 # Mudança de data plausível na virada (relay 65, ação 4): salto de até 400 dias (um ano e folga para a
 # remarcação) e, para evento com ano entre hoje − 1 e hoje + 2, ano novo também nessa faixa. Fora disso a linha
@@ -991,6 +1001,29 @@ def _tocado(
         script = True
         travados |= campos
     return ("script" if script else "nao_tocado"), frozenset(travados), reprovado_pela_carga
+
+
+def _motivo_conjunto(conj: tuple[list[int], str | None] | None, s: Solicitacao, bloqueio: str | None) -> str | None:
+    """#2036: por que a carga não deixa o evento existente com os dois projetos da linha (a lista do dono), ou
+    None (linha de um projeto, evento já completo ou o 2º entra agora). `bloqueio` é o retorno cedo do plano
+    (`data_suspeita`, `publicado`, `pessoa`)."""
+    if conj is None:
+        return None
+    ids, motivo = conj
+    if motivo:
+        return motivo
+    if ids_dos_projetos(s) == frozenset(ids):
+        return None
+    if bloqueio:
+        return f"conjunto_nao_aplicado:{bloqueio}"
+    if s.projeto_2_id is not None or s.projeto_id not in ids:
+        return "conjunto_nao_aplicado:projeto_fora_do_conjunto"
+    return None
+
+
+def _lista_conjunto(itens: list[dict[str, str]]) -> list[dict[str, str]]:
+    """A lista do dono em ordem fixa (`evento` = `evento_id` do evento novo ou `s<id>` do existente)."""
+    return sorted(itens, key=lambda i: (i["evento"], i["motivo"]))
 
 
 def _apagados_no_sistema() -> tuple[set[str], set[tuple[int, int, datetime]]]:
@@ -1199,6 +1232,8 @@ class ExportContractImporter:
         self._criadas_nesta_execucao: set[str] = set()
         # #2035: `evento_id` que o apply não criou porque o dono tem CPF válido sem cadastro (lista real do apply).
         self._apply_sem_cadastro_eventos: list[str] = []
+        # #2036: evento de dois projetos que o apply deixou com um (lista do dono: `evento`, `motivo`).
+        self._apply_conjunto_incompleto: list[dict[str, str]] = []
         # #2035: pares (u<id> do e-mail, u<id> do CPF) em que a linha de participante aponta duas pessoas.
         self._email_cpf_divergente: set[tuple[int, int]] = set()
         # #2035: CPF válido sem cadastro → ids das contas que o e-mail da linha ligaria (só saem os u<id>).
@@ -1234,6 +1269,30 @@ class ExportContractImporter:
             self._pidx = build_projeto_index()
         res = resolve_projeto_agenda(raw_name, disciplina, index=self._pidx)
         return res.projeto.id if res.status == "matched" and res.projeto else None
+
+    def _conjunto_da_linha(self, r: dict[str, str]) -> tuple[list[int], str | None] | None:
+        """#2036: os projetos de uma linha de dois projetos. A coluna `projetos` é um array JSON lido com
+        `json.loads`, nunca separado por vírgula ("ESCREVER, COMUNICAR E SER" é um nome só), e cada nome resolve
+        como o `projeto` da linha (`resolve_projeto_agenda`). None = linha de um projeto (coluna vazia, ilegível
+        ou com um nome): vale só a coluna `projeto`. Senão `(ids na ordem da planilha, motivo)`, com motivo
+        `conjunto_nao_resolve` (nome fora do catálogo) ou `conjunto_invalido` (par que fere a regra 2,
+        `par_de_projetos_invalido`, ou mais de dois nomes). Com motivo o evento fica com um projeto e vai para a
+        lista do dono."""
+        nomes = [str(n).strip() for n in _parse_json_list(r.get("projetos")) if str(n).strip()]
+        if len(nomes) < 2:
+            return None
+        if self._pidx is None:
+            self._pidx = build_projeto_index()
+        projetos: list[Projeto] = []
+        for nome in nomes:
+            res = resolve_projeto_agenda(nome, r.get("disciplina") or "", index=self._pidx)
+            if res.status != "matched" or res.projeto is None:
+                return [], "conjunto_nao_resolve"
+            projetos.append(res.projeto)
+        ids = [p.id for p in projetos]
+        if len(projetos) != 2 or par_de_projetos_invalido(projetos[0], projetos[1]):
+            return ids, "conjunto_invalido"
+        return ids, None
 
     def _load(self, name: str) -> list[dict[str, str]]:
         fp = os.path.join(self.path, f"{name}.csv")
@@ -1919,6 +1978,8 @@ class ExportContractImporter:
             # (o resto da linha resolve); os `evento_id` vão em `solicitante_cpf_sem_cadastro_eventos`.
             reject_reasons = {"fim_antes_do_inicio": 0, "solicitante_cpf_sem_cadastro": 0}
             sem_cadastro_eventos: list[str] = []
+            # #2036: linha de dois projetos cujo evento fica com um (lista do dono; a mesma do apply).
+            conjunto_incompleto: list[dict[str, str]] = []
 
             def recusa_dono(ext_hash: str) -> None:
                 reject_reasons["solicitante_cpf_sem_cadastro"] += 1
@@ -2006,6 +2067,8 @@ class ExportContractImporter:
                     tocado = _tocado(sol, logs_idx.get(sid_antigo, []), sid_antigo in admin_idx)
                     plano = self._plano_virada(sol, r, key, tocado, parts_por_sol.get(sid_antigo, []), [], ctx)
                     _somar_contagem(contagem, plano["c"])
+                    if plano["conjunto"]:
+                        conjunto_incompleto.append({"evento": f"s{sid_antigo}", "motivo": plano["conjunto"]})
                     if plano["marca"]:
                         sol.publicado_fora_do_sistema = True  # espelha o apply para a linha seguinte do evento
                     tally["would_update" if plano["c"]["evento_atualizado"] else "would_skip_same"] += 1
@@ -2036,6 +2099,8 @@ class ExportContractImporter:
                         parts_csv = ctx["parts_csv"].get(ext_hash, [])
                         plano = self._plano_virada(sol, r, key, tocado, parts_por_sol.get(sid, []), parts_csv, ctx)
                         _somar_contagem(contagem, plano["c"])
+                        if plano["conjunto"]:
+                            conjunto_incompleto.append({"evento": f"s{sid}", "motivo": plano["conjunto"]})
                         tally["would_update" if plano["c"]["evento_atualizado"] else "would_skip_same"] += 1
                         continue
                 elif _linha_apagada(r, ext_hash, key, apagados, vagas_apagadas):
@@ -2067,6 +2132,11 @@ class ExportContractImporter:
                         tally["possivel_apagado_pelo_admin"] += 1
                     if virada and _marca_da_linha(r):
                         _conta(contagem, "marca_fora_do_sistema")
+                    conj = self._conjunto_da_linha(r)
+                    if conj is not None and conj[1]:
+                        conjunto_incompleto.append({"evento": ext_hash, "motivo": conj[1]})
+                    elif conj is not None:
+                        _conta(contagem, "conjunto_criado")
                 st, _ = diff_and_classify({} if existe else None, {}, protected)
                 tally[st] += 1
                 if st == "would_create" and _to_bool(r.get("cancelado")):
@@ -2074,6 +2144,7 @@ class ExportContractImporter:
             tally["skip_reasons"] = skip_reasons
             tally["reject_reasons"] = reject_reasons
             tally["solicitante_cpf_sem_cadastro_eventos"] = sorted(sem_cadastro_eventos)
+            tally["conjunto_incompleto_eventos"] = _lista_conjunto(conjunto_incompleto)
             if virada:
                 tally["virada"] = contagem
                 # Evento de prod que a planilha não traz mais (nem como id antigo): só conta, por quando ×
@@ -2511,6 +2582,7 @@ class ExportContractImporter:
         apply_blocked = bool(self.apply) and not self.allow
         self._zerar_contagem_de_pessoas()
         self._apply_sem_cadastro_eventos = []
+        self._apply_conjunto_incompleto = []
 
         por_entidade: dict[str, Any] = {}
         for name in ENTITY_ORDER:
@@ -2552,6 +2624,8 @@ class ExportContractImporter:
             ],
             # `evento_id` que o apply NÃO criou porque o dono tem CPF válido sem cadastro (vazio sem apply).
             "apply_solicitante_cpf_sem_cadastro_eventos": sorted(self._apply_sem_cadastro_eventos),
+            # #2036: evento de dois projetos que o apply deixou com um, com o motivo (vazio sem apply).
+            "apply_conjunto_incompleto_eventos": _lista_conjunto(self._apply_conjunto_incompleto),
             "protected_fields": {k: sorted(v) for k, v in PROTECTED_FIELDS.items()},
             **({"virada_aplicada": self._virada_aplicada} if self.mode == "virada" else {}),
         }
@@ -3124,6 +3198,15 @@ class ExportContractImporter:
             marca = virada and _marca_da_linha(r)
             if marca:
                 _conta(contagem, "marca_fora_do_sistema")
+            # #2036: linha de dois projetos nasce com as duas vagas, na ordem da planilha; o par que não resolve
+            # ou fere a regra 2 nasce só com o projeto da linha e vai para a lista do dono.
+            proj_2_id: int | None = None
+            conj = self._conjunto_da_linha(r)
+            if conj is not None and conj[1]:
+                self._apply_conjunto_incompleto.append({"evento": ext_hash, "motivo": conj[1]})
+            elif conj is not None:
+                proj_id, proj_2_id = conj[0]
+                _conta(contagem, "conjunto_criado")
             # Cancelado na planilha: o modelo não tem "cancelado" e a linha nunca entra pendente/aprovada
             # (decisão do dono, 05/10/2026: nasce reprovada e fica no AuditLog).
             status = (
@@ -3135,6 +3218,7 @@ class ExportContractImporter:
                 usuario_id=coord_id,  # solicitante = coordenador (D3)
                 municipio_id=mun_id,
                 projeto_id=proj_id,
+                projeto_2_id=proj_2_id,
                 tipo_evento_id=tipo_id,
                 coordenador_id=coord_id,  # grava nos DOIS (decisão a)
                 inicio=inicio,
@@ -3195,6 +3279,8 @@ class ExportContractImporter:
         logs, admin = self._tocado_do_evento(sid, [x.id for x in parts])
         plano = self._plano_virada(s, r, key, _tocado(s, logs, admin), parts, ctx["parts_csv"].get(ext_hash, []), ctx)
         _somar_contagem(contagem, plano["c"])
+        if plano["conjunto"]:
+            self._apply_conjunto_incompleto.append({"evento": f"s{sid}", "motivo": plano["conjunto"]})
         return 1 if self._executar_plano_virada(s, plano) else 0
 
     # ── carga da virada: um evento existente por vez (classify e apply usam o mesmo plano) ──
@@ -3302,8 +3388,11 @@ class ExportContractImporter:
             "rejeitar": False,
             "reaprovacao": [],
             "marca": False,
+            "conjunto": None,  # #2036: motivo da lista do dono (`_motivo_conjunto`)
+            "sem_reaprovacao": False,
         }
         categoria, travados, reprovado_pela_carga = tocado
+        conj = self._conjunto_da_linha(r)
         if categoria == "publicado_pelo_sistema":
             # Sem evento vivo do sistema no Google (ERROR ou PENDING sem id, ou já tirado de lá): Publicar ou
             # Resync criaria um segundo evento ao lado do da planilha. A marca só segura isso; o resto fica.
@@ -3324,6 +3413,7 @@ class ExportContractImporter:
             _conta(c, "data_suspeita", str(s.id))
             if p["marca"]:
                 _conta(c, "evento_atualizado")
+            p["conjunto"] = _motivo_conjunto(conj, s, "data_suspeita")
             # a linha toda fica de fora (com a data errada, o resto dela também não é confiável), menos a
             # marca: ela só segura o Publicar contra um segundo evento no Google
             return p
@@ -3331,11 +3421,13 @@ class ExportContractImporter:
             _conta(c, "publicado_pelo_sistema")
             if p["marca"]:
                 _conta(c, "evento_atualizado")
+            p["conjunto"] = _motivo_conjunto(conj, s, "publicado")
             return p
         if categoria == "pessoa":
             _conta(c, "tocado_pessoa")
             if p["marca"]:
                 _conta(c, "evento_atualizado")
+            p["conjunto"] = _motivo_conjunto(conj, s, "pessoa")
             return p  # a tela vence; a marca (só contra duplicata no Google) entra assim mesmo
         _conta(c, "tocado_script" if categoria == "script" else "nao_tocado")
 
@@ -3351,23 +3443,37 @@ class ExportContractImporter:
                 if atual != novo:
                     _conta(c, "fora_do_escopo", campo)
 
-        # projeto: só pela disciplina, dentro do mesmo agrupador (o evento não guarda a disciplina)
         projeto_id = s.projeto_id
-        raw_proj = r.get("projeto") or ""
-        res = resolve_projeto_agenda(raw_proj, r.get("disciplina") or "", index=ctx["pidx"])
-        novo_proj = res.projeto.id if res.status == "matched" and res.projeto is not None else None
-        if novo_proj is not None and novo_proj != s.projeto_id:
-            irmaos = projetos_do_agrupador(raw_proj, index=ctx["pidx"])
-            if res.matched_via == "disciplina" and s.projeto_id in irmaos:
-                if "projeto" not in travados:
-                    projeto_id = novo_proj
-                    p["campos"]["projeto_id"] = novo_proj
-                    _conta(c, "would_update_virada", "projeto")
-                    novo = ctx["proj_by_id"].get(novo_proj)
-                    if s.municipio_id is not None and novo is not None and not par_liberado(s.municipio_id, novo):
-                        _conta(c, "projeto_sem_compra")
-            else:
-                _conta(c, "projeto_diverge")
+        if conj is not None:
+            # #2036, linha de dois projetos: o evento que tem um deles ganha o outro na vaga vazia (a escolha do
+            # dono na vaga 1 fica, como em Petrolina). O ramo da disciplina e o `projeto_diverge` não rodam, e o
+            # `projeto_2` fica fora de `_CAMPOS_VIRADA`: a trava de projeto de um script não segura o 2º, mas o
+            # evento sai por id em `conjunto_preenchido_sobre_trava` para o ensaio.
+            p["conjunto"] = _motivo_conjunto(conj, s, None)
+            if p["conjunto"] is None and s.projeto_2_id is None:
+                outro = next(i for i in conj[0] if i != s.projeto_id)
+                p["campos"]["projeto_2_id"] = outro
+                _conta(c, "conjunto_preenchido")
+                if "projeto" in travados:
+                    _conta(c, "conjunto_preenchido_sobre_trava", f"s{s.id}")
+        else:
+            # projeto: só pela disciplina, dentro do mesmo agrupador (o evento não guarda a disciplina)
+            raw_proj = r.get("projeto") or ""
+            res = resolve_projeto_agenda(raw_proj, r.get("disciplina") or "", index=ctx["pidx"])
+            novo_proj = res.projeto.id if res.status == "matched" and res.projeto is not None else None
+            # o projeto da linha já na outra vaga (#2036) não move: as duas vagas ficariam iguais
+            if novo_proj is not None and novo_proj not in (s.projeto_id, s.projeto_2_id):
+                irmaos = projetos_do_agrupador(raw_proj, index=ctx["pidx"])
+                if res.matched_via == "disciplina" and s.projeto_id in irmaos:
+                    if "projeto" not in travados:
+                        projeto_id = novo_proj
+                        p["campos"]["projeto_id"] = novo_proj
+                        _conta(c, "would_update_virada", "projeto")
+                        novo = ctx["proj_by_id"].get(novo_proj)
+                        if s.municipio_id is not None and novo is not None and not par_liberado(s.municipio_id, novo):
+                            _conta(c, "projeto_sem_compra")
+                else:
+                    _conta(c, "projeto_diverge")
 
         # data e hora (local de Fortaleza → UTC, como na criação)
         hora_ini = _parse_hora(r.get("hora_inicio"))
@@ -3477,6 +3583,11 @@ class ExportContractImporter:
                 if mudaram:
                     p["status"], p["reaprovacao"] = Solicitacao.Status.PENDENTE, mudaram
                     _conta(c, "super_volta_pendente")
+                elif "projeto_2_id" in p["campos"]:
+                    # #2036 (decisão do dono, como o D4 da cópia do Google): o 2º que a carga recupera da planilha
+                    # não volta o evento para aprovação; conta à parte e fica marcado no AuditLog.
+                    p["sem_reaprovacao"] = True
+                    _conta(c, "conjunto_sem_reaprovacao")
 
         if p["campos"] or p["entra"] or p["sai"] or p["convidados"] or p["status"] or p["marca"]:
             _conta(c, "evento_atualizado")
@@ -3551,6 +3662,8 @@ class ExportContractImporter:
                 details["reaprovacao"] = {"campos": p["reaprovacao"]}
             if aprovada_como_super:
                 details["aprovada_como_super"] = True
+            if p["sem_reaprovacao"]:
+                details["mudou_material_sem_reaprovacao"] = True
             AuditLog.objects.create(
                 usuario=self.actor, action=AuditLog.Action.UPDATE, model_name="Solicitacao", details=details
             )

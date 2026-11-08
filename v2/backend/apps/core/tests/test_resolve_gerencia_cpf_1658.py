@@ -23,8 +23,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-import pytest
 from django.core.management import call_command
+
+import pytest
 
 from apps.core.models import EquipeGerencia, Gerencia
 from apps.core.services.equipe_gerencia_import import (

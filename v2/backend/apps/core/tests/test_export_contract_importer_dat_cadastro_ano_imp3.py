@@ -7,7 +7,7 @@ o campo `ano`: etapas e demais campos ficam como estão (never-overwrite). O ano
 CSV; sem ela (ou inválida), das datas de etapa como antes. Inválida e sem data → `ano_invalido` (rejeita).
 
 Produto: o classify decide só pela existência do código (`_norm_codigo` dos dois lados), sem comparar
-nome. O apply segue sem gravar produto.
+nome. Desde o lote E2 o apply grava o produto real (`test_export_contract_importer_produto.py`).
 
 Fixtures sintéticos, sem dado pessoal.
 """
@@ -300,7 +300,10 @@ def test_classify_produto_so_pela_existencia_do_codigo_normalizado(tmp_path):
     proj = ProjetoFactory(nome="Proj Prod Imp3", fluxo="NAO_SUPER")
     Produto.objects.create(codigo="0402002", nome="Nome do Catálogo", projeto=proj)
     Produto.objects.create(codigo="PT-9", nome="Outro", projeto=proj)
-    csv = "codigo,nome\n402002,Nome Diferente na Planilha\npt-9,Outro\nPT-NOVO,Novo\n,Sem Codigo\n"
+    csv = (
+        "codigo,nome,projeto,fonte,codigo_erp\n402002,Nome Diferente na Planilha,Proj Prod Imp3,Produtos,\n"
+        "pt-9,Outro,Proj Prod Imp3,Produtos,\nPT-NOVO,Novo,Proj Prod Imp3,Produtos,\n,Sem Codigo,Proj Prod Imp3,Produtos,\n"
+    )
 
     r = ExportContractImporter(path=_write_export(tmp_path, {"produto": csv})).run()["por_entidade"]["produto"]
 
@@ -315,7 +318,10 @@ def test_classify_produto_normaliza_o_codigo_do_lado_do_arquivo(tmp_path):
     proj = ProjetoFactory(nome="Proj Prod Imp3 Arq", fluxo="NAO_SUPER")
     Produto.objects.create(codigo="402002", nome="Sem Zero", projeto=proj)
     Produto.objects.create(codigo="000", nome="Zeros", projeto=proj)
-    csv = "codigo,nome\n0402002,Com Zero\n000,Zeros\n00,Zeros Curto\n"
+    csv = (
+        "codigo,nome,projeto,fonte,codigo_erp\n0402002,Com Zero,Proj Prod Imp3 Arq,Produtos,\n"
+        "000,Zeros,Proj Prod Imp3 Arq,Produtos,\n00,Zeros Curto,Proj Prod Imp3 Arq,Produtos,\n"
+    )
 
     r = ExportContractImporter(path=_write_export(tmp_path, {"produto": csv})).run()["por_entidade"]["produto"]
 

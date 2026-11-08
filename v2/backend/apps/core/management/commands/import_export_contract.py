@@ -11,6 +11,11 @@ Uso:
     # contas antes dos eventos, numa execução própria: dry-run, OK do dono, depois o apply de usuario
     python manage.py import_export_contract --path ... --apply --allow-entity usuario
 
+    # produto antes das compras, numa execução própria (create-only): dry-run, o dono aprova a lista
+    # `would_create_codigos`, apply de produto, dry-run de novo e só então o apply de dat_compra
+    python manage.py import_export_contract --path ... --apply --allow-entity produto
+    python manage.py import_export_contract --path ... --apply --allow-entity dat_compra --as-user <cpf>
+
     # carga da virada (uma só): dry-run, depois apply com solicitacao + participation
     python manage.py import_export_contract --path ... --mode virada
     python manage.py import_export_contract --path ... --mode virada --apply \
@@ -29,6 +34,9 @@ Segurança:
 - contas primeiro (#2035): a entidade `usuario` entra antes, numa execução própria (dry-run → OK →
   `--apply --allow-entity usuario`), e só depois o ensaio e a carga de `solicitacao` + `participation`. O
   dry-run dos eventos só conhece as contas que já estão no banco; nessa ordem ele bate com o apply.
+- produto antes das compras (lote E2, 07/11/2026): `produto` roda sozinho (com outra entidade é erro) e cria só
+  o produto real (id curto com `codigo_erp` vazio); a linha do ERP é pulada. O dry-run de `dat_compra` só
+  conhece o produto que já está no banco, por isso a ligação das compras sem produto vem numa execução depois.
 - `gcal_adocao --apply` exige `--gcal-verificado` (decisão D63): só adota o id que o
   `conferir_gcal_adocao` achou confirmado e na mesma data no Google há menos de 24 h; o resto fica travado.
 """
@@ -46,6 +54,21 @@ from apps.core.services.export_contract_importer import APPLIABLE, ExportContrac
 
 if TYPE_CHECKING:
     from argparse import ArgumentParser
+
+# Contagens do lote E2 (produto e ligação das compras), impressas quando não são zero.
+_CONTADORES_DO_PRODUTO = (
+    "erp_ja_no_banco",
+    "gemeo_no_catalogo",
+    "produto_projeto_sem_colecao",
+    "produto_de_outro_projeto",
+    "produto_nao_resolvido",
+    "would_ligar_produto",
+    "ligacao_outro_projeto",
+    "ligacao_produto_nao_resolvido",
+    "sem_produto_fora_do_csv",
+    "nk_repetida_no_banco",
+    "produto_nao_resolvido_motivos",
+)
 
 
 class Command(BaseCommand):
@@ -149,6 +172,13 @@ class Command(BaseCommand):
                 "--mode virada --apply exige --allow-entity solicitacao e --allow-entity participation"
                 + " (ou gcal_adocao sozinha)."
             )
+        # Lote E2 (F7): o dry-run de dat_compra só enxerga o produto que já está no banco, e o de produto só o
+        # projeto que já está no banco. Junto de outra entidade, o apply faria mais do que o dry-run mostrou.
+        if "produto" in allow and len(allow) > 1:
+            raise CommandError(
+                "--allow-entity produto roda sozinha (create-only): primeiro o produto, depois um dry-run novo"
+                + " e só então dat_compra."
+            )
         actor = self._resolve_actor(opts.get("as_user"))
         importer = ExportContractImporter(
             path=opts["path"],
@@ -191,6 +221,12 @@ class Command(BaseCommand):
                         f"    rekey={v['would_rekey']} rekey_contraditorio={v.get('rekey_contraditorio', 0)}"
                         + f" canceladas_reprovadas={v.get('would_create_cancelada', 0)}"
                     )
+                for chave in _CONTADORES_DO_PRODUTO:
+                    if v.get(chave):
+                        self.stdout.write(f"    {chave}={v[chave]}")
+                for item in v.get("would_create_codigos") or []:
+                    # lote E2: a lista que o dono aprova (catálogo, sem dado pessoal)
+                    self.stdout.write(f"    would_create_codigos: {item}")
                 if v.get("projetos_nao_resolvidos"):
                     self.stdout.write(f"    projetos_nao_resolvidos={v['projetos_nao_resolvidos']}")
                 if v.get("solicitante_cpf_sem_cadastro_eventos"):

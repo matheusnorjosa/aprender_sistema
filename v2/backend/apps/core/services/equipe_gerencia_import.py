@@ -26,10 +26,12 @@ vinculo (pendencia `vinculo_com_pacote_bloqueado`). SSOT: `vinculo_exige_superus
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 import pandas as pd
@@ -41,6 +43,9 @@ from apps.core.pii import redact_cpf, redact_login_identifier
 from apps.core.rbac.helpers import GERENCIA_APROVADORA_NOME
 from apps.core.services.rbac_pacotes import PACOTE, PAPEIS_COM_PACOTE, PERFIL_PERMITIDO
 from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
+from apps.core.validators import is_valid_cpf
+
+logger = logging.getLogger(__name__)
 
 # Mapeamento de nomes de setor -> nome_setor canonico
 SETOR_MAPPING = {
@@ -274,24 +279,45 @@ def _generate_gerencia_nome(nome_setor: str) -> str:
     return mapping.get(nome_setor, f"GERENCIA {nome_setor.upper()}")
 
 
-def _resolve_gerencia(nome_setor: str) -> Gerencia | None:
-    """Resolve uma Gerencia EXISTENTE pelo setor/nome. NÃO cria (fail-closed, #1615).
+def _resolve_gerencia_status(nome_setor: str) -> tuple[str, Gerencia | None]:
+    """Resolve uma Gerencia EXISTENTE pelo setor/nome, com o status. NÃO cria (fail-closed, #1615).
 
     Ordem de match: nome_setor canônico → nome == setor → nome == nome-gerado → nome_setor == rótulo
     cru (o catálogo guarda "Brincando", que o de-para leva a "Brincando e Aprendendo"; o de-para vem
-    antes para "Avançando Juntos" ir à Vidas). O de-para ignora maiúscula e acento. Miss = None, para o chamador tratar como pendência — o
-    catálogo de gerências é SSOT semeado; a planilha resolve contra ele, não provisiona unidade nova
-    por rótulo (evita duplicata por grafia).
+    antes para "Avançando Juntos" ir à Vidas). O de-para ignora maiúscula e acento. O catálogo de gerências
+    é SSOT semeado; a planilha resolve contra ele, não provisiona unidade nova por rótulo.
+
+    A cadeia para no primeiro degrau em que alguma gerência casa, ativa ou inativa, como o `.first()` antigo
+    (#1658). Lotação dá poder, então a regra só pode reduzir o que a antiga ligava: a ativa sozinha no degrau =
+    `matched`; só inativas = `inactive` (com a gerência quando é uma só); 2 ou mais com alguma ativa =
+    `ambiguous`, sem escolher nenhuma. A ativa de um degrau posterior nunca vence a inativa de um anterior.
+    Nada casa = `none`.
     """
     rotulo = nome_setor
     nome_setor = _SETOR_MAPPING_NORM.get(norm_text(nome_setor), nome_setor)
-    nome_gerencia = _generate_gerencia_nome(nome_setor)
-    return (
-        Gerencia.objects.filter(nome_setor__iexact=nome_setor).first()
-        or Gerencia.objects.filter(nome__iexact=nome_setor).first()
-        or Gerencia.objects.filter(nome__iexact=nome_gerencia).first()
-        or Gerencia.objects.filter(nome_setor__iexact=rotulo).first()
+    degraus = (
+        Q(nome_setor__iexact=nome_setor),
+        Q(nome__iexact=nome_setor),
+        Q(nome__iexact=_generate_gerencia_nome(nome_setor)),
+        Q(nome_setor__iexact=rotulo),
     )
+    for degrau in degraus:
+        candidatas = list(Gerencia.objects.filter(degrau).order_by("-ativo", "pk")[:2])
+        if not candidatas:
+            continue
+        if len(candidatas) == 1:
+            return ("matched" if candidatas[0].ativo else "inactive"), candidatas[0]
+        if not any(g.ativo for g in candidatas):
+            return "inactive", None
+        logger.warning("Gerencia ambigua no catalogo: %s", sorted(f"g{g.pk}" for g in candidatas))
+        return "ambiguous", None
+    return "none", None
+
+
+def _resolve_gerencia(nome_setor: str) -> Gerencia | None:
+    """Gerência de `_resolve_gerencia_status`: a ativa única ou a inativa única; ambígua ou miss = None, para o
+    chamador tratar como pendência."""
+    return _resolve_gerencia_status(nome_setor)[1]
 
 
 def is_vinculo_aprovador(gerencia: Gerencia, papel: str) -> bool:
@@ -340,12 +366,18 @@ def motivo_vinculo_bloqueado(gerencia: Gerencia, papel: str) -> str:
 
 
 def _resolve_usuario(cpf: str, email: str, nome: str) -> Usuario | None:
-    """Resolve usuario por CPF > email > nome."""
+    """Resolve usuario por CPF > email > nome.
+
+    CPF válido (dígito verificador) sem cadastro devolve None, sem cair para e-mail nem nome (#1658, decisão do
+    dono de 07/11/2026, a mesma regra do #2035 na participação): lotação dá poder e o homônimo não herda a linha.
+    CPF de dígito errado continua caindo para e-mail e nome."""
     cpf_norm = normalize_cpf_digits(cpf)
     if cpf_norm:
         user = Usuario.objects.filter(cpf=cpf_norm).first()
         if user:
             return user
+        if is_valid_cpf(cpf_norm):
+            return None
 
     if email:
         user = resolve_user_by_email(email)

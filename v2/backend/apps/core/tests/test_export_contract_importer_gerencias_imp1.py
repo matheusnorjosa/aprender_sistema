@@ -246,7 +246,12 @@ def test_classify_gerencia_rejeita_o_que_nao_resolve_e_nunca_cria(tmp_path, vida
     assert pe["would_skip_same"] == 3
     assert pe["would_create"] == 0, "o import não cria gerência"
     assert pe["would_reject"] == 4
-    assert pe["reject_reasons"] == {"setor_sem_lotacao": 1, "gerencia_inexistente": 1, "gerencia_inativa": 1}
+    assert pe["reject_reasons"] == {
+        "setor_sem_lotacao": 1,
+        "gerencia_inexistente": 1,
+        "gerencia_inativa": 1,
+        "gerencia_ambigua": 0,
+    }
 
 
 def test_produto_e_gerencia_marcados_so_leitura_no_relatorio(tmp_path):

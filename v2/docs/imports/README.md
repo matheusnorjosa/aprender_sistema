@@ -119,7 +119,8 @@ As ações `IMPORT_USUARIOS`, `IMPORT_COMPRAS`, `IMPORT_AGENDA`, `IMPORT_AVAILAB
 
 Fora dos endpoints, o command `import_export_contract` (`export_contract_importer.py`) grava
 `AuditLog` `UPDATE`/`REJECT` nas decisões da carga de eventos (re-chave, cancelado na planilha,
-reconcile).
+reconcile) e `DELEGATE_BLOCK_CREATE` por bloqueio criado na carga `availability_block`
+(`origem=import_export_contract`, `created_by` = ator, #1643).
 
 `IMPORT_ARTIFACT_PURGE` registra o expurgo de artefatos de import (retenção LGPD), não o import.
 

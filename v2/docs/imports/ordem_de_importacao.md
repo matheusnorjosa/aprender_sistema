@@ -71,7 +71,7 @@ A ordem abaixo respeita as dependências de chave estrangeira e regras de domín
 - **Por quê**: agendamento concreto de eventos.
 - **Documento**: [agenda_solicitacoes.md](./agenda_solicitacoes.md)
 - **Service real**: `apps/core/services/eventos_import.py` (`import_eventos_from_file`). Cria 1 `Solicitacao` + N `Participation` (coord + formadores 1..5).
-- **Endpoint**: `POST /api/solicitacoes/import/` — gate `IsAuthenticated + SuperuserOnly` (D20).
+- **Endpoint**: nenhum desde 07/11/2026 (#1628). `POST /api/solicitacoes/import/` saiu; depois da virada o evento nasce pela Nova Solicitação e pela carga única do export-contract.
 - **Pré-requisitos**: Usuários (passo 1), Municípios (passo 3), Projetos (passo 4).
 - **Status inicial**: decidido **só pelo `projeto.fluxo`** (`eventos_import.py:497`) —
   `SUPER` → `pendente`, `NAO_SUPER` → `aprovado`. 🔴 **A data do evento não influencia nada**
@@ -135,11 +135,13 @@ Cada seta indica dependência de FK ou de validação de domínio.
 
 - **Eventos** — `update_or_create` sobrescreve `status`, `usuario`, `coordenador`, `inicio`, `fim`
   e mais 6 campos, e ainda **reporta `unchanged`**
-  ([#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628)). Um reimport pode
-  apagar uma decisão de aprovação sem ninguém notar.
+  ([#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628)). Um reimport podia
+  apagar uma decisão de aprovação sem ninguém notar. Corrigido no #2021; a importação de eventos pela
+  tela saiu em 07/11/2026.
 - **Compras** — `quantidade` e `uso` fazem **parte** do hash, então corrigir a quantidade na
   planilha **cria uma linha nova** em vez de atualizar
-  ([#1633](https://github.com/matheusnorjosa/aprender_sistema/issues/1633)).
+  ([#1633](https://github.com/matheusnorjosa/aprender_sistema/issues/1633), fechada como obsoleta: a `Compra`
+  foi apagada no G29).
 - **Bloqueios** — reimport atualiza `motivo`.
 - **Usuários** — reimport reconcilia por CPF; a concessão dos grupos da coluna `grupos` **era**
   irrestrita a cada reimport (auto-escalação), **corrigida** por
@@ -161,6 +163,6 @@ evidência que existe. `AuditLog` filtrado por `action LIKE 'IMPORT_%'` **não d
 - Disponibilidade deve preceder Agenda no fluxo real ou as duas chegam juntas? *(Atualizado #2021:
   o import agora consulta disponibilidade para evento FUTURO (#1620); histórico entra sem checar.)*
 - 🟡 **Antes do próximo reimport em massa**: #1628 (sobrescrita silenciosa de aprovação) **resolvido no #2021**
-  (reimport protege decisão humana); resta #1633 (duplicação de `Compra`). "Re-rodar o arquivo corrigido"
+  (reimport protege decisão humana; a importação de eventos pela tela saiu em 07/11/2026); o #1633 (duplicação de `Compra`) foi fechado como obsoleto, porque a `Compra` foi apagada no G29. "Re-rodar o arquivo corrigido"
   sem rastro. (A auto-escalação de grupos de #1610 já foi **corrigida** em `e2b7c528` — concessão
   gated por superuser.) Ver [../audits/ACHADOS_REAIS.md](../audits/ACHADOS_REAIS.md).

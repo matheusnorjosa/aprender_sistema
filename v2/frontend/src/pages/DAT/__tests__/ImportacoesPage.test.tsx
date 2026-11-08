@@ -4,7 +4,7 @@
  * Cobertura:
  * - Header com título canônico
  * - 3 categorias renderizadas (Cadastros base, Operacional, Disponibilidade)
- * - 9 cards de upload (cada um com label esperado)
+ * - 8 cards de upload (cada um com label esperado)
  *
  * Não cobre (escopo de outros PRs):
  * - Guard da rota: só superusuário (`podeImportarPelaTela` em AppRoutes.tsx, decisão do dono de
@@ -25,7 +25,6 @@ vi.mock('../../../api/ops', () => ({
   importCadastros: vi.fn(),
   importDeslocamentos: vi.fn(),
   importEquipeGerencia: vi.fn(),
-  importEventos: vi.fn(),
   importMunicipios: vi.fn(),
   importProdutos: vi.fn(),
   importUsuarios: vi.fn(),
@@ -63,14 +62,16 @@ describe('ImportacoesPage — DAT > Importações (PR-B)', () => {
     expect(within(section).getByText(/Importar VÍNCULOS/)).toBeInTheDocument();
   });
 
-  test('Operacional contém 3 cards (Ações, Eventos, Produtos)', () => {
+  test('Operacional contém 2 cards (Ações, Produtos)', () => {
     render(<ImportacoesPage />);
     const section = screen.getByRole('region', { name: 'Operacional' });
     // A lista antiga de compras saiu de uso (G29, decisão do dono de 05/11/2026): a atual é a de
     // Gestão de Compras (DATCompra), que não tem importação pela tela.
     expect(within(section).queryByText(/Importar COMPRAS/)).not.toBeInTheDocument();
+    // A importação de eventos pela tela saiu (#1628, decisão do dono de 07/11/2026): o evento nasce
+    // só pela Nova Solicitação e pela carga única da virada.
+    expect(within(section).queryByText(/Importar EVENTOS/)).not.toBeInTheDocument();
     expect(within(section).getByText(/Importar AÇÕES/)).toBeInTheDocument();
-    expect(within(section).getByText(/Importar EVENTOS/)).toBeInTheDocument();
     expect(within(section).getByText(/Importar PRODUTOS/)).toBeInTheDocument();
   });
 
@@ -81,10 +82,10 @@ describe('ImportacoesPage — DAT > Importações (PR-B)', () => {
     expect(within(section).getByText(/Importar DESLOCAMENTOS/)).toBeInTheDocument();
   });
 
-  test('total de 9 cards de import (4 + 3 + 2)', () => {
+  test('total de 8 cards de import (4 + 2 + 2)', () => {
     render(<ImportacoesPage />);
     // Cada card tem um label começando com "Importar X".
     const cardLabels = screen.getAllByText(/^Importar [A-Z]/);
-    expect(cardLabels).toHaveLength(9);
+    expect(cardLabels).toHaveLength(8);
   });
 });

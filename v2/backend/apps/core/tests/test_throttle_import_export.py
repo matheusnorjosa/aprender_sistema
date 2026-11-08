@@ -36,7 +36,6 @@ import pytest
 # import, adicione-o aqui — o wiring test abaixo forca que ele carregue o throttle.
 IMPORT_VIEWS: list[tuple[str, str]] = [
     ("apps.core.views_import_bloqueios", "ImportBloqueiosView"),
-    ("apps.core.views_import_eventos", "ImportEventosView"),
     ("apps.core.views_import_produtos", "ImportProdutosView"),
     ("apps.core.views_import_deslocamentos", "ImportDeslocamentosView"),
     ("apps.core.views_import_usuarios", "ImportUsuariosView"),

@@ -1,6 +1,9 @@
 """
 Service para importacao de Eventos (Solicitacao + Participation) via upload.
 
+Sem rota desde o #1628 (decisao do dono de 07/11/2026): a importacao de eventos pela tela saiu.
+O arquivo fica ate a limpeza depois da virada porque a carga da virada usa `_compute_external_hash`.
+
 Padrao: dry_run + external_hash para idempotencia.
 
 Colunas esperadas:

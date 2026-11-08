@@ -74,10 +74,10 @@ tupla natural `(usuario, inicio, fim, tipo)` — nenhum dos dois calcula `extern
 docstring de `bloqueios_import.py:4` afirmar o contrário. Tabela por service em
 [dry_run_response_contract.md](./dry_run_response_contract.md) §2.
 
-⚠️ **"Re-rodar não duplica" não significa "re-rodar não muda nada".** Três imports usam
-`update_or_create` e **sobrescrevem** o registro existente: eventos (status/owner/datas —
-[#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628)), compras e ações/cadastros.
-Ver §2.6.
+⚠️ **"Re-rodar não duplica" não significa "re-rodar não muda nada".** Os imports de
+ações e de cadastros **sobrescrevem** o registro existente. Os de eventos (status/owner/datas —
+[#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628), corrigido no #2021; a rota
+saiu em 07/11/2026) e de compras (G29) também sobrescreviam e saíram da tela. Ver §2.6.
 
 ### 2.3 RBAC — quem pode importar
 
@@ -163,7 +163,7 @@ Datas de calendário (Solicitação, AvailabilityBlock) **são armazenadas em UT
 |---|---|---|---|---|
 | Usuários | [usuarios.md](./usuarios.md) | [templates/usuarios.template.csv](./templates/usuarios.template.csv) | ✅ Sim | `POST /api/usuarios/import/` |
 | Produtos / Controle / Compras | [produtos_controle.md](./produtos_controle.md) | [templates/produtos_controle.template.csv](./templates/produtos_controle.template.csv) | ✅ Sim | `POST /api/produtos/import/` (o import de compras saiu em 06/11/2026, G29) |
-| Agenda / Solicitações / Eventos | [agenda_solicitacoes.md](./agenda_solicitacoes.md) | [templates/agenda_solicitacoes.template.csv](./templates/agenda_solicitacoes.template.csv) | ✅ Sim, com PA-01 | `POST /api/solicitacoes/import/` |
+| Agenda / Solicitações / Eventos | [agenda_solicitacoes.md](./agenda_solicitacoes.md) | [templates/agenda_solicitacoes.template.csv](./templates/agenda_solicitacoes.template.csv) | Serviço fica; sem rota desde 07/11/2026 (#1628) | — (o evento nasce pela Nova Solicitação e pela carga única do export-contract) |
 | Disponibilidade / Bloqueios | [disponibilidade.md](./disponibilidade.md) | [templates/disponibilidade.template.csv](./templates/disponibilidade.template.csv) | ✅ Tipos T/P (D pendente) | `POST /api/disponibilidade/import-bloqueios/` (sync) + `POST /api/imports/bloqueios/` (async, ImportJob) |
 
 Ordem de execução: [ordem_de_importacao.md](./ordem_de_importacao.md).
@@ -215,12 +215,11 @@ Helpers de reconciliação compartilhados em `apps/core/services/resolvers.py`:
 
 ### Endpoints HTTP
 
-**Síncronos** (10 endpoints, retornam `{stats, pendencias, dry_run, file}`):
+**Síncronos** (8 endpoints, retornam `{stats, pendencias, dry_run, file}`):
 
 | Endpoint | View | Gate RBAC |
 |---|---|---|
 | `POST /api/usuarios/import/` | `ImportUsuariosView` | `IsAuthenticated + SuperuserOnly` (D20) |
-| `POST /api/solicitacoes/import/` | `ImportEventosView` | `IsAuthenticated + SuperuserOnly` (D20) |
 | `POST /api/disponibilidade/import-bloqueios/` | `ImportBloqueiosView` | `IsAuthenticated + SuperuserOnly` (D20) |
 | `POST /api/produtos/import/` | `ImportProdutosView` | `IsAuthenticated + SuperuserOnly` (D20) |
 | `POST /api/municipios/import/` | `ImportMunicipiosView` | `IsAuthenticated + SuperuserOnly` (D20) |

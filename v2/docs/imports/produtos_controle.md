@@ -137,9 +137,10 @@ Aba `Controle` (ou similar) da planilha `sheets.banco`.
 `projeto_id` **não** vem de `Produto.projeto`: vem de `_infer_projeto_from_produto(produto_norm)`
 (`:234`, `:317+`), heurística sobre o **nome normalizado** do produto.
 
-⚠️ **A chave inclui campos mutáveis** (`quantidade` e `uso`). Corrigir a quantidade de uma linha na
-planilha muda o hash e o reimport **cria uma segunda `Compra`** em vez de atualizar a primeira —
-achado `M15-03` / [#1633](https://github.com/matheusnorjosa/aprender_sistema/issues/1633).
+⚠️ **A chave incluía campos mutáveis** (`quantidade` e `uso`). Corrigir a quantidade de uma linha na
+planilha mudava o hash e o reimport **criava uma segunda `Compra`** em vez de atualizar a primeira —
+achado `M15-03` / [#1633](https://github.com/matheusnorjosa/aprender_sistema/issues/1633). Obsoleto
+(G29): a `Compra` foi apagada (migração 0132) e o #1633 foi fechado como obsoleto.
 
 ### `external_hash` — **SHA-1** (não SHA-256)
 
@@ -286,8 +287,9 @@ Não é auditoria — não tem usuário, não tem histórico e o arquivo seguint
 - Listar `Compra` com `data__isnull=True` ou `quantidade__lte=0` — são as linhas inválidas que o
   preview deixou passar (#1634).
 - Listar `Compra` com `produto__isnull=True` — hoje serão **todas** (#1635).
-- Detectar duplicatas de #1633: agrupar por `(municipio, projeto, codigo, data)` e procurar
-  `count > 1` — cada correção de quantidade na planilha gera uma linha extra.
+- ~~Detectar duplicatas de #1633: agrupar por `(municipio, projeto, codigo, data)` e procurar
+  `count > 1` — cada correção de quantidade na planilha gerava uma linha extra.~~ Obsoleto (G29): a
+  `Compra` foi apagada (migração 0132) e o #1633 foi fechado como obsoleto.
 
 ### Reports operacionais
 - `view_compras_dashboard` (Diretoria + DAT) exibe dashboard.
@@ -305,7 +307,7 @@ Não é auditoria — não tem usuário, não tem histórico e o arquivo seguint
 | **Quantidade vazia/negativa/decimal aceita no preview** | obsoleto (G29) | não se aplica mais: a lista antiga `Compra` foi apagada (migração 0132, 06/11/2026) e a issue foi fechada como not planned. Era: vazio vira `0` e passa ([#1634](https://github.com/matheusnorjosa/aprender_sistema/issues/1634)) |
 | **Data ausente gravada como `None`** | obsoleto (G29) | não se aplica mais: a lista antiga `Compra` foi apagada (migração 0132, 06/11/2026) e a issue foi fechada como not planned. Era: `data` não está na validação bloqueante (#1634) |
 | **`Compra.produto` nunca preenchido** | obsoleto (G29) | não se aplica mais: a lista antiga `Compra` foi apagada (migração 0132, 06/11/2026) e a issue foi fechada como not planned. Era: não há FK no `defaults` (#1635) |
-| **Reimport com `quantidade` corrigida duplica a linha** | obsoleto (G29) | não se aplica mais: a lista antiga `Compra` foi apagada (migração 0132, 06/11/2026); a issue segue aberta, com proposta de fechar. Era: `quantidade` e `uso` estão dentro do hash ([#1633](https://github.com/matheusnorjosa/aprender_sistema/issues/1633)) |
+| **Reimport com `quantidade` corrigida duplica a linha** | obsoleto (G29) | não se aplica mais: a lista antiga `Compra` foi apagada (migração 0132, 06/11/2026); a issue foi fechada como obsoleta. Era: `quantidade` e `uso` estão dentro do hash ([#1633](https://github.com/matheusnorjosa/aprender_sistema/issues/1633)) |
 | `F` mal preenchido ou trocado entre linhas | Alta | ❌ Nenhuma — o código não resolve nada; só é gravado como texto |
 | Produto com nome variante (acento, caixa) | Média | ⚠️ Parcial — `norm_text` + `_infer_projeto_from_produto`; se falhar, vira `pendencias.projetos` |
 | Apply sem rastro de auditoria | Alta | ❌ Nenhuma — só o JSON sobrescrevível em `out_etl/` (§11) |
@@ -326,11 +328,10 @@ Não é auditoria — não tem usuário, não tem histórico e o arquivo seguint
 1. **`valor_unitario` no `sheets.banco`**: o template original (7 colunas) não inclui. Se vier na planilha real, `Compra` aceita? (verificar schema do model — não confirmado).
 2. **Granularidade**: 1 linha = 1 compra única, ou 1 linha = somatório por município/ano? Definir como o `external_hash` deve ser composto se for agregado.
 3. **`Uso das coleções`** (campo texto livre): há vocabulário fechado (Alfabetização, Acompanhamento, Reposição) ou string livre?
-4. 🔴 **Identidade real de `Compra`** — bloqueante. Hoje `quantidade` e `uso` fazem parte do
-   `external_hash`, então corrigir uma quantidade na planilha **cria uma segunda linha** em vez de
-   atualizar a primeira ([#1633](https://github.com/matheusnorjosa/aprender_sistema/issues/1633)).
-   Decidir a chave de identidade (provável: `municipio + projeto + codigo + data`) antes de
-   qualquer reimport em massa.
+4. ~~**Identidade real de `Compra`** — `quantidade` e `uso` faziam parte do `external_hash`, então
+   corrigir uma quantidade na planilha criava uma segunda linha em vez de atualizar a primeira.~~
+   Obsoleta (G29): a `Compra` foi apagada (migração 0132) e o
+   [#1633](https://github.com/matheusnorjosa/aprender_sistema/issues/1633) foi fechado como obsoleto.
 5. 🔴 **Invariantes de linha** — definir o que deve ser bloqueante: `quantidade >= 1`, `data`
    obrigatória e em faixa razoável, `codigo` existente em `Produto` (#1634).
 6. 🔴 **UF na resolução de município** e **FK `Compra.produto`** (#1635).

@@ -155,7 +155,7 @@ RESOURCES: Final[tuple[ResourceCase, ...]] = (
     ResourceCase("produtos_list", "GET", "/api/produtos/"),
     # UsuarioLookup (PR 5 #1310): cap-gated, sem hardcode de grupos.
     ResourceCase("usuario_lookup", "GET", "/api/lookup/usuarios/"),
-    # Upload de planilha (2026-10-02): import-acoes representa as 10 rotas de import pela tela (mesmo
+    # Upload de planilha (2026-10-02): import-acoes representa as 9 rotas de import pela tela (mesmo
     # gate `SuperuserOnly`); cada uma tem cobertura em test_imports_pela_tela_so_superusuario.py. Até
     # 06/11/2026 o representante era import-compras, que saiu com a lista antiga de compras (G29).
     ResourceCase("import_pela_tela", "POST", "/api/controle/import-acoes/"),

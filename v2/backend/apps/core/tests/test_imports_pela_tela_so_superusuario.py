@@ -2,7 +2,7 @@
 Importação pela tela é só do superusuário (decisão do dono, 02/10/2026).
 
 Nenhum perfil importa planilha pela tela na liberação: as cargas passam por script, com ensaio.
-As 10 rotas de upload exigem ``SuperuserOnly``; nenhuma capability
+As 9 rotas de upload exigem ``SuperuserOnly``; nenhuma capability
 (``import_spreadsheet``, ``manage_admin_registries``, ``run_daily_operations``) dá acesso. O command de terminal
 ``import_export_contract`` não passa por estes endpoints e não muda.
 
@@ -13,7 +13,6 @@ Endpoints cobertos:
 - POST /api/dat/import-cadastros/
 - POST /api/disponibilidade/import-bloqueios/
 - POST /api/deslocamentos/import/
-- POST /api/solicitacoes/import/
 - POST /api/usuarios/import/
 - POST /api/produtos/import/
 - POST /api/municipios/import/
@@ -58,7 +57,6 @@ ENDPOINTS_DE_IMPORT: list[str] = [
     "/api/dat/import-cadastros/",
     "/api/disponibilidade/import-bloqueios/",
     "/api/deslocamentos/import/",
-    "/api/solicitacoes/import/",
     "/api/usuarios/import/",
     "/api/produtos/import/",
     "/api/municipios/import/",

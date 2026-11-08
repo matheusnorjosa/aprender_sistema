@@ -70,7 +70,6 @@ from .views_health import features, readyz, versionz
 from .views_import_bloqueios import ImportBloqueiosView
 from .views_import_deslocamentos import ImportDeslocamentosView
 from .views_import_equipe_gerencia import ImportEquipeGerenciaView
-from .views_import_eventos import ImportEventosView
 from .views_import_municipios import ImportMunicipiosView
 from .views_import_produtos import ImportProdutosView
 from .views_import_usuarios import ImportUsuariosView
@@ -208,11 +207,6 @@ urlpatterns = [
         "deslocamentos/import/",
         ImportDeslocamentosView.as_view(),
         name="import-deslocamentos",
-    ),
-    path(
-        "solicitacoes/import/",
-        ImportEventosView.as_view(),
-        name="import-eventos",
     ),
     path(
         "usuarios/import/",

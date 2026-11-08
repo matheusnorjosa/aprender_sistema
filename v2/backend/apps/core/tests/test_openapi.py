@@ -285,7 +285,6 @@ class TestOpenAPISchema(TestCase):
             "/api/dat/import-cadastros/",
             "/api/disponibilidade/import-bloqueios/",
             "/api/deslocamentos/import/",
-            "/api/solicitacoes/import/",
             "/api/usuarios/import/",
             "/api/municipios/import/",
             "/api/equipe-gerencia/import/",

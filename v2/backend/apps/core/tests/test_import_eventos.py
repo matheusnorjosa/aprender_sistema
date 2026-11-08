@@ -3,8 +3,6 @@ Testes para importacao de Eventos (Solicitacao + Participation).
 
 Cobertura:
 - Service: import_eventos_from_file()
-- View: ImportEventosView
-- RBAC: Permissoes HasPerm("import_spreadsheet")
 - Idempotencia: Nao duplica registros
 - Regras PA: Status baseado em projeto.fluxo
 """
@@ -20,8 +18,6 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from django.utils import timezone
-from rest_framework import status
-from rest_framework.test import APIClient
 
 import pytest
 
@@ -49,44 +45,6 @@ def _write_csv(content: str) -> str:
     temp.write(content)
     temp.close()
     return temp.name
-
-
-# URL direta (evita problemas de cache de rotas no container)
-IMPORT_EVENTOS_URL = "/api/solicitacoes/import/"
-
-
-@pytest.fixture
-def dat_import_user(db):
-    """Usuario do grupo DAT: tem `import_spreadsheet`, mas não importa pela tela (403)."""
-    return UsuarioFactory(
-        username="dat_import_user",
-        email="dat_imports@test.com",
-        password="testpass123",
-        cpf="11111111111",
-        first_name="DAT",
-        last_name="Imports",
-        groups=["DAT"],
-    )
-
-
-@pytest.fixture
-def superuser(db):
-    """Superusuário: o único que importa pela tela (decisão do dono, 02/10/2026)."""
-    return UsuarioFactory(superuser=True)
-
-
-@pytest.fixture
-def formador_user(db):
-    """Usuario do grupo Formador (sem permissao de import)."""
-    return UsuarioFactory(
-        username="formador_user",
-        email="formador@test.com",
-        password="testpass123",
-        cpf="22222222222",
-        first_name="Formador",
-        last_name="User",
-        groups=["Formador"],
-    )
 
 
 @pytest.fixture
@@ -148,12 +106,6 @@ def tipo_evento(db):
     return TipoEventoFactory(
         nome="Formacao",
     )
-
-
-@pytest.fixture
-def api_client():
-    """Cliente API."""
-    return APIClient()
 
 
 @pytest.fixture
@@ -389,104 +341,6 @@ class TestEventosImportService:
         assert len(result["pendencias"]["dates"]) == 1
 
         Path(temp.name).unlink()
-
-
-# =============================================================================
-# TESTES DA VIEW
-# =============================================================================
-
-
-@pytest.mark.django_db
-class TestImportEventosView:
-    """Testes da view ImportEventosView."""
-
-    def test_permission_denied_for_formador(self, api_client, formador_user, sample_csv):
-        """Formador nao tem permissao (403)."""
-        api_client.force_authenticate(user=formador_user)
-
-        with open(sample_csv, "rb") as f:
-            response = api_client.post(
-                IMPORT_EVENTOS_URL,
-                {"file": f},
-                format="multipart",
-            )
-
-        assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    def test_dat_recebe_403(
-        self, api_client, dat_import_user, sample_csv, coordenador_user, municipio, projeto_super, tipo_evento
-    ):
-        """Importação pela tela é só do superusuário (decisão do dono, 02/10/2026): 403."""
-        api_client.force_authenticate(user=dat_import_user)
-
-        with open(sample_csv, "rb") as f:
-            response = api_client.post(
-                IMPORT_EVENTOS_URL + "?dry_run=true",
-                {"file": f},
-                format="multipart",
-            )
-
-        assert response.status_code == 403
-
-    def test_apply_mode_persists(
-        self, api_client, superuser, sample_csv, coordenador_user, municipio, projeto_super, tipo_evento
-    ):
-        """dry_run=false persiste os dados."""
-        api_client.force_authenticate(user=superuser)
-
-        with open(sample_csv, "rb") as f:
-            response = api_client.post(
-                IMPORT_EVENTOS_URL + "?dry_run=false",
-                {"file": f},
-                format="multipart",
-            )
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["dry_run"] is False
-        assert Solicitacao.objects.count() == 2
-
-    def test_missing_file_returns_400(self, api_client, superuser):
-        """Arquivo ausente retorna 400."""
-        api_client.force_authenticate(user=superuser)
-
-        response = api_client.post(
-            IMPORT_EVENTOS_URL,
-            {},
-            format="multipart",
-        )
-
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "file" in response.data["detail"].lower()
-
-    def test_invalid_mime_type_returns_400(self, api_client, superuser):
-        """Tipo de arquivo invalido retorna 400."""
-        from django.core.files.uploadedfile import SimpleUploadedFile
-
-        api_client.force_authenticate(user=superuser)
-
-        # Usar MIME type explicitamente inválido (não text/plain, pois CSVs podem ser text/plain)
-        fake_file = SimpleUploadedFile("malicious.exe", b"MZ\x90\x00", content_type="application/x-msdownload")
-
-        response = api_client.post(
-            IMPORT_EVENTOS_URL,
-            {"file": fake_file},
-            format="multipart",
-        )
-
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "tipo" in response.data["detail"].lower() or "permitido" in response.data["detail"].lower()
-
-    def test_unauthenticated_returns_401(self, api_client, sample_csv):
-        """Usuario nao autenticado retorna 401."""
-        with open(sample_csv, "rb") as f:
-            response = api_client.post(
-                IMPORT_EVENTOS_URL,
-                {"file": f},
-                format="multipart",
-            )
-
-        # Pode ser 401 ou 403 dependendo da configuracao
-        assert response.status_code in [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN]
 
 
 # =============================================================================

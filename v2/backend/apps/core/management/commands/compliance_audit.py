@@ -211,6 +211,33 @@ class Command(BaseCommand):
         )
 
         # ================================================================
+        # #2036: evento de dois projetos com os dois da mesma gerência e do mesmo fluxo
+        # ================================================================
+        # A regra 2 é de aplicação, não do banco: um data-fix pode furá-la. O poder lê só `projeto`: com
+        # gerência divergente o evento fica fora do escopo da outra gerência (fechado), mas com fluxo
+        # divergente segue o fluxo da vaga 1 e pode escapar da aprovação SUPER (aberto). Este check é o que
+        # detecta o par quebrado. Vale para todo evento, fora do período.
+        from apps.core.services.solicitacao_projetos import par_de_projetos_invalido
+
+        pares_quebrados = [
+            s.pk
+            for s in Solicitacao.objects.filter(projeto_2__isnull=False)
+            .select_related("projeto", "projeto_2")
+            .order_by("pk")
+            if s.projeto is None or s.projeto_2 is None or par_de_projetos_invalido(s.projeto, s.projeto_2)
+        ]
+
+        report["checks"].append(
+            {
+                "rule": "EVENTO-2-PROJETOS",
+                "description": "Events with two projects have both in the same gerência and the same fluxo",
+                "status": "PASS" if not pares_quebrados else "FAIL",
+                "violations": len(pares_quebrados),
+                "details": f"Found {len(pares_quebrados)} events breaking the rule; ids: {pares_quebrados[:50]}",
+            }
+        )
+
+        # ================================================================
         # RD-02: No events during total block
         # ================================================================
         # This is a complex check - simplified version

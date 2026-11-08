@@ -28,8 +28,10 @@ from __future__ import annotations
 from typing import Any
 
 from django.db import transaction
+from django.db.models import Q
 
-from apps.core.models import Projeto
+from apps.core.models import Projeto, Solicitacao
+from apps.core.services.solicitacao_projetos import par_de_projetos_invalido
 
 # (sobrevivente_canonico, duplicata_a_absorver) — verificados ao vivo no golden DB 2026-08-27.
 DEFAULT_PAIRS: list[tuple[str, str]] = [
@@ -58,11 +60,34 @@ def _merge_one(survivor_name: str, dup_name: str, apply: bool) -> dict[str, Any]
         entry["reason"] = "survivor == dup"
         return entry
 
+    # #2036: evento de dois projetos com o par {survivor, dup}, nas duas direções. Depois do reparent as duas
+    # vagas seriam o mesmo projeto (constraint `solicitacao_projeto_2_valido`): a vaga 2 sai antes do laço e
+    # o evento fica só com o sobrevivente.
+    par = Solicitacao.objects.filter(Q(projeto=survivor, projeto_2=dup) | Q(projeto=dup, projeto_2=survivor))
+    entry["conjunto_desfeito"] = par.count()
+    if apply and entry["conjunto_desfeito"]:
+        par.update(projeto_2=None)
+
+    # #2036: a duplicata em par com um terceiro projeto passa a formar par com o sobrevivente. Se esse par for
+    # inválido (gerência ou fluxo diferente), recusa antes de mudar qualquer coisa: o fluxo divergente faria o
+    # evento escapar da aprovação SUPER (PA-01).
+    com_terceiro = Solicitacao.objects.filter(
+        (Q(projeto=dup) & Q(projeto_2__isnull=False) & ~Q(projeto_2=survivor))
+        | (Q(projeto_2=dup) & ~Q(projeto=survivor))
+    ).select_related("projeto", "projeto_2")
+    for s in com_terceiro:
+        terceiro = s.projeto_2 if s.projeto_id == dup.pk else s.projeto
+        motivo = par_de_projetos_invalido(survivor, terceiro) if terceiro is not None else None
+        if motivo:
+            raise ValueError(f"o merge quebraria o par do evento s{s.pk}: {motivo}")
+
     reparented: dict[str, int] = {}
     for rel in Projeto._meta.related_objects:
         field_name = rel.field.name
         rel_model = rel.related_model
         qs = rel_model.objects.filter(**{field_name: dup})
+        if rel_model is Solicitacao and field_name == "projeto_2":
+            qs = qs.exclude(projeto=survivor)  # o par desfeito acima (o dry-run conta igual ao apply)
         n = qs.count()
         if not n:
             continue

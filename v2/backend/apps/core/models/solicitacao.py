@@ -68,7 +68,20 @@ class Solicitacao(models.Model):
         related_name="solicitacoes",
         null=True,
         blank=True,
-        help_text="Projeto associado ao evento (determina fluxo de aprovacao)",
+        help_text="Um dos projetos do evento (o outro, se houver, fica em projeto_2)",
+    )
+    # #2036: evento de dois projetos. As duas vagas valem igual (sem principal); mesma gerência e mesmo fluxo.
+    projeto_2 = models.ForeignKey(  # type: ignore[misc]
+        "core.Projeto",
+        on_delete=models.PROTECT,
+        related_name="solicitacoes_2",
+        null=True,
+        blank=True,
+        verbose_name="Outro projeto",
+        help_text=(
+            "Evento de dois projetos. As duas vagas valem igual; mesma gerência e mesmo fluxo "
+            "(regra em services/solicitacao_projetos)."
+        ),
     )
     tipo_evento = models.ForeignKey(  # type: ignore[misc]
         "core.TipoEvento", on_delete=models.PROTECT, related_name="solicitacoes"
@@ -315,6 +328,13 @@ class Solicitacao(models.Model):
             models.CheckConstraint(
                 condition=models.Q(gcal_status__in=["NONE", "PENDING", "PUBLISHED", "ERROR"]),
                 name="solicitacao_gcal_status_valid",
+            ),
+            # #2036: o 2º projeto só com o 1º, e diferente dele. Gerência e fluxo iguais é regra de aplicação
+            # (`par_de_projetos_invalido`), conferida pelo `compliance_audit`.
+            models.CheckConstraint(
+                condition=models.Q(projeto_2__isnull=True)
+                | (models.Q(projeto__isnull=False) & ~models.Q(projeto_2=models.F("projeto"))),
+                name="solicitacao_projeto_2_valido",
             ),
         ]
 

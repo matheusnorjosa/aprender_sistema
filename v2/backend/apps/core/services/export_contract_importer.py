@@ -73,7 +73,7 @@ from apps.core.services.dat_codigos import recompute_all
 from apps.core.services.dat_registro_split import split_dat_registros
 from apps.core.services.equipe_gerencia_import import (
     PAPEL_MAPPING,
-    _resolve_gerencia,
+    _resolve_gerencia_status,
     _resolve_usuario,
     motivo_vinculo_bloqueado,
     vinculo_exige_superusuario,
@@ -266,16 +266,19 @@ def _norm(s: str) -> str:
 def _gerencia_da_linha(setor: str) -> tuple[Gerencia | None, str]:
     """Gerência EXISTENTE e ativa da linha, ou (None, motivo). Nunca cria gerência (IMP-1).
 
-    Motivos: `setor_sem_lotacao` ("Outros"), `gerencia_inexistente`, `gerencia_inativa`. A resolução é a
-    do upload de equipe (`_resolve_gerencia`, com o de-para `SETOR_MAPPING`): o catálogo de gerências é
-    semeado, a planilha resolve contra ele."""
+    Motivos: `setor_sem_lotacao` ("Outros"), `gerencia_inexistente`, `gerencia_inativa`, `gerencia_ambigua`
+    (#1658: duas ou mais casam no mesmo degrau, alguma ativa; nenhuma é escolhida). A resolução é a do upload de equipe
+    (`_resolve_gerencia_status`, com o de-para `SETOR_MAPPING`): o catálogo de gerências é semeado, a planilha
+    resolve contra ele."""
     if _norm(setor) in _SETORES_SEM_LOTACAO:
         return None, "setor_sem_lotacao"
-    gerencia = _resolve_gerencia(setor)
+    status, gerencia = _resolve_gerencia_status(setor)
+    if status == "ambiguous":
+        return None, "gerencia_ambigua"
+    if status == "inactive":
+        return None, "gerencia_inativa"
     if gerencia is None:
         return None, "gerencia_inexistente"
-    if not gerencia.ativo:
-        return None, "gerencia_inativa"
     return gerencia, ""
 
 
@@ -1422,7 +1425,12 @@ class ExportContractImporter:
         elif name == "gerencia":
             # Export `nome` é o SETOR ("Vidas"); resolve como a linha de equipe (`_gerencia_da_linha`).
             # Só leitura: o import nunca cria gerência (IMP-1) → o que não resolve é rejeitado com o motivo.
-            reasons = {"setor_sem_lotacao": 0, "gerencia_inexistente": 0, "gerencia_inativa": 0}
+            reasons = {
+                "setor_sem_lotacao": 0,
+                "gerencia_inexistente": 0,
+                "gerencia_inativa": 0,
+                "gerencia_ambigua": 0,
+            }
             for r in rows:
                 nome = (r.get("nome") or "").strip()
                 if not nome or nome == "-":
@@ -1699,20 +1707,32 @@ class ExportContractImporter:
                 "setor_sem_lotacao": 0,
                 "gerencia_inexistente": 0,
                 "gerencia_inativa": 0,
+                "gerencia_ambigua": 0,
+                "cpf_sem_cadastro": 0,
+                "usuario_nao_resolvido": 0,
             }
+            perdidas: set[int] = set()
             for r in rows:
                 setor = (r.get("gerencia") or r.get("setor") or "").strip()
                 papel = _resolve_papel(r.get("papel"))
                 if not setor or papel not in _EQUIPE_PAPEIS:
                     tally["would_reject"] += 1
                     continue
-                usuario = _resolve_usuario(
-                    r.get("usuario_cpf") or r.get("cpf") or "",
-                    r.get("usuario_email") or r.get("email") or "",
-                    r.get("usuario_nome") or r.get("nome") or "",
-                )
+                cpf = r.get("usuario_cpf") or r.get("cpf") or ""
+                email = r.get("usuario_email") or r.get("email") or ""
+                nome = r.get("usuario_nome") or r.get("nome") or ""
+                usuario = _resolve_usuario(cpf, email, nome)
                 if usuario is None:
                     tally["would_reject"] += 1
+                    # #1658: CPF válido sem cadastro não cai para e-mail nem nome. A conta que eles ligariam pela
+                    # regra antiga é quem perde a lotação (`lotacao_perdida_contas`).
+                    if is_valid_cpf(normalize_cpf_digits(cpf)):
+                        reasons["cpf_sem_cadastro"] += 1
+                        antiga = _resolve_usuario("", email, nome)
+                        if antiga is not None:
+                            perdidas.add(antiga.id)
+                    else:
+                        reasons["usuario_nao_resolvido"] += 1
                     continue
                 ger, motivo = _gerencia_da_linha(setor)
                 if ger is None:
@@ -1729,6 +1749,7 @@ class ExportContractImporter:
                 st, _ = diff_and_classify({} if exists else None, {}, protected)
                 tally[st] += 1
             tally["reject_reasons"] = reasons
+            tally["lotacao_perdida_contas"] = [f"u{i}" for i in sorted(perdidas)]
 
         elif name == "solicitacao":
             # NK = external_hash (= evento_id estável do CSV; fallback hash/recompute). FK/hora/coordenador não resolvidos →

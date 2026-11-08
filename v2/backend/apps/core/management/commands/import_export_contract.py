@@ -198,6 +198,9 @@ class Command(BaseCommand):
                     self.stdout.write(
                         f"    solicitante_cpf_sem_cadastro_eventos={v['solicitante_cpf_sem_cadastro_eventos']}"
                     )
+                if v.get("lotacao_perdida_contas"):
+                    # #1658: quem a regra antiga lotaria e a nova deixa de fora (só u<id>), para o dono no ensaio
+                    self.stdout.write(f"    lotacao_perdida_contas={v['lotacao_perdida_contas']}")
         for ent in ("solicitacao", "gcal_adocao"):
             v = report["por_entidade"].get(ent) or {}
             if v.get("virada"):

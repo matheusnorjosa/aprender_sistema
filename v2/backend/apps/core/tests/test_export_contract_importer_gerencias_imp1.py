@@ -7,7 +7,8 @@ IMP-1 — o import_export_contract acha a gerência da linha e nunca a cria (dec
 - Gerência inexistente (`gerencia_inexistente`) ou inativa (`gerencia_inativa`) não recebe vínculo.
 - `Gerencia.setor_canonico` já preenchido não é reescrito pela linha.
 - Usuário novo cujas linhas de equipe não acham gerência nasce sem grupo (nem o do `cargo`).
-- O classify rejeita com o motivo; `produto` e `gerencia` aparecem como "só leitura, não grava".
+- O classify rejeita com o motivo; `gerencia` aparece como "só leitura, não grava" (`produto` grava desde o
+  lote E2).
 
 Fixtures sintéticas: CPFs de teste com DV válido, sem dado real.
 """
@@ -254,7 +255,7 @@ def test_classify_gerencia_rejeita_o_que_nao_resolve_e_nunca_cria(tmp_path, vida
     }
 
 
-def test_produto_e_gerencia_marcados_so_leitura_no_relatorio(tmp_path):
+def test_so_gerencia_marcada_so_leitura_no_relatorio(tmp_path):
     path = _export(
         tmp_path,
         {
@@ -266,14 +267,14 @@ def test_produto_e_gerencia_marcados_so_leitura_no_relatorio(tmp_path):
 
     pe = ExportContractImporter(path=path).run()["por_entidade"]
 
-    assert pe["produto"]["nota"] == "só leitura, não grava"
+    assert "nota" not in pe["produto"]  # lote E2: produto grava
     assert pe["gerencia"]["nota"] == "só leitura, não grava"
     assert "nota" not in pe["tipo_evento"]
 
     out = StringIO()
     call_command("import_export_contract", "--path", path, stdout=out)
     linhas = {ln.split("]")[0].strip(): ln for ln in out.getvalue().splitlines() if ln.strip().startswith("[")}
-    assert "só leitura, não grava" in linhas["[produto"]
+    assert "só leitura" not in linhas["[produto"]
     assert "só leitura, não grava" in linhas["[gerencia"]
     assert "só leitura" not in linhas["[tipo_evento"]
 

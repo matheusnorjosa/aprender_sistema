@@ -30,6 +30,7 @@ import os
 import re
 import unicodedata
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
@@ -69,7 +70,7 @@ from apps.core.models import (
 )
 from apps.core.rbac.helpers import fluxo_super_fora_da_superintendencia
 from apps.core.services.bloqueios_import import _FORMADOR_CUTOFF
-from apps.core.services.compra_elegibilidade import par_liberado
+from apps.core.services.compra_elegibilidade import par_liberado, produto_cabe_na_compra
 from apps.core.services.dat_codigos import recompute_all
 from apps.core.services.dat_registro_split import split_dat_registros
 from apps.core.services.equipe_gerencia_import import (
@@ -150,9 +151,10 @@ IMPLEMENTED = {
     # Sem CSV próprio: lê o solicitacao.csv, só no modo `virada`, depois da carga e do A5.
     "gcal_adocao",
 }
-# Escrivíveis = subconjunto de IMPLEMENTED com apply REAL. `produto`/`gerencia` classificam mas não
-# têm handler (silent-0) → `--allow-entity` neles é erro (CR-03), não "applied=0" calado.
-APPLIABLE = IMPLEMENTED - {"produto", "gerencia"}
+# Escrivíveis = subconjunto de IMPLEMENTED com apply REAL. `gerencia` classifica mas não tem handler
+# (silent-0) → `--allow-entity gerencia` é erro (CR-03), não "applied=0" calado. `produto` grava desde o
+# lote E2 (07/11/2026): só o produto real, create-only (`_plano_produto`).
+APPLIABLE = IMPLEMENTED - {"gerencia"}
 
 # Papel canonico (PAPEL_MAPPING) -> nome do Django Group (FUNCAO_GROUPS). Fonte do papel no
 # import de usuario: equipe_gerencia.papel (primaria, por CPF) -> usuario.cargo (fallback).
@@ -292,6 +294,80 @@ def _norm_codigo(code: str) -> str:
     Código só de zeros vira '0' (não some). Vazio permanece vazio (não linka)."""
     code = (code or "").strip().upper()
     return code.lstrip("0") or code[:1]
+
+
+# Lote E2 (decisões do dono de 07/11/2026). Linha do produto.csv com `codigo_erp` é ruído do ERP (fragmento ou kit
+# duplicado de um id curto): nunca vira produto e conta em `skip_reasons` pela natureza.
+_PRODUTO_REJEITOS = (
+    "contrato_sem_codigo_erp",
+    "fonte_inconsistente",
+    "codigo_vazio",
+    "projeto_nao_resolvido",
+    "codigo_repetido_no_arquivo",
+)
+_PRODUTO_PULOS = ("ja_existe", "erp_kit_com_par", "erp_kit_sem_par", "erp_fragmento", "erp_outro")
+
+
+def _eh_linha_erp(r: dict[str, str]) -> bool:
+    return bool((r.get("codigo_erp") or "").strip())
+
+
+def _motivo_linha_erp(r: dict[str, str]) -> str:
+    natureza = (r.get("natureza") or "").strip().casefold()
+    if natureza == "fragmento":
+        return "erp_fragmento"
+    if natureza == "kit":
+        return "erp_kit_com_par" if (r.get("id_curto_par") or "").strip() else "erp_kit_sem_par"
+    return "erp_outro"
+
+
+def _traducao_erp(linhas: list[dict[str, str]]) -> tuple[dict[str, str], dict[str, str]]:
+    """(id curto normalizado → nome, código ERP normalizado → id curto normalizado), do produto.csv do pacote.
+
+    Só entra o par cujo id curto também está no arquivo: a trava do nome (`_IndiceProduto.resolver`) precisa dele.
+    """
+    nomes = {
+        k: (r.get("nome") or "") for r in linhas if not _eh_linha_erp(r) and (k := _norm_codigo(r.get("codigo") or ""))
+    }
+    par: dict[str, str] = {}
+    for r in linhas:
+        curto = _norm_codigo(r.get("id_curto_par") or "")
+        if _eh_linha_erp(r) and curto in nomes:
+            par[_norm_codigo(r.get("codigo") or "")] = curto
+    return nomes, par
+
+
+@dataclass(frozen=True)
+class _IndiceProduto:
+    """Produto de uma compra pelo código: o do banco ou, para código do ERP, o id curto do par no produto.csv.
+
+    `banco`: código normalizado → (produto_id, projeto_id), sem os códigos que colidem depois de normalizar
+    (#1635, fail-closed). O código que está no banco vence a tradução (F9). A tradução só vale quando o nome do
+    id curto no produto.csv é o projeto da compra (F8: pega o par deslocado um livro, relay 54).
+    """
+
+    banco: dict[str, tuple[int, int]]
+    ambiguos: frozenset[str]
+    nomes_curto: dict[str, str]
+    par_erp: dict[str, str]
+
+    def resolver(self, codigo: str, projeto_compra: str) -> tuple[tuple[int, int] | None, str]:
+        """((produto_id, projeto_id) ou None, motivo de não resolver)."""
+        key = _norm_codigo(codigo)
+        if not key:
+            return None, "sem_codigo"
+        if key in self.banco:
+            return self.banco[key], ""
+        if key in self.ambiguos:
+            return None, "codigo_ambiguo"
+        curto = self.par_erp.get(key)
+        if curto is None:
+            return None, "codigo_desconhecido"
+        if _norm(self.nomes_curto[curto]) != _norm(projeto_compra):
+            return None, "par_erp_divergente"
+        if curto in self.banco:
+            return self.banco[curto], ""
+        return None, "codigo_ambiguo" if curto in self.ambiguos else "id_curto_ausente"
 
 
 def _cmp(v: Any) -> str:
@@ -1388,16 +1464,10 @@ class ExportContractImporter:
             tally["reject_reasons"] = reasons
 
         elif name == "produto":
-            # NK = codigo (unique), com `_norm_codigo` dos dois lados. Só leitura: decide pela existência e
-            # não compara nome (o apply não grava produto; o nome diferente só fazia ruído de would_update).
-            codigos = {_norm_codigo(c) for c in Produto.objects.values_list("codigo", flat=True)}
-            for r in rows:
-                codigo = _norm_codigo(r.get("codigo") or "")
-                if not codigo:
-                    tally["would_reject"] += 1
-                    continue
-                st, _ = diff_and_classify({} if codigo in codigos else None, {}, protected)
-                tally[st] += 1
+            # Lote E2: a mesma regra do apply (`_plano_produto`). Decide pela existência do código, sem
+            # comparar nome: o produto existente nunca é atualizado.
+            plano, _novos = self._plano_produto(rows)
+            tally.update(plano)
 
         elif name == "usuario":
             # NK = CPF válido (mod-11), fallback email para dedup. CPF estruturalmente
@@ -1667,14 +1737,33 @@ class ExportContractImporter:
             # sobrescreve). Espelha o apply, que grava só a 1ª linha de cada NK do arquivo: a repetição
             # vira would_reject(compra_repetida_no_arquivo), e would_create = compras que o apply cria.
             # ano_uso vazio (NÃO_CLASSIFICADO) grava com ano_uso=NULL (pendente de ano — decisão A).
+            # Lote E2: produto pela mesma regra do apply (`_produto_da_compra`); compra nova sem produto e sem
+            # descrição = `item_vazio`; compra do banco sem produto conta em um de quatro grupos, por linha do
+            # banco: would_ligar_produto + ligacao_outro_projeto + ligacao_produto_nao_resolvido +
+            # sem_produto_fora_do_csv = compras do banco com produto NULL.
             mun_idx = self._municipio_index()
             if self._pidx is None:
                 self._pidx = build_projeto_index()
+            indice = self._indice_produto()
+            projetos = self._projetos_para_guarda()
             anos_por_nk: dict[tuple[Any, ...], set[int | None]] = {}
-            for *nk_db, ano_db in DATCompra.objects.values_list(
-                "municipio_id", "projeto_id", "descricao_produto", "tipo", "quantidade", "data_compra", "ano_uso"
+            sem_produto_por_nk: dict[tuple[Any, ...], int] = {}
+            compras_por_nk: dict[tuple[Any, ...], int] = {}
+            for prod_db, *nk_db, ano_db in DATCompra.objects.values_list(
+                "produto_id",
+                "municipio_id",
+                "projeto_id",
+                "descricao_produto",
+                "tipo",
+                "quantidade",
+                "data_compra",
+                "ano_uso",
             ):
-                anos_por_nk.setdefault(tuple(nk_db), set()).add(ano_db)
+                nk_t = tuple(nk_db)
+                anos_por_nk.setdefault(nk_t, set()).add(ano_db)
+                compras_por_nk[nk_t] = compras_por_nk.get(nk_t, 0) + 1
+                if prod_db is None:
+                    sem_produto_por_nk[nk_t] = sem_produto_por_nk.get(nk_t, 0) + 1
             vistas: set[tuple[Any, ...]] = set()
             reasons = {
                 "projeto_vazio": 0,
@@ -1682,7 +1771,19 @@ class ExportContractImporter:
                 "projeto_ambiguo": 0,
                 "municipio_nao_resolvido": 0,
                 "compra_repetida_no_arquivo": 0,
+                "item_vazio": 0,
             }
+            ligacao: dict[str, int] = dict.fromkeys(
+                (
+                    "produto_de_outro_projeto",
+                    "produto_nao_resolvido",
+                    "would_ligar_produto",
+                    "ligacao_outro_projeto",
+                    "ligacao_produto_nao_resolvido",
+                ),
+                0,
+            )
+            motivos_produto: dict[str, int] = {}
             nao_resolvidos: dict[str, int] = {}
             for r in rows:
                 projeto = (r.get("projeto") or "").strip()
@@ -1705,16 +1806,41 @@ class ExportContractImporter:
                     tally["would_reject"] += 1
                     reasons["compra_repetida_no_arquivo"] += 1
                     continue
-                vistas.add(nk)
+                pid, motivo = self._produto_da_compra(indice, projetos, r, res.projeto.id)
                 anos = anos_por_nk.get(nk)
+                if anos is None and pid is None and not nk[2]:
+                    tally["would_reject"] += 1  # F12: fora de `vistas`, como no apply
+                    reasons["item_vazio"] += 1
+                    continue
+                vistas.add(nk)
                 if anos is None:
                     tally["would_create"] += 1
-                elif _dat_compra_ano_uso(r) in anos:
+                    if motivo == "outro_projeto":
+                        ligacao["produto_de_outro_projeto"] += 1
+                    elif motivo and motivo != "sem_codigo":
+                        ligacao["produto_nao_resolvido"] += 1
+                        motivos_produto[motivo] = motivos_produto.get(motivo, 0) + 1
+                    continue
+                if _dat_compra_ano_uso(r) in anos:
                     tally["would_skip_same"] += 1
                 else:
                     tally["would_update"] += 1  # mesma compra, outro ano_uso
+                n_nulos = sem_produto_por_nk.get(nk, 0)
+                if not n_nulos:
+                    continue
+                if pid is not None:
+                    ligacao["would_ligar_produto"] += n_nulos
+                elif motivo == "outro_projeto":
+                    ligacao["ligacao_outro_projeto"] += n_nulos
+                else:
+                    ligacao["ligacao_produto_nao_resolvido"] += n_nulos
+                    motivos_produto[motivo] = motivos_produto.get(motivo, 0) + n_nulos
             tally["reject_reasons"] = reasons
             tally["projetos_nao_resolvidos"] = nao_resolvidos
+            tally.update(ligacao)
+            tally["sem_produto_fora_do_csv"] = sum(n for k, n in sem_produto_por_nk.items() if k not in vistas)
+            tally["produto_nao_resolvido_motivos"] = motivos_produto
+            tally["nk_repetida_no_banco"] = sum(1 for n in compras_por_nk.values() if n > 1)
 
         elif name == "equipe_gerencia":
             # NK = (gerencia, usuario, papel). Papel fora do domínio ou usuário não-resolvido →
@@ -2257,6 +2383,124 @@ class ExportContractImporter:
             _parse_iso_date(r.get("data_compra")),
         )
 
+    def _indice_produto(self) -> _IndiceProduto:
+        """Índice de produto do classify e do apply de dat_compra: o banco mais o par ERP→id curto do produto.csv."""
+        banco: dict[str, tuple[int, int]] = {}
+        ambiguos: set[str] = set()
+        for pid, codigo, proj_id in Produto.objects.values_list("id", "codigo", "projeto_id"):
+            key = _norm_codigo(codigo)
+            if not key:
+                continue
+            if key in banco and banco[key][0] != pid:
+                ambiguos.add(key)
+            banco.setdefault(key, (pid, proj_id))
+        for key in ambiguos:
+            banco.pop(key, None)
+        nomes, par = _traducao_erp(self._load("produto"))
+        return _IndiceProduto(banco=banco, ambiguos=frozenset(ambiguos), nomes_curto=nomes, par_erp=par)
+
+    @staticmethod
+    def _projetos_para_guarda() -> dict[int, Projeto]:
+        """Projetos com o que `produto_cabe_na_compra` lê (id e coleção), numa consulta."""
+        return Projeto.objects.only("id", "projeto_geral_id").in_bulk()
+
+    @staticmethod
+    def _produto_da_compra(
+        indice: _IndiceProduto, projetos: dict[int, Projeto], r: dict[str, str], proj_id: int
+    ) -> tuple[int | None, str]:
+        """(produto_id, motivo) da linha de compra. Motivo vazio = liga; `outro_projeto` = o produto é de outra
+        coleção (guarda #1632, a compra fica sem produto); senão, por que o código não resolve."""
+        achado, motivo = indice.resolver(r.get("produto_codigo") or "", r.get("projeto") or "")
+        if achado is None:
+            return None, motivo
+        pid, prod_proj = achado
+        if not produto_cabe_na_compra(projetos[prod_proj], projetos[proj_id]):
+            return None, "outro_projeto"
+        return pid, ""
+
+    def _plano_produto(self, rows: list[dict[str, str]]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """Regra do produto real (lote E2), a mesma no classify e no apply. Devolve (contagens, produtos a criar).
+
+        Produto real = linha com `codigo_erp` vazio e `fonte=Produtos` (o id curto) cujo código, por `_norm_codigo`,
+        ainda não está no banco, com projeto que resolve. Linha com `codigo_erp` é ruído do ERP: skip pela natureza
+        (`erp_ja_no_banco` conta a que já está no banco). Sem as colunas `codigo_erp` e `fonte` (contrato antigo),
+        tudo é recusado: o export antigo criaria os 585 ruídos do v40. `would_create_codigos` é a lista que o dono
+        aprova (catálogo, sem dado pessoal), com o gêmeo no catálogo (mesmo projeto, nome e tipo de outro id curto
+        do arquivo) e as compras do pacote que usam o produto, pelo id curto ou pelo par do ERP."""
+        tally: dict[str, Any] = {"would_create": 0, "would_skip_same": 0, "would_reject": 0}
+        reasons: dict[str, int] = dict.fromkeys(_PRODUTO_REJEITOS, 0)
+        pulos: dict[str, int] = dict.fromkeys(_PRODUTO_PULOS, 0)
+        novos: list[dict[str, Any]] = []
+        extras: dict[str, Any] = {"erp_ja_no_banco": 0, "gemeo_no_catalogo": 0, "produto_projeto_sem_colecao": 0}
+        if rows and not {"codigo_erp", "fonte"} <= rows[0].keys():
+            reasons["contrato_sem_codigo_erp"] = tally["would_reject"] = len(rows)
+            rows = []
+        if self._pidx is None:
+            self._pidx = build_projeto_index()
+        no_banco = {_norm_codigo(c) for c in Produto.objects.values_list("codigo", flat=True)}
+        vistos: set[str] = set()
+        for r in rows:
+            codigo = (r.get("codigo") or "").strip()
+            key = _norm_codigo(codigo)
+            if not key:
+                tally["would_reject"] += 1
+                reasons["codigo_vazio"] += 1
+            elif _eh_linha_erp(r):
+                tally["would_skip_same"] += 1
+                pulos[_motivo_linha_erp(r)] += 1
+                extras["erp_ja_no_banco"] += key in no_banco
+            elif _norm(r.get("fonte") or "") != "PRODUTOS":
+                tally["would_reject"] += 1
+                reasons["fonte_inconsistente"] += 1
+            elif key in no_banco:
+                tally["would_skip_same"] += 1
+                pulos["ja_existe"] += 1
+            else:
+                res = resolve_projeto_export(r.get("projeto") or "", index=self._pidx)
+                if res.status != "matched" or res.projeto is None:
+                    tally["would_reject"] += 1
+                    reasons["projeto_nao_resolvido"] += 1
+                elif key in vistos:
+                    tally["would_reject"] += 1
+                    reasons["codigo_repetido_no_arquivo"] += 1
+                else:
+                    vistos.add(key)
+                    novos.append({"key": key, "codigo": codigo, "linha": r, "projeto": res.projeto})
+        tally["would_create"] = len(novos)
+        tally["reject_reasons"] = reasons
+        tally["skip_reasons"] = pulos
+
+        def assinatura(r: dict[str, str]) -> tuple[str, str, str]:
+            return (_norm(r.get("projeto") or ""), _norm(r.get("nome") or ""), _norm(r.get("tipo") or ""))
+
+        curtos: dict[tuple[str, str, str], list[str]] = {}
+        for r in rows:
+            if not _eh_linha_erp(r) and (r.get("codigo") or "").strip():
+                curtos.setdefault(assinatura(r), []).append((r.get("codigo") or "").strip())
+        _nomes, par = _traducao_erp(rows)
+        compras: dict[str, int] = {}
+        for c in self._load("dat_compra"):
+            k = _norm_codigo(c.get("produto_codigo") or "")
+            k = par.get(k, k)
+            compras[k] = compras.get(k, 0) + 1
+        lista: list[dict[str, Any]] = []
+        for n in novos:
+            gemeos = [c for c in curtos.get(assinatura(n["linha"]), []) if _norm_codigo(c) != n["key"]]
+            extras["gemeo_no_catalogo"] += bool(gemeos)
+            extras["produto_projeto_sem_colecao"] += n["projeto"].projeto_geral_id is None
+            lista.append(
+                {
+                    "codigo": n["codigo"],
+                    "nome": (n["linha"].get("nome") or "").strip(),
+                    "projeto": n["projeto"].nome,
+                    "compras_no_pacote": compras.get(n["key"], 0),
+                    "gemeo_de": gemeos,
+                }
+            )
+        tally["would_create_codigos"] = lista
+        tally.update(extras)
+        return tally, novos
+
     def _zerar_contagem_de_pessoas(self) -> None:
         """Os acumuladores do #2035 valem por rodada: o relatório não carrega contagem de outra."""
         self._email_cpf_divergente = set()
@@ -2352,7 +2596,18 @@ class ExportContractImporter:
                         applied["dat_registro__ano_preenchido"] = ano_preenchido
                     continue
                 if name == "dat_compra":
-                    applied[name] = self._apply_dat_compra(self._load(name))
+                    # Create-only + ligação da compra do banco sem produto (seed-if-empty, lote E2), reportada à
+                    # parte como o dat_registro__ano_preenchido.
+                    created_dc, ligados, de_outro_projeto = self._apply_dat_compra(self._load(name))
+                    applied[name] = created_dc
+                    if ligados:
+                        applied["dat_compra__produto_ligado"] = ligados
+                    if de_outro_projeto:
+                        applied["dat_compra__produto_de_outro_projeto"] = de_outro_projeto
+                    continue
+                if name == "produto":
+                    # Lote E2: só o produto real (`_plano_produto`), numa execução própria antes de dat_compra.
+                    applied[name] = self._apply_produto(self._load(name))
                     continue
                 if name == "dat_coordenador":
                     # Handler dedicado (fecha silent-gap M18-09: CSV usa `usuario`, não `nome` → o loop
@@ -3828,44 +4083,64 @@ class ExportContractImporter:
             created += 1
         return created, ano_preenchido
 
-    def _apply_dat_compra(self, rows: list[dict[str, str]]) -> int:
+    def _apply_produto(self, rows: list[dict[str, str]]) -> int:
+        """Create-only do produto real (lote E2), pela regra do classify (`_plano_produto`). Nunca atualiza produto
+        existente (os do banco mantêm o nome). Sem actor: Produto não tem `created_by`."""
+        _plano, novos = self._plano_produto(rows)
+        for n in novos:
+            r = n["linha"]
+            Produto.objects.create(
+                codigo=n["codigo"],
+                nome=(r.get("nome") or "").strip()[:200],
+                descricao=(r.get("descricao") or "").strip(),
+                projeto=n["projeto"],
+                ativo=True,
+            )
+        return len(novos)
+
+    def _apply_dat_compra(self, rows: list[dict[str, str]]) -> tuple[int, int, int]:
         """Create-only de DATCompra. NK existence-based por tupla; `tipo`/`conta_para_codigos`
-        alimentam o cálculo de nr_codigos (recomputado ao fim do apply). Produto resolvido por
-        codigo (opcional; fallback descricao_produto). status_uso é derivado no save()."""
+        alimentam o cálculo de nr_codigos (recomputado ao fim do apply). status_uso é derivado no save().
+
+        Produto (lote E2, a mesma regra do classify): pelo código no banco ou pelo par ERP→id curto do produto.csv
+        (`_IndiceProduto`), com a guarda da coleção (`produto_cabe_na_compra`): o produto de outra coleção fica de
+        fora e a compra nova entra sem produto. Compra nova sem produto e sem descrição (`item_vazio`) não entra.
+        Compra do banco sem produto, na 1ª linha da NK no arquivo, recebe o produto (seed-if-empty: o filtro
+        `produto__isnull=True` nunca sobrescreve), com `updated_by`/`updated_at` e um AuditLog `UPDATE` por compra.
+        A NK não é única no banco (sem UniqueConstraint): todas as compras da NK sem produto ligam.
+        Retorna `(created, ligados, de_outro_projeto)`."""
         actor = self._require_actor("dat_compra")
         mun_idx = self._municipio_index()
-        # #1635: índice por codigo normalizado (zero à esquerda) nos DOIS lados. Colisão de chave
-        # normalizada entre 2 produtos distintos = ambígua → não linka (fail-closed, sem chute).
-        prod_idx: dict[str, int] = {}
-        _ambiguous_codes: set[str] = set()
-        for pid, c in Produto.objects.values_list("id", "codigo"):
-            key = _norm_codigo(c)
-            if not key:
-                continue
-            if key in prod_idx and prod_idx[key] != pid:
-                _ambiguous_codes.add(key)
-            prod_idx.setdefault(key, pid)
-        for key in _ambiguous_codes:
-            prod_idx.pop(key, None)
-        existing = set(
-            DATCompra.objects.values_list(
-                "municipio_id", "projeto_id", "descricao_produto", "tipo", "quantidade", "data_compra"
-            )
-        )
-        created = 0
+        indice = self._indice_produto()
+        projetos = self._projetos_para_guarda()
+        existing: dict[tuple[Any, ...], list[tuple[int, int | None]]] = {}
+        for cid, prod_db, *nk_db in DATCompra.objects.values_list(
+            "id", "produto_id", "municipio_id", "projeto_id", "descricao_produto", "tipo", "quantidade", "data_compra"
+        ):
+            existing.setdefault(tuple(nk_db), []).append((cid, prod_db))
+        vistas: set[tuple[Any, ...]] = set()  # F4: separado do banco, como no classify
+        created = ligados = de_outro_projeto = 0
         for r in rows:
             mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
             proj_id = self.resolve_projeto(r.get("projeto") or "")
             nk = self._dat_compra_nk(r, mun_id, proj_id)
             if mun_id is None or proj_id is None:
                 continue  # FK não-resolvida: o classify conta e dá o motivo (reject_reasons)
+            if nk in vistas:
+                continue  # repetida no arquivo: o classify espelha (compra_repetida_no_arquivo)
+            pid, motivo = self._produto_da_compra(indice, projetos, r, proj_id)
             if nk in existing:
-                # já existe (mesmo com outro ano_uso) ou repetida no arquivo: o classify espelha
+                vistas.add(nk)  # já existe (mesmo com outro ano_uso): create-only não cria nem sobrescreve
+                if pid is not None:
+                    ligados += self._ligar_produto([cid for cid, p in existing[nk] if p is None], pid, actor)
                 continue
+            if pid is None and not nk[2]:
+                continue  # item_vazio: fora de `vistas`, como no classify
+            vistas.add(nk)
             DATCompra.objects.create(
                 municipio_id=mun_id,
                 projeto_id=proj_id,
-                produto_id=prod_idx.get(_norm_codigo(r.get("produto_codigo") or "")),
+                produto_id=pid,
                 descricao_produto=nk[2],
                 tipo=nk[3],
                 conta_para_codigos=_to_bool(r.get("conta_para_codigos")),
@@ -3874,9 +4149,33 @@ class ExportContractImporter:
                 data_compra=nk[5],
                 created_by=actor,
             )
-            existing.add(nk)
             created += 1
-        return created
+            de_outro_projeto += motivo == "outro_projeto"
+        return created, ligados, de_outro_projeto
+
+    @staticmethod
+    def _ligar_produto(ids: list[int], produto_id: int, actor: Usuario) -> int:
+        """Liga `produto_id` às compras sem produto (nunca sobrescreve) e grava um AuditLog por compra ligada."""
+        ligados = 0
+        for cid in ids:
+            n = DATCompra.objects.filter(pk=cid, produto__isnull=True).update(
+                produto_id=produto_id, updated_by=actor, updated_at=timezone.now()
+            )
+            if n:
+                AuditLog.objects.create(
+                    usuario=actor,
+                    action=AuditLog.Action.UPDATE,
+                    model_name="DATCompra",
+                    details={
+                        "dat_compra_id": cid,
+                        "origem": ORIGEM_IMPORTER,
+                        "campo": "produto_id",
+                        "de": None,
+                        "para": produto_id,
+                    },
+                )
+                ligados += n
+        return ligados
 
     def _apply_projeto(self, rows: list[dict[str, str]]) -> tuple[int, int]:
         """Create-only do master `projeto` (catálogo de variantes — Onda A) + reconcile de

@@ -19,7 +19,7 @@ from django.core.management import call_command
 
 import pytest
 
-from apps.core.models import DATCompra, DATRegistro, Produto, ProjetoGeral
+from apps.core.models import AuditLog, DATCompra, DATRegistro, Produto, ProjetoGeral
 from apps.core.services.export_contract_importer import ExportContractImporter, _parse_int
 from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, UsuarioFactory
 
@@ -466,6 +466,7 @@ def test_classify_dat_compra_rejeito_tem_motivo_e_nome_do_projeto(tmp_path):
         "projeto_ambiguo": 1,
         "municipio_nao_resolvido": 1,
         "compra_repetida_no_arquivo": 0,
+        "item_vazio": 0,
     }
     assert sum(t["reject_reasons"].values()) == t["would_reject"]
     assert t["projetos_nao_resolvidos"] == {"GESTÃO ESCOLAR 4": 2, "VIDA - E - MATEMATICA 6": 1}
@@ -477,3 +478,327 @@ def test_comando_texto_mostra_motivo_do_rejeito(tmp_path):
     texto = out.getvalue()
     assert "projeto_nao_resolvido" in texto
     assert "GESTÃO ESCOLAR 4" in texto
+
+
+# ───────── Lote E2 (07/11/2026): guardas do produto na compra e ligação da compra sem produto ─────────
+PRODUTO_HEADER = "codigo,nome,descricao,projeto,tipo,fonte,natureza,codigo_erp,id_curto_par"
+
+
+def _colecoes():
+    """Coleção A (livros 1 e 2) e coleção B (livro 1), com o município e o ator."""
+    actor = _actor()
+    mun = MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    pg_a = ProjetoGeral.objects.create(nome="Col A", usa_avaliar=False)
+    pg_b = ProjetoGeral.objects.create(nome="Col B", usa_avaliar=False)
+    a1 = ProjetoFactory(nome="Col A 1", fluxo="NAO_SUPER", projeto_geral=pg_a)
+    a2 = ProjetoFactory(nome="Col A 2", fluxo="NAO_SUPER", projeto_geral=pg_a)
+    b1 = ProjetoFactory(nome="Col B 1", fluxo="NAO_SUPER", projeto_geral=pg_b)
+    return actor, mun, a1, a2, b1
+
+
+def _linha(projeto: str, codigo: str, desc: str = "kit", qtde: int = 10) -> str:
+    return f"Cidade X,CE,{projeto},{codigo},{desc},Aluno,true,{qtde},2026,2026-06-08"
+
+
+def _existente(actor, mun, projeto, desc="kit", qtde=10, produto=None):
+    """Compra já gravada com a NK de `_linha(projeto, ..., desc, qtde)`."""
+    return DATCompra.objects.create(
+        municipio=mun,
+        projeto=projeto,
+        produto=produto,
+        descricao_produto=desc,
+        tipo="Aluno",
+        quantidade=qtde,
+        ano_uso=2026,
+        data_compra=date(2026, 6, 8),
+        created_by=actor,
+    )
+
+
+def _pacote(tmp_path, *linhas: str, produto: str | None = None) -> str:
+    files = {"dat_compra": COMPRA_HEADER + "\n" + "\n".join(linhas) + "\n"}
+    if produto is not None:
+        files["produto"] = produto
+    return _write_export(tmp_path, files)
+
+
+def _seco(path: str) -> dict[str, Any]:
+    return ExportContractImporter(path=path).run()["por_entidade"]["dat_compra"]
+
+
+def _aplica(path: str, actor) -> dict[str, Any]:
+    return ExportContractImporter(path=path, apply=True, allow=("dat_compra",), actor=actor).run()["applied"]
+
+
+# Par do ERP: o kit 0101005 do ERP é o id curto 5, cujo nome é o projeto das compras dele.
+_PAR_ERP = (
+    PRODUTO_HEADER
+    + "\n5,Col A 1,kit,Col A,Aluno,Produtos,kit,,"
+    + "\n0101005,Col A 1,kit erp,Col A,Aluno,produtos_erp,kit,0101005,5\n"
+)
+
+
+def test_compra_nova_com_produto_de_outra_colecao_entra_sem_produto(tmp_path):
+    actor, _mun, _a1, _a2, b1 = _colecoes()
+    Produto.objects.create(codigo="7", nome="Col B 1", projeto=b1)
+    path = _pacote(tmp_path, _linha("Col A 1", "7"))
+
+    t = _seco(path)
+    assert (t["would_create"], t.get("produto_de_outro_projeto")) == (1, 1)
+
+    applied = _aplica(path, actor)
+    assert applied["dat_compra"] == 1
+    assert applied.get("dat_compra__produto_de_outro_projeto") == 1
+    assert DATCompra.objects.get().produto_id is None
+
+
+def test_produto_de_outro_livro_da_mesma_colecao_liga(tmp_path):
+    actor, _mun, _a1, a2, _b1 = _colecoes()
+    p = Produto.objects.create(codigo="8", nome="Col A 2", projeto=a2)
+    path = _pacote(tmp_path, _linha("Col A 1", "8"))
+
+    assert _seco(path).get("produto_de_outro_projeto") == 0
+    applied = _aplica(path, actor)
+    assert "dat_compra__produto_de_outro_projeto" not in applied
+    assert DATCompra.objects.get().produto_id == p.pk
+
+
+def test_projetos_sem_colecao_diferentes_nao_ligam(tmp_path):
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Avulso 1", fluxo="NAO_SUPER")
+    Produto.objects.create(codigo="9", nome="Avulso 2", projeto=ProjetoFactory(nome="Avulso 2", fluxo="NAO_SUPER"))
+    path = _pacote(tmp_path, _linha("Avulso 1", "9"))
+
+    assert _seco(path).get("produto_de_outro_projeto") == 1
+    _aplica(path, actor)
+    assert DATCompra.objects.get().produto_id is None
+
+
+def test_item_vazio_nao_entra(tmp_path):
+    actor, _mun, _a1, _a2, b1 = _colecoes()
+    Produto.objects.create(codigo="7", nome="Col B 1", projeto=b1)
+    path = _pacote(
+        tmp_path,
+        _linha("Col A 1", "", desc=""),  # sem código e sem descrição
+        _linha("Col A 1", "999", desc="", qtde=11),  # código desconhecido e sem descrição
+        _linha("Col A 1", "7", desc="", qtde=12),  # produto barrado pela guarda e sem descrição
+        _linha("Col A 1", "", desc="", qtde=12),  # repete a NK do anterior: item vazio não entra em `vistas`
+    )
+
+    t = _seco(path)
+    assert (t["would_create"], t["would_reject"]) == (0, 4)
+    assert t["reject_reasons"]["item_vazio"] == 4
+    assert sum(t["reject_reasons"].values()) == t["would_reject"]
+    assert t.get("produto_de_outro_projeto") == 0
+
+    assert _aplica(path, actor)["dat_compra"] == 0
+    assert not DATCompra.objects.exists()
+
+
+def test_compra_existente_sem_produto_liga_pelo_id_curto(tmp_path):
+    actor, mun, a1, _a2, _b1 = _colecoes()
+    p = Produto.objects.create(codigo="5", nome="Col A 1", projeto=a1)
+    compra = _existente(actor, mun, a1)
+    path = _pacote(tmp_path, _linha("Col A 1", "5"))
+
+    t = _seco(path)
+    assert (t["would_create"], t["would_skip_same"], t.get("would_ligar_produto")) == (0, 1, 1)
+
+    applied = _aplica(path, actor)
+    assert applied["dat_compra"] == 0
+    assert applied.get("dat_compra__produto_ligado") == 1
+    compra.refresh_from_db()
+    assert (compra.produto_id, compra.updated_by_id) == (p.pk, actor.pk)
+    log = AuditLog.objects.get(model_name="DATCompra")
+    assert (log.action, log.usuario_id) == (AuditLog.Action.UPDATE, actor.pk)
+    assert log.details == {
+        "dat_compra_id": compra.pk,
+        "origem": "import_export_contract",
+        "campo": "produto_id",
+        "de": None,
+        "para": p.pk,
+    }
+
+    assert "dat_compra__produto_ligado" not in _aplica(path, actor)  # 2ª execução não liga de novo
+    assert AuditLog.objects.filter(model_name="DATCompra").count() == 1
+
+
+def test_ligacao_pelo_codigo_do_erp_usa_o_par_do_produto_csv(tmp_path):
+    actor, mun, a1, _a2, _b1 = _colecoes()
+    p = Produto.objects.create(codigo="5", nome="Col A 1", projeto=a1)
+    compra = _existente(actor, mun, a1)
+    path = _pacote(
+        tmp_path,
+        _linha("Col A 1", "101005"),  # código do ERP sem o zero, compra já gravada
+        _linha("Col A 1", "0101005", qtde=20),  # compra nova
+        produto=_PAR_ERP,
+    )
+
+    t = _seco(path)
+    assert (t["would_create"], t.get("would_ligar_produto")) == (1, 1)
+    assert t.get("produto_nao_resolvido") == 0
+
+    applied = _aplica(path, actor)
+    assert (applied["dat_compra"], applied.get("dat_compra__produto_ligado")) == (1, 1)
+    compra.refresh_from_db()
+    assert compra.produto_id == p.pk
+    assert DATCompra.objects.get(quantidade=20).produto_id == p.pk
+
+
+def test_compra_existente_com_produto_nao_muda(tmp_path):
+    actor, mun, a1, _a2, _b1 = _colecoes()
+    antigo = Produto.objects.create(codigo="4", nome="Col A 1", projeto=a1)
+    Produto.objects.create(codigo="5", nome="Col A 1", projeto=a1)
+    compra = _existente(actor, mun, a1, produto=antigo)
+    path = _pacote(tmp_path, _linha("Col A 1", "5"))
+
+    assert _seco(path).get("would_ligar_produto") == 0
+    assert "dat_compra__produto_ligado" not in _aplica(path, actor)
+    compra.refresh_from_db()
+    assert compra.produto_id == antigo.pk
+
+
+def test_compra_existente_sem_produto_de_outra_colecao_fica_sem_produto(tmp_path):
+    actor, mun, a1, _a2, b1 = _colecoes()
+    Produto.objects.create(codigo="7", nome="Col B 1", projeto=b1)
+    compra = _existente(actor, mun, a1)
+    path = _pacote(tmp_path, _linha("Col A 1", "7"))
+
+    t = _seco(path)
+    assert (t.get("ligacao_outro_projeto"), t.get("would_ligar_produto")) == (1, 0)
+    assert t.get("produto_de_outro_projeto") == 0  # a guarda da compra nova não conta a existente
+
+    applied = _aplica(path, actor)
+    assert "dat_compra__produto_ligado" not in applied
+    assert "dat_compra__produto_de_outro_projeto" not in applied
+    compra.refresh_from_db()
+    assert compra.produto_id is None
+
+
+def test_conta_das_compras_sem_produto_fecha(tmp_path):
+    actor, mun, a1, _a2, b1 = _colecoes()
+    Produto.objects.create(codigo="5", nome="Col A 1", projeto=a1)
+    Produto.objects.create(codigo="7", nome="Col B 1", projeto=b1)
+    _existente(actor, mun, a1, qtde=1)  # liga
+    _existente(actor, mun, a1, qtde=2)  # produto de outra coleção
+    _existente(actor, mun, a1, qtde=3)  # código desconhecido
+    _existente(actor, mun, a1, qtde=4)  # fora do arquivo
+    path = _pacote(
+        tmp_path,
+        _linha("Col A 1", "5", qtde=1),
+        _linha("Col A 1", "7", qtde=2),
+        _linha("Col A 1", "999", qtde=3),
+    )
+
+    t = _seco(path)
+    grupos = (
+        t["would_ligar_produto"],
+        t["ligacao_outro_projeto"],
+        t["ligacao_produto_nao_resolvido"],
+        t["sem_produto_fora_do_csv"],
+    )
+    assert grupos == (1, 1, 1, 1)
+    assert sum(grupos) == DATCompra.objects.filter(produto__isnull=True).count()
+    assert t["produto_nao_resolvido_motivos"] == {"codigo_desconhecido": 1}
+
+
+def test_nk_repetida_no_arquivo_nao_liga_a_compra_criada_pela_primeira(tmp_path):
+    actor, _mun, a1, _a2, _b1 = _colecoes()
+    Produto.objects.create(codigo="5", nome="Col A 1", projeto=a1)
+    path = _pacote(tmp_path, _linha("Col A 1", "999"), _linha("Col A 1", "5"))
+
+    t = _seco(path)
+    assert (t["would_create"], t["reject_reasons"]["compra_repetida_no_arquivo"]) == (1, 1)
+    assert t.get("would_ligar_produto") == 0
+
+    applied = _aplica(path, actor)
+    assert applied["dat_compra"] == 1
+    assert "dat_compra__produto_ligado" not in applied
+    assert DATCompra.objects.get().produto_id is None
+
+
+def test_duas_compras_no_banco_com_a_mesma_nk_ligam_as_duas(tmp_path):
+    actor, mun, a1, _a2, _b1 = _colecoes()
+    p = Produto.objects.create(codigo="5", nome="Col A 1", projeto=a1)
+    _existente(actor, mun, a1)
+    _existente(actor, mun, a1)
+    path = _pacote(tmp_path, _linha("Col A 1", "5"))
+
+    t = _seco(path)
+    assert (t.get("would_ligar_produto"), t.get("nk_repetida_no_banco")) == (2, 1)
+
+    assert _aplica(path, actor).get("dat_compra__produto_ligado") == 2
+    assert set(DATCompra.objects.values_list("produto_id", flat=True)) == {p.pk}
+
+
+def test_par_erp_com_nome_de_outro_projeto_nao_liga(tmp_path):
+    actor, _mun, a1, _a2, _b1 = _colecoes()
+    Produto.objects.create(codigo="5", nome="Col A 2", projeto=a1)
+    par_deslocado = PRODUTO_HEADER + (
+        "\n5,Col A 2,kit,Col A,Aluno,Produtos,kit,,\n0101005,Col A 1,kit erp,Col A,Aluno,produtos_erp,kit,0101005,5\n"
+    )
+    path = _pacote(tmp_path, _linha("Col A 1", "0101005"), produto=par_deslocado)
+
+    t = _seco(path)
+    assert t.get("produto_nao_resolvido") == 1
+    assert t["produto_nao_resolvido_motivos"] == {"par_erp_divergente": 1}
+
+    _aplica(path, actor)
+    assert DATCompra.objects.get().produto_id is None
+
+
+def test_codigo_do_erp_no_banco_vence_a_traducao(tmp_path):
+    actor, _mun, a1, a2, _b1 = _colecoes()
+    erp = Produto.objects.create(codigo="0101005", nome="Kit ERP", projeto=a1)
+    Produto.objects.create(codigo="5", nome="Col A 1", projeto=a2)
+    path = _pacote(tmp_path, _linha("Col A 1", "101005"), produto=_PAR_ERP)
+
+    _aplica(path, actor)
+    assert DATCompra.objects.get().produto_id == erp.pk
+
+
+def test_sem_produto_csv_o_codigo_do_erp_fica_sem_produto(tmp_path):
+    actor, _mun, a1, _a2, _b1 = _colecoes()
+    Produto.objects.create(codigo="5", nome="Col A 1", projeto=a1)
+    path = _pacote(tmp_path, _linha("Col A 1", "0101005"))
+
+    t = _seco(path)
+    assert (t["would_create"], t.get("produto_nao_resolvido")) == (1, 1)
+    assert t["produto_nao_resolvido_motivos"] == {"codigo_desconhecido": 1}
+    assert _aplica(path, actor)["dat_compra"] == 1
+    assert DATCompra.objects.get().produto_id is None
+
+
+def test_codigo_ambiguo_no_banco_nao_liga_a_compra_existente(tmp_path):
+    actor, mun, a1, _a2, _b1 = _colecoes()
+    Produto.objects.create(codigo="0402", nome="Col A 1", projeto=a1)
+    Produto.objects.create(codigo="402", nome="Col A 1", projeto=a1)
+    compra = _existente(actor, mun, a1)
+    path = _pacote(tmp_path, _linha("Col A 1", "402"))
+
+    t = _seco(path)
+    assert (t.get("would_ligar_produto"), t.get("ligacao_produto_nao_resolvido")) == (0, 1)
+    assert t["produto_nao_resolvido_motivos"] == {"codigo_ambiguo": 1}
+    _aplica(path, actor)
+    compra.refresh_from_db()
+    assert compra.produto_id is None
+
+
+def test_comando_texto_mostra_ligacao_guarda_e_item_vazio(tmp_path):
+    actor, mun, a1, _a2, b1 = _colecoes()
+    Produto.objects.create(codigo="5", nome="Col A 1", projeto=a1)
+    Produto.objects.create(codigo="7", nome="Col B 1", projeto=b1)
+    _existente(actor, mun, a1)
+    path = _pacote(
+        tmp_path,
+        _linha("Col A 1", "5"),
+        _linha("Col A 1", "7", qtde=2),
+        _linha("Col A 1", "", desc="", qtde=3),
+    )
+    out = StringIO()
+    call_command("import_export_contract", "--path", path, stdout=out)
+    texto = out.getvalue()
+    assert "would_ligar_produto=1" in texto
+    assert "produto_de_outro_projeto=1" in texto
+    assert "item_vazio" in texto

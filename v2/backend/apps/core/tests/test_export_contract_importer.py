@@ -222,9 +222,13 @@ def test_classify_produto(tmp_path):
     proj = ProjetoFactory(nome="Proj Prod Teste", fluxo="NAO_SUPER")
     Produto.objects.create(codigo="PT-1", nome="Produto Existente", projeto=proj)
     Produto.objects.create(codigo="PT-2", nome="Produto Upd", projeto=proj)
-    # Só leitura, decide pela existência do código (IMP-3): PT-1 e PT-2 (nome diverge) -> skip;
-    # PT-NOVO -> create; vazio -> reject
-    csv = "codigo,nome\nPT-1,Produto Existente\nPT-2,Nome Mudou\nPT-NOVO,Novo\n,Sem Codigo\n"
+    # Decide pela existência do código (IMP-3): PT-1 e PT-2 (nome diverge) -> skip; PT-NOVO -> create;
+    # vazio -> reject. Colunas `fonte`/`codigo_erp` do contrato (lote E2: sem elas, tudo é recusado).
+    csv = (
+        "codigo,nome,projeto,fonte,codigo_erp\nPT-1,Produto Existente,Proj Prod Teste,Produtos,\n"
+        "PT-2,Nome Mudou,Proj Prod Teste,Produtos,\nPT-NOVO,Novo,Proj Prod Teste,Produtos,\n"
+        ",Sem Codigo,Proj Prod Teste,Produtos,\n"
+    )
     r = ExportContractImporter(path=_write_export(tmp_path, {"produto": csv})).run()["por_entidade"]["produto"]
     assert r["would_skip_same"] == 2
     assert r["would_update"] == 0

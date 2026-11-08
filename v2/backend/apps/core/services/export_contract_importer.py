@@ -68,6 +68,7 @@ from apps.core.models import (
     Usuario,
 )
 from apps.core.rbac.helpers import fluxo_super_fora_da_superintendencia
+from apps.core.services.bloqueios_import import _FORMADOR_CUTOFF
 from apps.core.services.compra_elegibilidade import par_liberado
 from apps.core.services.dat_codigos import recompute_all
 from apps.core.services.dat_registro_split import split_dat_registros
@@ -166,6 +167,8 @@ _PAPEL_TO_GROUP: dict[str, str] = {
 # EQUIPE ("Equipe administrativa", #2094) grava o vínculo e nada mais: fica fora de
 # _PAPEL_TO_GROUP, então nunca dá grupo, e não abre escopo (EquipeGerencia.vigentes_com_escopo_em).
 _EQUIPE_PAPEIS = frozenset(_PAPEL_TO_GROUP) | {EquipeGerencia.PAPEL_EQUIPE}
+# Papéis que põem a pessoa como alvo de bloqueio da carga (#1643): os da tela Bloqueios, G/C/A + FORMADOR.
+_PAPEIS_DA_TELA_BLOQUEIOS = EquipeGerencia.PAPEIS_DE_ATUACAO | {"FORMADOR"}
 
 # Rótulo de equipe que não é gerência: a linha não lota ninguém (decisão do dono, 14/10). Comparado
 # por `_norm`, então cobre "Outros" e o `gerencia_norm` "OUTROS".
@@ -336,6 +339,20 @@ def _parse_local_datetime(v: Any) -> datetime | None:
     if dt.tzinfo is None:
         dt = timezone.make_aware(dt, _FORTALEZA_TZ)
     return dt
+
+
+def _motivo_alvo_bloqueio(usr_id: int, inicio: datetime, ativos: set[int], com_papel: set[int]) -> str | None:
+    """Motivo de recusa do alvo de um bloqueio da carga (#1643), ou None se ele pode receber o bloqueio.
+
+    Antes de `_FORMADOR_CUTOFF` (data LOCAL do `inicio`) vale qualquer alvo: é dado histórico (decisão de 14/09).
+    A partir dele, fica de fora só quem está inativo ou sem papel vigente (decisão do dono de 07/11/2026)."""
+    if inicio.astimezone(_FORTALEZA_TZ).date() < _FORMADOR_CUTOFF:
+        return None
+    if usr_id not in ativos:
+        return "alvo_inativo"
+    if usr_id not in com_papel:
+        return "alvo_sem_papel"
+    return None
 
 
 def _parse_hora(v: Any) -> time | None:
@@ -1098,6 +1115,9 @@ class ExportContractImporter:
         # Planos que o classify de plano_formacao prevê criar (mun_id, proj_id, ano): a filha desses
         # planos é would_create no dry-run, como no apply (ENTITY_ORDER cria o plano antes).
         self._plano_criaria: set[tuple[int, int, int]] = set()
+        # Contas que o classify de equipe_gerencia prevê ganhar papel da tela Bloqueios (#1643): o dry-run de
+        # availability_block as conta como alvo com papel, como o apply (ENTITY_ORDER cria o vínculo antes).
+        self._papel_criaria: set[int] = set()
         self._sol_existente: set[str] | None = None
         self._sol_passado_novo: set[str] = set()
         self._criadas_nesta_execucao: set[str] = set()
@@ -1712,6 +1732,7 @@ class ExportContractImporter:
                 "usuario_nao_resolvido": 0,
             }
             perdidas: set[int] = set()
+            self._papel_criaria = set()
             for r in rows:
                 setor = (r.get("gerencia") or r.get("setor") or "").strip()
                 papel = _resolve_papel(r.get("papel"))
@@ -1748,6 +1769,8 @@ class ExportContractImporter:
                     continue
                 st, _ = diff_and_classify({} if exists else None, {}, protected)
                 tally[st] += 1
+                if not exists and papel in _PAPEIS_DA_TELA_BLOQUEIOS:
+                    self._papel_criaria.add(usuario.id)
             tally["reject_reasons"] = reasons
             tally["lotacao_perdida_contas"] = [f"u{i}" for i in sorted(perdidas)]
 
@@ -2071,18 +2094,39 @@ class ExportContractImporter:
             # Bloco de disponibilidade de formador. usuario por CPF (FK PROTECT NOT NULL → sem match
             # = reject). tipo ∈ {T, P} (CheckConstraint). inicio/fim datetime local → UTC; fim ≤ inicio
             # viola a constraint → reject. NK (usuario, inicio, fim, tipo). Existence-based.
+            # A partir do corte, alvo inativo ou sem papel vigente → reject (#1643, `_motivo_alvo_bloqueio`). O papel
+            # que a equipe_gerencia do mesmo pacote cria conta (`_papel_criaria`), como no apply.
             cpf_idx = self._usuario_cpf_index()
+            ativos, com_papel = self._alvos_de_bloqueio()
+            alvos = (ativos, com_papel | self._papel_criaria)
             existing = set(AvailabilityBlock.objects.values_list("usuario_id", "inicio", "fim", "tipo"))
+            reasons = {
+                "cpf_sem_usuario": 0,
+                "tipo_invalido": 0,
+                "data_invalida": 0,
+                "alvo_inativo": 0,
+                "alvo_sem_papel": 0,
+            }
             for r in rows:
                 usr_id = cpf_idx.get(normalize_cpf_digits(r.get("usuario_cpf") or ""))
                 tipo = (r.get("tipo") or "").strip().upper()
                 inicio = _parse_local_datetime(r.get("inicio"))
                 fim = _parse_local_datetime(r.get("fim"))
-                if usr_id is None or tipo not in ("T", "P") or inicio is None or fim is None or fim <= inicio:
+                if usr_id is None:
+                    motivo = "cpf_sem_usuario"
+                elif tipo not in ("T", "P"):
+                    motivo = "tipo_invalido"
+                elif inicio is None or fim is None or fim <= inicio:
+                    motivo = "data_invalida"
+                else:
+                    motivo = _motivo_alvo_bloqueio(usr_id, inicio, *alvos)
+                if motivo:
                     tally["would_reject"] += 1
+                    reasons[motivo] += 1
                     continue
                 st, _ = diff_and_classify({} if (usr_id, inicio, fim, tipo) in existing else None, {}, protected)
                 tally[st] += 1
+            tally["reject_reasons"] = reasons
 
         elif name == "deslocamento":
             # Deslocamento de formador (origem/destino TEXTO, não FK). usuario por CPF (PROTECT NOT
@@ -3623,9 +3667,16 @@ class ExportContractImporter:
         (FK PROTECT NOT NULL → sem match = skip). inicio/fim datetime LOCAL Fortaleza → UTC (RD-06);
         fim ≤ inicio viola a CheckConstraint → skip. tipo ∈ {T, P} → skip fora disso. `motivo` sem
         origem na planilha → ''. status default 'aprovado' (save auto-aprova). created_by = actor.
-        NK existence-based (usuario, inicio, fim, tipo)."""
+        NK existence-based (usuario, inicio, fim, tipo).
+
+        #1643: a partir do corte, alvo inativo ou sem papel vigente → skip (`_motivo_alvo_bloqueio`). Os índices
+        de CPF e de alvo são montados AQUI, depois de usuario/equipe_gerencia da mesma execução (ENTITY_ORDER):
+        a pessoa criada nesta carga recebe o bloqueio. Cada bloqueio criado grava o AuditLog
+        DELEGATE_BLOCK_CREATE da rota delegada (sem `motivo`), com origem=ORIGEM_IMPORTER; a linha que já
+        existe não cria nem audita de novo."""
         actor = self._require_actor("availability_block")
         cpf_idx = self._usuario_cpf_index()
+        alvos = self._alvos_de_bloqueio()
         existing = set(AvailabilityBlock.objects.values_list("usuario_id", "inicio", "fim", "tipo"))
         created = 0
         for r in rows:
@@ -3635,10 +3686,12 @@ class ExportContractImporter:
             fim = _parse_local_datetime(r.get("fim"))
             if usr_id is None or tipo not in ("T", "P") or inicio is None or fim is None or fim <= inicio:
                 continue
+            if _motivo_alvo_bloqueio(usr_id, inicio, *alvos):
+                continue
             nk = (usr_id, inicio, fim, tipo)
             if nk in existing:
                 continue
-            AvailabilityBlock.objects.create(
+            block = AvailabilityBlock.objects.create(
                 usuario_id=usr_id,
                 inicio=inicio,
                 fim=fim,
@@ -3646,9 +3699,36 @@ class ExportContractImporter:
                 motivo=(r.get("motivo") or "").strip()[:255],
                 created_by=actor,
             )
+            AuditLog.objects.create(
+                usuario=actor,
+                action=AuditLog.Action.DELEGATE_BLOCK_CREATE,
+                model_name="AvailabilityBlock",
+                details={
+                    "delegate_user_id": actor.pk,
+                    "target_formador_id": usr_id,
+                    "block_id": block.pk,
+                    "inicio": block.inicio.isoformat(),
+                    "fim": block.fim.isoformat(),
+                    "origem": ORIGEM_IMPORTER,
+                },
+            )
             existing.add(nk)
             created += 1
         return created
+
+    def _alvos_de_bloqueio(self) -> tuple[set[int], set[int]]:
+        """(ids ativos, ids com papel vigente em gerência ativa que usa a tela Bloqueios) para o `_motivo_alvo_bloqueio`.
+
+        Papéis = os da tela Bloqueios (G/C/A + FORMADOR, `access_availability_blocks`): decisão do dono de
+        07/11/2026, coordenadora ou apoio que não é formadora também entra. EQUIPE não conta (só diz onde trabalha).
+        """
+        ativos = set(Usuario.objects.filter(is_active=True).values_list("id", flat=True))
+        com_papel = set(
+            EquipeGerencia.vigentes_em()
+            .filter(papel__in=_PAPEIS_DA_TELA_BLOQUEIOS, gerencia__ativo=True)
+            .values_list("usuario_id", flat=True)
+        )
+        return ativos, com_papel
 
     def _apply_deslocamento(self, rows: list[dict[str, str]]) -> int:
         """Create-only de Deslocamento (formador entre municípios, origem/destino TEXTO). usuario por

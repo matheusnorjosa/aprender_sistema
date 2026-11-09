@@ -12,6 +12,7 @@ import type { JSX } from 'react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, test, vi } from 'vitest';
 
+import { ComAcesso } from '../../../test/comAcesso';
 import { definirLarguraTela } from '../../../test/larguraTela';
 
 vi.mock('../../../api/dashboard', () => ({
@@ -97,6 +98,13 @@ vi.setConfig({ testTimeout: 30_000 });
 function renderPagina(pagina: JSX.Element): ReturnType<typeof render> {
   return render(<MemoryRouter>{pagina}</MemoryRouter>);
 }
+
+/** O painel de Compras inteiro é de quem tem `view_compras_dashboard`; sem ela, só as pendências. */
+const comprasComDashboard = (
+  <ComAcesso policies={['view_compras_dashboard', 'view_compras_pendencias']}>
+    <ComprasDashboardPage />
+  </ComAcesso>
+);
 
 /** Cabeçalhos da tabela que contém `celula` (sem a coluna do botão de expandir). */
 function cabecalhosDe(celula: HTMLElement): string[] {
@@ -211,7 +219,7 @@ describe('Dashboard Google Calendar sem rolagem horizontal (G30)', { timeout: 20
 
 describe('Dashboard de Compras sem rolagem horizontal (G30)', { timeout: 20000 }, () => {
   test('a 1280 px: pendências e "quem compra mais" sem largura forçada', async () => {
-    const { container } = renderPagina(<ComprasDashboardPage />);
+    const { container } = renderPagina(comprasComDashboard);
     const pendente = await screen.findByText('Iguatu', {}, { timeout: 15000 });
     const comprador = screen.getByText('Crato');
 
@@ -222,7 +230,7 @@ describe('Dashboard de Compras sem rolagem horizontal (G30)', { timeout: 20000 }
 
   test('a 360 px: só o município na linha; o resto na linha expandida', async () => {
     definirLarguraTela(360);
-    renderPagina(<ComprasDashboardPage />);
+    renderPagina(comprasComDashboard);
     const pendente = await screen.findByText('Iguatu', {}, { timeout: 15000 });
 
     await esperarCabecalhos(() => pendente, ['Município']);
@@ -230,7 +238,7 @@ describe('Dashboard de Compras sem rolagem horizontal (G30)', { timeout: 20000 }
   });
 
   test('os cartões de indicador só ficam 5 por linha a partir de xxl', async () => {
-    renderPagina(<ComprasDashboardPage />);
+    renderPagina(comprasComDashboard);
     await screen.findByText('Iguatu', {}, { timeout: 15000 });
 
     const coluna = screen.getByText('Municípios atendidos').closest('.ant-col');
@@ -239,7 +247,7 @@ describe('Dashboard de Compras sem rolagem horizontal (G30)', { timeout: 20000 }
   });
 
   test('mudar a largura reorganiza as colunas', async () => {
-    renderPagina(<ComprasDashboardPage />);
+    renderPagina(comprasComDashboard);
     await screen.findByText('Iguatu', {}, { timeout: 15000 });
 
     act(() => definirLarguraTela(768));

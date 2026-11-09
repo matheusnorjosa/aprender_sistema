@@ -173,6 +173,7 @@ Cada módulo em produção tem uma spec versionada, datada e rastreável ao cód
 - [imports/ordem_de_importacao.md](./imports/ordem_de_importacao.md)
 - [imports/dry_run_response_contract.md](./imports/dry_run_response_contract.md)
 - [imports/usuarios.md](./imports/usuarios.md) · [imports/disponibilidade.md](./imports/disponibilidade.md) · [imports/agenda_solicitacoes.md](./imports/agenda_solicitacoes.md) · [imports/produtos_controle.md](./imports/produtos_controle.md)
+- [imports/ROTEIRO_CONFERENCIA_TELAS_POS_CARGA.md](./imports/ROTEIRO_CONFERENCIA_TELAS_POS_CARGA.md) - Conferir as telas depois de cada passo da carga da virada (fechou a #1900)
 - Spec: [specs/backend/imports.spec.md](./specs/backend/imports.spec.md)
 - **Espelho Sistema × Planilha**: [ESPELHO_SISTEMA_PLANILHA.md](./ESPELHO_SISTEMA_PLANILHA.md) — o que o sistema faz com o contrato da planilha (contraparte da `REFERENCIA-DOMINIO.md`); dependências de import + requisitos + a §9.1 re-verificada
 

@@ -209,6 +209,8 @@ const ACTORS: ActorSnapshot[] = [
     actor: 'Controle',
     expectedAccess: {
       ...NEGA_TUDO,
+      // 09/11/2026 (decisão do dono): view_compras_pendencias abre a tela, só com as pendências.
+      '/dashboards/compras': true,
       '/dashboards/gcal': true,
       '/solicitacoes/aprovacoes': true,
       ...ESCOPO,
@@ -255,6 +257,7 @@ const ACTORS: ActorSnapshot[] = [
     actor: 'Assistente Administrativo Controle',
     expectedAccess: {
       ...NEGA_TUDO,
+      '/dashboards/compras': true, // view_compras_pendencias (09/11/2026)
       '/dashboards/gcal': true,
       '/solicitacoes/aprovacoes': true,
       ...ESCOPO,

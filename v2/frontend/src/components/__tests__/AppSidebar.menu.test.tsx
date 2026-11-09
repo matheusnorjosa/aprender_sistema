@@ -86,6 +86,7 @@ type TopLevelItem = (typeof TOP_LEVEL_ITEMS)[number];
 const DASHBOARDS_CHILDREN = [
   'Dashboard Geral',
   'Dashboard Compras',
+  'Pendências de compras',
   'Dashboard Equipe',
   'Dashboard GCal',
   'Mapa do Brasil',
@@ -114,7 +115,8 @@ const ACTORS: ActorSnapshot[] = [
   {
     actor: 'Superuser',
     expectedVisible: [...TOP_LEVEL_ITEMS],
-    expectedDashboardsChildren: [...DASHBOARDS_CHILDREN],
+    // Com as duas policies, o item é o dashboard ("Pendências de compras" é de quem não o tem).
+    expectedDashboardsChildren: DASHBOARDS_CHILDREN.filter((c) => c !== 'Pendências de compras'),
     expectedDatChildren: [...DAT_CHILDREN],
     expectedControleChildren: TODO_O_CONTROLE,
     expectedSolicitacoesChildren: [...SOLICITACOES_CHILDREN],
@@ -156,7 +158,8 @@ const ACTORS: ActorSnapshot[] = [
       'Dashboards',
       'Grade Mensal',
     ],
-    expectedDashboardsChildren: ['Dashboard GCal'],
+    // 09/11/2026 (decisão do dono): view_compras_pendencias sem o dashboard → só as pendências.
+    expectedDashboardsChildren: ['Pendências de compras', 'Dashboard GCal'],
     expectedDatChildren: [],
     expectedControleChildren: TODO_O_CONTROLE,
     expectedSolicitacoesChildren: [],
@@ -254,7 +257,8 @@ const ACTORS: ActorSnapshot[] = [
       'Dashboards',
       'Grade Mensal',
     ],
-    expectedDashboardsChildren: ['Dashboard GCal'],
+    // 09/11/2026 (decisão do dono): view_compras_pendencias sem o dashboard → só as pendências.
+    expectedDashboardsChildren: ['Pendências de compras', 'Dashboard GCal'],
     expectedDatChildren: [],
     expectedControleChildren: TODO_O_CONTROLE,
     expectedSolicitacoesChildren: [],
@@ -475,6 +479,22 @@ describe('AppSidebar — "Publicar na agenda" (#1656)', () => {
     );
     const link = screen.getByRole('link', { name: /^Publicar na agenda$/i });
     expect(link.closest('li')?.className).toContain('ant-menu-item-selected');
+  });
+});
+
+describe('AppSidebar — Pendências de compras (09/11/2026)', () => {
+  test('só view_compras_pendencias: o submenu Dashboards aparece, só com Pendências de compras', () => {
+    renderSidebar(['view_compras_pendencias']);
+    expect(isTopLevelVisible('Dashboards')).toBe(true);
+    expect(getDashboardsChildren()).toEqual(['Pendências de compras']);
+    expect(screen.getByRole('link', { name: /^Pendências de compras$/i }).getAttribute('href')).toBe(
+      '/dashboards/compras',
+    );
+  });
+
+  test('com view_compras_dashboard: o item continua Dashboard Compras', () => {
+    renderSidebar(['view_compras_dashboard', 'view_compras_pendencias']);
+    expect(getDashboardsChildren()).toEqual(['Dashboard Compras']);
   });
 });
 

@@ -85,7 +85,8 @@ export function AppRoutes({ user }: AppRoutesProps): JSX.Element {
         {/* Dashboards — #1271: gate por policy pública (RequirePolicy). Fallback padrão
             do RequirePolicy é a mesma tela genérica ("Recurso indisponível", OWASP). */}
         <Route path="/dashboards" element={<RequirePolicy policy="view_overview_dashboard" policies={policies}><DashboardsPage /></RequirePolicy>} />
-        <Route path="/dashboards/compras" element={<RequirePolicy policy="view_compras_dashboard" policies={policies}><ComprasDashboardPage /></RequirePolicy>} />
+        {/* Quem tem só view_compras_pendencias vê a tela só com as pendências (09/11/2026). */}
+        <Route path="/dashboards/compras" element={<RequirePolicy policy={['view_compras_dashboard', 'view_compras_pendencias']} policies={policies}><ComprasDashboardPage /></RequirePolicy>} />
         <Route path="/dashboards/equipe" element={<RequirePolicy policy="view_team_dashboard" policies={policies}><EquipeDashboardPage /></RequirePolicy>} />
         <Route path="/dashboards/gcal" element={<RequirePolicy policy="view_gcal_dashboard" policies={policies}><GCalDashboardPage /></RequirePolicy>} />
         <Route path="/mapa-brasil" element={<RequirePolicy policy="view_map_metrics" policies={policies}><MapaBrasilPage /></RequirePolicy>} />

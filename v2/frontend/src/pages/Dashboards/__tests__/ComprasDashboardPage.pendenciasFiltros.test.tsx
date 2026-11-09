@@ -7,6 +7,8 @@ import { describe, expect, test, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 
+import { ComAcesso } from '../../../test/comAcesso';
+
 const { dashboard } = vi.hoisted(() => ({
   dashboard: {
     kpis: {
@@ -58,7 +60,9 @@ describe('ComprasDashboardPage: pendências com os filtros do painel', () => {
     async () => {
       render(
         <MemoryRouter>
-          <ComprasDashboardPage />
+          <ComAcesso policies={['view_compras_dashboard', 'view_compras_pendencias']}>
+            <ComprasDashboardPage />
+          </ComAcesso>
         </MemoryRouter>,
       );
       await screen.findByText('Municípios pendentes de agendamento', {}, { timeout: 15000 });

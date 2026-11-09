@@ -32,6 +32,7 @@ from apps.core.serializers.gcal_dashboard_contract import (
 )
 from apps.core.services.gcal import compute_payload_hash
 from apps.core.services.gcal.validation import _event_id_for
+from apps.core.services.solicitacao_projetos import q_tem_projeto, rotulo_dos_projetos
 from apps.core.views_gcal.helpers import DashboardEventsPagination, _filter_events_queryset
 
 
@@ -97,7 +98,7 @@ class DashboardEventsExportView(APIView):
         qs = _filter_events_queryset(
             request,
             Solicitacao.objects.select_related(
-                "municipio", "projeto", "tipo_evento", "usuario", "coordenador", "projeto__gerencia"
+                "municipio", "projeto", "projeto_2", "tipo_evento", "usuario", "coordenador", "projeto__gerencia"
             ).prefetch_related("participations__usuario"),
         )
 
@@ -158,7 +159,7 @@ class DashboardEventsExportView(APIView):
                 [
                     s.id,
                     sanitize_csv_value(s.municipio.nome if s.municipio else ""),
-                    sanitize_csv_value(s.projeto.nome if s.projeto else ""),
+                    sanitize_csv_value(rotulo_dos_projetos(s) or ""),
                     sanitize_csv_value(s.tipo_evento.nome if s.tipo_evento else ""),
                     s.inicio.isoformat() if s.inicio else "",
                     s.fim.isoformat() if s.fim else "",
@@ -206,7 +207,9 @@ class EventDetailAPIView(APIView):
         # Buscar solicitação com select_related para otimizar queries
         try:
             solicitacao = (
-                Solicitacao.objects.select_related("usuario", "municipio", "tipo_evento", "projeto", "coordenador")
+                Solicitacao.objects.select_related(
+                    "usuario", "municipio", "tipo_evento", "projeto", "projeto_2", "coordenador"
+                )
                 .prefetch_related("participations__usuario")
                 .get(pk=pk)
             )
@@ -264,7 +267,7 @@ class GCalDriftView(APIView):
         # Base queryset: apenas PUBLISHED
         # MP4: select_related para evitar N+1 (compute_payload_hash acessa 5 FKs)
         qs = Solicitacao.objects.filter(status="aprovado", gcal_status=Solicitacao.GCalStatus.PUBLISHED).select_related(
-            "municipio", "projeto", "tipo_evento", "usuario", "coordenador"
+            "municipio", "projeto", "projeto_2", "tipo_evento", "usuario", "coordenador"
         )
 
         # Aplicar filtros
@@ -284,13 +287,14 @@ class GCalDriftView(APIView):
             except (ValueError, TypeError):
                 pass
 
+        # Os dois projetos do evento (#2036).
         sector = request.query_params.get("sector")
         if sector:
-            qs = qs.filter(projeto__nome__icontains=sector)
+            qs = qs.filter(q_tem_projeto(nome__icontains=sector))
 
         q = request.query_params.get("q")
         if q:
-            qs = qs.filter(Q(municipio__nome__icontains=q) | Q(projeto__nome__icontains=q))
+            qs = qs.filter(Q(municipio__nome__icontains=q) | q_tem_projeto(nome__icontains=q))
 
         # Detectar drift (comparar hashes)
         drift_items = []
@@ -303,7 +307,7 @@ class GCalDriftView(APIView):
                         "inicio": s.inicio.isoformat(),
                         "fim": s.fim.isoformat(),
                         "municipio": s.municipio.nome if s.municipio else "",
-                        "projeto": s.projeto.nome if s.projeto else "",
+                        "projeto": rotulo_dos_projetos(s) or "",
                         "stored_hash": s.gcal_payload_hash,
                         "current_hash": current_hash,
                         "external_event_id": s.external_event_id or _event_id_for(s),

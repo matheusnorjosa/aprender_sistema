@@ -14,6 +14,8 @@ from typing import Any, cast
 
 from rest_framework import serializers  # type: ignore[attr-defined]
 
+from drf_spectacular.utils import extend_schema_field
+
 from apps.core.models import AuditLog, Participation, Solicitacao, Usuario
 from apps.core.pii import email_sem_cpf, redact_cpf_deep
 from apps.core.rbac.permissions import PodeExcluirSolicitacao
@@ -29,7 +31,15 @@ from apps.core.services.compra_elegibilidade import (
 )
 from apps.core.services.solicitacao_approval import DECISAO_IMPEDIDA, decisoes_impedidas_na_lista
 from apps.core.services.solicitacao_exclusao import ids_ja_decididas, motivo_que_impede_excluir
+from apps.core.services.solicitacao_projetos import projetos_do_evento, rotulo_dos_projetos
 from apps.core.services.solicitacao_scope import EscritaEmSolicitacao, scope_publishable_solicitacoes
+
+
+class ProjetoDoEventoSerializer(serializers.Serializer):
+    """Um projeto do evento (#2036): `projetos` lista os dois, na ordem das vagas."""
+
+    id = serializers.IntegerField()
+    nome = serializers.CharField()
 
 
 class ParticipationNestedSerializer(serializers.ModelSerializer):
@@ -72,7 +82,11 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
     # o CPF; o nome sai em `coordenador_nome` e `str(usuario)` (nome ou "Usuario #id").
     coordenador_nome = serializers.SerializerMethodField()
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
-    projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
+    # Evento de dois projetos (#2036): `projeto_nome` é o rótulo "A + B" (o nome, com um projeto só) e
+    # `projetos` lista os dois. O 2º projeto só se lê aqui; a escrita, com a regra do par, é do PR 4.
+    projeto_nome = serializers.SerializerMethodField()
+    projeto_2 = serializers.PrimaryKeyRelatedField(read_only=True)
+    projetos = serializers.SerializerMethodField()
     projeto_geral_nome = serializers.CharField(source="projeto.projeto_geral.nome", read_only=True, allow_null=True)
     tipo_evento_nome = serializers.CharField(source="tipo_evento.nome", read_only=True)
     # Decisão do dono (05/10/2026): a resposta "pretende avaliar o formador" é lida por outro
@@ -108,6 +122,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "municipio_nome",
             "projeto",
             "projeto_nome",
+            "projeto_2",
+            "projetos",
             "projeto_geral_nome",
             "tipo_evento",
             "tipo_evento_nome",
@@ -221,6 +237,13 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
 
     def get_avaliaveis_ids(self, obj: Solicitacao) -> list[int] | None:
         return sorted(formadores_avaliaveis_ids(obj)) if self._um_evento() else None
+
+    def get_projeto_nome(self, obj: Solicitacao) -> str | None:
+        return rotulo_dos_projetos(obj)
+
+    @extend_schema_field(ProjetoDoEventoSerializer(many=True))
+    def get_projetos(self, obj: Solicitacao) -> list[dict[str, Any]]:
+        return [{"id": p.pk, "nome": p.nome} for p in projetos_do_evento(obj)]
 
     def get_projeto_pergunta_avaliar_formador(self, obj: Solicitacao) -> bool | None:
         return gerencia_pergunta(obj) if self._um_evento() else None
@@ -449,7 +472,10 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({"municipio": "Informe o município do evento."})
                 if projeto_em_espera(projeto):
                     raise serializers.ValidationError({"projeto": MSG_PROJETO_EM_ESPERA})
-                self.par_sem_compra = not par_liberado(municipio.pk, projeto)
+                # Evento de dois projetos (#2036): sem a marca só com os dois cobertos (a leitura da lista,
+                # `solicitacoes_com_par_liberado`, diz o mesmo). O 2º ainda não entra pela API (PR 4).
+                projeto_2 = getattr(instance, "projeto_2", None)
+                self.par_sem_compra = not all(par_liberado(municipio.pk, p) for p in (projeto, projeto_2) if p)
                 self.par_conferido = True
 
         # Regra 1: Validação de intervalo (fim > inicio)
@@ -528,9 +554,9 @@ class EventDetailSerializer(serializers.ModelSerializer):
     Endpoint: GET /api/gcal/dashboard/events/{id}/detail/
     """
 
-    # Campos legíveis (nomes em vez de IDs)
+    # Campos legíveis (nomes em vez de IDs). `projeto_nome`: o rótulo "A + B" do evento de dois projetos.
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
-    projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
+    projeto_nome = serializers.SerializerMethodField()
     tipo_evento_nome = serializers.CharField(source="tipo_evento.nome", read_only=True)
     usuario_nome = serializers.SerializerMethodField()
     coordenador_nome = serializers.SerializerMethodField()
@@ -565,6 +591,9 @@ class EventDetailSerializer(serializers.ModelSerializer):
             "timeline",
         ]
         read_only_fields = fields
+
+    def get_projeto_nome(self, obj: Solicitacao) -> str | None:
+        return rotulo_dos_projetos(obj)
 
     def get_usuario_nome(self, obj: Solicitacao) -> str | None:
         """Nome de quem criou a solicitação (ou "Usuario #id")."""

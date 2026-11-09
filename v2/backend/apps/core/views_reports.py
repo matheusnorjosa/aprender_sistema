@@ -21,6 +21,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from .models import Solicitacao
 from .rbac.policies import CanViewReports
 from .responses import APIResponse
+from .services.solicitacao_projetos import contar_por_projeto
 
 
 @api_view(["GET"])
@@ -136,19 +137,17 @@ def reports_top_projects(request: Request) -> Response:
     end_date = timezone.now().date()
     start_date = end_date - timedelta(days=30)
 
-    # Query - filtrar por data do evento (inicio)
-    top_projects = (
-        Solicitacao.objects.filter(inicio__date__gte=start_date, inicio__date__lte=end_date)
-        .exclude(projeto__isnull=True)
-        .values("projeto__nome")
-        .annotate(count=Count("id"))
-        .order_by("-count")[:limit]
+    # Query - filtrar por data do evento (inicio). O evento de dois projetos conta nos dois (#2036):
+    # soma por vaga, e só então ordena e corta.
+    por_projeto = contar_por_projeto(
+        Solicitacao.objects.filter(inicio__date__gte=start_date, inicio__date__lte=end_date), "nome"
     )
+    top_projects = sorted(por_projeto.items(), key=lambda par: (-par[1]["count"], par[0]))[:limit]
 
     # Format with ranking
     items_list = [
-        {"projeto": item["projeto__nome"], "count": item["count"], "rank": idx + 1}
-        for idx, item in enumerate(top_projects)
+        {"projeto": nome, "count": valores["count"], "rank": idx + 1}
+        for idx, (nome, valores) in enumerate(top_projects)
     ]
 
     # Response consistency (#411)

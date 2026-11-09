@@ -255,7 +255,7 @@ def _travar_linha(pk: int) -> Solicitacao | None:
 def _linhas_por_event_id(event_ids: Sequence[str]) -> dict[str, list[Solicitacao]]:
     """Todas as linhas com cada event id, de qualquer status (o duplicado conta antes do filtro)."""
     por_id: dict[str, list[Solicitacao]] = {}
-    for s in Solicitacao.objects.filter(external_event_id__in=list(event_ids)).select_related("projeto"):
+    for s in Solicitacao.objects.filter(external_event_id__in=list(event_ids)).select_related("projeto", "projeto_2"):
         por_id.setdefault(str(s.external_event_id), []).append(s)
     return por_id
 

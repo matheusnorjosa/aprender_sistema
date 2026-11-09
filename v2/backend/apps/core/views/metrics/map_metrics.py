@@ -25,6 +25,12 @@ from apps.core.exceptions import ValidationAPIError
 from apps.core.models import Participation, Projeto, Solicitacao, Usuario
 from apps.core.permissions import HasPerm
 from apps.core.services.compra_elegibilidade import _compras_validas, _q_libera  # pyright: ignore[reportPrivateUsage]
+from apps.core.services.solicitacao_projetos import (
+    contar_por_projeto,
+    projetos_distintos_por,
+    projetos_do_evento,
+    q_tem_projeto,
+)
 
 MAP_LIMIT_MAX = 1000
 VALID_STATUS_FILTERS = {"pendente", "aprovado", "reprovado"}
@@ -173,7 +179,7 @@ def _apply_filters_to_solicitacoes(
     if filters.status:
         queryset = queryset.filter(status=filters.status)
     if filters.projeto_id is not None:
-        queryset = queryset.filter(projeto_id=filters.projeto_id)
+        queryset = queryset.filter(q_tem_projeto(pk=filters.projeto_id))  # as duas vagas (#2036)
     if filters.uf:
         queryset = queryset.filter(municipio__uf=filters.uf)
     if filters.data_inicio:
@@ -270,15 +276,18 @@ def metrics_map(request: Request) -> Response:
             "municipio__latitude",
             "municipio__longitude",
         )
-        .annotate(
-            projetos=Count("projeto_id", distinct=True),
-            eventos=Count("id"),
-        )
+        .annotate(eventos=Count("id"))
         .order_by("-eventos", "municipio__nome")
     )
 
     if limit is not None:
         by_municipio_queryset = by_municipio_queryset[:limit]
+
+    # Projetos distintos pelas duas vagas (#2036): o evento conta uma vez, os projetos dele, os dois. Com o
+    # filtro de projeto, só o projeto filtrado (o parceiro do combo não entra).
+    com_municipio = queryset.exclude(municipio__isnull=True)
+    projetos_por_municipio = projetos_distintos_por(com_municipio, "municipio_id", so_projeto=filters.projeto_id)
+    projetos_por_uf = projetos_distintos_por(com_municipio, "municipio__uf", so_projeto=filters.projeto_id)
 
     # Coordenadores distintos por município e por UF, de uma só leitura dos pares (pessoa, evento)
     local_do_evento = {
@@ -316,7 +325,7 @@ def metrics_map(request: Request) -> Response:
                 "uf": item["municipio__uf"],
                 "latitude": float(item["municipio__latitude"]),
                 "longitude": float(item["municipio__longitude"]),
-                "projetos": item["projetos"],
+                "projetos": projetos_por_municipio[municipio_id],
                 "eventos": item["eventos"],
                 "coordenadores": coordenadores_por_municipio.get(municipio_id, 0),
                 "compras": compras_por_municipio.get(municipio_id, 0),
@@ -328,7 +337,6 @@ def metrics_map(request: Request) -> Response:
         .values("municipio__uf")
         .annotate(
             eventos=Count("id"),
-            projetos=Count("projeto_id", distinct=True),
             municipios=Count("municipio_id", distinct=True),
         )
         .order_by("-eventos", "municipio__uf")
@@ -341,26 +349,23 @@ def metrics_map(request: Request) -> Response:
             {
                 "uf": uf,
                 "eventos": int(item["eventos"]),
-                "projetos": int(item["projetos"]),
+                "projetos": projetos_por_uf[uf],
                 "municipios": int(item["municipios"]),
                 "coordenadores": coordenadores_por_uf.get(uf, 0),
                 "compras": compras_por_uf.get(uf, 0),
             }
         )
 
-    top_projetos = (
-        queryset.exclude(projeto__isnull=True)
-        .values("projeto__nome")
-        .annotate(count=Count("id"))
-        .order_by("-count")[:10]
-    )
+    # Conta o evento de dois projetos nos dois (#2036), ou só no projeto filtrado; ordena e corta depois da soma.
+    por_projeto = contar_por_projeto(queryset, "nome", so_projeto=filters.projeto_id)
+    top_projetos = sorted(por_projeto.items(), key=lambda par: (-par[1]["count"], par[0]))[:10]
 
     # Contagens por status
     status_counts = queryset.values("status").annotate(count=Count("id"))
     by_status = {item["status"]: item["count"] for item in status_counts}
 
     # Formatar top projetos
-    top_projetos_list = [{"nome": item["projeto__nome"], "count": item["count"]} for item in top_projetos]
+    top_projetos_list = [{"nome": nome, "count": valores["count"]} for nome, valores in top_projetos]
 
     return Response(
         {
@@ -426,7 +431,9 @@ def metrics_map_coordinators(request: Request) -> Response:
     # Coordenadores do evento (responsável + COORD_ACOMPANHA, uma vez por evento) no estado especificado;
     # eventos e pessoas em consultas fixas, sem N+1
     pares = sorted(coordenadores_do_evento(solicitacoes_filtradas))
-    eventos = solicitacoes_filtradas.select_related("projeto", "municipio").in_bulk({sol_id for _, sol_id in pares})
+    eventos = solicitacoes_filtradas.select_related("projeto", "projeto_2", "municipio").in_bulk(
+        {sol_id for _, sol_id in pares}
+    )
     pessoas = Usuario.objects.in_bulk({user_id for user_id, _ in pares})
 
     # Agregar por coordenador com contagem detalhada
@@ -447,9 +454,11 @@ def metrics_map_coordinators(request: Request) -> Response:
 
         coordenadores_data[user_id]["eventos"] += 1
 
-        # Contagem por projeto
-        if solicitacao.projeto:
-            proj_nome = solicitacao.projeto.nome
+        # Contagem por projeto: o evento de dois projetos conta nos dois (#2036), ou só no projeto filtrado
+        for projeto in projetos_do_evento(solicitacao):
+            if filters.projeto_id is not None and projeto.pk != filters.projeto_id:
+                continue
+            proj_nome = projeto.nome
             coordenadores_data[user_id]["projetos"][proj_nome] = (
                 coordenadores_data[user_id]["projetos"].get(proj_nome, 0) + 1
             )

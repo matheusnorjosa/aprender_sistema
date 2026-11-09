@@ -96,7 +96,7 @@ class MeEventsListView(generics.ListAPIView):
                 participations__usuario=user,
                 status="aprovado",
             )
-            .select_related("municipio", "projeto", "tipo_evento", "coordenador", "usuario")
+            .select_related("municipio", "projeto", "projeto_2", "tipo_evento", "coordenador", "usuario")
             .prefetch_related("participations__usuario")
             .order_by("-inicio", "id")
             .distinct()

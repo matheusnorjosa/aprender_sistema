@@ -65,6 +65,7 @@ from .services.solicitacao_exclusao import (
     motivo_que_impede_excluir,
     tem_decisao_humana,
 )
+from .services.solicitacao_projetos import q_tem_projeto
 from .services.solicitacao_publish import cancel_from_gcal
 from .services.solicitacao_publish import preview_gcal as preview_gcal_service
 from .services.solicitacao_publish import publish_to_gcal, remover_do_google_agora, resync_to_gcal
@@ -427,7 +428,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     """
 
     queryset = Solicitacao.objects.select_related(
-        "usuario", "municipio", "tipo_evento", "projeto", "projeto__projeto_geral", "coordenador"
+        "usuario", "municipio", "tipo_evento", "projeto", "projeto_2", "projeto__projeto_geral", "coordenador"
     )
     serializer_class = SolicitacaoSerializer
     permission_classes = [IsAuthenticated]
@@ -481,6 +482,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                     "municipio",
                     "tipo_evento",
                     "projeto",
+                    "projeto_2",
                     "projeto__projeto_geral",
                     "coordenador",
                     "formador_avaliado",
@@ -501,6 +503,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 "municipio",
                 "tipo_evento",
                 "projeto",
+                "projeto_2",
                 "projeto__gerencia",
                 "coordenador",
                 "formador_avaliado",
@@ -569,9 +572,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 pass  # Ignore invalid date format
 
         if q:
+            # Os dois projetos do evento (#2036): FK, então o OR não duplica linha.
             qs = qs.filter(
                 Q(municipio__nome__icontains=q)
-                | Q(projeto__nome__icontains=q)
+                | q_tem_projeto(nome__icontains=q)
                 | Q(tipo_evento__nome__icontains=q)
                 | Q(observacoes__icontains=q)
                 | Q(usuario__first_name__icontains=q)

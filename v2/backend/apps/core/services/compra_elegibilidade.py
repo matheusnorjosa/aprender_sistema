@@ -105,17 +105,23 @@ def solicitacoes_com_par_liberado(qs: QuerySet[Solicitacao]) -> QuerySet[Solicit
     """Solicitações de `qs` cujo par (município, projeto) está liberado, numa consulta (a lista inteira).
 
     A regra de `par_liberado` do lado da solicitação; sem município ou sem projeto, nada casa (NULL).
+    Evento de dois projetos (#2036; decisão do dono de 08/11/2026): liberado só com os DOIS cobertos, cada
+    um pela regra de sempre (a compra `COMBOS` que libera as duas coleções cobre os dois).
     """
     compras = _compras_validas().filter(municipio_id=OuterRef("municipio_id"))
-    mesmo_projeto = Exists(compras.filter(projeto_id=OuterRef("projeto_id")))
-    mesma_colecao = Exists(compras.filter(projeto__projeto_geral_id=OuterRef("projeto__projeto_geral_id")))
-    mesma_gerencia = Exists(compras.filter(projeto__gerencia_id=OuterRef("projeto__gerencia_id")))
-    libera = mesmo_projeto | mesma_colecao | (Q(projeto__eh_nome_geral=True) & mesma_gerencia)
-    for combo, colecoes in COMBOS.items():
-        libera |= Q(projeto__projeto_geral__nome__in=colecoes) & Exists(
-            compras.filter(projeto__projeto_geral__nome=combo)
-        )
-    return qs.filter(libera)
+
+    def libera(vaga: str) -> Q | Exists:
+        mesmo_projeto = Exists(compras.filter(projeto_id=OuterRef(f"{vaga}_id")))
+        mesma_colecao = Exists(compras.filter(projeto__projeto_geral_id=OuterRef(f"{vaga}__projeto_geral_id")))
+        mesma_gerencia = Exists(compras.filter(projeto__gerencia_id=OuterRef(f"{vaga}__gerencia_id")))
+        q = mesmo_projeto | mesma_colecao | (Q(**{f"{vaga}__eh_nome_geral": True}) & mesma_gerencia)
+        for combo, colecoes in COMBOS.items():
+            q |= Q(**{f"{vaga}__projeto_geral__nome__in": colecoes}) & Exists(
+                compras.filter(projeto__projeto_geral__nome=combo)
+            )
+        return q
+
+    return qs.filter(libera("projeto") & (Q(projeto_2__isnull=True) | libera("projeto_2")))
 
 
 def projeto_em_espera(projeto: Projeto) -> bool:

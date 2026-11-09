@@ -167,13 +167,21 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
         mun_display = f"{nome_mun} - {uf_mun}" if (nome_mun and uf_mun) else nome_mun
         description_lines.append(f"📍 Município: {mun_display}")
 
-    # Seção 2: Projeto
-    if projeto:
-        projeto_nome = getattr(projeto, "nome", "")
-        projeto_codigo = getattr(projeto, "codigo", "")
+    # Seção 2: Projeto. Evento de dois projetos (#2036): "Projetos: A + B", na ordem do rótulo da tela
+    # (`rotulo_dos_projetos`: alfabética, não depende da vaga). Com um projeto, a linha de sempre.
+    projetos_display = []
+    for p in sorted(
+        (p for p in (projeto, getattr(s, "projeto_2", None)) if p),
+        key=lambda p: (getattr(p, "nome", "") or "").casefold(),
+    ):
+        projeto_nome = getattr(p, "nome", "")
+        projeto_codigo = getattr(p, "codigo", "")
         if projeto_nome:
-            projeto_display = f"{projeto_nome} ({projeto_codigo})" if projeto_codigo else projeto_nome
-            description_lines.append(f"📂 Projeto: {projeto_display}")
+            projetos_display.append(f"{projeto_nome} ({projeto_codigo})" if projeto_codigo else projeto_nome)
+    if len(projetos_display) == 1:
+        description_lines.append(f"📂 Projeto: {projetos_display[0]}")
+    elif projetos_display:
+        description_lines.append(f"📂 Projetos: {' + '.join(projetos_display)}")
 
     # Seção 3: Tipo de Evento
     if tipo:

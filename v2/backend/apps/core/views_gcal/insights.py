@@ -27,6 +27,7 @@ from apps.core.serializers.gcal_dashboard_contract import (
     SuccessRateResponseSerializer,
     TopInsightsResponseSerializer,
 )
+from apps.core.services.solicitacao_projetos import contar_por_projeto
 from apps.core.views_gcal.helpers import _filter_events_queryset
 
 
@@ -161,19 +162,23 @@ class TopInsightsView(APIView):
         qs = _filter_events_queryset(request, Solicitacao.objects.all())
 
         # Aggregations
-        items_qs = (
-            qs.values(group_field)
-            .annotate(
-                count=Count("id"),
-                published=Count("id", filter=Q(gcal_status=Solicitacao.GCalStatus.PUBLISHED)),
-                error=Count("id", filter=Q(gcal_status=Solicitacao.GCalStatus.ERROR)),
-            )
-            .order_by("-error", "-count")[:limit]
-        )
+        aggs = {
+            "count": Count("id"),
+            "published": Count("id", filter=Q(gcal_status=Solicitacao.GCalStatus.PUBLISHED)),
+            "error": Count("id", filter=Q(gcal_status=Solicitacao.GCalStatus.ERROR)),
+        }
+        if metric == "projetos":
+            # Evento de dois projetos (#2036): conta nos dois. Soma por vaga; ordena e corta depois da soma.
+            por_projeto = contar_por_projeto(qs, "nome", **aggs)
+            linhas = [{group_field: nome, **valores} for nome, valores in por_projeto.items()]
+            linhas.sort(key=lambda linha: (-linha["error"], -linha["count"], linha[group_field]))
+            linhas = linhas[:limit]
+        else:
+            linhas = list(qs.values(group_field).annotate(**aggs).order_by("-error", "-count")[:limit])
 
         # Formatar items com rate
         items = []
-        for item in items_qs:
+        for item in linhas:
             pub = item["published"]
             err = item["error"]
             denom = pub + err

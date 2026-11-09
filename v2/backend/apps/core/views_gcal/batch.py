@@ -119,7 +119,9 @@ class GCalPublishBatchView(APIView):
             return Response({"detail": "Limite de 500 IDs por requisição"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Buscar solicitações
-        solicitacoes = Solicitacao.objects.filter(id__in=solicitacao_ids).select_related("projeto", "municipio")
+        solicitacoes = Solicitacao.objects.filter(id__in=solicitacao_ids).select_related(
+            "projeto", "projeto_2", "municipio"
+        )
 
         # Verificar GCAL_CLIENT
         gcal_client = getattr(settings, "GCAL_CLIENT", "fake")

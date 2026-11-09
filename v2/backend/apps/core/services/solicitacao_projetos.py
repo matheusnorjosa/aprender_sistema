@@ -65,10 +65,15 @@ def q_tem_projeto(**lookup: Any) -> Q:
     return q
 
 
+# Como a planilha escreve o combo ("UNI DUNI TÊ / Cataventos"; v40, 26 eventos): na ordem das vagas,
+# separados por " / ". Vale para a tela, a descrição e o título do Google (PR 6, 09/11/2026).
+SEPARADOR_DOS_PROJETOS = " / "
+
+
 def rotulo_dos_projetos(s: Solicitacao) -> str | None:
-    """Nome para a tela: "A + B" em ordem alfabética (não depende da vaga). Projeto único: o nome."""
-    nomes = sorted((p.nome for p in projetos_do_evento(s)), key=str.casefold)
-    return " + ".join(nomes) if nomes else None
+    """Nome para a tela: "A / B" na ordem das vagas, como a planilha. Projeto único: o nome."""
+    nomes = [p.nome for p in projetos_do_evento(s)]
+    return SEPARADOR_DOS_PROJETOS.join(nomes) if nomes else None
 
 
 def _na_vaga(qs: QuerySet[Solicitacao], vaga: str, so_projeto: int | None) -> QuerySet[Solicitacao]:

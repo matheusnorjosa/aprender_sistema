@@ -62,7 +62,8 @@ def dashboard_overview(request: Request) -> Response:
     from .models import Participation, Solicitacao
 
     now = timezone.now()
-    hoje = now.date()
+    # O dia de Fortaleza (RD-06): o filtro `inicio__date` usa o fuso local; o dia UTC vira às 21h (#1900).
+    hoje = timezone.localdate(now)
 
     # Base querysets
     qs_all = Solicitacao.objects.all()

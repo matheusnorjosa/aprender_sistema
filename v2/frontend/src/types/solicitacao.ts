@@ -72,7 +72,11 @@ export interface Solicitacao {
   municipio: ID | null;
   municipio_nome: string | null;
   projeto: ID | null;
+  /** O outro projeto do combo (#2036): sem principal; `projeto_nome` junta os dois. */
+  projeto_2?: ID | null;
   projeto_nome: string | null;
+  /** Os projetos do evento, na ordem das vagas (1 ou 2). */
+  projetos?: Array<{ id: ID; nome: string }>;
   tipo_evento: ID | null;
   tipo_evento_nome: string | null;
   tipo: string | null;
@@ -140,6 +144,7 @@ export interface ExtraParticipantsPayload {
 export interface SolicitacaoPayload {
   municipio?: ID;
   projeto?: ID;
+  projeto_2?: ID | null;
   tipo_evento?: ID;
   tipo?: string | null;
   encontro?: string | null;

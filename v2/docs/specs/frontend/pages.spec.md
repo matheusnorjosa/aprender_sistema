@@ -1,7 +1,7 @@
 ---
 title: Páginas (React)
 status: canonical
-last_verified: 2026-11-06
+last_verified: 2026-11-09
 verified_at_commit: a63674ec98b181115a979a8c7d958f338e54209e
 sources_of_truth:
   - v2/frontend/src/App.tsx
@@ -246,6 +246,8 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 > **Horário e erros da Nova Solicitação (item 36, 19/10/2026; página única desde 28/10).** Data ou horário faltando e fim igual ou antes do início ("O horário de fim precisa ser depois do início.", a mesma regra do backend, `errors.fim`) não deixam criar: a mensagem fica junto do horário (`DateTimeRange` com `erro`, campos marcados com `aria-invalid` e apontando o texto por `aria-describedby`; na edição o texto é `role="alert"`, na Nova Solicitação quem anuncia é o resumo do topo) e aparece junto dos erros dos outros campos, no mesmo clique. "Criar solicitação" com campo faltando leva a tela e o foco ao primeiro campo com erro. O horário escolhido nas colunas do `TimePicker` vale sem o OK (`needConfirm={false}`; antes, sair do campo o descartava), na Nova Solicitação e na edição. Recusa do backend por campo (400 do lote) mostra o motivo de `errors.<campo>` junto do campo e no resumo do topo, e não o `detail` genérico "Erro de validação."; sem resposta (rede) ou 5xx, só o aviso de rede (ver "Vários eventos de uma vez"). Observações aceitam até 5000 caracteres, o limite do backend. Testes: `NewSolicitacaoWizard.erros.test.tsx`, `DateTimeRange.test.tsx`.
 >
 > **Sair da Nova Solicitação (item 36, 19/10/2026).** O botão do topo diz "Voltar para Minhas Solicitações". Sem nada preenchido, sai direto; com algo preenchido, toda saída para outra página pergunta uma vez "Sair sem criar a solicitação?" ("O que você preencheu será perdido."), com o foco em "Continuar preenchendo" e "Sair e descartar" em vermelho: o botão do topo, o Voltar do navegador e o do Android (também segurar o Voltar e escolher uma página mais antiga), o menu lateral e os outros links. Quem segura é o `useBlocker` do data router (o App usa `createBrowserRouter` com uma rota coringa; as `<Routes>` de `AppRoutes` são descendentes); um novo Voltar com o aviso aberto não abre outro aviso. Depois do envio com sucesso, vai para Minhas Solicitações sem perguntar. Recarregar ou fechar a aba não passa pelo roteador: com algo preenchido, o aviso do próprio navegador (`beforeunload`), menos no reload do próprio app (sessão encerrada ou "Sair"), que leva ao login. Testes: `NewSolicitacaoWizard.test.tsx`, `NewSolicitacaoWizard.perguntas.test.tsx` (montados num data router de memória, `src/test/comRoteador.tsx`).
+
+> **Evento de dois projetos (combo, #2036; decisões do dono de 07 e 08/11/2026).** A Nova Solicitação e a edição têm o campo "2º projeto (combo)", que só aparece com o 1º escolhido e só lista os projetos da mesma gerência e do mesmo fluxo (`mesmo_grupo_de`). Não há projeto principal. Trocar o 1º limpa o 2º e tirar o 1º sobe o 2º. O município escolhido é reconferido com os dois projetos (`projeto_2_id`): sem compra para qualquer um deles, o evento vai para aprovação. O erro do par vem na chave `projeto_2` e aparece no campo. Na edição, cada campo mostra um projeto (`projetos[]`), e não o rótulo do evento. Ganhar, trocar ou tirar o 2º numa SUPER aprovada avisa que volta para aprovação; inverter os dois não avisa, porque o servidor compara o conjunto. Testes: `NewSolicitacaoWizard.doisProjetos.test.tsx` e `EditSolicitacaoPage.doisProjetos.test.tsx`.
 
 ### Aprovações
 

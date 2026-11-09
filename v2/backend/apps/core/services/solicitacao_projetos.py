@@ -71,20 +71,40 @@ def rotulo_dos_projetos(s: Solicitacao) -> str | None:
     return " + ".join(nomes) if nomes else None
 
 
-def contar_por_projeto(qs: QuerySet[Solicitacao], campo: str = "nome", **aggs: Any) -> dict[Any, dict[str, int]]:
+def _na_vaga(qs: QuerySet[Solicitacao], vaga: str, so_projeto: int | None) -> QuerySet[Solicitacao]:
+    """Eventos com a vaga preenchida; com `so_projeto`, só os que têm esse projeto nela."""
+    return qs.filter(**({f"{vaga}_id": so_projeto} if so_projeto is not None else {f"{vaga}__isnull": False}))
+
+
+def contar_por_projeto(
+    qs: QuerySet[Solicitacao], campo: str = "nome", *, so_projeto: int | None = None, **aggs: Any
+) -> dict[Any, dict[str, int]]:
     """Agrega por projeto nas duas vagas e soma: o evento de dois projetos conta nos dois.
 
     `campo` é o campo do projeto que vira a chave (padrão `nome`). `aggs` são as anotações (padrão
     `count=Count("id")`). Vaga vazia não entra (sem balde nulo). Ordenar e cortar o top N depois da soma.
+    `so_projeto` (o filtro de projeto da tela) conta só esse projeto: o parceiro do combo fica de fora.
     """
     aggs = aggs or {"count": Count("id")}
     soma: defaultdict[Any, Counter[str]] = defaultdict(Counter)
     for vaga in VAGAS:
         chave = f"{vaga}__{campo}"
-        linhas = qs.filter(**{f"{vaga}__isnull": False}).order_by().values(chave).annotate(**aggs)
+        linhas = _na_vaga(qs, vaga, so_projeto).order_by().values(chave).annotate(**aggs)
         for linha in linhas:
             soma[linha[chave]].update({nome: linha[nome] for nome in aggs})
     return {chave: dict(valores) for chave, valores in soma.items()}
+
+
+def projetos_distintos_por(qs: QuerySet[Solicitacao], chave: str, *, so_projeto: int | None = None) -> Counter[Any]:
+    """Quantos projetos distintos há em cada valor de `chave` (ex.: `municipio_id`), unindo as duas vagas.
+
+    O projeto que está na vaga 1 de um evento e na vaga 2 de outro conta uma vez. Duas consultas.
+    `so_projeto` (o filtro de projeto da tela) conta só esse projeto: o parceiro do combo fica de fora.
+    """
+    pares: set[tuple[Any, int]] = set()
+    for vaga in VAGAS:
+        pares.update(_na_vaga(qs, vaga, so_projeto).order_by().values_list(chave, f"{vaga}_id").distinct())
+    return Counter(valor for valor, _ in pares)
 
 
 def eventos_conjuntos_do_projeto(projeto: Projeto) -> int:

@@ -19,6 +19,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
 
 from apps.core.models import Solicitacao
+from apps.core.services.solicitacao_projetos import q_tem_projeto
 
 
 def _filter_events_queryset(request: Request, base_qs: QuerySet[Solicitacao]) -> QuerySet[Solicitacao]:
@@ -44,7 +45,7 @@ def _filter_events_queryset(request: Request, base_qs: QuerySet[Solicitacao]) ->
     datetimes UTC derivados da janela local.
     """
     # Base: apenas aprovadas com select_related
-    qs = base_qs.filter(status="aprovado").select_related("usuario", "municipio", "tipo_evento", "projeto")
+    qs = base_qs.filter(status="aprovado").select_related("usuario", "municipio", "tipo_evento", "projeto", "projeto_2")
 
     # Filtro por status (gcal_status)
     status_param = request.query_params.get("status")
@@ -99,7 +100,7 @@ def _apply_common_filters(qs: QuerySet[Solicitacao], request: Request) -> QueryS
     Filtros suportados:
     - date_from (YYYY-MM-DD): início >= date_from
     - date_to (YYYY-MM-DD): início <= date_to
-    - sector: projeto__nome__icontains
+    - sector: nome de um dos projetos do evento (icontains; #2036, as duas vagas)
     - gerencia_id: projeto__gerencia_id (o mesmo filtro da lista `/solicitacoes/`)
     - q: busca em múltiplos campos
     - status: filtra por gcal_status (NONE/PENDING/PUBLISHED/ERROR)
@@ -121,10 +122,10 @@ def _apply_common_filters(qs: QuerySet[Solicitacao], request: Request) -> QueryS
         except (ValueError, TypeError):
             pass
 
-    # Filtro por setor (projeto)
+    # Filtro por setor (projeto): os dois projetos do evento (#2036). FK, então o OR não duplica linha.
     sector = request.query_params.get("sector")
     if sector:
-        qs = qs.filter(projeto__nome__icontains=sector)
+        qs = qs.filter(q_tem_projeto(nome__icontains=sector))
 
     # PR A: filtro por gerência (id), igual ao da lista da PreAgenda.
     gerencia_id = request.query_params.get("gerencia_id")
@@ -141,7 +142,7 @@ def _apply_common_filters(qs: QuerySet[Solicitacao], request: Request) -> QueryS
     if q:
         qs = qs.filter(
             Q(municipio__nome__icontains=q)
-            | Q(projeto__nome__icontains=q)
+            | q_tem_projeto(nome__icontains=q)
             | Q(tipo_evento__nome__icontains=q)
             | Q(observacoes__icontains=q)
             | Q(usuario__first_name__icontains=q)

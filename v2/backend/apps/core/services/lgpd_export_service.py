@@ -89,6 +89,7 @@ def build_lgpd_export_data(user: Any, *, include_audit: bool = True, include_gca
             "fim",
             "municipio__nome",
             "projeto__nome",
+            "projeto_2__nome",  # evento de dois projetos (#2036)
             "tipo_evento__nome",
             "created_at",
             "updated_at",

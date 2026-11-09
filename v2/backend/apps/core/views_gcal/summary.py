@@ -32,6 +32,7 @@ from apps.core.serializers.gcal_dashboard_contract import (
     PaginatedSolicitacaoResponseSerializer,
 )
 from apps.core.services.oauth.token_manager import usuarios_para_reconectar
+from apps.core.services.solicitacao_projetos import rotulo_dos_projetos
 from apps.core.views_gcal.helpers import _apply_common_filters, _filter_events_queryset
 
 
@@ -104,7 +105,7 @@ class GCalListView(APIView):
         # Fix N+1: prefetch participations with their users
         qs = (
             Solicitacao.objects.filter(status="aprovado")
-            .select_related("usuario", "municipio", "tipo_evento", "projeto", "projeto__gerencia")
+            .select_related("usuario", "municipio", "tipo_evento", "projeto", "projeto_2", "projeto__gerencia")
             .prefetch_related("participations__usuario")
         )
 
@@ -203,7 +204,7 @@ class DashboardMetricsView(APIView):
         # Recent errors (top 5, ordenados por updated_at desc)
         error_qs = (
             qs.filter(gcal_status=Solicitacao.GCalStatus.ERROR)
-            .select_related("municipio", "projeto")
+            .select_related("municipio", "projeto", "projeto_2")
             .order_by("-updated_at")[:5]
         )
 
@@ -212,7 +213,7 @@ class DashboardMetricsView(APIView):
             # Gerar summary simples para exibição
             municipio_nome = s.municipio.nome if s.municipio else ""
             municipio_uf = s.municipio.uf if s.municipio else ""
-            projeto_nome = s.projeto.nome if s.projeto else ""
+            projeto_nome = rotulo_dos_projetos(s) or ""
             summary_text = (
                 f"{municipio_nome} - {municipio_uf} {projeto_nome}" if municipio_nome else f"Solicitação #{s.id}"
             )

@@ -22,6 +22,7 @@ from rest_framework import serializers
 
 from apps.core.models import Solicitacao, Usuario
 from apps.core.pii import email_sem_cpf
+from apps.core.services.solicitacao_projetos import rotulo_dos_projetos
 
 
 class MeEventSerializer(serializers.ModelSerializer):
@@ -33,7 +34,7 @@ class MeEventSerializer(serializers.ModelSerializer):
     """
 
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True, default=None)
-    projeto_nome = serializers.CharField(source="projeto.nome", read_only=True, default=None)
+    projeto_nome = serializers.SerializerMethodField()  # "A + B" no evento de dois projetos (#2036)
     tipo_evento_nome = serializers.CharField(source="tipo_evento.nome", read_only=True, default=None)
     formadores = serializers.SerializerMethodField()
     participantes = serializers.SerializerMethodField()
@@ -60,6 +61,9 @@ class MeEventSerializer(serializers.ModelSerializer):
             "status",
         ]
         read_only_fields = fields
+
+    def get_projeto_nome(self, obj: Solicitacao) -> str | None:
+        return rotulo_dos_projetos(obj)
 
     def get_formadores(self, obj: Solicitacao) -> list[str]:
         """Lista nomes dos participantes com role=FORMADOR (ordem estável)."""

@@ -33,6 +33,7 @@ from apps.core.models import AvailabilityBlock, Deslocamento, EquipeGerencia, Pa
 from apps.core.pii import busca_por_nome, email_sem_cpf
 from apps.core.services.availability_service import ENFORCED_ROLES, coordenador_ocupante, ocupa_agenda_q
 from apps.core.services.horas_formacao import horas_formacao
+from apps.core.services.solicitacao_projetos import q_tem_projeto
 from apps.core.types import UserId
 
 
@@ -59,7 +60,7 @@ def build_monthly_grid(
         gerencia_id: ID da gerência para filtrar. Quando especificado, filtra
             participações e eventos apenas dessa gerência. Quando None, mantém
             comportamento legado (apenas fluxo SUPER).
-        sector: Filtro opcional por setor (projeto.nome)
+        sector: Filtro opcional pelo nome de um dos projetos do evento (#2036: qualquer vaga)
         q: Filtro opcional por nome (icontains); o e-mail só entra quando o termo não tem
             dígito (acha "Conceição" por "conceicao" sem virar oráculo de CPF)
         allowed_user_ids: Lista de IDs de usuários permitidos (None = todos)
@@ -162,7 +163,7 @@ def build_monthly_grid(
     )
 
     if sector and sector.strip():
-        events_q = events_q.filter(projeto__nome__iexact=sector.strip())
+        events_q = events_q.filter(q_tem_projeto(nome__iexact=sector.strip()))
 
     # Nota: NÃO filtrar eventos por gerência aqui.
     # Quando gerencia_id é especificado, mostramos os MEMBROS daquela gerência,

@@ -34,6 +34,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.utils import timezone
+from rest_framework.test import APIClient
 
 import pytest
 
@@ -48,6 +49,7 @@ from apps.core.tests.factories import (
     ProjetoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    liberar_par,
 )
 
 pytestmark = pytest.mark.django_db
@@ -1471,6 +1473,42 @@ def test_2036_disciplina_nao_leva_o_projeto_para_a_outra_vaga(tmp_path, m):
     _virada(_export(tmp_path, [_sol(projeto="Superativar", disciplina="LING")]))
     s.refresh_from_db()
     assert (s.projeto_id, s.projeto_2_id) == (m.superativar.id, m.sup_ling.id)
+
+
+def _sem_compra_na_lista(s: Solicitacao) -> bool:
+    client = APIClient()
+    client.force_authenticate(user=UsuarioFactory(superuser=True))
+    return client.get(f"/api/solicitacoes/{s.pk}/").json()["sem_compra"]
+
+
+@pytest.mark.parametrize(
+    ("marca_antes", "cobre_o_2", "esperado"),
+    [(False, False, True), (True, True, False)],
+    ids=["2o_sem_compra", "os_dois_cobertos"],
+)
+def test_2036_carga_que_poe_o_2o_grava_a_marca_sem_compra_com_os_dois(tmp_path, m, g, marca_antes, cobre_o_2, esperado):
+    """A marca "sem compra" da lista é o último AuditLog com `sem_compra`, e a de antes da carga conferiu só a
+    vaga 1. O UPDATE da carga que põe o 2º grava a marca com os dois projetos, para ela vencer."""
+    s = _combo_existente(m, g)
+    liberar_par(s.municipio, g.uni)
+    if cobre_o_2:
+        liberar_par(s.municipio, g.cat)
+    AuditLog.objects.create(
+        action="CREATE",
+        model_name="Solicitacao",
+        details={"solicitacao_id": s.id, "projeto_id": g.uni.id, "sem_compra": marca_antes},
+    )
+    _virada(_export(tmp_path, [_linha_combo()]))
+    s.refresh_from_db()
+    assert s.projeto_2_id == g.cat.id
+    assert _sem_compra_na_lista(s) is esperado
+
+
+def test_2036_combo_criado_pela_carga_com_o_2o_sem_compra_sai_marcado(tmp_path, m, g):
+    """A criação pela carga não grava marca: a lista lê o par de hoje, que confere os dois projetos."""
+    liberar_par(Municipio.objects.get(nome="Cidade X"), g.uni)
+    _virada(_export(tmp_path, [_linha_combo(evento_id="EVC")]))
+    assert _sem_compra_na_lista(Solicitacao.objects.get(external_hash="EVC")) is True
 
 
 def test_2036_comando_em_texto_mostra_a_lista(tmp_path, m, g):

@@ -90,7 +90,7 @@ from apps.core.services.export_contract_projeto_resolver import (
 )
 from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
 from apps.core.services.solicitacao_create import resolve_initial_status
-from apps.core.services.solicitacao_projetos import ids_dos_projetos, par_de_projetos_invalido
+from apps.core.services.solicitacao_projetos import ids_dos_projetos, par_de_projetos_invalido, projetos_do_evento
 from apps.core.utils.cache_utils import invalidate_availability_cache
 from apps.core.validators import CPF_ABSENT, CPF_INVALID, classify_cpf, is_valid_cpf
 
@@ -3664,6 +3664,12 @@ class ExportContractImporter:
                 details["aprovada_como_super"] = True
             if p["sem_reaprovacao"]:
                 details["mudou_material_sem_reaprovacao"] = True
+            if "projeto_2_id" in p["campos"]:
+                # #2036: a marca "sem compra" da lista é a última gravada, e a de antes conferiu só a vaga 1.
+                # Esta, com os dois projetos (cada um pela regra da compra), passa a vencer.
+                details["sem_compra"] = s.municipio_id is not None and not all(
+                    par_liberado(s.municipio_id, projeto) for projeto in projetos_do_evento(s)
+                )
             AuditLog.objects.create(
                 usuario=self.actor, action=AuditLog.Action.UPDATE, model_name="Solicitacao", details=details
             )

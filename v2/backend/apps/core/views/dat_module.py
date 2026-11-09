@@ -58,6 +58,7 @@ from apps.core.serializers import (
 )
 from apps.core.services.compra_elegibilidade import COMBOS
 from apps.core.services.dat_codigos import recompute_registros
+from apps.core.services.solicitacao_projetos import q_tem_projeto
 from apps.core.views.mixins import LockOnWriteMixin
 
 if TYPE_CHECKING:
@@ -669,12 +670,13 @@ class DATCompraViewSet(LockOnWriteMixin, viewsets.ModelViewSet):
             municipio_id=OuterRef("municipio_id"),
             status__in=["pendente", "aprovado"],
         )
+        # O evento de dois projetos atende pelos dois (#2036): cada termo olha as duas vagas.
         atendida = (
-            Exists(solicitacoes_ativas.filter(projeto_id=OuterRef("projeto_id")))
-            | Exists(solicitacoes_ativas.filter(projeto__projeto_geral_id=OuterRef("projeto__projeto_geral_id")))
+            Exists(solicitacoes_ativas.filter(q_tem_projeto(pk=OuterRef("projeto_id"))))
+            | Exists(solicitacoes_ativas.filter(q_tem_projeto(projeto_geral_id=OuterRef("projeto__projeto_geral_id"))))
             | Exists(
                 solicitacoes_ativas.filter(
-                    projeto__eh_nome_geral=True, projeto__gerencia_id=OuterRef("projeto__gerencia_id")
+                    q_tem_projeto(eh_nome_geral=True, gerencia_id=OuterRef("projeto__gerencia_id"))
                 )
             )
         )
@@ -682,7 +684,7 @@ class DATCompraViewSet(LockOnWriteMixin, viewsets.ModelViewSet):
         # nulo): com NULL o par sairia das duas contas (com evento e pendente).
         for combo, colecoes in COMBOS.items():
             atendida |= Q(projeto__projeto_geral__isnull=False, projeto__projeto_geral__nome=combo) & Exists(
-                solicitacoes_ativas.filter(projeto__projeto_geral__nome__in=colecoes)
+                solicitacoes_ativas.filter(q_tem_projeto(projeto_geral__nome__in=colecoes))
             )
 
         base_pairs = (

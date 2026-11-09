@@ -86,6 +86,9 @@ class MunicipioLookup(APIView):
       `sem_compra` (o evento ali vai para aprovação; pedido do dono, 03/11/2026) e `projeto_em_espera`
       (o projeto não tem compra em município nenhum: a criação e a edição o recusam)
     - municipio_id=<id>: só esse município (a edição reconfere a marca do par ao trocar o projeto)
+    - projeto_2_id=<id> (com projeto_id): evento de dois projetos (#2036). O filtro pede compra que libere
+      os dois; com `marcar_sem_compra`, `sem_compra` e `projeto_em_espera` valem se valem para qualquer um
+      dos dois. Projeto inexistente devolve lista vazia
 
     Os filtros de compra não valem para quem é isento da regra (superuser ou a capacidade); com
     `marcar_sem_compra`, o isento recebe `sem_compra: false` em tudo (ele cria sem aprovação).
@@ -108,6 +111,9 @@ class MunicipioLookup(APIView):
                 projeto_id = int(projeto_id_raw)
         except ValueError:
             projeto_id = None
+        projeto_2_raw = request.GET.get("projeto_2_id", "").strip()
+        projeto_2: Projeto | None = _projeto_do_parametro(projeto_2_raw) if projeto_2_raw else None
+        projeto_2_invalido = bool(projeto_2_raw) and projeto_2 is None
 
         qs: QuerySet[Municipio] = Municipio.objects.filter(ativo=True)
         # Hubs de viagem têm UF vazia (origem/destino de deslocamento, não local de evento). Fora do
@@ -123,19 +129,21 @@ class MunicipioLookup(APIView):
         em_espera = False  # o projeto não recebe evento (sem compra em município nenhum): a tela avisa
         if marcar_sem_compra and projeto_id is not None:
             projeto = Projeto.objects.filter(pk=projeto_id).first()
-            if projeto is None:
+            if projeto is None or projeto_2_invalido:
                 qs = qs.none()
             elif not isento_da_regra_da_compra(request.user):
                 # Com compra primeiro: o teto da lista sem busca não esconde o município com compra.
-                qs = municipios_com_marca_sem_compra(qs, projeto)
+                qs = municipios_com_marca_sem_compra(qs, projeto, projeto_2)
                 ordem = ("sem_compra", "nome")
-                em_espera = projeto_em_espera(projeto)
+                em_espera = projeto_em_espera(projeto) or (projeto_2 is not None and projeto_em_espera(projeto_2))
         elif (com_compra or projeto_id is not None) and not isento_da_regra_da_compra(request.user):
             if projeto_id is None:
                 qs = municipios_liberados(qs, None)
             else:
                 projeto = Projeto.objects.filter(pk=projeto_id).first()
-                qs = municipios_liberados(qs, projeto) if projeto is not None else qs.none()
+                qs = municipios_liberados(qs, projeto) if projeto is not None and not projeto_2_invalido else qs.none()
+                if projeto_2 is not None:
+                    qs = municipios_liberados(qs, projeto_2)
 
         if not q:
             # Retornar municípios (max 100)
@@ -168,6 +176,9 @@ class ProjetoLookup(APIView):
     - com_compra=true|false: esconde o projeto "em espera" (sem compra que o libere em município
       nenhum; regra única em `services/compra_elegibilidade`)
     - municipio_id=<id>: só projetos liberados no município informado
+    - mesmo_grupo_de=<id>: evento de dois projetos (#2036). Só os projetos que podem ser o outro projeto
+      do evento: mesma gerência e mesmo fluxo (`par_de_projetos_invalido`), sem o próprio. Projeto sem
+      gerência, inexistente ou id inválido devolve lista vazia
 
     Os filtros de compra não valem para quem é isento da regra (superuser ou a capacidade).
 
@@ -197,6 +208,13 @@ class ProjetoLookup(APIView):
             municipio_id = None
 
         qs: QuerySet[Projeto] = Projeto.objects.filter(ativo=True).select_related("gerencia")
+        mesmo_grupo_raw = request.GET.get("mesmo_grupo_de", "").strip()
+        if mesmo_grupo_raw:
+            par = _projeto_do_parametro(mesmo_grupo_raw)
+            if par is None or par.gerencia_id is None:
+                qs = qs.none()
+            else:
+                qs = qs.filter(gerencia_id=par.gerencia_id, fluxo=par.fluxo).exclude(pk=par.pk)
         if (com_compra or municipio_id is not None) and not isento_da_regra_da_compra(request.user):
             qs = projetos_liberados(qs, municipio_id)
         # Os EVENTOS usam o nome-família (ex.: "A COR DA GENTE"); as séries ("A COR DA GENTE 3") são

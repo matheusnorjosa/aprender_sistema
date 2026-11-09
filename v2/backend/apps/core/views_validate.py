@@ -6,6 +6,7 @@ Payload:
 {
   "municipio": "Fortaleza" ou {id: 1},
   "projeto": "ACerta" ou {id: 2},
+  "projeto_2": "Outro" ou {id: 4},   (opcional: evento de dois projetos, #2036)
   "tipo_evento": "Formação" ou {id: 3},
   "date": "2025-01-15",
   "start": "09:00",
@@ -24,6 +25,7 @@ Retorna:
   "canonical": {
     "municipio_id": 1,
     "projeto_id": 2,
+    "projeto_2_id": 4,   (só com projeto_2)
     "tipo_evento_id": 3,
     "inicio": "2025-01-15T09:00:00-03:00",
     "fim": "2025-01-15T12:00:00-03:00",
@@ -63,6 +65,7 @@ from apps.core.services.compra_elegibilidade import (
     projeto_em_espera,
 )
 from apps.core.services.resolvers import resolve_municipio, resolve_projeto, resolve_tipo_evento
+from apps.core.services.solicitacao_projetos import par_de_projetos_invalido
 from apps.core.services.solicitacao_scope import scope_usuarios_por_gerencia
 
 from .models import Municipio, Projeto, TipoEvento, Usuario
@@ -171,6 +174,21 @@ class SolicitationValidateView(APIView):
             else:
                 errors.append(f"Projeto não encontrado: {projeto_input}")
 
+        # 2.1 Evento de dois projetos (#2036): o 2º é opcional e passa pela regra do par (mesma gerência e
+        # mesmo fluxo; `par_de_projetos_invalido`), como na criação.
+        projeto_2_obj: Projeto | None = None
+        projeto_2_input = data.get("projeto_2")
+        if projeto_2_input:
+            projeto_2_obj = self._resolve_field(projeto_2_input, Projeto, resolve_projeto, "projeto")
+            if projeto_2_obj is None:
+                errors.append(f"Projeto não encontrado: {projeto_2_input}")
+            elif projeto_obj is not None:
+                motivo = par_de_projetos_invalido(projeto_obj, projeto_2_obj)
+                if motivo:
+                    errors.append(motivo)
+                else:
+                    canonical["projeto_2_id"] = projeto_2_obj.id
+
         # 3. Validar e resolver tipo_evento
         tipo_input = data.get("tipo_evento")
         if not tipo_input:
@@ -185,14 +203,16 @@ class SolicitationValidateView(APIView):
         # 3.1 Regra da compra (SSOT `compra_elegibilidade`); isentos: superuser e a capacidade. Sem
         # compra não bloqueia: o evento vai para aprovação (pedido do dono, 03/11/2026). O projeto em
         # espera (sem compra em município nenhum) a criação recusa (Regra 4), e a prévia também.
+        # Com dois projetos, vale para os dois: um em espera é erro, e falta de compra de um é aviso.
         isento = isento_da_regra_da_compra(request.user)
-        if not isento and projeto_obj is not None and projeto_em_espera(projeto_obj):
+        projetos = [p for p in (projeto_obj, projeto_2_obj) if p is not None]
+        if not isento and any(projeto_em_espera(p) for p in projetos):
             errors.append(MSG_PROJETO_EM_ESPERA)
         elif (
             not isento
             and canonical.get("municipio_id") is not None
-            and projeto_obj is not None
-            and not par_liberado(canonical["municipio_id"], projeto_obj)
+            and projetos
+            and not all(par_liberado(canonical["municipio_id"], p) for p in projetos)
         ):
             warnings.append("Sem compra neste município para este projeto: o evento vai para aprovação.")
 

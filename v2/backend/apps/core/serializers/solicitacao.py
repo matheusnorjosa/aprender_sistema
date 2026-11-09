@@ -16,7 +16,7 @@ from rest_framework import serializers  # type: ignore[attr-defined]
 
 from drf_spectacular.utils import extend_schema_field
 
-from apps.core.models import AuditLog, Participation, Solicitacao, Usuario
+from apps.core.models import AuditLog, Participation, Projeto, Solicitacao, Usuario
 from apps.core.pii import email_sem_cpf, redact_cpf_deep
 from apps.core.rbac.permissions import PodeExcluirSolicitacao
 from apps.core.rbac.policies import user_has_policy
@@ -31,7 +31,13 @@ from apps.core.services.compra_elegibilidade import (
 )
 from apps.core.services.solicitacao_approval import DECISAO_IMPEDIDA, decisoes_impedidas_na_lista
 from apps.core.services.solicitacao_exclusao import ids_ja_decididas, motivo_que_impede_excluir
-from apps.core.services.solicitacao_projetos import projetos_do_evento, rotulo_dos_projetos
+from apps.core.services.solicitacao_projetos import (
+    MSG_SEGUNDO_SEM_PRIMEIRO,
+    ids_dos_projetos,
+    par_de_projetos_invalido,
+    projetos_do_evento,
+    rotulo_dos_projetos,
+)
 from apps.core.services.solicitacao_scope import EscritaEmSolicitacao, scope_publishable_solicitacoes
 
 
@@ -83,9 +89,10 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
     coordenador_nome = serializers.SerializerMethodField()
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
     # Evento de dois projetos (#2036): `projeto_nome` é o rótulo "A + B" (o nome, com um projeto só) e
-    # `projetos` lista os dois. O 2º projeto só se lê aqui; a escrita, com a regra do par, é do PR 4.
+    # `projetos` lista os dois. `projeto_2` é opcional na escrita (regra do par em `validate`); o PATCH sem a
+    # chave não mexe nele.
     projeto_nome = serializers.SerializerMethodField()
-    projeto_2 = serializers.PrimaryKeyRelatedField(read_only=True)
+    projeto_2 = serializers.PrimaryKeyRelatedField(queryset=Projeto.objects.all(), required=False, allow_null=True)
     projetos = serializers.SerializerMethodField()
     projeto_geral_nome = serializers.CharField(source="projeto.projeto_geral.nome", read_only=True, allow_null=True)
     tipo_evento_nome = serializers.CharField(source="tipo_evento.nome", read_only=True)
@@ -392,6 +399,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
            evento antigo sem município não troca de projeto sem informar o município.
         5. Na criação, `coordenador_acompanha` é obrigatório (decisão do dono, 05/10/2026):
            o padrão do model (False) esconderia a falta da resposta. Null o campo já recusa.
+        6. Evento de dois projetos (#2036): a regra do par (`_conferir_projetos`) e, na Regra 4, o conjunto
+           dos projetos no lugar do projeto (os dois cobertos; o 2º "em espera" dá 400 em `projeto_2`).
         """
         instance = getattr(self, "instance", None)
 
@@ -453,29 +462,31 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         # antigas cujo par não tem compra. A regra (DATCompra, coleção, nome geral) e a isenção
         # (superuser ou capacidade) moram em `compra_elegibilidade`. Sem compra não recusa: marca
         # (`par_sem_compra`) para a view mandar o evento para aprovação (pedido do dono, 03/11/2026).
+        projeto, projeto_2 = self._conferir_projetos(attrs, instance)
         self.par_sem_compra = False
         self.par_conferido = False  # o par foi conferido (quem não é isento, par novo): a view grava a marca
         request = cast(Any, self.context.get("request"))
         user = getattr(request, "user", None)
         if not isento_da_regra_da_compra(user):
             municipio = attrs.get("municipio", getattr(instance, "municipio", None))
-            projeto = attrs.get("projeto", getattr(instance, "projeto", None))
+            # Evento de dois projetos (#2036): o par muda quando muda o CONJUNTO de projetos (inverter as
+            # vagas não é reatribuir), e o evento só sai sem a marca com os dois cobertos (a leitura da lista,
+            # `solicitacoes_com_par_liberado`, diz o mesmo; decisão do dono de 08/11/2026).
+            projetos = [p for p in (projeto, projeto_2) if p is not None]
             reatribui_par = (
                 instance is None
                 or getattr(municipio, "pk", None) != instance.municipio_id
-                or getattr(projeto, "pk", None) != instance.projeto_id
+                or frozenset(p.pk for p in projetos) != ids_dos_projetos(instance)
             )
             if reatribui_par and projeto is not None:
                 # Evento antigo sem município (gravado pelo ORM) num PATCH que só troca o projeto:
                 # sem o par não há o que conferir, então não pula a regra.
                 if municipio is None:
                     raise serializers.ValidationError({"municipio": "Informe o município do evento."})
-                if projeto_em_espera(projeto):
-                    raise serializers.ValidationError({"projeto": MSG_PROJETO_EM_ESPERA})
-                # Evento de dois projetos (#2036): sem a marca só com os dois cobertos (a leitura da lista,
-                # `solicitacoes_com_par_liberado`, diz o mesmo). O 2º ainda não entra pela API (PR 4).
-                projeto_2 = getattr(instance, "projeto_2", None)
-                self.par_sem_compra = not all(par_liberado(municipio.pk, p) for p in (projeto, projeto_2) if p)
+                for campo, p in (("projeto", projeto), ("projeto_2", projeto_2)):
+                    if p is not None and projeto_em_espera(p):
+                        raise serializers.ValidationError({campo: MSG_PROJETO_EM_ESPERA})
+                self.par_sem_compra = not all(par_liberado(municipio.pk, p) for p in projetos)
                 self.par_conferido = True
 
         # Regra 1: Validação de intervalo (fim > inicio)
@@ -494,6 +505,37 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             )
 
         return super().validate(attrs)
+
+    def _conferir_projetos(self, attrs: dict[str, Any], instance: Any) -> tuple[Any, Any]:
+        """Evento de dois projetos (#2036; decisões do dono de 08/11/2026): os projetos finais, conferidos.
+
+        - Inverter as vagas não muda nada: o conjunto é o mesmo, e a ordem gravada fica (sem `changed_fields`
+          falso, que impediria quem salvou de decidir, PA-02).
+        - Quando o valor de alguma vaga muda, o 2º passa pela regra do par (`par_de_projetos_invalido`: o mesmo
+          projeto, gerência vazia, outra gerência ou outro fluxo) e não fica sem o 1º. Erro em `projeto_2`.
+          Vale também para quem é isento da regra da compra.
+        """
+        projeto = attrs.get("projeto", getattr(instance, "projeto", None))
+        projeto_2 = attrs.get("projeto_2", getattr(instance, "projeto_2", None))
+        if instance is None:
+            mudou = projeto_2 is not None
+        else:
+            if (
+                projeto_2 is not None
+                and getattr(projeto, "pk", None) == instance.projeto_2_id
+                and projeto_2.pk == instance.projeto_id
+            ):
+                attrs["projeto"], attrs["projeto_2"] = instance.projeto, instance.projeto_2
+                return instance.projeto, instance.projeto_2
+            mudou = (getattr(projeto, "pk", None), getattr(projeto_2, "pk", None)) != (
+                instance.projeto_id,
+                instance.projeto_2_id,
+            )
+        if mudou and projeto_2 is not None:
+            motivo = MSG_SEGUNDO_SEM_PRIMEIRO if projeto is None else par_de_projetos_invalido(projeto, projeto_2)
+            if motivo:
+                raise serializers.ValidationError({"projeto_2": motivo})
+        return projeto, projeto_2
 
 
 # ================================================================

@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from django.db.models import Exists, OuterRef, Q, QuerySet
+from django.db.models import BooleanField, Exists, ExpressionWrapper, OuterRef, Q, QuerySet
 
 from apps.core.models import DATCompra, Municipio, Projeto, Solicitacao
 from apps.core.rbac.helpers import user_has_any_perm
@@ -95,10 +95,22 @@ def municipios_liberados(qs: QuerySet[Municipio], projeto: Projeto | None) -> Qu
     return qs.filter(Exists(compras))
 
 
-def municipios_com_marca_sem_compra(qs: QuerySet[Municipio], projeto: Projeto) -> QuerySet[Municipio]:
-    """`qs` inteiro, com `sem_compra` anotado: True no município sem compra que libere `projeto`."""
-    compras = _compras_validas().filter(_q_libera(projeto), municipio_id=OuterRef("pk"))
-    return qs.annotate(sem_compra=~Exists(compras))
+def municipios_com_marca_sem_compra(
+    qs: QuerySet[Municipio], projeto: Projeto, projeto_2: Projeto | None = None
+) -> QuerySet[Municipio]:
+    """`qs` inteiro, com `sem_compra` anotado: True no município sem compra que libere `projeto`.
+
+    Evento de dois projetos (#2036): com `projeto_2`, True quando falta a compra de qualquer um dos dois.
+    """
+
+    def falta(p: Projeto) -> Exists:
+        return ~Exists(_compras_validas().filter(_q_libera(p), municipio_id=OuterRef("pk")))
+
+    if projeto_2 is None:
+        return qs.annotate(sem_compra=falta(projeto))
+    return qs.annotate(
+        sem_compra=ExpressionWrapper(Q(falta(projeto)) | Q(falta(projeto_2)), output_field=BooleanField())
+    )
 
 
 def solicitacoes_com_par_liberado(qs: QuerySet[Solicitacao]) -> QuerySet[Solicitacao]:

@@ -65,7 +65,7 @@ from .services.solicitacao_exclusao import (
     motivo_que_impede_excluir,
     tem_decisao_humana,
 )
-from .services.solicitacao_projetos import q_tem_projeto
+from .services.solicitacao_projetos import ids_dos_projetos, q_tem_projeto
 from .services.solicitacao_publish import cancel_from_gcal
 from .services.solicitacao_publish import preview_gcal as preview_gcal_service
 from .services.solicitacao_publish import publish_to_gcal, remover_do_google_agora, resync_to_gcal
@@ -124,14 +124,15 @@ class _ExtraParticipantsSerializer(serializers.Serializer):
 def _campos_materiais(
     solicitacao: Solicitacao, formador_ids: set[int | None], coordenador_ids: set[int | None]
 ) -> dict[str, Any]:
-    """O que a aprovação SUPER aprovou: projeto (M10-02/#1624) mais data, horário, município e
+    """O que a aprovação SUPER aprovou: os projetos (M10-02/#1624; o conjunto das duas vagas, #2036: pôr,
+    trocar ou tirar o 2º muda, inverter as vagas não) mais data, horário, município e
     formadores (decisão do dono, 14/10/2026) e os coordenadores além do responsável (ocupam a agenda;
     decisão do dono, 03/11/2026) e o responsável que acompanha (quem ele ocupa na agenda; trocar ou
     passar a acompanhar ou não muda a agenda, decisão do dono de 04/11/2026). Observação, local e evento
     online ficam de fora. Datas comparadas como instante (o mesmo horário em outro fuso não é mudança)."""
     ocupante = coordenador_ocupante(solicitacao)
     return {
-        "projeto": solicitacao.projeto_id,
+        "projetos": ids_dos_projetos(solicitacao),
         "municipio": solicitacao.municipio_id,
         "inicio": solicitacao.inicio,
         "fim": solicitacao.fim,
@@ -167,7 +168,7 @@ def _rebaixar_se_mudou_campo_material(
     )
     mudaram = [campo for campo, valor in antes.items() if depois[campo] != valor]
     # Sem projeto o fluxo é NAO_SUPER (`get_fluxo`): só o M10-02 (o projeto mudou) rebaixa.
-    if solicitacao.projeto_id is None and "projeto" not in mudaram:
+    if solicitacao.projeto_id is None and "projetos" not in mudaram:
         return []
     if mudaram:
         solicitacao.status = "pendente"
@@ -635,6 +636,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # PR 9: o projeto tem que ser de uma gerência onde quem cria tem papel G/C/A.
         self._assert_projeto_na_gerencia(projeto)
         self._assert_projeto_no_alcance_da_aprovadora(projeto)
+        self._assert_segundo_projeto(serializer.validated_data.get("projeto_2"))
         coordenador = self._resolver_coordenador_responsavel(serializer.validated_data.get("coordenador"), projeto)
         sem_compra = getattr(serializer, "par_sem_compra", False)
         return coordenador, resolve_initial_status(projeto=projeto, sem_compra=sem_compra)
@@ -686,6 +688,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 "sem_compra": False,
             }
         if details is not None:
+            # Evento de dois projetos (#2036): o 2º só entra no registro quando existe (o de um projeto fica igual).
+            if instance.projeto_2_id is not None:
+                details["projeto_2_id"] = instance.projeto_2_id
             if lote:
                 details["lote"] = True
             AuditLog.objects.create(
@@ -799,7 +804,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
     _MSG_PROJETO_FORA_DA_GERENCIA = "Você só pode criar ou mover solicitação para projeto da sua gerência."
 
-    def _assert_projeto_na_gerencia(self, projeto):
+    def _assert_projeto_na_gerencia(self, projeto, campo="projeto"):
         """PR 9: barra com 400 projeto sem gerência ou de gerência onde quem cria não tem papel G/C/A.
 
         Regra em `projeto_fora_da_gerencia` (global/privilegiado isento). Sem `request` → ator None →
@@ -807,19 +812,30 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         """
         creator = getattr(getattr(self, "request", None), "user", None)
         if projeto_fora_da_gerencia(creator, projeto):
-            raise serializers.ValidationError({"projeto": [self._MSG_PROJETO_FORA_DA_GERENCIA]})
+            raise serializers.ValidationError({campo: [self._MSG_PROJETO_FORA_DA_GERENCIA]})
 
     _ESCOPO_APROVADORA_MSG_PROJETO = (
         "Você só pode criar ou mover solicitação para projeto do fluxo SUPER da Superintendência."
     )
 
-    def _assert_projeto_no_alcance_da_aprovadora(self, projeto):
+    def _assert_projeto_no_alcance_da_aprovadora(self, projeto, campo="projeto"):
         """Regra do dono (30/09): a aprovadora por vínculo só cria ou move solicitação para projeto
         do alcance dela (`projeto_fora_do_alcance_da_restrita`; projeto None → 400). Sem `request` →
         ator None → não restringe (como `_assert_projeto_na_gerencia`)."""
         user = getattr(getattr(self, "request", None), "user", None)
         if projeto_fora_do_alcance_da_restrita(user, projeto):
-            raise serializers.ValidationError({"projeto": [self._ESCOPO_APROVADORA_MSG_PROJETO]})
+            raise serializers.ValidationError({campo: [self._ESCOPO_APROVADORA_MSG_PROJETO]})
+
+    def _assert_segundo_projeto(self, projeto_2):
+        """Evento de dois projetos (#2036): defesa em profundidade. O poder lê só `projeto`, e a regra do par
+        (mesma gerência e mesmo fluxo, no serializer) já põe o 2º no mesmo escopo; mesmo assim, o 2º que entra
+        passa pela gerência e pelo alcance da aprovadora, com erro em `projeto_2`. O 2º vazio não é conferido:
+        o alcance trata projeto None como fora e daria 400 em todo evento de um projeto (furo 1 do cético).
+        Quem chama só passa o 2º que entra (criação, ou valor novo na edição)."""
+        if projeto_2 is None:
+            return
+        self._assert_projeto_na_gerencia(projeto_2, campo="projeto_2")
+        self._assert_projeto_no_alcance_da_aprovadora(projeto_2, campo="projeto_2")
 
     def _create_participants(self, solicitacao, extra):
         """
@@ -945,6 +961,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 mudou_projeto = True
                 self._assert_projeto_na_gerencia(novo_projeto)
                 self._assert_projeto_no_alcance_da_aprovadora(novo_projeto)
+        novo_projeto_2 = serializer.validated_data.get("projeto_2")
+        if getattr(novo_projeto_2, "pk", None) not in (None, instance.projeto_2_id):
+            self._assert_segundo_projeto(novo_projeto_2)
 
         # Responsável: trocar passa pela gerência do projeto final; não dá para esvaziar.
         coordenador_antigo_id = instance.coordenador_id
@@ -966,6 +985,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             "status": instance.status,
             "municipio_id": instance.municipio_id,
             "projeto_id": instance.projeto_id,
+            "projeto_2_id": instance.projeto_2_id,
             "tipo_evento_id": instance.tipo_evento_id,
             "inicio": instance.inicio.isoformat() if instance.inicio else None,
             "fim": instance.fim.isoformat() if instance.fim else None,
@@ -1046,6 +1066,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 "status": instance.status,
                 "municipio_id": instance.municipio_id,
                 "projeto_id": instance.projeto_id,
+                "projeto_2_id": instance.projeto_2_id,
                 "tipo_evento_id": instance.tipo_evento_id,
                 "inicio": instance.inicio.isoformat() if instance.inicio else None,
                 "fim": instance.fim.isoformat() if instance.fim else None,
@@ -1093,7 +1114,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                     and not campos_reaprovacao
                     and _campos_materiais(instance, new_formador_ids, new_coord_ids) != materiais_antes
                     and _projeto_saiu_do_super_depois_da_aprovacao(
-                        instance, {old_data["projeto_id"], instance.projeto_id}
+                        instance,
+                        {old_data["projeto_id"], old_data["projeto_2_id"], instance.projeto_id, instance.projeto_2_id},
                     )
                 ):
                     details["editada_com_fluxo_nao_super"] = True
@@ -1267,6 +1289,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             "municipio_nome": instance.municipio.nome if instance.municipio else None,
             "projeto_id": instance.projeto_id,
             "projeto_nome": instance.projeto.nome if instance.projeto else None,
+            "projeto_2_id": instance.projeto_2_id,
+            "projeto_2_nome": instance.projeto_2.nome if instance.projeto_2 else None,
             "tipo_evento_id": instance.tipo_evento_id,
             "inicio": instance.inicio.isoformat() if instance.inicio else None,
             "fim": instance.fim.isoformat() if instance.fim else None,

@@ -105,7 +105,10 @@ JANELA_SEGREGACAO = timedelta(days=30)
 # PA-02, quem editou não decide (PR 10): chave de `changed_fields` no AuditLog `UPDATE` da solicitação
 # → campo material do adendo da PA-04 (`views_solicitacao._campos_materiais`). Paridade por teste.
 CAMPOS_MATERIAIS_NO_AUDITLOG: dict[str, str] = {
-    "projeto_id": "projeto",
+    # Evento de dois projetos (#2036): as duas vagas são o material `projetos` (conjunto). A chave
+    # `projeto_id` segue no mapa, e os AuditLogs dos últimos 30 dias continuam valendo.
+    "projeto_id": "projetos",
+    "projeto_2_id": "projetos",
     "municipio_id": "municipio",
     "inicio": "inicio",
     "fim": "fim",

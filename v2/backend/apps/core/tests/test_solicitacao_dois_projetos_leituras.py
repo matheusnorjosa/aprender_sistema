@@ -112,17 +112,6 @@ def test_solicitacao_de_projeto_unico_fica_igual(admin, par):
     assert data["projetos"] == [{"id": a.pk, "nome": a.nome}]
 
 
-def test_projeto_2_nao_se_grava_por_este_pr(admin, par):
-    """A escrita do 2º projeto é do PR 4 (regra 2, reaprovação, compra): aqui ele só se lê."""
-    a, b = par
-    s = SolicitacaoFactory(projeto=a, usuario=UsuarioFactory())
-
-    admin.patch(f"/api/solicitacoes/{s.pk}/", {"projeto_2": b.pk}, format="json")
-
-    s.refresh_from_db()
-    assert s.projeto_2_id is None
-
-
 def test_detalhe_gcal_e_meus_eventos_usam_o_rotulo(admin, par, combo):
     pessoa = UsuarioFactory()
     Participation.objects.create(solicitacao=combo, usuario=pessoa, role="FORMADOR")

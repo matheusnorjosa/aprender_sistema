@@ -79,8 +79,8 @@ Rodei um workflow de 8 agentes cruzando cada afirmação do **lado-sistema** da 
 
 **Rastreamento: milestone #22 — Import v15 → dev correto** (issues #1891–#1900). Ordem sugerida:
 **#1891 ✅** (bomba usuarios_import — corrigida no #1902) → **#1892** (merge VIDA `--apply` — aplicado no dev) → **#1893 ✅** (campos setor) / **#1894 ✅** (desativado_localmente) →
-**#1895/#1896/#1897** (import) → **#1898** (gates D6/D7) → **#1899** (relay external_event_id) → **#1900**
-(validação de dev). As duas landmines (external_event_id, bomba de reativação) foram evitadas por verificar
+**#1895/#1896/#1897** (import) → **#1898** (gates D6/D7) → **#1899** (relay external_event_id) → **#1900 ✅**
+(validação de dev; fechou em 09/11/2026 com o [roteiro de conferência das telas](../imports/ROTEIRO_CONFERENCIA_TELAS_POS_CARGA.md), sem o passo de Planos, que não vale por desenho: aprovar evento não alimenta Planos). As duas landmines (external_event_id, bomba de reativação) foram evitadas por verificar
 antes de construir.
 
 ## Decisões travadas (não relitigar sem o dono)

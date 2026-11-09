@@ -6,6 +6,11 @@
  * Sem rolagem horizontal (G30): as tabelas são o ResponsiveTable (o que some vai para a linha
  * expandida) e os 5 cartões de indicador só ficam lado a lado a partir de 1600 px (em 1/6 da
  * largura, o título era cortado).
+ *
+ * Quem tem só `view_compras_pendencias` (o Controle; decisão do dono, 09/11/2026) vê a tela como
+ * "Pendências de compras": sem pedir o dashboard agregado (403 para ele) e sem os blocos dele.
+ * Os filtros ficam: leem `/options/*`, abertos a quem está logado, e o servidor das pendências
+ * aceita os mesmos.
  */
 
 import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
@@ -44,6 +49,7 @@ import {
   type ComprasPendenciasResponse,
 } from '../../api/datModule';
 import { UF_OPTIONS } from '../../constants';
+import { useAcesso } from '../../contexts/AcessoContext';
 import { buildCsvRow } from '../../utils/csvSanitize';
 import './ComprasDashboardPage.css';
 
@@ -181,6 +187,7 @@ function PercentLegend(): JSX.Element {
 }
 
 export default function ComprasDashboardPage(): JSX.Element {
+  const veDashboard = useAcesso().caps.canViewComprasDashboard;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ComprasDashboardData | null>(null);
@@ -210,19 +217,20 @@ export default function ComprasDashboardPage(): JSX.Element {
       if (filters['tipo_compra']) dashboardParams['tipo_compra'] = filters['tipo_compra'];
 
       // As pendências seguem os mesmos filtros dos KPIs (o servidor aceita os mesmos).
+      // Sem o dashboard, nem o pede: o 403 derrubaria a tela inteira.
       const [dashboardResponse, pendenciasResponse] = await Promise.all([
-        getComprasDashboard(dashboardParams),
+        veDashboard ? getComprasDashboard(dashboardParams) : Promise.resolve(null),
         getComprasPendencias(dashboardParams),
       ]);
       setData(dashboardResponse);
       setPendencias(pendenciasResponse);
     } catch (err) {
-      setError((err as Error).message || 'Erro ao carregar dashboard');
+      setError((err as Error).message || (veDashboard ? 'Erro ao carregar dashboard' : 'Erro ao carregar pendências'));
       setPendencias(null);
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, veDashboard]);
 
   useEffect(() => {
     void loadDashboard();
@@ -414,7 +422,7 @@ export default function ComprasDashboardPage(): JSX.Element {
   if (loading) {
     return (
       <div className="p-6 flex justify-center items-center min-h-96">
-        <Spin size="large" tip="Carregando dashboard..." />
+        <Spin size="large" tip={veDashboard ? 'Carregando dashboard...' : 'Carregando pendências...'} />
       </div>
     );
   }
@@ -423,7 +431,7 @@ export default function ComprasDashboardPage(): JSX.Element {
     return (
       <div className="p-6">
         <Alert
-          message="Erro ao carregar dashboard"
+          message={veDashboard ? 'Erro ao carregar dashboard' : 'Erro ao carregar pendências'}
           description={error}
           type="error"
           showIcon
@@ -437,7 +445,7 @@ export default function ComprasDashboardPage(): JSX.Element {
     );
   }
 
-  if (!data) {
+  if (veDashboard && !data) {
     return (
       <div className="p-6">
         <Empty description="Nenhum dado disponível" />
@@ -450,10 +458,12 @@ export default function ComprasDashboardPage(): JSX.Element {
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <Title level={2} id="compras-dashboard-title" className="dashboard-title">
-            Dashboard de Compras
+            {veDashboard ? 'Dashboard de Compras' : 'Pendências de compras'}
           </Title>
           <Text type="secondary">
-            Municípios atendidos, volumes de livros e ranking de compras.
+            {veDashboard
+              ? 'Municípios atendidos, volumes de livros e ranking de compras.'
+              : 'Municípios com compra e ainda sem evento agendado.'}
           </Text>
         </div>
         <Space>
@@ -523,68 +533,70 @@ export default function ComprasDashboardPage(): JSX.Element {
         </Row>
       </Card>
 
-      <Row gutter={[16, 16]} className="mb-6">
-        <Col xs={24} sm={12} md={8} xxl={4}>
-          <Card className="kpi-card kpi-1" bordered={false}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="kpi-title">Municípios atendidos</div>
-                <div className="kpi-value">{formatNumber(data.kpis.municipios_atendidos)}</div>
-                {data.kpis.total_municipios_referencia ? (
-                  <div className="kpi-subtitle">
-                    de {formatNumber(data.kpis.total_municipios_referencia)} ({data.kpis.cobertura_percentual}%)
-                  </div>
-                ) : null}
+      {data && (
+        <Row gutter={[16, 16]} className="mb-6">
+          <Col xs={24} sm={12} md={8} xxl={4}>
+            <Card className="kpi-card kpi-1" bordered={false}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="kpi-title">Municípios atendidos</div>
+                  <div className="kpi-value">{formatNumber(data.kpis.municipios_atendidos)}</div>
+                  {data.kpis.total_municipios_referencia ? (
+                    <div className="kpi-subtitle">
+                      de {formatNumber(data.kpis.total_municipios_referencia)} ({data.kpis.cobertura_percentual}%)
+                    </div>
+                  ) : null}
+                </div>
+                <EnvironmentOutlined className="kpi-icon" />
               </div>
-              <EnvironmentOutlined className="kpi-icon" />
-            </div>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={8} xxl={4}>
-          <Card className="kpi-card kpi-2" bordered={false}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="kpi-title">Livros comprados</div>
-                <div className="kpi-value">{formatNumber(data.kpis.total_itens)}</div>
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={8} xxl={4}>
+            <Card className="kpi-card kpi-2" bordered={false}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="kpi-title">Livros comprados</div>
+                  <div className="kpi-value">{formatNumber(data.kpis.total_itens)}</div>
+                </div>
+                <BookOutlined className="kpi-icon" />
               </div>
-              <BookOutlined className="kpi-icon" />
-            </div>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={8} xxl={4}>
-          <Card className="kpi-card kpi-3" bordered={false}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="kpi-title">Entregues / Vendidos</div>
-                <div className="kpi-value">{formatNumber(data.kpis.total_entregue)}</div>
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={8} xxl={4}>
+            <Card className="kpi-card kpi-3" bordered={false}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="kpi-title">Entregues / Vendidos</div>
+                  <div className="kpi-value">{formatNumber(data.kpis.total_entregue)}</div>
+                </div>
+                <CheckCircleOutlined className="kpi-icon" />
               </div>
-              <CheckCircleOutlined className="kpi-icon" />
-            </div>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={8} xxl={4}>
-          <Card className="kpi-card kpi-4" bordered={false}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="kpi-title">Disponível</div>
-                <div className="kpi-value">{formatNumber(data.kpis.total_disponivel)}</div>
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={8} xxl={4}>
+            <Card className="kpi-card kpi-4" bordered={false}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="kpi-title">Disponível</div>
+                  <div className="kpi-value">{formatNumber(data.kpis.total_disponivel)}</div>
+                </div>
+                <InboxOutlined className="kpi-icon" />
               </div>
-              <InboxOutlined className="kpi-icon" />
-            </div>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={8} xxl={4}>
-          <Card className="kpi-card kpi-5" bordered={false}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="kpi-title">Coleções ativas</div>
-                <div className="kpi-value">{formatNumber(data.kpis.colecoes_diferentes)}</div>
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={8} xxl={4}>
+            <Card className="kpi-card kpi-5" bordered={false}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="kpi-title">Coleções ativas</div>
+                  <div className="kpi-value">{formatNumber(data.kpis.colecoes_diferentes)}</div>
+                </div>
+                <AppstoreOutlined className="kpi-icon" />
               </div>
-              <AppstoreOutlined className="kpi-icon" />
-            </div>
-          </Card>
-        </Col>
-      </Row>
+            </Card>
+          </Col>
+        </Row>
+      )}
 
       <Card
         className="chart-card mb-6"
@@ -626,113 +638,117 @@ export default function ComprasDashboardPage(): JSX.Element {
         )}
       </Card>
 
-      <Row gutter={[16, 16]} className="mb-6">
-        <Col xs={24} lg={12}>
-          <Card className="chart-card" bordered={false} title={(
-            <Space>
-              <ShoppingCartOutlined />
-              <span className="chart-title">Quantidade por Coleção</span>
-            </Space>
-          )}>
-            <BarList
-              data={data.por_colecao}
-              labelKey="colecao"
-              valueKey="quantidade"
-              percentKey="percentual"
-              color="linear-gradient(90deg, #339af0, #20c997)"
-              emptyLabel="Sem dados de coleção"
-            />
-          </Card>
-        </Col>
-        <Col xs={24} lg={12}>
-          <Card className="chart-card" bordered={false} title={(
-            <Space>
-              <BookOutlined />
-              <span className="chart-title">Top Produtos (o que compram mais)</span>
-            </Space>
-          )}>
-            <BarList
-              data={data.top_produtos}
-              labelKey="produto"
-              valueKey="quantidade"
-              percentKey="percentual"
-              color="linear-gradient(90deg, #ff6b6b, #f06595)"
-              emptyLabel="Sem dados de produtos"
-            />
-          </Card>
-        </Col>
-      </Row>
+      {data && (
+        <>
+          <Row gutter={[16, 16]} className="mb-6">
+            <Col xs={24} lg={12}>
+              <Card className="chart-card" bordered={false} title={(
+                <Space>
+                  <ShoppingCartOutlined />
+                  <span className="chart-title">Quantidade por Coleção</span>
+                </Space>
+              )}>
+                <BarList
+                  data={data.por_colecao}
+                  labelKey="colecao"
+                  valueKey="quantidade"
+                  percentKey="percentual"
+                  color="linear-gradient(90deg, #339af0, #20c997)"
+                  emptyLabel="Sem dados de coleção"
+                />
+              </Card>
+            </Col>
+            <Col xs={24} lg={12}>
+              <Card className="chart-card" bordered={false} title={(
+                <Space>
+                  <BookOutlined />
+                  <span className="chart-title">Top Produtos (o que compram mais)</span>
+                </Space>
+              )}>
+                <BarList
+                  data={data.top_produtos}
+                  labelKey="produto"
+                  valueKey="quantidade"
+                  percentKey="percentual"
+                  color="linear-gradient(90deg, #ff6b6b, #f06595)"
+                  emptyLabel="Sem dados de produtos"
+                />
+              </Card>
+            </Col>
+          </Row>
 
-      <Row gutter={[16, 16]} className="mb-6">
-        <Col xs={24} lg={14}>
-          <Card className="chart-card" bordered={false} title={(
-            <Space>
-              <EnvironmentOutlined />
-              <span className="chart-title">Quem compra mais (Municípios)</span>
-            </Space>
-          )}>
-            <ResponsiveTable<Record<string, string | number>>
-              dataSource={data.top_municipios}
-              columns={topMunicipiosColumns}
-              nomeDaLinha={(item) => `${String(item['municipio'])} - ${String(item['uf'])}`}
-              rowKey={(record) => `${record['municipio']}-${record['uf']}`}
-              pagination={false}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} lg={10}>
-          <Card className="chart-card" bordered={false} title={(
-            <Space>
-              <AppstoreOutlined />
-              <span className="chart-title">Compras por Ano de Uso</span>
-            </Space>
-          )}>
-            <MiniBars data={data.por_ano} labelKey="ano_uso" valueKey="quantidade" />
-            <div className="legend-line mt-4">
-              <span className="legend-dot" />
-              <span>Distribuição anual do volume comprado</span>
-            </div>
-          </Card>
-        </Col>
-      </Row>
+          <Row gutter={[16, 16]} className="mb-6">
+            <Col xs={24} lg={14}>
+              <Card className="chart-card" bordered={false} title={(
+                <Space>
+                  <EnvironmentOutlined />
+                  <span className="chart-title">Quem compra mais (Municípios)</span>
+                </Space>
+              )}>
+                <ResponsiveTable<Record<string, string | number>>
+                  dataSource={data.top_municipios}
+                  columns={topMunicipiosColumns}
+                  nomeDaLinha={(item) => `${String(item['municipio'])} - ${String(item['uf'])}`}
+                  rowKey={(record) => `${record['municipio']}-${record['uf']}`}
+                  pagination={false}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} lg={10}>
+              <Card className="chart-card" bordered={false} title={(
+                <Space>
+                  <AppstoreOutlined />
+                  <span className="chart-title">Compras por Ano de Uso</span>
+                </Space>
+              )}>
+                <MiniBars data={data.por_ano} labelKey="ano_uso" valueKey="quantidade" />
+                <div className="legend-line mt-4">
+                  <span className="legend-dot" />
+                  <span>Distribuição anual do volume comprado</span>
+                </div>
+              </Card>
+            </Col>
+          </Row>
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} lg={12}>
-          <Card className="chart-card" bordered={false} title={(
-            <Space>
-              <EnvironmentOutlined />
-              <span className="chart-title">Quem compra mais vezes</span>
-            </Space>
-          )}>
-            <BarList
-              data={data.top_frequencia}
-              labelKey="municipio"
-              valueKey="compras"
-              color="linear-gradient(90deg, #20c997, #12b886)"
-              colorScale={percentColorScale}
-              emptyLabel="Sem dados de frequência"
-              valueFormatter={(value) => `${formatNumber(value)} compras`}
-            />
-            <PercentLegend />
-          </Card>
-        </Col>
-        <Col xs={24} lg={12}>
-          <Card className="chart-card" bordered={false} title={(
-            <Space>
-              <AppstoreOutlined />
-              <span className="chart-title">Tipo de Compra</span>
-            </Space>
-          )}>
-            <BarList
-              data={data.por_tipo_compra}
-              labelKey="tipo_compra"
-              valueKey="quantidade"
-              color="linear-gradient(90deg, #ffa94d, #ff922b)"
-              emptyLabel="Sem dados de tipo de compra"
-            />
-          </Card>
-        </Col>
-      </Row>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={12}>
+              <Card className="chart-card" bordered={false} title={(
+                <Space>
+                  <EnvironmentOutlined />
+                  <span className="chart-title">Quem compra mais vezes</span>
+                </Space>
+              )}>
+                <BarList
+                  data={data.top_frequencia}
+                  labelKey="municipio"
+                  valueKey="compras"
+                  color="linear-gradient(90deg, #20c997, #12b886)"
+                  colorScale={percentColorScale}
+                  emptyLabel="Sem dados de frequência"
+                  valueFormatter={(value) => `${formatNumber(value)} compras`}
+                />
+                <PercentLegend />
+              </Card>
+            </Col>
+            <Col xs={24} lg={12}>
+              <Card className="chart-card" bordered={false} title={(
+                <Space>
+                  <AppstoreOutlined />
+                  <span className="chart-title">Tipo de Compra</span>
+                </Space>
+              )}>
+                <BarList
+                  data={data.por_tipo_compra}
+                  labelKey="tipo_compra"
+                  valueKey="quantidade"
+                  color="linear-gradient(90deg, #ffa94d, #ff922b)"
+                  emptyLabel="Sem dados de tipo de compra"
+                />
+              </Card>
+            </Col>
+          </Row>
+        </>
+      )}
     </section>
   );
 }

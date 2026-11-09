@@ -374,6 +374,7 @@ export function AppSidebar({
 
             {(caps.canViewOverviewDashboard ||
               caps.canViewComprasDashboard ||
+              caps.canViewComprasPendencias ||
               caps.canViewTeamDashboard ||
               caps.canViewGcalDashboard ||
               caps.canViewMapMetrics) && (
@@ -381,8 +382,13 @@ export function AppSidebar({
                 {caps.canViewOverviewDashboard && (
                   <Menu.Item key="dashboard-geral"><Link to="/dashboards">Dashboard Geral</Link></Menu.Item>
                 )}
-                {caps.canViewComprasDashboard && (
-                  <Menu.Item key="dashboard-compras"><Link to="/dashboards/compras">Dashboard Compras</Link></Menu.Item>
+                {/* Sem o dashboard, a mesma tela mostra só as pendências (09/11/2026). */}
+                {(caps.canViewComprasDashboard || caps.canViewComprasPendencias) && (
+                  <Menu.Item key="dashboard-compras">
+                    <Link to="/dashboards/compras">
+                      {caps.canViewComprasDashboard ? 'Dashboard Compras' : 'Pendências de compras'}
+                    </Link>
+                  </Menu.Item>
                 )}
                 {caps.canViewTeamDashboard && (
                   <Menu.Item key="dashboard-equipe"><Link to="/dashboards/equipe">Dashboard Equipe</Link></Menu.Item>

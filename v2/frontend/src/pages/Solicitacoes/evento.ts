@@ -71,6 +71,8 @@ export interface Horario {
 /** O que a pessoa preenche num evento: o que vale para todos os horários e os horários (pelo menos 1). */
 export interface FormDataType {
   projeto: ComboBoxValue | null;
+  /** O outro projeto do combo (#2036): sem principal; mesma gerência e mesmo fluxo do 1º. */
+  projeto_2: ComboBoxValue | null;
   tipoEvento: ComboBoxValue | null;
   municipio: ComboBoxValue | null;
   horarios: Horario[];
@@ -90,6 +92,7 @@ export interface FormDataType {
  */
 export const ORDEM_DO_CARTAO = [
   'projeto',
+  'projeto_2',
   'tipoEvento',
   // "Nº da formação" fica na 1ª linha do cartão, antes do Município (03/11/2026).
   'encontro',
@@ -132,6 +135,7 @@ export function horarioEmBranco(chave: number): Horario {
 /** Evento em branco (com o horário de chave 1): o estado inicial da página e a régua do `estaEmBranco`. */
 export const FORM_INICIAL: FormDataType = {
   projeto: null,
+  projeto_2: null,
   tipoEvento: null,
   municipio: null,
   horarios: [horarioEmBranco(1)],

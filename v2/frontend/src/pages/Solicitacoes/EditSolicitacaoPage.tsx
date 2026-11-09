@@ -94,6 +94,8 @@ interface FormadorType {
 /** Form data type */
 interface FormDataType {
   projeto: ComboBoxValue | null;
+  /** O outro projeto do combo (#2036): sem principal; mesma gerência e mesmo fluxo do 1º. */
+  projeto_2: ComboBoxValue | null;
   tipoEvento: ComboBoxValue | null;
   municipio: ComboBoxValue | null;
   inicio: string | null;
@@ -198,6 +200,11 @@ function travaDaEdicao(s: Solicitacao): { titulo: string; texto: string; publica
   return null;
 }
 
+/** Os projetos do evento como conjunto (combo, #2036): a ordem das vagas não conta. */
+function idsDosProjetos(...ids: Array<ID | null | undefined>): string {
+  return ids.filter(i => i != null).map(String).sort().join(',');
+}
+
 /**
  * O que a aprovação SUPER aprovou (`_campos_materiais` do backend): projeto, município, início e fim
  * (como instante), formadores, os coordenadores além do responsável e o responsável que acompanha.
@@ -206,7 +213,8 @@ function camposMateriais(d: FormDataType): string {
   const ids = (lista: Array<{ id: ID }>): string => lista.map(p => String(p.id)).sort().join(',');
   const instante = (iso: string | null): number | null => (iso ? dayjs(iso).valueOf() : null);
   return JSON.stringify([
-    d.projeto?.id ?? null,
+    // Os projetos como conjunto (#2036): inverter as vagas não muda o que foi aprovado.
+    idsDosProjetos(d.projeto?.id, d.projeto_2?.id),
     d.municipio?.id ?? null,
     instante(d.inicio),
     instante(d.fim),
@@ -231,6 +239,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
   // Estado do formulário
   const [formData, setFormData] = useState<FormDataType>({
     projeto: null,
+    projeto_2: null,
     tipoEvento: null,
     municipio: null,
     inicio: null,
@@ -289,13 +298,15 @@ export default function EditSolicitacaoPage(): JSX.Element {
 
         // Preencher o formData com os dados existentes
         const inicial: FormDataType = {
+          // Cada campo mostra um projeto: no combo, `projeto_nome` é o rótulo dos dois juntos.
           projeto: data.projeto
             ? {
                 id: data.projeto,
-                label: data.projeto_nome || '',
+                label: data.projetos?.[0]?.nome ?? (data.projeto_nome || ''),
                 pergunta_avaliar_formador: data.projeto_pergunta_avaliar_formador ?? true,
               }
             : null,
+          projeto_2: data.projeto_2 ? { id: data.projeto_2, label: data.projetos?.[1]?.nome ?? '' } : null,
           tipoEvento: data.tipo_evento ? { id: data.tipo_evento, label: data.tipo_evento_nome || '' } : null,
           municipio: data.municipio ? { id: data.municipio, label: data.municipio_nome || '' } : null,
           inicio: data.inicio,
@@ -390,17 +401,31 @@ export default function EditSolicitacaoPage(): JSX.Element {
     [],
   );
   const projetoId = formData.projeto?.id;
+  const projeto2Id = formData.projeto_2?.id;
+  // Combo: o 2º só pode ser da mesma gerência e do mesmo fluxo do 1º (o servidor filtra).
+  const lookupProjetosCompativeis = useCallback(
+    (q: string): Promise<LookupItem[]> => lookupProjetos(q, { com_compra: true, mesmo_grupo_de: projetoId }),
+    [projetoId],
+  );
   const lookupMunicipiosElegiveis = useCallback(
     (q: string): Promise<LookupItem[]> =>
-      lookupMunicipiosWithFilters({ q, com_compra: true, marcar_sem_compra: true, projeto_id: projetoId }),
-    [projetoId],
+      lookupMunicipiosWithFilters({
+        q,
+        com_compra: true,
+        marcar_sem_compra: true,
+        projeto_id: projetoId,
+        ...(projeto2Id ? { projeto_2_id: projeto2Id } : {}),
+      }),
+    [projetoId, projeto2Id],
   );
   // A marca vem do município escolhido na lista, ou da reconferência ao trocar o projeto. Só avisa
   // quando o par difere do gravado: salvar com o mesmo par não muda o status.
   const dispensaCompra = useAcesso().caps.canCreateSolicitationWithoutPurchase;
   const parDiferente =
     solicitacao !== null &&
-    (formData.municipio?.id !== solicitacao.municipio || formData.projeto?.id !== solicitacao.projeto);
+    (formData.municipio?.id !== solicitacao.municipio ||
+      idsDosProjetos(formData.projeto?.id, formData.projeto_2?.id) !==
+        idsDosProjetos(solicitacao.projeto, solicitacao.projeto_2));
   // Projeto em espera: o servidor recusa o par novo (não vai para aprovação), e a tela diz isso.
   const emEspera = parDiferente && formData.municipio?.projeto_em_espera === true;
   const semCompra = parDiferente && !emEspera && formData.municipio?.sem_compra === true;
@@ -416,24 +441,33 @@ export default function EditSolicitacaoPage(): JSX.Element {
 
   // Trocar o projeto: a marca era do par antigo. Com município escolhido, reconfere o par novo pelo
   // mesmo lookup (só esse município); a resposta só vale se o par ainda é o mesmo.
+  // Combo (#2036): tirar o 1º sobe o 2º; trocar o 1º limpa o 2º (ele só vale com o 1º que o escolheu).
   const handleProjetoChange = (value: ComboBoxValue | null): void => {
+    const sobe = !value && formData.projeto_2 ? formData.projeto_2 : null;
+    reconferirPar(sobe ?? value, sobe ? null : value?.id === formData.projeto?.id ? formData.projeto_2 : null);
+  };
+  const handleProjeto2Change = (value: ComboBoxValue | null): void => reconferirPar(formData.projeto, value);
+
+  const reconferirPar = (projeto: ComboBoxValue | null, projeto2: ComboBoxValue | null): void => {
     const municipioId = formData.municipio?.id;
     setFormData({
       ...formData,
-      projeto: value,
+      projeto,
+      projeto_2: projeto2,
       municipio: formData.municipio && { ...formData.municipio, sem_compra: false, projeto_em_espera: false },
     });
-    if (!value || municipioId == null) return;
+    if (!projeto || municipioId == null) return;
     lookupMunicipiosWithFilters({
       q: '',
       com_compra: true,
       marcar_sem_compra: true,
-      projeto_id: value.id,
+      projeto_id: projeto.id,
+      ...(projeto2 ? { projeto_2_id: projeto2.id } : {}),
       municipio_id: municipioId,
     })
       .then(([item]) => {
         setFormData(prev =>
-          prev.projeto?.id === value.id && prev.municipio?.id === municipioId
+          prev.projeto?.id === projeto.id && prev.projeto_2?.id === projeto2?.id && prev.municipio?.id === municipioId
             ? {
                 ...prev,
                 municipio: {
@@ -546,6 +580,8 @@ export default function EditSolicitacaoPage(): JSX.Element {
       const payload = {
         municipio: formData.municipio.id,
         projeto: formData.projeto.id,
+        // Combo (#2036): manda o 2º quando há ou havia um (null tira); o evento de um projeto não o manda.
+        ...((formData.projeto_2 || solicitacao?.projeto_2) && { projeto_2: formData.projeto_2?.id ?? null }),
         tipo_evento: formData.tipoEvento.id,
         inicio: dayjs(formData.inicio).utc().format(),
         fim: dayjs(formData.fim).utc().format(),
@@ -710,6 +746,23 @@ export default function EditSolicitacaoPage(): JSX.Element {
               placeholder="Busque ou selecione um projeto"
             />
           </Form.Item>
+
+          {/* Combo (#2036, decisões do dono de 07/11/2026): os dois projetos juntos, sem principal. */}
+          {formData.projeto && (
+            <Form.Item
+              label="2º projeto (combo)"
+              htmlFor="edit-projeto-2"
+              extra="Só quando os dois projetos acontecem juntos. Aparecem os da mesma gerência e do mesmo fluxo."
+            >
+              <ComboBox
+                id="edit-projeto-2"
+                lookupFunction={lookupProjetosCompativeis}
+                onChange={handleProjeto2Change}
+                value={formData.projeto_2 as LookupItem | null}
+                placeholder="Opcional: o outro projeto do combo"
+              />
+            </Form.Item>
+          )}
 
           <Form.Item
             label="Tipo de Evento"

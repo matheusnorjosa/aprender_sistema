@@ -151,9 +151,11 @@ def test_rotulo_sem_projeto_e_none():
     assert rotulo_dos_projetos(SolicitacaoFactory(projeto=None)) is None
 
 
-def test_rotulo_do_combo_nao_depende_da_vaga(par):
+def test_rotulo_do_combo_segue_a_ordem_das_vagas_como_a_planilha(par):
+    """PR 6 (09/11/2026): a planilha escreve "UNI DUNI TÊ / Cataventos" (v40); antes era alfabético, com " + "."""
     a, b = par
-    assert rotulo_dos_projetos(_combo(a, b)) == rotulo_dos_projetos(_combo(b, a)) == "Cataventos Teste + Uni Duni Teste"
+    assert rotulo_dos_projetos(_combo(a, b)) == f"{a.nome} / {b.nome}"
+    assert rotulo_dos_projetos(_combo(b, a)) == f"{b.nome} / {a.nome}"
 
 
 def test_projetos_e_ids_do_evento(par):

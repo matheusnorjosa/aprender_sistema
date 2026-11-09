@@ -37,6 +37,8 @@ export type LookupMunicipiosParams = QueryParams & {
   marcar_sem_compra?: boolean | undefined;
   /** Só esse município (a edição reconfere a marca do par ao trocar o projeto). */
   municipio_id?: ID | undefined;
+  /** Com `projeto_id`: o outro projeto do combo (#2036). A marca e o filtro pedem compra para os dois. */
+  projeto_2_id?: ID | undefined;
 };
 
 /**
@@ -65,6 +67,8 @@ export async function lookupMunicipiosWithFilters(params: LookupMunicipiosParams
 export type LookupProjetosParams = QueryParams & {
   /** Esconde o projeto "em espera" (sem compra que o libere); o servidor isenta quem é isento. */
   com_compra?: boolean | undefined;
+  /** Combo (#2036): só os projetos que podem ir com este (mesma gerência e mesmo fluxo), sem ele. */
+  mesmo_grupo_de?: ID | undefined;
 };
 
 /**

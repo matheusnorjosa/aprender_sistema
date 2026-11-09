@@ -42,7 +42,8 @@ from apps.core.tests.factories import (
 pytestmark = pytest.mark.django_db
 
 FORTALEZA = ZoneInfo("America/Fortaleza")
-ROTULO = "Cataventos Teste + Uni Duni Teste"
+# Na ordem das vagas, separados por " / ", como a planilha escreve o combo (PR 6, 09/11/2026).
+ROTULO = "Uni Duni Teste / Cataventos Teste"
 
 
 @pytest.fixture
@@ -422,7 +423,7 @@ def test_pendencia_da_colecao_do_2o_fecha_com_o_evento_combo(admin, gerencia):
 
 
 # =============================================================================
-# Google: descrição "Projetos: A + B"; projeto único igual byte a byte; título fica (PR 6)
+# Google: descrição "Projetos: A / B" e título "[A / B]" (PR 6); projeto único igual byte a byte
 # =============================================================================
 
 
@@ -456,15 +457,15 @@ def test_descricao_do_google_de_projeto_unico_fica_igual(par):
     assert payload["summary"] == "CURVELO - MG 4º EF - Presencial [UNI DUNI TESTE]"
 
 
-def test_descricao_do_google_do_combo_lista_os_dois_e_o_titulo_fica(par):
+def test_descricao_e_titulo_do_google_do_combo_levam_os_dois_na_ordem_das_vagas(par):
     a, b = par
     s = _evento_fixo(a, b)
 
     payload = build_event_payload(s, enable_meet=False)
 
-    assert "📂 Projetos: Cataventos Teste (CTV) + Uni Duni Teste (UDT)\n" in payload["description"]
+    assert "📂 Projetos: Uni Duni Teste (UDT) / Cataventos Teste (CTV)\n" in payload["description"]
     assert "📂 Projeto:" not in payload["description"]
-    assert payload["summary"] == "CURVELO - MG 4º EF - Presencial [UNI DUNI TESTE]"
+    assert payload["summary"] == "CURVELO - MG 4º EF - Presencial [UNI DUNI TESTE / CATAVENTOS TESTE]"
 
 
 # =============================================================================

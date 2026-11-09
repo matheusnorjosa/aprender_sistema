@@ -88,7 +88,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
     # o CPF; o nome sai em `coordenador_nome` e `str(usuario)` (nome ou "Usuario #id").
     coordenador_nome = serializers.SerializerMethodField()
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
-    # Evento de dois projetos (#2036): `projeto_nome` é o rótulo "A + B" (o nome, com um projeto só) e
+    # Evento de dois projetos (#2036): `projeto_nome` é o rótulo "A / B" (o nome, com um projeto só) e
     # `projetos` lista os dois. `projeto_2` é opcional na escrita (regra do par em `validate`); o PATCH sem a
     # chave não mexe nele.
     projeto_nome = serializers.SerializerMethodField()
@@ -596,7 +596,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
     Endpoint: GET /api/gcal/dashboard/events/{id}/detail/
     """
 
-    # Campos legíveis (nomes em vez de IDs). `projeto_nome`: o rótulo "A + B" do evento de dois projetos.
+    # Campos legíveis (nomes em vez de IDs). `projeto_nome`: o rótulo "A / B" do evento de dois projetos.
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
     projeto_nome = serializers.SerializerMethodField()
     tipo_evento_nome = serializers.CharField(source="tipo_evento.nome", read_only=True)

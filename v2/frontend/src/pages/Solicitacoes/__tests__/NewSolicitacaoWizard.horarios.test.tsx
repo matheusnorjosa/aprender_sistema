@@ -114,9 +114,11 @@ function MockComboBox({
   }, [lookupFunction]);
   const testid = placeholder.includes('munic')
     ? 'cb-municipio'
-    : placeholder.includes('projeto')
-      ? 'cb-projeto'
-      : 'cb-tipo';
+    : placeholder.includes('combo')
+      ? 'cb-projeto-2'
+      : placeholder.includes('projeto')
+        ? 'cb-projeto'
+        : 'cb-tipo';
   return (
     <button
       type="button"

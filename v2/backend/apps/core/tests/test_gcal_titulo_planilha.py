@@ -19,6 +19,7 @@ import pytest
 from apps.core.models import ProjetoGeral
 from apps.core.services.gcal_sync_service import build_event_payload
 from apps.core.tests.factories import (
+    GerenciaFactory,
     MunicipioFactory,
     ProjetoFactory,
     SolicitacaoFactory,
@@ -159,3 +160,28 @@ def test_api_da_colecao_recusa_nome_na_agenda_acima_de_100():
     resp = client.post("/api/projetos-gerais/", {"nome": "Longa", "nome_na_agenda": "X" * 101}, format="json")
 
     assert resp.status_code == 400
+
+
+def test_combo_leva_os_dois_nomes_na_ordem_das_vagas_como_a_planilha():
+    """#2036 (PR 6): a planilha escreve "[UNI DUNI TÊ / CATAVENTOS 2 a 5 anos]" (v40, 26 títulos conferidos).
+
+    Cada nome é o da agenda da sua coleção, na ordem das vagas, e o segmento vem uma vez no fim.
+    """
+    gerencia = GerenciaFactory()
+    uni = ProjetoFactory(
+        nome="UNI DUNI TÊ", projeto_geral=ProjetoGeral.objects.create(nome="UNI DUNI TÊ"), gerencia=gerencia, super=True
+    )
+    catavento = ProjetoGeral.objects.create(nome="Catavento", nome_na_agenda="CATAVENTOS")
+    cat = ProjetoFactory(nome="Cataventos", projeto_geral=catavento, gerencia=gerencia, super=True)
+    s = SolicitacaoFactory(
+        municipio=MunicipioFactory(nome="Maracanaú", uf="CE"),
+        projeto=uni,
+        projeto_2=cat,
+        tipo_evento=TipoEventoFactory(nome="Presencial"),
+        encontro="6",
+        segmento="2 a 5 anos",
+    )
+
+    summary = build_event_payload(s, enable_meet=False)["summary"]
+
+    assert summary == "MARACANAÚ - CE 6º EF - Presencial [UNI DUNI TÊ / CATAVENTOS 2 a 5 anos]"

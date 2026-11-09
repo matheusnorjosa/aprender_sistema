@@ -17,6 +17,7 @@ from django.db.models import Q
 
 from apps.core.models import Solicitacao
 from apps.core.pii import email_de_reserva
+from apps.core.services.solicitacao_projetos import SEPARADOR_DOS_PROJETOS
 from apps.core.types import JsonDict, PayloadHash
 
 from .minimize import minimize_free_text
@@ -123,12 +124,21 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
     title_parts.append("Acompanhamento" if sem_acento.casefold() == "acompanhamento" else f"EF - {nome_tipo}")
 
     # 4. [NOME NA AGENDA segmento]: o da coleção; vazio, a coleção em maiúsculas; sem coleção, o projeto.
+    # Combo (#2036, PR 6): os dois nomes na ordem das vagas, "[UNI DUNI TÊ / CATAVENTOS 2 a 5 anos]".
     if projeto:
-        colecao = getattr(projeto, "projeto_geral", None)
-        rotulo = (getattr(colecao, "nome_na_agenda", "") or "").strip() or (getattr(colecao, "nome", "") or "").upper()
-        rotulo = rotulo or (getattr(projeto, "nome", "") or "").upper()
+        nomes = []
+        for p in (projeto, getattr(s, "projeto_2", None)):
+            if not p:
+                continue
+            colecao = getattr(p, "projeto_geral", None)
+            nome = (getattr(colecao, "nome_na_agenda", "") or "").strip() or (
+                getattr(colecao, "nome", "") or ""
+            ).upper()
+            nome = nome or (getattr(p, "nome", "") or "").upper()
+            if nome:
+                nomes.append(nome)
         segmento = (getattr(s, "segmento", "") or "").strip()
-        rotulo = f"{rotulo} {segmento}".strip()
+        rotulo = f"{SEPARADOR_DOS_PROJETOS.join(nomes)} {segmento}".strip()
         if rotulo:
             title_parts.append(f"[{rotulo}]")
 
@@ -167,13 +177,10 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
         mun_display = f"{nome_mun} - {uf_mun}" if (nome_mun and uf_mun) else nome_mun
         description_lines.append(f"📍 Município: {mun_display}")
 
-    # Seção 2: Projeto. Evento de dois projetos (#2036): "Projetos: A + B", na ordem do rótulo da tela
-    # (`rotulo_dos_projetos`: alfabética, não depende da vaga). Com um projeto, a linha de sempre.
+    # Seção 2: Projeto. Evento de dois projetos (#2036): "Projetos: A / B", na ordem das vagas, como o
+    # rótulo da tela (`rotulo_dos_projetos`). Com um projeto, a linha de sempre.
     projetos_display = []
-    for p in sorted(
-        (p for p in (projeto, getattr(s, "projeto_2", None)) if p),
-        key=lambda p: (getattr(p, "nome", "") or "").casefold(),
-    ):
+    for p in (p for p in (projeto, getattr(s, "projeto_2", None)) if p):
         projeto_nome = getattr(p, "nome", "")
         projeto_codigo = getattr(p, "codigo", "")
         if projeto_nome:
@@ -181,7 +188,7 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
     if len(projetos_display) == 1:
         description_lines.append(f"📂 Projeto: {projetos_display[0]}")
     elif projetos_display:
-        description_lines.append(f"📂 Projetos: {' + '.join(projetos_display)}")
+        description_lines.append(f"📂 Projetos: {SEPARADOR_DOS_PROJETOS.join(projetos_display)}")
 
     # Seção 3: Tipo de Evento
     if tipo:

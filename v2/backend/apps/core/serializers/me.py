@@ -34,7 +34,7 @@ class MeEventSerializer(serializers.ModelSerializer):
     """
 
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True, default=None)
-    projeto_nome = serializers.SerializerMethodField()  # "A + B" no evento de dois projetos (#2036)
+    projeto_nome = serializers.SerializerMethodField()  # "A / B" no evento de dois projetos (#2036)
     tipo_evento_nome = serializers.CharField(source="tipo_evento.nome", read_only=True, default=None)
     formadores = serializers.SerializerMethodField()
     participantes = serializers.SerializerMethodField()

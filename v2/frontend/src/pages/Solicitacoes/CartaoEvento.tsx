@@ -178,7 +178,36 @@ export default function CartaoEvento({
     [chave, onRemoverHorario],
   );
 
+  // A marca "sem compra" do município escolhido é dos projetos de antes: com os projetos novos, reconfere
+  // só esse município. A resposta só vale se ninguém mexeu em projeto ou município no meio.
+  const reconferencia = useRef(0);
+  const reconferirMunicipio = (projeto: ComboBoxValue, projeto2: ComboBoxValue | null): void => {
+    const vez = ++reconferencia.current;
+    const municipio = dados.municipio;
+    if (dispensaCompra || !municipio) return;
+    lookupMunicipiosWithFilters({
+      q: '',
+      marcar_sem_compra: true,
+      projeto_id: projeto.id,
+      ...(projeto2 ? { projeto_2_id: projeto2.id } : {}),
+      municipio_id: municipio.id,
+    })
+      .then(([item]) => {
+        if (vez === reconferencia.current) mudar({ municipio: { ...municipio, sem_compra: item?.['sem_compra'] === true } });
+      })
+      .catch((err: unknown) => logger.warn('Não foi possível reconferir a compra do município:', err));
+  };
+
   const handleProjetoChange = (value: ComboBoxValue | null): void => {
+    reconferencia.current += 1;
+    // Combo (#2036): tirar o 1º sobe o 2º. É da mesma gerência, então pessoas e município ficam.
+    if (!value && dados.projeto_2) {
+      const sobe = dados.projeto_2;
+      mudar({ projeto: sobe, projeto_2: null });
+      form.setFieldsValue({ projeto: sobe, projeto_2: null });
+      reconferirMunicipio(sobe, null);
+      return;
+    }
     const projetoChanged = dados.projeto?.id !== value?.id;
     // Trocar o projeto pode trocar a gerência (PR 9, P9-5: só entram pessoas da gerência do projeto):
     // formadores, coordenadores e a resposta de avaliar escolhidos para o projeto anterior saem, em
@@ -187,6 +216,8 @@ export default function CartaoEvento({
       projeto: value,
       ...(projetoChanged
         ? {
+            // O 2º só vale com o 1º que o escolheu (mesma gerência e mesmo fluxo).
+            projeto_2: null,
             municipio: null,
             horarios: dados.horarios.map((h) => ({
               ...h,
@@ -201,13 +232,19 @@ export default function CartaoEvento({
         : {}),
     });
     if (projetoChanged) {
-      form.setFieldsValue({ municipio: null });
+      form.setFieldsValue({ municipio: null, projeto_2: null });
       horarios.current.forEach((h) => h.limparPessoas());
       setMunicipioLookupHasResults(null);
     }
   };
 
+  const handleProjeto2Change = (value: ComboBoxValue | null): void => {
+    mudar({ projeto_2: value });
+    if (dados.projeto) reconferirMunicipio(dados.projeto, value);
+  };
+
   const projetoId = dados.projeto?.id;
+  const projeto2Id = dados.projeto_2?.id;
   const lookupMunicipiosElegiveis = useCallback(async (q: string): Promise<LookupItem[]> => {
     // Para usuário comum, exige projeto: a lista marca os municípios sem compra para ele.
     if (!dispensaCompra && !projetoId) {
@@ -216,20 +253,28 @@ export default function CartaoEvento({
     }
     // Pedido do dono (03/11/2026): o município sem compra também vem (com compra primeiro), marcado.
     const results = await lookupMunicipiosWithFilters(
-      dispensaCompra ? { q } : { q, marcar_sem_compra: true, projeto_id: projetoId },
+      dispensaCompra
+        ? { q }
+        : { q, marcar_sem_compra: true, projeto_id: projetoId, ...(projeto2Id ? { projeto_2_id: projeto2Id } : {}) },
     );
     if (!q.trim()) {
       // Com compra primeiro: se nenhum da lista sem busca tem compra, nenhum tem.
       setMunicipioLookupHasResults(results.some((r) => r['sem_compra'] !== true));
     }
     return results;
-  }, [projetoId, dispensaCompra]);
+  }, [projetoId, projeto2Id, dispensaCompra]);
   const semCompra = !dispensaCompra && dados.municipio?.sem_compra === true;
 
   // Regra da compra: projeto sem compra que o libere ("em espera") some da lista.
   const lookupProjetosElegiveis = useCallback(
     (q: string): Promise<LookupItem[]> => lookupProjetos(q, dispensaCompra ? {} : { com_compra: true }),
     [dispensaCompra],
+  );
+  // Combo: o 2º só pode ser da mesma gerência e do mesmo fluxo do 1º (o servidor filtra).
+  const lookupProjetosCompativeis = useCallback(
+    (q: string): Promise<LookupItem[]> =>
+      lookupProjetos(q, dispensaCompra ? { mesmo_grupo_de: projetoId } : { com_compra: true, mesmo_grupo_de: projetoId }),
+    [dispensaCompra, projetoId],
   );
 
   // Confere o evento e os horários; a ordem é a da tela (os campos do evento antes e depois dos horários).
@@ -434,6 +479,22 @@ export default function CartaoEvento({
                 oQueCarrega="os projetos"
               />
             </Form.Item>
+            {/* Combo (#2036, decisões do dono de 07/11/2026): os dois projetos juntos, sem principal. */}
+            {dados.projeto && (
+              <Form.Item
+                label="2º projeto (combo)"
+                name="projeto_2"
+                extra="Só quando os dois projetos acontecem juntos. Aparecem os da mesma gerência e do mesmo fluxo."
+              >
+                <ComboBox
+                  lookupFunction={lookupProjetosCompativeis}
+                  onChange={handleProjeto2Change}
+                  value={dados.projeto_2}
+                  placeholder="Opcional: o outro projeto do combo"
+                  oQueCarrega="os projetos"
+                />
+              </Form.Item>
+            )}
           </div>
           <div className="min-w-0">
             <Form.Item

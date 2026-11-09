@@ -62,6 +62,8 @@ const { Title } = Typography;
 export interface SolicitacaoWizardPayloadInput {
   municipioId: ID;
   projetoId: ID;
+  /** O outro projeto do combo (#2036); vazio no evento de um projeto. */
+  projeto2Id?: ID | null;
   tipoEventoId: ID;
   inicio: string;
   fim: string;
@@ -90,6 +92,7 @@ export function buildSolicitacaoPayload(input: SolicitacaoWizardPayloadInput): R
   return {
     municipio: input.municipioId,
     projeto: input.projetoId,
+    ...(input.projeto2Id ? { projeto_2: input.projeto2Id } : {}),
     tipo_evento: input.tipoEventoId,
     inicio: dayjs(input.inicio).utc().format(),
     fim: dayjs(input.fim).utc().format(),
@@ -245,6 +248,7 @@ function payloadDo(dados: EventoDeUmHorario): SolicitacaoPayload | null {
   return buildSolicitacaoPayload({
     municipioId: dados.municipio.id,
     projetoId: dados.projeto.id,
+    projeto2Id: dados.projeto_2?.id ?? null,
     tipoEventoId: dados.tipoEvento.id,
     inicio: dados.inicio,
     fim: dados.fim,

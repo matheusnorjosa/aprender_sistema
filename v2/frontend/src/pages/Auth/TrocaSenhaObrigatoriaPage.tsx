@@ -73,6 +73,11 @@ const trocaJaFeita = async (error: unknown): Promise<boolean> => {
   }
 };
 
+/** Rótulo do servidor (`ROTULO_ADMINISTRACAO` em views_basic.py) para quem redefiniu sendo superusuário. */
+const ROTULO_ADMINISTRACAO = 'Administração do sistema';
+const porQuem = (rotulo: string): string =>
+  rotulo === ROTULO_ADMINISTRACAO ? 'pela administração do sistema' : `por ${rotulo}`;
+
 export default function TrocaSenhaObrigatoriaPage({
   aviso = null,
   redefinicoes = [],
@@ -183,7 +188,7 @@ export default function TrocaSenhaObrigatoriaPage({
             type="info"
             showIcon
             role="status"
-            message={`Sua senha foi redefinida por ${aviso.por} em ${aviso.em}.`}
+            message={`Sua senha foi redefinida ${porQuem(aviso.por)} em ${aviso.em}.`}
             style={{ marginBottom: '16px' }}
           />
         )}

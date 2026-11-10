@@ -60,6 +60,21 @@ describe('TrocaSenhaObrigatoriaPage — aviso de senha redefinida (F1)', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Sua senha foi redefinida por Pessoa Do Dat em 16/10/2026.');
   });
 
+  test('redefinida pelo superusuário: "pela administração do sistema" (pedido do dono, 10/11/2026)', () => {
+    render(
+      <TrocaSenhaObrigatoriaPage
+        aviso={{ por: 'Administração do sistema', em: '10/11/2026' }}
+        onConcluida={vi.fn()}
+        onSair={vi.fn()}
+        onSessaoEncerrada={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Sua senha foi redefinida pela administração do sistema em 10/11/2026.',
+    );
+  });
+
   test('sem aviso, não mostra o status', () => {
     montar();
 

@@ -317,3 +317,19 @@ class TestBackoffJitter1969:
             _retry_with_backoff(Mock(side_effect=[error, "success"]), operation_name="t", initial_delay=1.0)
 
         assert [c.args[0] for c in mock_sleep.call_args_list] == [5.0]
+
+
+class TestLimiteBrandoNaoRetenta1968:
+    """#1968: o aviso de tempo esgotado (25 min) sobe na hora; não é erro do Google para tentar de novo."""
+
+    @patch("apps.core.services.gcal.utils.time.sleep")
+    def test_soft_time_limit_nao_e_retentado(self, mock_sleep):
+        from celery.exceptions import SoftTimeLimitExceeded
+
+        func = Mock(side_effect=[SoftTimeLimitExceeded(), "success"])
+
+        with pytest.raises(SoftTimeLimitExceeded):
+            _retry_with_backoff(func, operation_name="t", max_retries=3, initial_delay=1.0)
+
+        assert func.call_count == 1
+        mock_sleep.assert_not_called()

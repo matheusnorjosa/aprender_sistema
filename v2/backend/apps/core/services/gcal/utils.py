@@ -16,6 +16,8 @@ import time
 from collections.abc import Callable
 from typing import TypeVar, cast
 
+from celery.exceptions import SoftTimeLimitExceeded
+
 from apps.core.types import JsonDict, PayloadHash
 
 logger = logging.getLogger(__name__)
@@ -66,6 +68,9 @@ def _retry_with_backoff(
                 logger.info(f"{operation_name} succeeded after {attempt} retries")
             return result
 
+        except SoftTimeLimitExceeded:
+            # #1968: tempo esgotado sobe na hora, para a task registrar a falha antes do limite duro.
+            raise
         except Exception as e:
             last_exception = e
             error_str = str(e).lower()

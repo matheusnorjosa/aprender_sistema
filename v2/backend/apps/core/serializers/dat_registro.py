@@ -130,7 +130,8 @@ class DATRegistroCreateSerializer(serializers.ModelSerializer["DATRegistro"]):
             # ETL
             "external_hash",
         ]
-        read_only_fields = ["id"]
+        # #2189: a chave de identidade só o importador grava (pelo ORM); pela API ela é ignorada.
+        read_only_fields = ["id", "external_hash"]
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """

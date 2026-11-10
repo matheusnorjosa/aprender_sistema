@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Result, Button } from 'antd';
 import logger from '../utils/logger';
+import { ehVersaoAntiga, recarregarSeVersaoAntiga } from '../utils/recargaVersaoNova';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -30,6 +31,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   override componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     logger.error('[ErrorBoundary] Uncaught error:', error, errorInfo);
+    // Aba aberta de uma versão que saiu do ar: recarregar busca a versão nova (uma vez; ver o util).
+    recarregarSeVersaoAntiga(error);
   }
 
   override componentDidUpdate(prevProps: ErrorBoundaryProps): void {
@@ -47,6 +50,20 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   override render(): ReactNode {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
+      if (ehVersaoAntiga(this.state.error)) {
+        return (
+          <Result
+            status="info"
+            title="O sistema foi atualizado"
+            subTitle="Recarregue a página para continuar."
+            extra={
+              <Button type="primary" onClick={() => window.location.reload()}>
+                Recarregar página
+              </Button>
+            }
+          />
+        );
+      }
       return (
         <Result
           status="error"

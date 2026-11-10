@@ -212,7 +212,7 @@ def test_batch_reapply_retorna_202_com_queued_count(mock_task, api_client, usuar
 def test_batch_reapply_despacha_sem_exigir_pending(
     mock_send_task, auth_mode, request, api_client, usuario_controle, setup_publicadas
 ):
-    """#1970: o reapply não marca PENDING, então pede à task para não descartar a reentrega.
+    """#1970: o reapply não marca PENDING, então pede à task o modo reenvio (não exige PENDING na reentrega).
 
     Sem isso, a mensagem só reservada que volta para a fila no restart do worker virava SKIP calado.
     Só o envio ao broker é mockado: o Celery confere o kwarg contra a assinatura real da task.
@@ -231,7 +231,7 @@ def test_batch_reapply_despacha_sem_exigir_pending(
     assert response.data["errors"] == []
     assert mock_send_task.call_count == 3
     for chamada in mock_send_task.call_args_list:
-        assert chamada.args[2]["exige_pending"] is False
+        assert chamada.args[2]["reenvio"] is True
 
 
 @pytest.mark.django_db

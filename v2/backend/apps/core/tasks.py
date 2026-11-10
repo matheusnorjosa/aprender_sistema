@@ -19,7 +19,7 @@ import json
 import logging
 from datetime import date
 from io import StringIO
-from typing import Any
+from typing import Any, Literal
 
 from django.core.management import call_command
 
@@ -233,32 +233,57 @@ def _mark_gcal_error(
     )
 
 
-def _pular_reentrega_obsoleta(task: Any, solicitation_id: int) -> dict[str, Any] | None:
-    """Descarta a mensagem reentregue (acks_late, #1970) quando a linha já não espera esta operação.
+def _pular_reentrega_obsoleta(
+    task: Any, solicitation_id: int, operacao: Literal["publish", "reenvio", "cancel"]
+) -> dict[str, Any] | None:
+    """Descarta a mensagem (acks_late, #1970) quando a linha já não espera esta operação.
 
     `redelivered` quer dizer que a mensagem voltou para a fila, não que ela já rodou: o kombu marca
-    também a que o worker só tinha reservado (prefetch) e devolveu no restart sem começar. Quem diz
-    se a operação ainda é esperada é a linha: publish, resync e cancel a marcam PENDING antes de
-    enfileirar. Se a reentrega chega e a linha não está mais PENDING, ou a operação terminou e só
-    faltou o ack, ou uma ação mais nova passou na frente. Rodar de novo marcaria ERROR numa linha
-    certa (cancel) ou traria de volta um evento que a pessoa removeu (publish). Roda antes do
-    cliente OAuth: montar o cliente com token revogado também rebaixaria a linha. Sem `redelivered`
-    (1ª entrega ou chamada direta) não age. Quem não marca PENDING (o reapply em lote) não pode
-    usar a guarda: passa `exige_pending=False` à task.
+    também a que o worker só tinha reservado (prefetch) e devolveu no restart sem começar. Por isso
+    quem decide é a linha, e cada operação olha o sinal dela:
+
+    - `publish` (Publicar e Reenviar marcam PENDING antes de enfileirar): só na reentrega; descarta
+      se a linha saiu de PENDING. Rodar de novo traria de volta um evento que a pessoa removeu.
+    - `reenvio` (reapply em lote, que não marca PENDING): em toda entrega; descarta se a linha está
+      NONE, a mesma recusa de `motivo_nao_publicavel(reenvio=True)`. Entre enfileirar e rodar a
+      pessoa pode ter removido o evento, e o cancel zera o hash e o id: o upsert adotaria o
+      `asv2{id}` cancelado e o traria de volta.
+    - `cancel`: só na reentrega; descarta se não há o que remover (sem `external_event_id` e fora
+      de PUBLISHED, a mesma pré-condição de `cancel_solicitacao`). Com o evento vinculado o cancel
+      roda mesmo fora de PENDING: uma resync que terminou antes dele não desfaz o pedido de remover.
+
+    Roda antes do cliente OAuth: montar o cliente com token revogado também rebaixaria a linha.
     """
     from apps.core.models import Solicitacao
 
-    if not (task.request.delivery_info or {}).get("redelivered"):
+    reentregue = bool((task.request.delivery_info or {}).get("redelivered"))
+    if operacao != "reenvio" and not reentregue:
         return None
-    status = Solicitacao.objects.filter(pk=solicitation_id).values_list("gcal_status", flat=True).first()
-    if status == Solicitacao.GCalStatus.PENDING:
+    linha = Solicitacao.objects.filter(pk=solicitation_id).values("gcal_status", "external_event_id").first()
+    if linha is None:
         return None
-    logger.info("%s: reentrega de s%s descartada (gcal_status=%s)", task.name, solicitation_id, status)
+    status = linha["gcal_status"]
+    if operacao == "publish":
+        obsoleta = status != Solicitacao.GCalStatus.PENDING
+    elif operacao == "reenvio":
+        obsoleta = status == Solicitacao.GCalStatus.NONE
+    else:
+        obsoleta = not linha["external_event_id"] and status != Solicitacao.GCalStatus.PUBLISHED
+    if not obsoleta:
+        return None
+    logger.info(
+        "%s: %s de s%s descartado (gcal_status=%s, reentregue=%s)",
+        task.name,
+        operacao,
+        solicitation_id,
+        status,
+        reentregue,
+    )
     return {
         "action": "SKIP",
         "solicitation_id": solicitation_id,
         "external_event_id": None,
-        "summary": "reentrega descartada: a linha não espera mais esta operação",
+        "summary": "descartado: a linha não espera mais esta operação",
         "error": None,
     }
 
@@ -277,7 +302,7 @@ def task_publish_solicitacao_to_gcal(
     dry_run: bool = False,
     apply_blocked: bool = False,
     operator_user_id: int | None = None,
-    exige_pending: bool = True,
+    reenvio: bool = False,
 ) -> dict[str, Any]:
     """
     Publica uma Solicitacao no Google Calendar (via Celery).
@@ -289,9 +314,10 @@ def task_publish_solicitacao_to_gcal(
         dry_run: Se True, não persiste mudanças no DB/Calendar
         apply_blocked: Se True, aplica mesmo sem GCAL_CLIENT configurado
         operator_user_id: ID do usuário operador (OAuth mode)
-        exige_pending: Se False, a reentrega roda mesmo com a linha fora de PENDING. É o caso do
-            reapply em lote, que não marca PENDING; rodar de novo é seguro porque o upsert pula o
-            UPDATE quando o hash do conteúdo não mudou.
+        reenvio: True no reapply em lote, que não marca PENDING. A task então não exige PENDING na
+            reentrega, mas em toda entrega descarta a linha que voltou a NONE (a pessoa removeu o
+            evento depois de enfileirar). O cancel zera o hash e o id, então o upsert sozinho não
+            protegeria: adotaria o evento cancelado. Ver `_pular_reentrega_obsoleta`.
 
     Returns:
         dict: {
@@ -307,8 +333,9 @@ def task_publish_solicitacao_to_gcal(
     from apps.core.models import AuditLog, Solicitacao, Usuario
     from apps.core.services.gcal_sync_service import apply_one_solicitacao
 
-    # A prévia e o reapply não marcam PENDING: reentregues, só rodam de novo.
-    if not dry_run and exige_pending and (pulo := _pular_reentrega_obsoleta(self, solicitation_id)):
+    # A prévia não marca PENDING nem escreve: reentregue, só roda de novo.
+    operacao: Literal["publish", "reenvio"] = "reenvio" if reenvio else "publish"
+    if not dry_run and (pulo := _pular_reentrega_obsoleta(self, solicitation_id, operacao)):
         return pulo
 
     # OAuth Phase 3: Verificar modo OAuth e criar cliente se necessário
@@ -520,7 +547,7 @@ def task_cancel_solicitacao_from_gcal(
     from apps.core.models import AuditLog, Solicitacao, Usuario
     from apps.core.services.gcal_sync_service import cancel_solicitacao
 
-    if pulo := _pular_reentrega_obsoleta(self, solicitation_id):
+    if pulo := _pular_reentrega_obsoleta(self, solicitation_id, "cancel"):
         return pulo
 
     # OAuth: create OAuth client if needed (fix #572)
@@ -1095,8 +1122,9 @@ def queue_gcal_sync_retry(
     """
     Retry GCal sync when circuit breaker closes (Gap 6 - PLAN_maturity_gaps.md).
 
-    This task is queued when the circuit breaker is open. It waits for the
-    circuit to close before attempting to sync.
+    This task is queued when the circuit breaker is open. Each run attempts the
+    sync; while the breaker is open it raises CircuitBreakerError and the task
+    retries in 60s. Once reset_timeout elapses, the call is the half-open probe.
 
     Args:
         solicitation_id: ID of the Solicitacao to sync
@@ -1107,18 +1135,10 @@ def queue_gcal_sync_retry(
         dict: Result with action, status, and any errors
     """
     from apps.core.models import AuditLog, Solicitacao
-    from apps.core.services.gcal.circuit_breaker import gcal_breaker
 
-    # Check circuit breaker state
-    if str(gcal_breaker.current_state) == "open":
-        # Circuit still open, retry later
-        logger.info(
-            f"Circuit breaker still open for Solicitacao #{solicitation_id}, "
-            f"retrying in 60s (attempt {self.request.retries + 1}/{self.max_retries})"
-        )
-        raise self.retry(countdown=60)
-
-    # Circuit is closed or half-open, attempt sync
+    # Tenta sempre: quem decide é o `gcal_breaker.call()` lá dentro. Aberto e dentro do reset_timeout,
+    # ele levanta CircuitBreakerError (o `except` abaixo reagenda); vencido o prazo, passa a half-open
+    # e deixa esta chamada testar. Ler `current_state` antes e desistir nunca disparava essa passagem.
     try:
         s = Solicitacao.objects.get(id=solicitation_id)
 

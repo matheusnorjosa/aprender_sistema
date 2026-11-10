@@ -302,8 +302,8 @@ class GCalBatchReapplyView(APIView):
                 )
                 continue
 
-            # Válida: enfileirar (reapply não reseta hash nem marca PENDING). `exige_pending=False`: a
-            # mensagem que volta para a fila no restart do worker roda de novo em vez de ser descartada.
+            # Válida: enfileirar (reapply não reseta hash nem marca PENDING). `reenvio=True`: a mensagem
+            # que volta para a fila no restart do worker roda de novo, mas não se a linha voltou a NONE.
             if not dry_run:
                 try:
                     # OAuth mode: passar operator_user_id
@@ -313,12 +313,12 @@ class GCalBatchReapplyView(APIView):
                             dry_run=dry_run,
                             apply_blocked=apply_blocked,
                             operator_user_id=operator_user_id,
-                            exige_pending=False,
+                            reenvio=True,
                         )
                     else:
                         # Service account mode: sem operator_user_id
                         task_publish_solicitacao_to_gcal.delay(
-                            sol.id, dry_run=dry_run, apply_blocked=apply_blocked, exige_pending=False
+                            sol.id, dry_run=dry_run, apply_blocked=apply_blocked, reenvio=True
                         )
                     queued_count += 1
                     logger.info(f"Batch reapply queued: id={sol.id}, operator={operator_user_id}")

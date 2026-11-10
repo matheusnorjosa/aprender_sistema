@@ -4,7 +4,8 @@ Sem `acks_late`, o Celery confirma a mensagem ANTES de rodar a task: se o worker
 publicação some e a linha fica PENDING. Com `acks_late` + `reject_on_worker_lost` a mensagem volta
 para a fila, e aí a task pode rodar de novo. Rodar de novo sem olhar a linha estraga: o cancel que
 já terminou marca ERROR ("não possui evento publicado"), e o publish atrasado traz de volta o evento
-que a pessoa removeu depois. A guarda descarta a reentrega quando a linha já não está PENDING.
+que a pessoa removeu depois. A guarda olha a linha: publish exige PENDING, o reapply (`reenvio`) recusa
+NONE, e o cancel só desiste quando não há mais o que remover.
 
 A reentrega é simulada como o kombu a entrega: `delivery_info["redelivered"] = True` no request.
 A chamada direta da task (o resto da suíte) não tem `delivery_info`, então a guarda não entra.
@@ -139,7 +140,7 @@ def test_reapply_reentregue_com_linha_publicada_atualiza_o_google():
 
     O kombu marca `redelivered` também na mensagem que o worker só tinha reservado (prefetch) e
     devolveu no restart sem rodar. Com a guarda, o reapply de todo deploy virava SKIP calado e o
-    Google ficava com o conteúdo velho. O reapply passa `exige_pending=False` e roda de novo.
+    Google ficava com o conteúdo velho. O reapply passa `reenvio=True` e roda de novo.
     """
     operador = UsuarioFactory()
     sol = _linha(Solicitacao.GCalStatus.PUBLISHED)
@@ -151,15 +152,82 @@ def test_reapply_reentregue_com_linha_publicada_atualiza_o_google():
     client.update.return_value = {"id": sol.external_event_id}
 
     with patch(CLIENT_FACTORY, return_value=(client, "cal-org")):
-        resultado = _reentregue(
-            task_publish_solicitacao_to_gcal, sol.id, operator_user_id=operador.pk, exige_pending=False
-        )
+        resultado = _reentregue(task_publish_solicitacao_to_gcal, sol.id, operator_user_id=operador.pk, reenvio=True)
 
     assert resultado["action"] == "UPDATE"
     client.update.assert_called_once()
     sol.refresh_from_db()
     assert sol.gcal_status == Solicitacao.GCalStatus.PUBLISHED
     assert sol.gcal_payload_hash != "hash-do-conteudo-anterior"
+
+
+@OAUTH
+@pytest.mark.parametrize("reentregue", [True, False], ids=["reentrega", "primeira-entrega"])
+def test_reapply_com_linha_desvinculada_nao_ressuscita_evento_cancelado(reentregue):
+    """A pessoa removeu do Google depois do reapply ir para a fila: a linha está NONE e sem id.
+
+    O cancel zera o hash e o id, então o upsert não tem o que pular: sem a conferência, o reapply
+    adota o `asv2{id}` cancelado e o traz de volta. Vale em toda entrega, não só na reentrega.
+    """
+    operador = UsuarioFactory()
+    sol = _linha(Solicitacao.GCalStatus.NONE)
+    client = _cliente()
+    client.get.return_value = {"id": f"asv2{sol.id}", "status": "cancelled"}
+
+    with patch(CLIENT_FACTORY, return_value=(client, "cal-org")) as fabrica:
+        if reentregue:
+            resultado = _reentregue(
+                task_publish_solicitacao_to_gcal, sol.id, operator_user_id=operador.pk, reenvio=True
+            )
+        else:
+            resultado = task_publish_solicitacao_to_gcal.run(sol.id, operator_user_id=operador.pk, reenvio=True)
+
+    assert resultado["action"] == "SKIP"
+    fabrica.assert_not_called()
+    client.update.assert_not_called()
+    client.insert.assert_not_called()
+    sol.refresh_from_db()
+    assert sol.gcal_status == Solicitacao.GCalStatus.NONE
+    assert sol.external_event_id is None
+
+
+@OAUTH
+def test_cancel_reentregue_com_linha_publicada_remove_do_google():
+    """Uma resync terminou (PUBLISHED) enquanto o cancel pedido depois esperava na fila.
+
+    A última ação da pessoa foi remover: com o evento ainda vinculado, o cancel reentregue remove.
+    """
+    operador = UsuarioFactory()
+    sol = _linha(Solicitacao.GCalStatus.PUBLISHED)
+    sol.external_event_id = f"asv2{sol.id}"
+    sol.save(update_fields=["external_event_id"])
+    client = _cliente()
+
+    with patch(CLIENT_FACTORY, return_value=(client, "cal-org")):
+        resultado = _reentregue(task_cancel_solicitacao_from_gcal, sol.id, operator_user_id=operador.pk)
+
+    assert resultado["action"] == "DELETE"
+    client.delete.assert_called_once()
+    sol.refresh_from_db()
+    assert sol.gcal_status == Solicitacao.GCalStatus.NONE
+    assert sol.external_event_id is None
+
+
+@OAUTH
+def test_cancel_reentregue_sem_evento_vinculado_nao_marca_erro_na_publicacao_pendente():
+    """O cancel terminou e a pessoa publicou de novo (PENDING, ainda sem id): o cancel que volta não tem o
+    que remover e não pode marcar ERROR por cima da publicação que espera na fila."""
+    operador = UsuarioFactory()
+    sol = _linha(Solicitacao.GCalStatus.PENDING)
+    client = _cliente()
+
+    with patch(CLIENT_FACTORY, return_value=(client, "cal-org")):
+        resultado = _reentregue(task_cancel_solicitacao_from_gcal, sol.id, operator_user_id=operador.pk)
+
+    assert resultado["action"] == "SKIP"
+    client.delete.assert_not_called()
+    sol.refresh_from_db()
+    assert sol.gcal_status == Solicitacao.GCalStatus.PENDING
 
 
 @OAUTH

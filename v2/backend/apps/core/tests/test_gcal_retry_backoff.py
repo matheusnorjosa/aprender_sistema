@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from unittest.mock import Mock, call, patch
 
+import httplib2
 import pytest
 
 from apps.core.services.gcal_sync_service import _retry_with_backoff
@@ -195,7 +196,8 @@ class TestRetryBackoff:
         Cenário: API retorna Retry-After: 5 (segundos)
         """
         error = MockHttpError(429, "Rate Limit")
-        error.resp.get = Mock(return_value="5")  # Retry-After: 5s
+        # A resposta real do googleapiclient: o httplib2 guarda os cabeçalhos em minúsculas.
+        error.resp = httplib2.Response({"status": 429, "Retry-After": "5"})
 
         mock_func = Mock()
         mock_func.side_effect = [error, "success"]
@@ -317,7 +319,7 @@ class TestBackoffJitter1969:
     def test_retry_after_nao_recebe_jitter(self, mock_sleep):
         """Quem define a espera no Retry-After é o servidor."""
         error = MockHttpError(429, "Rate Limit")
-        error.resp.get = Mock(return_value="5")
+        error.resp = httplib2.Response({"status": 429, "Retry-After": "5"})
 
         with _no_piso():
             _retry_with_backoff(Mock(side_effect=[error, "success"]), operation_name="t", initial_delay=1.0)

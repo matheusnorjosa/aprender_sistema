@@ -712,7 +712,9 @@ except Exception as e:
 > **Circuit breaker** (`apps/core/services/gcal/circuit_breaker.py`, `gcal_breaker`): as chamadas
 > ao Google Calendar (create/update/cancel) passam por `_retry_with_circuit_breaker`, que **falha
 > rápido** enquanto o circuito está aberto (após uma sequência de falhas), evitando martelar a API.
-> O retry/backoff (`_retry_with_backoff`) roda por dentro do breaker.
+> O retry/backoff (`_retry_with_backoff`) roda por dentro do breaker. Vencido o `reset_timeout`, a
+> próxima chamada passa como teste (half-open) e, se der certo, fecha o circuito. Essa passagem só
+> acontece dentro de `gcal_breaker.call()`; por isso nenhum chamador lê `current_state` para desistir antes.
 
 ## 5. Comandos Úteis
 

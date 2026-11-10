@@ -79,9 +79,9 @@ def _retry_with_backoff(
                 # googleapiclient.errors.HttpError
                 status_code = e.resp.status
 
-                # Extrair Retry-After header
+                # Retry-After: o httplib2.Response guarda os cabeçalhos em minúsculas
                 if hasattr(e.resp, "get"):
-                    retry_after = e.resp.get("Retry-After")
+                    retry_after = e.resp.get("retry-after")
             elif "429" in error_str:
                 status_code = 429
             elif "500" in error_str or "502" in error_str or "503" in error_str or "504" in error_str:
@@ -183,7 +183,7 @@ def _retry_with_circuit_breaker(
     Execute function with retry, backoff, AND circuit breaker protection.
 
     Combines _retry_with_backoff with circuit breaker pattern.
-    If circuit is open, raises CircuitBreakerError immediately.
+    If the circuit is open and reset_timeout has not elapsed, raises CircuitBreakerError without calling.
     Failed operations count toward circuit breaker failure threshold.
 
     Args:
@@ -201,13 +201,9 @@ def _retry_with_circuit_breaker(
     """
     from .circuit_breaker import CircuitBreakerError, gcal_breaker
 
-    # Check circuit state first
-    if str(gcal_breaker.current_state) == "open":
-        logger.warning(f"{operation_name}: Circuit breaker is OPEN, failing fast")
-        raise CircuitBreakerError(gcal_breaker)
-
     try:
-        # Use circuit breaker to track success/failure
+        # O breaker decide: aberto dentro do reset_timeout, levanta sem chamar; vencido o prazo, passa
+        # a half-open e esta chamada testa. Ler `current_state` antes e desistir travava no aberto.
         result = gcal_breaker.call(
             _retry_with_backoff,
             func,

@@ -235,3 +235,15 @@ class TestNotificacoesTask:
         result = processar_notificacoes_acoes_diarias()
 
         assert "notifications_created" in result or "actions_evaluated" in result
+
+
+def test_limite_brando_global_abaixo_do_duro():
+    """#1968: aos 25 min a task recebe SoftTimeLimitExceeded e registra a falha; aos 30 min o SIGKILL não limpa nada."""
+    from django.conf import settings
+
+    from config.celery import app
+
+    brando = getattr(settings, "CELERY_TASK_SOFT_TIME_LIMIT", None)
+    assert brando is not None
+    assert brando < settings.CELERY_TASK_TIME_LIMIT
+    assert app.conf.task_soft_time_limit == brando

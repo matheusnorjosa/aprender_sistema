@@ -44,6 +44,7 @@ class TestRetryBackoff:
         assert result == "success"
         assert mock_func.call_count == 1
 
+    @patch("random.uniform", new=lambda a, b: b)  # jitter no teto (#1969): o backoff cheio
     @patch("apps.core.services.gcal.utils.time.sleep")
     def test_retry_429_rate_limit_until_success(self, mock_sleep):
         """
@@ -206,6 +207,7 @@ class TestRetryBackoff:
         # Deve usar Retry-After (5s) em vez de backoff exponencial
         assert mock_sleep.call_args[0][0] == 5.0
 
+    @patch("random.uniform", new=lambda a, b: b)  # jitter no teto (#1969): o backoff cheio
     @patch("apps.core.services.gcal.utils.time.sleep")
     def test_exponential_backoff_sequence(self, mock_sleep):
         """
@@ -274,3 +276,60 @@ class TestRetryBackoff:
         assert result == "success"
         assert mock_func.call_count == 2
         assert mock_sleep.call_count == 1
+
+
+# #1969: o sorteio do jitter fica nas pontas — `a` é o piso (50%), `b` o teto (100%, o valor de antes).
+def _no_piso():
+    return patch("random.uniform", new=lambda a, b: a)
+
+
+def _no_teto():
+    return patch("random.uniform", new=lambda a, b: b)
+
+
+class TestBackoffJitter1969:
+    """#1969: a espera entre tentativas varia de 50% a 100% do backoff, para os workers não baterem juntos."""
+
+    def _cinco_xx_tres_vezes(self):
+        return Mock(side_effect=[MockHttpError(500), MockHttpError(500), MockHttpError(500), "success"])
+
+    @patch("apps.core.services.gcal.utils.time.sleep")
+    def test_backoff_tem_jitter_piso_metade(self, mock_sleep):
+        with _no_piso():
+            _retry_with_backoff(self._cinco_xx_tres_vezes(), operation_name="t", max_retries=3, initial_delay=1.0)
+
+        assert [c.args[0] for c in mock_sleep.call_args_list] == [0.5, 1.0, 2.0]
+
+    @patch("apps.core.services.gcal.utils.time.sleep")
+    def test_backoff_jitter_nao_passa_do_teto(self, mock_sleep):
+        with _no_teto():
+            _retry_with_backoff(self._cinco_xx_tres_vezes(), operation_name="t", max_retries=3, initial_delay=1.0)
+
+        assert [c.args[0] for c in mock_sleep.call_args_list] == [1.0, 2.0, 4.0]
+
+    @patch("apps.core.services.gcal.utils.time.sleep")
+    def test_retry_after_nao_recebe_jitter(self, mock_sleep):
+        """Quem define a espera no Retry-After é o servidor."""
+        error = MockHttpError(429, "Rate Limit")
+        error.resp.get = Mock(return_value="5")  # Retry-After: 5s
+
+        with _no_piso():
+            _retry_with_backoff(Mock(side_effect=[error, "success"]), operation_name="t", initial_delay=1.0)
+
+        assert [c.args[0] for c in mock_sleep.call_args_list] == [5.0]
+
+
+class TestLimiteBrandoNaoRetenta1968:
+    """#1968: o aviso de tempo esgotado (25 min) sobe na hora; não é erro do Google para tentar de novo."""
+
+    @patch("apps.core.services.gcal.utils.time.sleep")
+    def test_soft_time_limit_nao_e_retentado(self, mock_sleep):
+        from celery.exceptions import SoftTimeLimitExceeded
+
+        func = Mock(side_effect=[SoftTimeLimitExceeded(), "success"])
+
+        with pytest.raises(SoftTimeLimitExceeded):
+            _retry_with_backoff(func, operation_name="t", max_retries=3, initial_delay=1.0)
+
+        assert func.call_count == 1
+        mock_sleep.assert_not_called()

@@ -910,6 +910,8 @@ def task_run_import_job(self: Any, import_job_id: int) -> dict[str, Any]:
 
     from django.db import transaction
 
+    from celery.exceptions import SoftTimeLimitExceeded
+
     from apps.core.models import AuditLog, ImportJob
     from apps.core.services.bloqueios_import import import_bloqueios_from_file
 
@@ -984,7 +986,11 @@ def task_run_import_job(self: Any, import_job_id: int) -> dict[str, Any]:
 
     except Exception as exc:
         tb = traceback.format_exc()
-        err_msg = str(exc)
+        if isinstance(exc, SoftTimeLimitExceeded):
+            # str() daria "SoftTimeLimitExceeded()". O service desfaz o arquivo inteiro antes de chegar aqui (#1968).
+            err_msg = "Tempo esgotado: o import passou do limite de tempo e foi interrompido."
+        else:
+            err_msg = str(exc)
         logger.exception(f"task_run_import_job: erro ao executar job #{import_job_id}")
 
         try:

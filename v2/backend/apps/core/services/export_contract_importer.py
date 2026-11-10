@@ -258,6 +258,35 @@ _CONSUMED_FIELDS: dict[str, frozenset[str]] = {
     "deslocamento": frozenset({"usuario_cpf", "origem", "destino", "start_date", "end_date", "observacao"}),
 }
 
+# CON-12: colunas sem as quais a carga muda de sentido calada (cada `r.get(col) or ""` vira vazio). Com uma
+# delas faltando no cabeçalho, o relatório aponta em `contrato_faltando` e nada é gravado. Coluna a mais não
+# é falta (vai para `ignored_fields`).
+_COLUNAS_OBRIGATORIAS: dict[str, tuple[str, ...]] = {
+    "usuario": ("cpf", "email", "nome_completo"),
+    "solicitacao": (
+        "evento_id",
+        "municipio",
+        "uf",
+        "projeto",
+        "disciplina",
+        "tipo_evento",
+        "data",
+        "hora_inicio",
+        "hora_fim",
+        "segmento",
+        "solicitante_cpf",
+        "cancelado",
+        "evento_ids_anteriores",
+        "linha_completa",
+        "na_agenda_google",
+        "external_event_id",
+        "projetos",
+    ),
+    "participation": ("evento_id", "role", "usuario_cpf", "match_procedencia", "usuario"),
+}
+# O create-only aceita o solicitacao.csv e o participation.csv antigos; só a virada exige as colunas deles.
+_OBRIGATORIAS_SO_NA_VIRADA = frozenset({"solicitacao", "participation"})
+
 
 def _resolve_papel(raw: str | None) -> str:
     """Nome de papel bruto -> canonico (GERENTE/COORDENADOR/APOIO/FORMADOR/EQUIPE) via PAPEL_MAPPING."""
@@ -1298,15 +1327,45 @@ class ExportContractImporter:
         fp = os.path.join(self.path, f"{name}.csv")
         if not os.path.exists(fp):
             return []
-        with open(fp, encoding="utf-8") as f:
+        with open(fp, encoding="utf-8-sig") as f:  # CON-12: BOM não come o 1º cabeçalho
             return list(csv.DictReader(f))
 
     def _read_manifest(self) -> dict[str, Any]:
         fp = os.path.join(self.path, "manifest.json")
         if not os.path.exists(fp):
             return {}
-        with open(fp, encoding="utf-8") as f:
+        with open(fp, encoding="utf-8-sig") as f:
             return json.load(f)
+
+    def _cabecalho(self, name: str) -> list[str]:
+        """Linha 1 do CSV, sem aparar espaço. Leitura à parte para não mudar a assinatura de `_load`."""
+        with open(os.path.join(self.path, f"{name}.csv"), encoding="utf-8-sig") as f:
+            return next(csv.reader(f), [])
+
+    def _contrato_faltando(self, manifest: dict[str, Any]) -> dict[str, Any]:
+        """CON-12: arquivo e coluna obrigatória que faltam no pacote, só com nomes (nenhum valor de linha).
+
+        Arquivo: o declarado em `manifest["entities"][*]["file_csv"]`, o da entidade do `--allow-entity`
+        (`gcal_adocao` lê o solicitacao.csv) e, na virada, solicitacao.csv e participation.csv. Coluna: as de
+        `_COLUNAS_OBRIGATORIAS` que não estão no cabeçalho. O VALOR de `contrato_versao` não é conferido."""
+        virada = self.mode == "virada"
+        entidades = manifest.get("entities")
+        declarados = [e.get("file_csv") for e in entidades.values()] if isinstance(entidades, dict) else []
+        exigidos = [f"{'solicitacao' if n == 'gcal_adocao' else n}.csv" for n in self.allow]
+        if virada:
+            exigidos += ["solicitacao.csv", "participation.csv"]
+        arquivos = sorted({a for a in declarados + exigidos if a and not os.path.exists(os.path.join(self.path, a))})
+        colunas: dict[str, list[str]] = {}
+        for name, obrigatorias in _COLUNAS_OBRIGATORIAS.items():
+            if name in _OBRIGATORIAS_SO_NA_VIRADA and not virada:
+                continue
+            if not os.path.exists(os.path.join(self.path, f"{name}.csv")):
+                continue  # o arquivo que falta já entrou em `arquivos` quando é exigido
+            cabecalho = set(self._cabecalho(name))
+            faltam = [c for c in obrigatorias if c not in cabecalho]
+            if faltam:
+                colunas[name] = faltam
+        return {"arquivos": arquivos, "colunas": colunas}
 
     def _municipio_index(self) -> dict[tuple[str, str], int]:
         """Índice (norm(nome), uf.upper()) → municipio_id, para resolver FK por nome+uf.
@@ -2600,6 +2659,7 @@ class ExportContractImporter:
 
     def run(self) -> dict[str, Any]:
         manifest = self._read_manifest()
+        contrato_faltando = self._contrato_faltando(manifest)
         apply_blocked = bool(self.apply) and not self.allow
         self._zerar_contagem_de_pessoas()
         self._apply_sem_cadastro_eventos = []
@@ -2619,7 +2679,9 @@ class ExportContractImporter:
 
         # ── escrita (create-only) — só se apply + allowlist; NÃO exercida no skeleton ──
         applied: dict[str, int] = {}
-        if self.apply and self.allow and self.mode in ("create-only", "virada"):
+        # CON-12: pacote fora do contrato não grava nada (a trava fica aqui, não só no comando).
+        fora_do_contrato = bool(contrato_faltando["arquivos"] or contrato_faltando["colunas"])
+        if self.apply and self.allow and self.mode in ("create-only", "virada") and not fora_do_contrato:
             # O relatório do apply conta o que o apply resolveu, não o classify.
             self._zerar_contagem_de_pessoas()
             applied = self._apply_create_only()
@@ -2631,6 +2693,8 @@ class ExportContractImporter:
             "apply_blocked": apply_blocked,
             "allow": list(self.allow),
             "manifest": manifest,
+            # CON-12: só nomes de arquivo e de coluna; com algo aqui, `applied` fica vazio.
+            "contrato_faltando": contrato_faltando,
             "por_entidade": por_entidade,
             "applied": applied,
             # Pares distintos u<id>→u<id> (e-mail × CPF) em que valeu o CPF; só ids internos, sem dado pessoal.
@@ -3904,7 +3968,8 @@ class ExportContractImporter:
         JÁ tentou CPF/e-mail + escada-2-tokens e se absteve — o resolver-por-nome (Degrau 2, token-subset)
         é sinal mais fraco e casaria a pessoa que SAIU a um homônimo de nome mais longo. Então NÃO resolve
         por nome nesse caso → vira `guest_nome` (preserva quem saiu). Coluna ausente (fixtures/CSV antigo) =
-        sem sinal → mantém o fallback por nome."""
+        sem sinal → mantém o fallback por nome; só no create-only, porque na virada a coluna é obrigatória
+        (CON-12, `_COLUNAS_OBRIGATORIAS`) e o pacote sem ela não grava."""
         email = (r.get("usuario_email") or r.get("email") or r.get("convidados_emails") or "").strip()
         por_email = resolve_user_by_email(email.replace(";", ",").split(",")[0].strip()) if email else None
         cpf = normalize_cpf_digits(r.get("usuario_cpf") or "")

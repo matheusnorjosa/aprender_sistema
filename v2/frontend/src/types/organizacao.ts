@@ -90,6 +90,8 @@ export interface Gerencia {
   nome_exibicao: string;
   rotulo: string;
   ativo: boolean;
+  /** Só o superusuário lota aqui (DAT, Controle, Diretoria): não é gerência de formação. */
+  lotacao_reservada?: boolean;
 }
 
 /**

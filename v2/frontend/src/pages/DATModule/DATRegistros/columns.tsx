@@ -66,7 +66,9 @@ export function nomeDoRegistro(record: DATRegistroRecord): string {
  *
  * Sem rolagem horizontal (padrão responsivo, item 38): sempre na linha o município (com o projeto,
  * no celular), o ano e as ações; o resto sobe por largura e, abaixo dela, vai para a linha
- * expandida. Observações e as etapas de detalhe só entram na linha a partir de xxl.
+ * expandida. A Coleção entra na linha a partir de xxl; observações e etapas de detalhe ficam sempre na
+ * linha expandida (DEF-23: na linha, a 1.600 px as 18 colunas passavam do espaço e a cidade ficava com
+ * largura zero).
  */
 export function getColumns({ onEdit, onDelete, compacto = false }: ColumnHandlers): ColunaResponsiva<DATRegistroRecord>[] {
   return [
@@ -137,7 +139,7 @@ export function getColumns({ onEdit, onDelete, compacto = false }: ColumnHandler
       title: 'Reunião DAT',
       dataIndex: 'reuniao_dat',
       key: 'reuniao_dat',
-      responsive: VISIVEL_A_PARTIR.xxl,
+      responsive: VISIVEL_A_PARTIR.detalhe,
       width: 110,
       render: (val: string | undefined) => (val ? dayjs(val).format('DD/MM/YYYY') : '-'),
     },
@@ -145,7 +147,7 @@ export function getColumns({ onEdit, onDelete, compacto = false }: ColumnHandler
       title: 'ID Turma',
       dataIndex: 'turma_formar_id',
       key: 'turma_formar_id',
-      responsive: VISIVEL_A_PARTIR.xxl,
+      responsive: VISIVEL_A_PARTIR.detalhe,
       width: 100,
       render: (val: string | undefined) =>
         val ? (
@@ -178,7 +180,7 @@ export function getColumns({ onEdit, onDelete, compacto = false }: ColumnHandler
       title: 'Códs',
       dataIndex: 'nr_codigos',
       key: 'nr_codigos',
-      responsive: VISIVEL_A_PARTIR.xxl,
+      responsive: VISIVEL_A_PARTIR.detalhe,
       width: 70,
       align: 'center',
       render: (val: number | undefined) => (val ? <Tag>{val}</Tag> : '-'),
@@ -215,7 +217,7 @@ export function getColumns({ onEdit, onDelete, compacto = false }: ColumnHandler
       title: 'Envio',
       dataIndex: 'envio_codigos_status',
       key: 'envio',
-      responsive: VISIVEL_A_PARTIR.xxl,
+      responsive: VISIVEL_A_PARTIR.detalhe,
       width: 70,
       align: 'center',
       render: (status: string | undefined) => (
@@ -228,7 +230,7 @@ export function getColumns({ onEdit, onDelete, compacto = false }: ColumnHandler
       title: 'Obs. FORMAR',
       dataIndex: 'obs_formar',
       key: 'obs_formar',
-      responsive: VISIVEL_A_PARTIR.xxl,
+      responsive: VISIVEL_A_PARTIR.detalhe,
       width: 150,
       ellipsis: { showTitle: false },
       render: (val: string | undefined) => (
@@ -252,7 +254,7 @@ export function getColumns({ onEdit, onDelete, compacto = false }: ColumnHandler
       title: 'Recebidos',
       dataIndex: 'alunos_recebidos_status',
       key: 'recebidos',
-      responsive: VISIVEL_A_PARTIR.xxl,
+      responsive: VISIVEL_A_PARTIR.detalhe,
       width: 90,
       align: 'center',
       render: (status: string | undefined) => renderStatusIcon(status),
@@ -261,7 +263,7 @@ export function getColumns({ onEdit, onDelete, compacto = false }: ColumnHandler
       title: 'Validados',
       dataIndex: 'alunos_validados_status',
       key: 'validados',
-      responsive: VISIVEL_A_PARTIR.xxl,
+      responsive: VISIVEL_A_PARTIR.detalhe,
       width: 90,
       align: 'center',
       render: (status: string | undefined) => renderStatusIcon(status),
@@ -270,7 +272,7 @@ export function getColumns({ onEdit, onDelete, compacto = false }: ColumnHandler
       title: 'Importados',
       dataIndex: 'alunos_importados_status',
       key: 'importados',
-      responsive: VISIVEL_A_PARTIR.xxl,
+      responsive: VISIVEL_A_PARTIR.detalhe,
       width: 90,
       align: 'center',
       render: (status: string | undefined) => renderStatusIcon(status),
@@ -279,7 +281,7 @@ export function getColumns({ onEdit, onDelete, compacto = false }: ColumnHandler
       title: 'Obs. AVALIAR',
       dataIndex: 'obs_avaliar',
       key: 'obs_avaliar',
-      responsive: VISIVEL_A_PARTIR.xxl,
+      responsive: VISIVEL_A_PARTIR.detalhe,
       width: 150,
       ellipsis: { showTitle: false },
       render: (val: string | undefined) => (

@@ -192,6 +192,9 @@ export default function ApprovalsPage(): JSX.Element {
 
   const [statusFilter, setStatusFilter] = useState<SolicitacaoStatus | (string & {})>('pendente');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  // DEF-01: o que vai ao servidor. Segue o que se digita 350 ms depois da última tecla (uma consulta por busca,
+  // não por tecla); o Enter aplica na hora.
+  const [busca, setBusca] = useState<string>('');
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
 
@@ -248,7 +251,7 @@ export default function ApprovalsPage(): JSX.Element {
           ? { flow: 'SUPER,NAO_SUPER' as const }
           : { com_decisao: true }),
         status: (statusFilter || 'pendente') as SolicitacaoStatus,
-        q: searchTerm,
+        q: busca,
         ordering: 'proximidade',
         page,
         page_size: pageSize,
@@ -293,7 +296,7 @@ export default function ApprovalsPage(): JSX.Element {
       emVooRef.current -= 1;
       if (seq === seqRef.current) setLoading(false);
     }
-  }, [statusFilter, searchTerm, page, pageSize, pausarPolling]);
+  }, [statusFilter, busca, page, pageSize, pausarPolling]);
   loadDataRef.current = loadData;
 
   // Trocar filtro, busca, página ou tamanho muda o que está na tela: a seleção recomeça.
@@ -316,6 +319,11 @@ export default function ApprovalsPage(): JSX.Element {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setBusca(searchTerm), 350);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // RT-02: BroadcastChannel for instant cross-tab sync
   useEffect(() => {
@@ -693,7 +701,7 @@ export default function ApprovalsPage(): JSX.Element {
                 placeholder="Buscar por município, projeto, autor..."
                 value={searchTerm}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => handleSearchChange(e.target.value)}
-                onSearch={() => { void loadData(); }}
+                onSearch={(valor: string) => { if (valor === busca) { void loadData(); } else { setBusca(valor); } }}
                 style={{ width: '100%', maxWidth: 400 }}
                 allowClear
                 aria-label="Buscar solicitações"
@@ -775,7 +783,7 @@ export default function ApprovalsPage(): JSX.Element {
                 nomeDaLinha={rotuloDoEvento}
                 erro={erroCarga}
                 onTentarDeNovo={() => { void loadData(); }}
-                locale={{ emptyText: textoDoVazio(statusFilter, searchTerm) }}
+                locale={{ emptyText: textoDoVazio(statusFilter, busca) }}
                 pagination={{
                   current: page,
                   pageSize,

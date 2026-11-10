@@ -23,6 +23,7 @@ from zoneinfo import ZoneInfo
 from django.db import transaction
 
 import pandas as pd
+from celery.exceptions import SoftTimeLimitExceeded
 
 from apps.core.imports.normalization import normalize_blank
 from apps.core.imports.row_errors import registrar_erro_import
@@ -87,6 +88,8 @@ def import_bloqueios_from_file(*, path: str, dry_run: bool = True, actor: Any = 
             try:
                 with transaction.atomic():  # savepoint
                     _process_row(row, idx, stats, pendencias, actor)
+            except SoftTimeLimitExceeded:
+                raise  # tempo esgotado não é erro da linha: aborta o arquivo (rollback do atomic externo, #1968)
             except Exception:
                 stats["skipped"]["other"] += 1
                 pendencias["outros"].append(

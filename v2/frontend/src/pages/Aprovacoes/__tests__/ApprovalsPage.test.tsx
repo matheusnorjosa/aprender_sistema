@@ -468,6 +468,22 @@ describe('ApprovalsPage', () => {
     await waitFor(() => expect(ultimoFiltro()).toEqual(expect.objectContaining({ q: 'sobral', page: 1 })));
   }, 20000);
 
+  test('busca espera a pessoa parar de digitar: uma consulta só, com o texto final (DEF-01)', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(2, 2));
+
+    renderPage();
+    await screen.findByText('Municipio1');
+
+    const caixa = screen.getByRole('searchbox', { name: 'Buscar solicitações' });
+    fireEvent.change(caixa, { target: { value: 's' } });
+    fireEvent.change(caixa, { target: { value: 'so' } });
+    fireEvent.change(caixa, { target: { value: 'sob' } });
+
+    await waitFor(() => expect(ultimoFiltro()).toEqual(expect.objectContaining({ q: 'sob' })));
+    const buscas = vi.mocked(listSolicitacoes).mock.calls.map((c) => c[0]?.q).filter(Boolean);
+    expect(buscas).toEqual(['sob']);
+  }, 20000);
+
   test('oferece 20, 50 e 100 por página (o lote do servidor aceita até 100)', async () => {
     vi.mocked(listSolicitacoes).mockResolvedValue(pagina(20, 45));
 

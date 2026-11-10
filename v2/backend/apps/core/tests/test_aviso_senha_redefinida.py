@@ -235,3 +235,15 @@ def test_historico_sem_a_conta_de_quem_redefiniu_nao_mostra_cpf_login_nem_email(
     assert historico == [{"por": f"Usuario #{ator.pk}", "em": _hoje()}]
     assert ator.cpf not in str(historico)
     assert ator.email not in str(historico)
+
+
+def test_superusuario_que_redefine_aparece_como_administracao_do_sistema():
+    """Pedido do dono (10/11/2026): a conta do superusuário não tem nome ("Usuario #1"); o aviso diz a função."""
+    admin = UsuarioFactory(first_name="", last_name="", is_superuser=True, is_staff=True)
+    alvo = UsuarioFactory()
+    _redefinir(admin, alvo)
+
+    me = _me(alvo)
+
+    assert me["aviso_senha_redefinida"] == {"por": "Administração do sistema", "em": _hoje()}
+    assert me["redefinicoes_senha"] == [{"por": "Administração do sistema", "em": _hoje()}]

@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import random
 import time
 from collections.abc import Callable
 from typing import TypeVar, cast
@@ -35,7 +36,7 @@ def _retry_with_backoff(
 
     Estratégia:
     - 1 tentativa inicial + até 3 retries (total: 4 tentativas)
-    - Backoff: 1s, 2s, 4s
+    - Backoff: até 1s, 2s, 4s (50–100% de cada um, jitter #1969)
     - Retry apenas em: 429 (rate limit), 5xx (server errors)
     - Não retry em: 4xx (exceto 429)
     - Respeita Retry-After header se presente
@@ -124,14 +125,16 @@ def _retry_with_backoff(
                 logger.error(f"{operation_name}: Failed after {attempt + 1} attempts. Last error: {error_str[:200]}")
                 raise
 
-            # Calcular delay
+            # Calcular delay. Jitter (#1969): workers que falham juntos não retentam juntos.
+            # O Retry-After fica sem jitter: quem define a espera é o servidor.
+            backoff = initial_delay * (2**attempt) * random.uniform(0.5, 1.0)
             if retry_after:
                 try:
                     delay = float(retry_after)
                 except (ValueError, TypeError):
-                    delay = initial_delay * (2**attempt)
+                    delay = backoff
             else:
-                delay = initial_delay * (2**attempt)
+                delay = backoff
 
             logger.info(f"{operation_name}: Retrying in {delay:.1f}s...")
             time.sleep(delay)

@@ -39,6 +39,9 @@ Segurança:
   conhece o produto que já está no banco, por isso a ligação das compras sem produto vem numa execução depois.
 - `gcal_adocao --apply` exige `--gcal-verificado` (decisão D63): só adota o id que o
   `conferir_gcal_adocao` achou confirmado e na mesma data no Google há menos de 24 h; o resto fica travado.
+- pacote fora do contrato (CON-12): arquivo ou coluna obrigatória que falta sai numa linha de ERRO, nada é
+  gravado e o comando termina com erro, também no dry-run e com --json (depois de imprimir o relatório).
+  `contrato_versao` do manifest só é mostrado, não conferido.
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUnknownArgumentType=false
@@ -192,10 +195,18 @@ class Command(BaseCommand):
 
         if opts["json"]:
             self.stdout.write(json.dumps(report, ensure_ascii=False, indent=2))
+            _recusar_fora_do_contrato(report)
             return
 
         self.stdout.write(self.style.MIGRATE_HEADING("Import export-contract"))
         self.stdout.write(f"  path={opts['path']}  mode={report['mode']}  apply={report['apply']}")
+        # CON-12: só mostra a versão; conferir o valor depende do combinado com o sheets.banco.
+        self.stdout.write(f"  contrato_versao={report['manifest'].get('contrato_versao') or 'ausente'}")
+        falta = report["contrato_faltando"]
+        for arquivo in falta["arquivos"]:
+            self.stdout.write(self.style.ERROR(f"  ERRO: falta o arquivo {arquivo}"))
+        for ent, cols in falta["colunas"].items():
+            self.stdout.write(self.style.ERROR(f"  ERRO: [{ent}] falta coluna obrigatória: {', '.join(cols)}"))
         if report["apply_blocked"]:
             self.stdout.write(self.style.WARNING("  ⚠️  --apply BLOQUEADO: forneça --allow-entity. Nada escrito."))
         for ent, v in report["por_entidade"].items():
@@ -265,3 +276,14 @@ class Command(BaseCommand):
         if report["apply_conjunto_incompleto_eventos"]:
             # #2036: o que o apply deixou com um projeto só, para o dono (só evento_id ou s<id>)
             self.stdout.write(f"  apply_conjunto_incompleto_eventos={report['apply_conjunto_incompleto_eventos']}")
+        _recusar_fora_do_contrato(report)
+
+
+def _recusar_fora_do_contrato(report: dict[str, Any]) -> None:
+    """CON-12: com arquivo ou coluna faltando, o comando termina com erro (o serviço já não gravou nada)."""
+    falta = report["contrato_faltando"]
+    partes = [f"falta {a}" for a in falta["arquivos"]]
+    partes += [f"{ent}: {', '.join(cols)}" for ent, cols in falta["colunas"].items()]
+    if partes:
+        fim = "nada gravado" if report["apply"] else "o --apply recusa"
+        raise CommandError(f"pacote fora do contrato: {'; '.join(partes)}; {fim}")

@@ -710,6 +710,25 @@ class DATCompraAPITests(DATModuleAPITestCase):
         self.assertEqual(data["pendentes"][0]["total_itens"], 20)
         self.assertEqual(data["pendentes"][0]["ultima_compra"], date(2026, 3, 2))
 
+    def test_pendencias_le_os_pares_uma_vez_so(self):
+        """DEF-22: a lista e os totais saem da MESMA leitura dos pares (antes eram 4 consultas pesadas iguais)."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        self._dat_compra(self.municipio, self.projeto, data_compra=date(2026, 3, 1))
+        self._dat_compra(self.municipio2, self.projeto, quantidade=20, data_compra=date(2026, 3, 2))
+        self._evento(self.municipio, self.projeto)
+
+        with CaptureQueriesContext(connection) as ctx:
+            data = self._pendencias()
+
+        com_eventos = [q["sql"] for q in ctx.captured_queries if "core_solicitacao" in q["sql"]]
+        self.assertEqual(len(com_eventos), 1, com_eventos)
+        self.assertEqual(
+            (data["total_com_compra"], data["total_com_evento"], data["total_pendentes"], len(data["pendentes"])),
+            (2, 1, 1, 1),
+        )
+
     def test_pendencias_ignoram_a_compra_que_nao_libera(self):
         """DATCompra inativa ou com quantidade 0 não conta."""
         self._dat_compra(self.municipio2, self.projeto, ativo=False)

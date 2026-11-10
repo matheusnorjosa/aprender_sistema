@@ -85,10 +85,13 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
     void fetchData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Com a policy: todas as ativas. Sem ela: só as do vínculo G/C/A (`me.gerencias`). */
+  /**
+   * Com a policy: as ativas, menos as reservadas (DAT, Controle: administração, sem formadores; pedido do dono,
+   * 10/11/2026). Sem ela: só as do vínculo G/C/A (`me.gerencias`).
+   */
   const gerencias = useMemo((): GerenciaOpcao[] => {
     if (!userInfo) return [];
-    return canSeeAll ? [...allGerencias].sort(porRotulo) : gerenciasDaGrade(userInfo);
+    return canSeeAll ? allGerencias.filter((g) => !g.lotacao_reservada).sort(porRotulo) : gerenciasDaGrade(userInfo);
   }, [allGerencias, userInfo, canSeeAll]);
 
   const semOpcoes = !loading && !canSeeAll && gerencias.length === 0;

@@ -73,6 +73,19 @@ def _setores_da_lotacao(user: Any) -> list[str]:
     return sorted({v.gerencia.rotulo for v in vinculos}, key=str.casefold)
 
 
+# Pedido do dono (10/11/2026): a conta do superusuário não tem nome e aparecia como "Usuario #1".
+ROTULO_ADMINISTRACAO = "Administração do sistema"
+
+
+def _rotulo_de_quem_redefiniu(quem: Any) -> str:
+    """Rótulo de quem redefiniu a senha: a administração (superusuário), o nome das telas, ou genérico."""
+    if quem is None:
+        return "uma pessoa da administração"
+    if quem.is_superuser:
+        return ROTULO_ADMINISTRACAO
+    return str(quem)
+
+
 def _aviso_senha_redefinida(user: Any) -> dict[str, str] | None:
     """F1 (scan 16/10/2026): quem redefiniu a senha desta conta e quando; None sem aviso.
 
@@ -84,7 +97,7 @@ def _aviso_senha_redefinida(user: Any) -> dict[str, str] | None:
         return None
     quem = user.senha_redefinida_por
     return {
-        "por": str(quem) if quem is not None else "uma pessoa da administração",
+        "por": _rotulo_de_quem_redefiniu(quem),
         "em": timezone.localtime(quando).strftime("%d/%m/%Y"),
     }
 
@@ -116,7 +129,7 @@ def _redefinicoes_senha(user: Any) -> list[dict[str, str]]:
     )
     return [
         {
-            "por": str(linha.usuario) if linha.usuario is not None else "uma pessoa da administração",
+            "por": _rotulo_de_quem_redefiniu(linha.usuario),
             "em": timezone.localtime(linha.created_at).strftime("%d/%m/%Y"),
         }
         for linha in linhas

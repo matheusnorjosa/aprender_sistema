@@ -68,6 +68,23 @@ async function opcoes(): Promise<string[]> {
   return within(select).getAllByRole('option').map((o) => o.textContent ?? '');
 }
 
+describe('FiltersBar — DAT e Controle fora da Grade (pedido do dono, 10/11/2026)', () => {
+  test('com a policy, as gerências reservadas (DAT, Controle) não aparecem no filtro', async () => {
+    vi.clearAllMocks();
+    getGerenciasMock.mockResolvedValue([
+      ...ATIVAS,
+      { id: 13, nome: 'GERENCIA DAT', nome_setor: 'DAT', nome_exibicao: '', rotulo: 'DAT', ativo: true, lotacao_reservada: true },
+      { id: 14, nome: 'CONTROLE', nome_setor: 'Controle', nome_exibicao: '', rotulo: 'Controle', ativo: true, lotacao_reservada: true },
+    ]);
+    getMyPoliciesMock.mockResolvedValue(['view_all_availability']);
+    getMeMock.mockResolvedValue(makeMe({ is_superuser: true }));
+
+    renderBar();
+
+    expect(await opcoes()).toEqual(['Participantes de projetos SUPER', 'Fluir', 'Superativar', 'Vidas']);
+  });
+});
+
 describe('FiltersBar — gerência pelo vínculo + policy', () => {
   beforeEach(() => {
     vi.clearAllMocks();

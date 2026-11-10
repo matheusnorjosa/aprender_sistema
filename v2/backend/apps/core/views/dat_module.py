@@ -704,10 +704,12 @@ class DATCompraViewSet(LockOnWriteMixin, viewsets.ModelViewSet):
             .order_by("municipio__nome", "projeto__nome")
         )
 
-        total_com_compra = base_pairs.count()
-        total_com_evento = base_pairs.filter(possui_evento=True).count()
-        pendentes_pairs = base_pairs.filter(possui_evento=False)
-        total_pendentes = pendentes_pairs.count()
+        # DEF-22: uma leitura só dos pares; os totais saem dela (antes eram 4 consultas pesadas iguais).
+        pares = list(base_pairs)
+        total_com_compra = len(pares)
+        total_com_evento = sum(1 for p in pares if p["possui_evento"])
+        pendentes_pairs = [p for p in pares if not p["possui_evento"]]
+        total_pendentes = len(pendentes_pairs)
         percentual_pendentes = round((total_pendentes / total_com_compra) * 100, 1) if total_com_compra > 0 else 0
 
         pendentes = [

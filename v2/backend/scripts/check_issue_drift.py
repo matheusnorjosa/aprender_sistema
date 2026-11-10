@@ -74,10 +74,30 @@ ABERTO = re.compile(
 CORRIGIDO = re.compile(r"(?i)(corrigid|resolvid|fechad|implementad|mergead|conclu|feito em|sanad)")
 
 
+# Teto do `gh issue list`. Em 2026-11-10 eram 785 fechadas com teto de 800: o
+# corte chegaria em semanas e tiraria as mais antigas da conta, sem aviso.
+_LIMITE_API = 5000
+
+
+def _numeros_de_issue(brutas: object) -> set[str]:
+    """Aceita [1611, ...] e a saida crua de `gh issue list --json number`
+    ([{"number": 1611}, ...]). Item sem numero e erro: lido como str(dict), ele
+    nunca casa com #NNNN e o gate diz "0 suspeitas" por cegueira (2026-11-09)."""
+    if not isinstance(brutas, list):
+        raise ValueError("esperava uma lista de numeros de issue")
+    fechadas: set[str] = set()
+    for item in brutas:
+        n = item.get("number") if isinstance(item, dict) else item
+        if isinstance(n, bool) or not str(n).isdigit():
+            raise ValueError(f"item sem numero de issue: {item!r}")
+        fechadas.add(str(n))
+    return fechadas
+
+
 def _fechadas_da_api() -> set[str] | None:
     try:
         r = subprocess.run(
-            ["gh", "issue", "list", "--state", "closed", "--limit", "800", "--json", "number"],
+            ["gh", "issue", "list", "--state", "closed", "--limit", str(_LIMITE_API), "--json", "number"],
             capture_output=True,
             text=True,
             check=False,
@@ -90,9 +110,15 @@ def _fechadas_da_api() -> set[str] | None:
     if r.returncode != 0 or not r.stdout.strip():
         return None
     try:
-        return {str(x["number"]) for x in json.loads(r.stdout)}
-    except (json.JSONDecodeError, KeyError, TypeError):
+        brutas = json.loads(r.stdout)
+        fechadas = _numeros_de_issue(brutas)
+    except (json.JSONDecodeError, ValueError):
         return None
+    if len(brutas) >= _LIMITE_API:
+        print(f"AVISO: a lista de issues fechadas veio cheia ate o teto de {_LIMITE_API};")
+        print("as mais antigas ficariam fora da conta. Suba _LIMITE_API.")
+        return None
+    return fechadas
 
 
 def _raiz_de(rel: str) -> str:
@@ -140,7 +166,10 @@ def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(add_help=True)
     ap.add_argument("--repo-root", default=".")
     ap.add_argument("--baseline", help="JSON {raiz: teto}. Obrigatorio.")
-    ap.add_argument("--closed-from", help="JSON com numeros de issue fechada (teste/offline)")
+    ap.add_argument(
+        "--closed-from",
+        help="JSON [N, ...] ou a saida de `gh issue list --json number` (teste/offline)",
+    )
     a = ap.parse_args(argv[1:])
 
     raiz = pathlib.Path(a.repo_root).resolve()
@@ -164,16 +193,16 @@ def main(argv: list[str]) -> int:
 
     if a.closed_from:
         try:
-            fechadas = {str(x) for x in json.loads(pathlib.Path(a.closed_from).read_text(encoding="utf-8"))}
-        except (OSError, json.JSONDecodeError) as e:
+            fechadas = _numeros_de_issue(json.loads(pathlib.Path(a.closed_from).read_text(encoding="utf-8")))
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             print(f"ERRO: --closed-from ilegivel: {e}", file=sys.stderr)
             return 2
     else:
         lidas = _fechadas_da_api()
         if lidas is None:
             print()
-            print("AVISO: nao consegui listar as issues fechadas (gh indisponivel ou sem")
-            print("permissao). NADA foi verificado aqui — isto nao e aprovacao, e ausencia")
+            print("AVISO: nao consegui listar as issues fechadas (gh indisponivel, sem")
+            print("permissao ou lista cortada no teto). NADA foi verificado aqui — isto nao e aprovacao, e ausencia")
             print("de medida. Fazer o CI depender da API do GitHub seria pior.")
             return 0
         fechadas = lidas

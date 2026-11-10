@@ -41,6 +41,10 @@ Verifica que:
 8. Sem acesso a API, avisa e sai 0 — nunca aprova por nao ter medido.
 9. Piso ausente e tratado como falha de configuracao, nao como zero.
 10. A saida nomeia arquivo:linha e o numero da issue.
+11. `--closed-from` aceita a saida crua do `gh issue list --json number` e recusa
+    item sem numero. Em 2026-11-09 essa saida foi lida como `str(dict)`, nada
+    casou, e o gate disse "0 suspeitas" quando havia 8.
+12. Lista de fechadas cortada no teto do `gh` e ausencia de medida, nao aprovacao.
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportMissingTypeStubs=false
@@ -66,9 +70,10 @@ def _monta(raiz: pathlib.Path, arquivos: dict[str, str]) -> None:
 
 def _run(
     raiz: pathlib.Path,
-    fechadas: list[int] | None,
+    fechadas: list[object] | None,
     piso: dict[str, int] | None = None,
     sem_gh: bool = False,
+    gh_falso: pathlib.Path | None = None,
 ):
     """`sem_gh` remove o `gh` do PATH em vez de torcer para ele nao existir.
 
@@ -88,6 +93,8 @@ def _run(
     env = dict(os.environ)
     if sem_gh:
         env["PATH"] = str(raiz)  # diretorio sem `gh` dentro
+    if gh_falso is not None:
+        env["PATH"] = f"{gh_falso}{os.pathsep}{env.get('PATH', '')}"
     return subprocess.run(args, capture_output=True, text=True, check=False, encoding="utf-8", env=env)
 
 
@@ -195,3 +202,58 @@ def test_piso_ausente_e_falha_de_configuracao(tmp_path):
     saida = (r.stdout + r.stderr).lower()
     assert r.returncode == 2, f"piso ausente deveria ser erro de uso:\n{r.stdout}\n{r.stderr}"
     assert "piso" in saida or "baseline" in saida
+
+
+def test_closed_from_aceita_a_saida_crua_do_gh(tmp_path):
+    """`gh issue list --json number` devolve [{"number": N}]. Lido como str(dict),
+    nenhum numero casava e o gate dava 0 por cegueira (2026-11-09)."""
+    _monta(tmp_path, {"v2/docs/specs/backup.spec.md": SPEC_ABERTA})
+    r = _run(tmp_path, fechadas=[{"number": 1611}], piso={})
+    assert r.returncode == 1, f"saida do gh nao foi lida como numero:\n{r.stdout}\n{r.stderr}"
+    assert "1611" in r.stdout
+
+
+def test_closed_from_com_item_sem_numero_e_erro(tmp_path):
+    _monta(tmp_path, {"v2/docs/specs/backup.spec.md": SPEC_ABERTA})
+    for item in ({"id": 1611}, "abc", None, True):
+        r = _run(tmp_path, fechadas=[item], piso={})
+        assert r.returncode == 2, f"item {item!r} sem numero foi aceito:\n{r.stdout}\n{r.stderr}"
+        assert "closed-from" in r.stderr
+
+
+def _gh_falso(dir_: pathlib.Path, corpo: str) -> pathlib.Path:
+    """Um `gh` que roda `corpo` com `limite` = o valor de --limit pedido."""
+    dir_.mkdir()
+    gh = dir_ / "gh"
+    gh.write_text(
+        f"#!{sys.executable}\n"
+        "import json, sys\n"
+        "a = sys.argv[1:]\n"
+        "limite = int(a[a.index('--limit') + 1])\n"
+        f"{corpo}\n",
+        encoding="utf-8",
+    )
+    gh.chmod(0o755)
+    return dir_
+
+
+def test_gh_falso_e_usado_controle_positivo(tmp_path):
+    """Sem este controle, o teste do teto passaria tambem com o `gh` falso nem rodando."""
+    _monta(tmp_path, {"v2/docs/specs/backup.spec.md": SPEC_ABERTA})
+    gh = _gh_falso(tmp_path / "bin", "print(json.dumps([{'number': 1611}]))")
+    r = _run(tmp_path, fechadas=None, piso={}, gh_falso=gh)
+    assert r.returncode == 1, f"o gh falso nao foi usado:\n{r.stdout}\n{r.stderr}"
+    assert "1611" in r.stdout
+
+
+def test_lista_cortada_no_teto_do_gh_nao_aprova(tmp_path):
+    """Com o teto cheio, as fechadas mais antigas ficam de fora sem aviso."""
+    _monta(tmp_path, {"v2/docs/specs/backup.spec.md": SPEC_ABERTA})
+    gh = _gh_falso(
+        tmp_path / "bin",
+        "print(json.dumps([{'number': 1611}] + [{'number': 100000 + i} for i in range(limite - 1)]))",
+    )
+    r = _run(tmp_path, fechadas=None, piso={}, gh_falso=gh)
+    saida = r.stdout + r.stderr
+    assert r.returncode == 0, f"teto cheio derrubou o build:\n{saida}"
+    assert "AVISO" in saida and "teto" in saida, f"o corte no teto precisa ser barulhento:\n{saida}"

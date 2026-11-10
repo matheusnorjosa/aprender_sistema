@@ -265,3 +265,74 @@ def test_visibility_timeout_maior_que_time_limit():
 
     opcoes = app.conf.broker_transport_options or {}
     assert opcoes.get("visibility_timeout", 3600) > app.conf.task_time_limit
+
+
+def _cancel_termina_durante(sol: Solicitacao):
+    """Fábrica OAuth que, ao montar o cliente, deixa outro worker concluir o cancel da linha.
+
+    Reproduz o intervalo entre a guarda (leitura sem lock) e o `select_for_update`: a guarda viu a
+    linha esperando a operação, e o cancel commitou NONE, sem id e sem hash, antes do lock.
+    """
+    client = _cliente()
+    client.get.return_value = {"id": f"asv2{sol.id}", "status": "cancelled"}
+    client.update.return_value = {"id": f"asv2{sol.id}"}
+
+    def _fabrica(_operador):
+        Solicitacao.objects.filter(pk=sol.pk).update(
+            gcal_status=Solicitacao.GCalStatus.NONE, external_event_id=None, gcal_payload_hash=None
+        )
+        return client, "cal-org"
+
+    return client, _fabrica
+
+
+@OAUTH
+@pytest.mark.parametrize(
+    ("reenvio", "reentregue"),
+    [(True, False), (False, True)],
+    ids=["reapply", "publish-reentregue"],
+)
+def test_publish_nao_ressuscita_evento_cancelado_entre_a_guarda_e_o_lock(reenvio, reentregue):
+    """A guarda leu PENDING sem lock; o cancel commitou NONE antes do `select_for_update`.
+
+    Sob o lock a task relê a linha e tem de desistir: sem isso o upsert adota o `asv2{id}` cancelado
+    (o delete do Google é soft-delete) e o traz de volta, com a linha PUBLISHED.
+    """
+    operador = UsuarioFactory()
+    sol = _linha(Solicitacao.GCalStatus.PENDING, external_event_id="asv2-em-remocao")
+    client, fabrica = _cancel_termina_durante(sol)
+
+    with patch(CLIENT_FACTORY, side_effect=fabrica):
+        if reentregue:
+            resultado = _reentregue(task_publish_solicitacao_to_gcal, sol.id, operator_user_id=operador.pk)
+        else:
+            resultado = task_publish_solicitacao_to_gcal.run(sol.id, operator_user_id=operador.pk, reenvio=reenvio)
+
+    assert resultado["action"] == "SKIP"
+    client.update.assert_not_called()
+    client.insert.assert_not_called()
+    sol.refresh_from_db()
+    assert sol.gcal_status == Solicitacao.GCalStatus.NONE
+    assert sol.external_event_id is None
+
+
+@OAUTH
+def test_cancel_reentregue_nao_marca_erro_quando_a_copia_original_termina_entre_a_guarda_e_o_lock():
+    """Duas cópias da mesma mensagem: a original terminou enquanto a reentrega montava o cliente.
+
+    Sob o lock a linha está NONE e sem id: não há o que remover, e a reentrega não pode virar ERROR.
+    """
+    operador = UsuarioFactory()
+    sol = _linha(Solicitacao.GCalStatus.PENDING, external_event_id="asv2-em-remocao")
+    client, fabrica = _cancel_termina_durante(sol)
+
+    with patch(CLIENT_FACTORY, side_effect=fabrica):
+        resultado = _reentregue(task_cancel_solicitacao_from_gcal, sol.id, operator_user_id=operador.pk)
+
+    assert resultado["action"] == "SKIP"
+    client.delete.assert_not_called()
+    sol.refresh_from_db()
+    assert sol.gcal_status == Solicitacao.GCalStatus.NONE
+    assert not AuditLog.objects.filter(
+        action=AuditLog.Action.PUBLISH_GCAL_ERROR, details__solicitacao_id=sol.id
+    ).exists()

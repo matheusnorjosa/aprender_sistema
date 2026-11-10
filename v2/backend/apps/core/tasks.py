@@ -19,11 +19,14 @@ import json
 import logging
 from datetime import date
 from io import StringIO
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from django.core.management import call_command
 
 from celery import shared_task  # type: ignore[attr-defined]
+
+if TYPE_CHECKING:
+    from apps.core.models import Solicitacao
 
 logger = logging.getLogger(__name__)
 
@@ -234,7 +237,10 @@ def _mark_gcal_error(
 
 
 def _pular_reentrega_obsoleta(
-    task: Any, solicitation_id: int, operacao: Literal["publish", "reenvio", "cancel"]
+    task: Any,
+    solicitation_id: int,
+    operacao: Literal["publish", "reenvio", "cancel"],
+    travada: Solicitacao | None = None,
 ) -> dict[str, Any] | None:
     """Descarta a mensagem (acks_late, #1970) quando a linha já não espera esta operação.
 
@@ -252,14 +258,19 @@ def _pular_reentrega_obsoleta(
       de PUBLISHED, a mesma pré-condição de `cancel_solicitacao`). Com o evento vinculado o cancel
       roda mesmo fora de PENDING: uma resync que terminou antes dele não desfaz o pedido de remover.
 
-    Roda antes do cliente OAuth: montar o cliente com token revogado também rebaixaria a linha.
+    Roda duas vezes. A primeira, sem lock e antes do cliente OAuth, é atalho: montar o cliente com
+    token revogado também rebaixaria a linha. A que vale é a segunda, com a linha `travada` pelo
+    `select_for_update`: um cancel de outro worker pode commitar entre as duas leituras.
     """
     from apps.core.models import Solicitacao
 
     reentregue = bool((task.request.delivery_info or {}).get("redelivered"))
     if operacao != "reenvio" and not reentregue:
         return None
-    linha = Solicitacao.objects.filter(pk=solicitation_id).values("gcal_status", "external_event_id").first()
+    if travada is not None:
+        linha = {"gcal_status": travada.gcal_status, "external_event_id": travada.external_event_id}
+    else:
+        linha = Solicitacao.objects.filter(pk=solicitation_id).values("gcal_status", "external_event_id").first()
     if linha is None:
         return None
     status = linha["gcal_status"]
@@ -435,6 +446,8 @@ def task_publish_solicitacao_to_gcal(
             # não segura publish/cancel/edição reais enquanto espera o Google.
             qs = Solicitacao.objects.all() if dry_run else Solicitacao.objects.select_for_update()
             s = qs.get(id=solicitation_id)
+            if not dry_run and (pulo := _pular_reentrega_obsoleta(self, solicitation_id, operacao, travada=s)):
+                return pulo
 
             # Aplicar publicação (com cliente OAuth se disponível)
             outcome = apply_one_solicitacao(s, dry_run=dry_run, apply_blocked=apply_blocked, client=client)
@@ -589,6 +602,8 @@ def task_cancel_solicitacao_from_gcal(
         with transaction.atomic():
             # Buscar solicitação (com lock de linha)
             s = Solicitacao.objects.select_for_update().get(id=solicitation_id)
+            if pulo := _pular_reentrega_obsoleta(self, solicitation_id, "cancel", travada=s):
+                return pulo
 
             # Cancelar evento no Calendar e limpar campos
             outcome = cancel_solicitacao(s, client=client)

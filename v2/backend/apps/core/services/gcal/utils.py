@@ -39,7 +39,7 @@ def _retry_with_backoff(
     - Backoff: até 1s, 2s, 4s (50–100% de cada um, jitter #1969)
     - Retry apenas em: 429 (rate limit), 5xx (server errors)
     - Não retry em: 4xx (exceto 429)
-    - Respeita Retry-After header se presente
+    - Respeita Retry-After até o teto `initial_delay * 2**max_retries` (8s); acima dele, desiste
     - Trata 409/412 como sucesso (idempotência)
 
     Args:
@@ -125,12 +125,20 @@ def _retry_with_backoff(
                 logger.error(f"{operation_name}: Failed after {attempt + 1} attempts. Last error: {error_str[:200]}")
                 raise
 
-            # Calcular delay
-            if retry_after:
-                try:
-                    delay = float(retry_after)
-                except (ValueError, TypeError):
-                    delay = initial_delay * (2**attempt) * random.uniform(0.5, 1.0)
+            # Calcular delay. O Retry-After vale até o teto: o mesmo retry roda no request do gunicorn,
+            # sob select_for_update, e quem pede mais espera que isso faz a operação desistir.
+            try:
+                espera_do_servidor = float(retry_after) if retry_after else None
+            except (ValueError, TypeError):
+                espera_do_servidor = None
+            teto = initial_delay * (2**max_retries)
+            if espera_do_servidor is not None and espera_do_servidor > teto:
+                logger.error(
+                    f"{operation_name}: Retry-After {espera_do_servidor:.0f}s passa do teto de {teto:.0f}s, aborting"
+                )
+                raise
+            if espera_do_servidor is not None and espera_do_servidor >= 0:
+                delay = espera_do_servidor
             else:
                 # Jitter (#1969): workers que falham juntos não retentam juntos. O Retry-After fica sem jitter.
                 delay = initial_delay * (2**attempt) * random.uniform(0.5, 1.0)

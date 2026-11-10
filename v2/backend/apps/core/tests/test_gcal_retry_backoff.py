@@ -350,3 +350,47 @@ class TestBackoffJitter1969:
             assert client._retry_with_backoff(func) == "ok"
 
         assert [c.args[0] for c in mock_sleep.call_args_list] == [0.5, 1.0, 2.0]
+
+
+class TestRetryAfterComTeto:
+    """O Retry-After não decide sozinho quanto o processo dorme.
+
+    O mesmo retry roda no request do gunicorn (excluir chama `cancel_solicitacao` sob
+    `select_for_update`): um Retry-After de minutos seguraria o worker e o lock da linha. Acima do teto
+    (`initial_delay * 2**max_retries`, 8 s no padrão) a operação desiste com o erro original.
+    """
+
+    @staticmethod
+    def _erro(retry_after):
+        error = MockHttpError(503, "Service Unavailable")
+        error.resp = httplib2.Response({"status": 503, "Retry-After": retry_after})
+        return error
+
+    @patch("apps.core.services.gcal.utils.time.sleep")
+    def test_retry_after_acima_do_teto_desiste_sem_dormir(self, mock_sleep):
+        error = self._erro("3600")
+        func = Mock(side_effect=[error, "success"])
+
+        with pytest.raises(MockHttpError) as exc:
+            _retry_with_backoff(func, operation_name="t", max_retries=3, initial_delay=1.0)
+
+        assert exc.value is error
+        mock_sleep.assert_not_called()
+        assert func.call_count == 1
+
+    @patch("apps.core.services.gcal.utils.time.sleep")
+    def test_retry_after_no_teto_e_respeitado(self, mock_sleep):
+        func = Mock(side_effect=[self._erro("8"), "success"])
+
+        assert _retry_with_backoff(func, operation_name="t", max_retries=3, initial_delay=1.0) == "success"
+
+        assert [c.args[0] for c in mock_sleep.call_args_list] == [8.0]
+
+    @patch("apps.core.services.gcal.utils.time.sleep")
+    def test_retry_after_negativo_cai_no_backoff(self, mock_sleep):
+        func = Mock(side_effect=[self._erro("-1"), "success"])
+
+        with _no_teto():
+            assert _retry_with_backoff(func, operation_name="t", max_retries=3, initial_delay=1.0) == "success"
+
+        assert [c.args[0] for c in mock_sleep.call_args_list] == [1.0]

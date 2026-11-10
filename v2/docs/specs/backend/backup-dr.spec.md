@@ -106,7 +106,7 @@ age -d -i /etc/backup-key.txt backup_full_<ts>.sql.gz.age | gunzip | psql -h <ho
 
 **Backup (caminho feliz):** Beat dispara 02:00 -> `perform_database_backup("full")` valida que `/app/infra/scripts/backup_db.sh` existe -> monta env do `settings.DATABASES` -> `subprocess.run` (timeout 1h) -> script faz `pg_dump | gzip [| age]` em `$BACKUP_DIR` -> verifica arquivo nao-vazio -> upload S3 (se `BACKUP_S3_BUCKET`) -> retencao -> task parseia o path do stdout e retorna `{status: success, ...}`.
 
-**Erros:** timeout -> `self.retry` (countdown 300); `CalledProcessError` -> log + Sentry + retry com backoff exponencial; retries esgotados -> excecao propaga (deveria alertar via Sentry).
+**Erros:** timeout -> `self.retry` (countdown 300); `CalledProcessError` -> log + Sentry + retry com backoff exponencial; retries esgotados -> excecao propaga (deveria alertar via Sentry). Na pratica o limite do Celery chega antes do `timeout=3600` do `subprocess.run`, que nunca dispara (M24-02): aos 25 min (`CELERY_TASK_SOFT_TIME_LIMIT`, #1968) a task recebe `SoftTimeLimitExceeded`, o `subprocess.run` mata so o bash e a excecao cai no `except Exception` (log + Sentry + relanca, sem retry); aos 30 min (`CELERY_TASK_TIME_LIMIT`) o limite duro mata o processo. O pipe `pg_dump | gzip | age` pode ficar orfao e deixar arquivo parcial (M24-02, aberto).
 
 **Restore (cenario 1 — corrupcao de DB), contrato-alvo:** parar `web/worker/beat` -> listar backups -> `restore_db.sh <file>` (verifica integridade, termina conexoes, drop/create, restaura, valida contagem) -> reiniciar -> validar `/healthz/detailed/`. Cenarios completos (perda total do servidor, credenciais comprometidas, GCal indisponivel) em [`DISASTER_RECOVERY.md` §2](../../DISASTER_RECOVERY.md).
 

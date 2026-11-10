@@ -162,6 +162,26 @@ class TestBloqueiosImportService:
         # Total no banco
         assert AvailabilityBlock.objects.count() == 2
 
+    def test_soft_time_limit_propaga_do_laco_por_linha(self, sample_csv, target_user, monkeypatch):
+        """#1968: tempo esgotado não é erro da linha. Sai do laço e desfaz o arquivo inteiro."""
+        from celery.exceptions import SoftTimeLimitExceeded
+
+        from apps.core.services import bloqueios_import
+
+        linha_real = bloqueios_import._process_row
+
+        def _estoura_na_linha_2(row, idx, *args):
+            if idx == 2:
+                raise SoftTimeLimitExceeded()
+            return linha_real(row, idx, *args)
+
+        monkeypatch.setattr(bloqueios_import, "_process_row", _estoura_na_linha_2)
+
+        with pytest.raises(SoftTimeLimitExceeded):
+            import_bloqueios_from_file(path=sample_csv, dry_run=False)
+
+        assert AvailabilityBlock.objects.count() == 0
+
     def test_invalid_user_adds_pendencia(self, sample_csv_invalid):
         """Usuario inexistente adiciona pendencia."""
         result = import_bloqueios_from_file(path=sample_csv_invalid, dry_run=True)

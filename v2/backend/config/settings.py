@@ -659,6 +659,9 @@ CELERY_CACHE_BACKEND = "default"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+# Limite brando: aos 25 min a task recebe SoftTimeLimitExceeded e consegue registrar a falha;
+# aos 30 min o limite duro mata o processo sem limpeza (#1968).
+CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60
 
 # Auto-apply GCal (Celery task preview_then_apply_gcal) - Fase 3
 # Default: False (desativado por padrão para consolidar governança via /pre-agenda)

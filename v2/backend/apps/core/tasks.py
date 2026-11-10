@@ -236,11 +236,15 @@ def _mark_gcal_error(
 def _pular_reentrega_obsoleta(task: Any, solicitation_id: int) -> dict[str, Any] | None:
     """Descarta a mensagem reentregue (acks_late, #1970) quando a linha já não espera esta operação.
 
-    Publish, resync e cancel marcam a linha PENDING antes de enfileirar. Se a reentrega chega e a
-    linha não está mais PENDING, ou a operação terminou e só faltou o ack, ou uma ação mais nova
-    passou na frente. Rodar de novo marcaria ERROR numa linha certa (cancel) ou traria de volta um
-    evento que a pessoa removeu (publish). Roda antes do cliente OAuth: montar o cliente com token
-    revogado também rebaixaria a linha. Sem `redelivered` (1ª entrega ou chamada direta) não age.
+    `redelivered` quer dizer que a mensagem voltou para a fila, não que ela já rodou: o kombu marca
+    também a que o worker só tinha reservado (prefetch) e devolveu no restart sem começar. Quem diz
+    se a operação ainda é esperada é a linha: publish, resync e cancel a marcam PENDING antes de
+    enfileirar. Se a reentrega chega e a linha não está mais PENDING, ou a operação terminou e só
+    faltou o ack, ou uma ação mais nova passou na frente. Rodar de novo marcaria ERROR numa linha
+    certa (cancel) ou traria de volta um evento que a pessoa removeu (publish). Roda antes do
+    cliente OAuth: montar o cliente com token revogado também rebaixaria a linha. Sem `redelivered`
+    (1ª entrega ou chamada direta) não age. Quem não marca PENDING (o reapply em lote) não pode
+    usar a guarda: passa `exige_pending=False` à task.
     """
     from apps.core.models import Solicitacao
 
@@ -273,6 +277,7 @@ def task_publish_solicitacao_to_gcal(
     dry_run: bool = False,
     apply_blocked: bool = False,
     operator_user_id: int | None = None,
+    exige_pending: bool = True,
 ) -> dict[str, Any]:
     """
     Publica uma Solicitacao no Google Calendar (via Celery).
@@ -284,6 +289,9 @@ def task_publish_solicitacao_to_gcal(
         dry_run: Se True, não persiste mudanças no DB/Calendar
         apply_blocked: Se True, aplica mesmo sem GCAL_CLIENT configurado
         operator_user_id: ID do usuário operador (OAuth mode)
+        exige_pending: Se False, a reentrega roda mesmo com a linha fora de PENDING. É o caso do
+            reapply em lote, que não marca PENDING; rodar de novo é seguro porque o upsert pula o
+            UPDATE quando o hash do conteúdo não mudou.
 
     Returns:
         dict: {
@@ -299,8 +307,8 @@ def task_publish_solicitacao_to_gcal(
     from apps.core.models import AuditLog, Solicitacao, Usuario
     from apps.core.services.gcal_sync_service import apply_one_solicitacao
 
-    # A prévia não marca PENDING nem escreve: reentregue, só roda de novo.
-    if not dry_run and (pulo := _pular_reentrega_obsoleta(self, solicitation_id)):
+    # A prévia e o reapply não marcam PENDING: reentregues, só rodam de novo.
+    if not dry_run and exige_pending and (pulo := _pular_reentrega_obsoleta(self, solicitation_id)):
         return pulo
 
     # OAuth Phase 3: Verificar modo OAuth e criar cliente se necessário

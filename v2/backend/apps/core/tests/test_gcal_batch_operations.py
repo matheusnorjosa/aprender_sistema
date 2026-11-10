@@ -207,6 +207,34 @@ def test_batch_reapply_retorna_202_com_queued_count(mock_task, api_client, usuar
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("auth_mode", ["service_account", "oauth"])
+@patch("celery.app.base.Celery.send_task")
+def test_batch_reapply_despacha_sem_exigir_pending(
+    mock_send_task, auth_mode, request, api_client, usuario_controle, setup_publicadas
+):
+    """#1970: o reapply não marca PENDING, então pede à task para não descartar a reentrega.
+
+    Sem isso, a mensagem só reservada que volta para a fila no restart do worker virava SKIP calado.
+    Só o envio ao broker é mockado: o Celery confere o kwarg contra a assinatura real da task.
+    """
+    if auth_mode == "oauth":
+        request.getfixturevalue("google_oauth_credential")
+    api_client.force_authenticate(user=usuario_controle)
+    ids = [sol.id for sol in setup_publicadas]
+
+    with override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE=auth_mode):
+        response = api_client.post(
+            "/api/gcal/dashboard/batch/reapply/", {"ids": ids, "dry_run": False, "apply_blocked": False}, format="json"
+        )
+
+    assert response.status_code == http_status.HTTP_202_ACCEPTED
+    assert response.data["errors"] == []
+    assert mock_send_task.call_count == 3
+    for chamada in mock_send_task.call_args_list:
+        assert chamada.args[2]["exige_pending"] is False
+
+
+@pytest.mark.django_db
 @override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
 @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
 def test_batch_reapply_retorna_erros_para_ids_inexistentes(mock_task, api_client, usuario_controle, setup_publicadas):

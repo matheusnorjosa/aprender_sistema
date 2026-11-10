@@ -134,6 +134,35 @@ def test_publish_reentregue_com_linha_pending_publica():
 
 
 @OAUTH
+def test_reapply_reentregue_com_linha_publicada_atualiza_o_google():
+    """O reapply em lote não marca PENDING, e `redelivered` só diz que a mensagem voltou para a fila.
+
+    O kombu marca `redelivered` também na mensagem que o worker só tinha reservado (prefetch) e
+    devolveu no restart sem rodar. Com a guarda, o reapply de todo deploy virava SKIP calado e o
+    Google ficava com o conteúdo velho. O reapply passa `exige_pending=False` e roda de novo.
+    """
+    operador = UsuarioFactory()
+    sol = _linha(Solicitacao.GCalStatus.PUBLISHED)
+    sol.external_event_id = f"asv2{sol.id}"
+    sol.gcal_payload_hash = "hash-do-conteudo-anterior"
+    sol.save(update_fields=["external_event_id", "gcal_payload_hash"])
+    client = _cliente()
+    client.get.return_value = {"id": sol.external_event_id, "status": "confirmed"}
+    client.update.return_value = {"id": sol.external_event_id}
+
+    with patch(CLIENT_FACTORY, return_value=(client, "cal-org")):
+        resultado = _reentregue(
+            task_publish_solicitacao_to_gcal, sol.id, operator_user_id=operador.pk, exige_pending=False
+        )
+
+    assert resultado["action"] == "UPDATE"
+    client.update.assert_called_once()
+    sol.refresh_from_db()
+    assert sol.gcal_status == Solicitacao.GCalStatus.PUBLISHED
+    assert sol.gcal_payload_hash != "hash-do-conteudo-anterior"
+
+
+@OAUTH
 def test_cancel_reentregue_com_linha_pending_cancela():
     """Controle: a linha ainda espera o cancel. A reentrega remove do Google e desvincula."""
     operador = UsuarioFactory()

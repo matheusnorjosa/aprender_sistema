@@ -162,8 +162,9 @@ const ERRO_NA_TELA = '.ant-result-error, .ant-result-warning, .ant-alert-error';
  * para os controles provarem que cada camada, sozinha, reprova o seu caso:
  * - marco: o título próprio da tela aparece em `main` (a casca sozinha não basta);
  * - casca autenticada: o header com o botão "Sair" (a tela de login também tem `main`);
- * - nenhum erro em `main`: Result de erro ou aviso, Alert de erro, "Algo deu errado"
- *   (ErrorBoundary) e "Recurso indisponível" (RequirePolicy);
+ * - nenhum erro em `main`: Result de erro ou aviso, Alert de erro, "Algo deu errado" e "O sistema foi
+ *   atualizado" (ErrorBoundary; o 2º é a tela que não carregou o pedaço dela) e "Recurso indisponível"
+ *   (RequirePolicy);
  * - dados: o texto do seed dentro da linha de tabela ou do contêiner declarado (em `main`, ou
  *   na página com `foraDeMain`);
  * - rede: nenhuma requisição da mesma origem com falha, fora as esperadas.
@@ -192,7 +193,7 @@ export async function verificarTela(
   if (!login && !alvo.semCasca && !(await sair.isVisible())) problemas.push('casca autenticada ausente (header com "Sair")');
   const erros = await main.locator(ERRO_NA_TELA).count();
   if (erros > 0) problemas.push(`erro na tela: ${erros} Result/Alert de erro em main`);
-  for (const texto of ['Algo deu errado', 'Recurso indisponível']) {
+  for (const texto of ['Algo deu errado', 'O sistema foi atualizado', 'Recurso indisponível']) {
     if ((await main.getByText(texto).count()) > 0) problemas.push(`erro na tela: "${texto}"`);
   }
   if (alvo.dados) {

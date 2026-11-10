@@ -178,7 +178,9 @@ def test_evento_novo_passado_cancelado_tambem_nao_nasce(tmp_path, masters):
 
 def test_evento_existente_passado_segue_com_o_reconcile(tmp_path, masters):
     _existente(masters, "EV000100", date(2026, 9, 8))
-    r = _apply(_export(tmp_path, [_sol(evento_id="EV000100", data="2026-09-08", segmento_norm="3º ano EF")]))
+    linha = _sol(evento_id="EV000100", data="2026-09-08", segmento_norm="3º ano EF")
+    # Só solicitacao: sem participation.csv, a entidade na allowlist seria arquivo faltando (CON-12).
+    r = _apply(_export(tmp_path, [linha]), allow=("solicitacao",))
     assert r["applied"]["solicitacao__segmento_norm_reconciled"] == 1
     assert "solicitacao__pulada_passado" not in r["applied"], "existente não é 'passado novo'"
 

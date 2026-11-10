@@ -68,7 +68,7 @@ v2/backend/apps/
 
 v2/frontend/src/
   pages/          41 lazy-loaded (AppRoutes.tsx)
-  components/     22 reutilizáveis (+ access/, google/, lgpd/)
+  components/     24 reutilizáveis (+ access/, google/, lgpd/)
   hooks/          13 custom hooks
   api/            15 clientes API (fetch) + config.ts + unwrapList.ts
   types/          TypeScript definitions
@@ -134,7 +134,9 @@ Versão em produção não se fixa aqui: é a última tag promovida por `.github
   protegidos** (Solicitacao.status, Formacao.data_formacao, Acompanhamento). Dois modos (`--mode`):
   `create-only` (padrão; só insere `would_create`) e `virada` (#2116, carga **única** da virada, decisões
   do dono de 16/10: atualiza o evento que ninguém mexeu pela tela; `--apply` exige `solicitacao` +
-  `participation` juntos; depois do A5, `--allow-entity gcal_adocao` sozinha adota o Event ID do Google).
+  `participation` juntos; depois do A5, `--allow-entity gcal_adocao` sozinha adota o Event ID do Google.
+  O `--apply` dela exige `--gcal-verificado <arquivo>`, o JSON do `conferir_gcal_adocao` com menos de
+  24 h (D63, #2179); sem ele, `CommandError`).
   Entidades graváveis e o passo a passo: `imports.spec.md` (seções de entidades e "Carga da virada").
 - **REGRA**: antes de qualquer `--apply` com dado real: dry-run verde, OK do dono e backup do alvo.
   Re-import cego sobrescreveria os data-fixes manuais (D2/C3-A/C4.4); a carga da virada é uma só.

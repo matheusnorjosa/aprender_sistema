@@ -66,7 +66,7 @@ Comandos que **existem hoje**:
 Onde existe hash, é **SHA-1** — nunca SHA-256. O helper canônico é
 `apps/core/imports/hashing.py::stable_import_hash` (`:37-60`), e o algoritmo é **congelado por
 ADR-012** (`v2/docs/adr/ADR-012-sha1-idempotency-hashes.md`): trocar quebraria os `external_hash`
-já gravados em `Compra`, `Solicitacao`, `Deslocamento`, `AcaoControle`, `AcaoDAT` e `Acompanhamento`
+já gravados em `Solicitacao`, `Deslocamento` e `AcaoDAT`
 (`apps/core/imports/hashing.py:4-11`).
 
 ⚠️ **Nem todo import usa hash.** `usuarios` reconcilia por CPF (campo unique) e `bloqueios` por

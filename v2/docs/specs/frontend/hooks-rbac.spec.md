@@ -1,7 +1,7 @@
 ---
 title: Hooks de RBAC e Guards (Frontend)
 status: canonical
-last_verified: 2026-10-28
+last_verified: 2026-11-09
 sources_of_truth:
   - v2/frontend/src/contexts/AcessoContext.ts
   - v2/frontend/src/test/lint/acessoSoPorPolicy.test.ts
@@ -109,7 +109,7 @@ Guard de rota (componente, nao hook):
 3. `App.tsx` monta `montarAcesso(policies, user, loading)` e o entrega no `AcessoContext.Provider`.
 4. Menu (`AppSidebar.tsx`), rotas (`<RequirePolicy policy=...>` em `AppRoutes.tsx`), Pagina Inicial e botoes de pagina leem `useAcesso()`. Rota negada renderiza o `Result` generico `DefaultForbidden` (OWASP — nao revela recurso/permissao necessaria).
 
-**Atualizacao de RBAC**: nao ha polling das capabilities. Mudancas de permissao so refletem apos reload/relogin (logout faz `window.location.reload()`). Os pollings existentes em `App.tsx` sao de dados operacionais e nao re-buscam policies: `useGCalAlertsPolling` e gated por `caps.canAccessControleSection` e `useUnreadNotificationsPolling` por `caps.canManageInternalActions` (`App.tsx`, policies). Os dois usam `hooks/usePolling.ts`, que para com a aba oculta, nao abre carga nova com outra em voo; nenhum dos dois trata o 429 (nao usam o `pausar` do hook) (regras em [pages.spec](./pages.spec.md), "Telas que se atualizam sozinhas").
+**Atualizacao de RBAC**: nao ha polling das capabilities. Mudancas de permissao so refletem apos reload/relogin (o logout faz `window.location.replace('/')`; a sessao encerrada pelo servidor faz `window.location.reload()`). Os pollings existentes em `App.tsx` sao de dados operacionais e nao re-buscam policies: `useGCalAlertsPolling` e gated por `caps.canAccessControleSection` e `useUnreadNotificationsPolling` por `caps.canManageInternalActions` (`App.tsx`, policies). Os dois usam `hooks/usePolling.ts`, que para com a aba oculta, nao abre carga nova com outra em voo; nenhum dos dois trata o 429 (nao usam o `pausar` do hook) (regras em [pages.spec](./pages.spec.md), "Telas que se atualizam sozinhas").
 
 **Guard Google (caminho feliz + erro):**
 

@@ -1309,8 +1309,24 @@ class ExportContractImporter:
             return json.load(f)
 
     def _municipio_index(self) -> dict[tuple[str, str], int]:
-        """Índice (norm(nome), uf.upper()) → municipio_id, para resolver FK por nome+uf."""
-        return {(_norm(n), (u or "").upper()): mid for mid, n, u in Municipio.objects.values_list("id", "nome", "uf")}
+        """Índice (norm(nome), uf.upper()) → municipio_id, para resolver FK por nome+uf.
+
+        A UniqueConstraint(nome, uf) compara byte a byte, então 'Acaraú'/CE e 'Acarau'/CE convivem no banco.
+        Chave repetida levanta ValueError com as ids em vez de escolher uma calada (ISS-1635b, #1658)."""
+        idx: dict[tuple[str, str], int] = {}
+        repetidos: dict[tuple[str, str], list[int]] = {}
+        for mid, n, u in Municipio.objects.values_list("id", "nome", "uf").order_by("id"):
+            key = (_norm(n), (u or "").upper())
+            if key in idx:
+                repetidos.setdefault(key, [idx[key]]).append(mid)
+            else:
+                idx[key] = mid
+        if repetidos:
+            lista = "; ".join(
+                f"({nome}, {uf}) → {', '.join(f'm{i}' for i in ids)}" for (nome, uf), ids in repetidos.items()
+            )
+            raise ValueError(f"município repetido no cadastro: {lista}; junte as cópias antes do import")
+        return idx
 
     def _projeto_geral_index(self) -> dict[str, int]:
         """Índice norm(nome) → projeto_geral_id (ProjetoGeral.nome é unique)."""
@@ -1426,17 +1442,22 @@ class ExportContractImporter:
                 tally[st] += 1
 
         elif name == "municipio":
-            idx = {
-                (_norm(n), (u or "").upper()): {"ativo": a}
-                for n, u, a in Municipio.objects.values_list("nome", "uf", "ativo")
-            }
+            # Mesmo índice do apply: a grafia sem acento casa o município que já existe. A chave vista neste
+            # CSV entra no índice, e a 2ª grafia conta como a 1ª (o apply cria um só).
+            mun_idx = self._municipio_index()
+            ativo = dict(Municipio.objects.values_list("id", "ativo"))
+            vistos_mun: dict[tuple[str, str], dict[str, Any]] = {}
             for r in rows:
                 nome = (r.get("nome") or "").strip()
                 if not nome:
                     tally["would_reject"] += 1
                     continue
                 key = (_norm(nome), (r.get("uf") or "").upper())
-                st, _ = diff_and_classify(idx.get(key), {"ativo": _to_bool(r.get("ativo"))}, protected)
+                mid = mun_idx.get(key)
+                existing = {"ativo": ativo[mid]} if mid is not None else vistos_mun.get(key)
+                novo = {"ativo": _to_bool(r.get("ativo"))}
+                st, _ = diff_and_classify(existing, novo, protected)
+                vistos_mun.setdefault(key, novo)
                 tally[st] += 1
 
         elif name == "projeto_geral":
@@ -2749,6 +2770,7 @@ class ExportContractImporter:
                     continue
                 created = 0
                 pg_idx = self._projeto_geral_index() if name == "projeto_geral" else {}
+                mun_idx = self._municipio_index() if name == "municipio" else {}
                 for r in self._load(name):
                     nome = (r.get("nome") or "").strip()
                     if not nome:
@@ -2757,9 +2779,11 @@ class ExportContractImporter:
                         DATArea.objects.create(nome=nome)
                         created += 1
                     elif name == "municipio":
+                        # Existe = mesmo índice do classify (sem acento/caixa): 'Acarau' não recria 'Acaraú'.
                         uf = (r.get("uf") or "").upper()
-                        if not Municipio.objects.filter(nome__iexact=nome, uf=uf).exists():
-                            Municipio.objects.create(nome=nome, uf=uf, ativo=_to_bool(r.get("ativo")))
+                        if (_norm(nome), uf) not in mun_idx:
+                            novo_mun = Municipio.objects.create(nome=nome, uf=uf, ativo=_to_bool(r.get("ativo")))
+                            mun_idx[(_norm(nome), uf)] = novo_mun.pk
                             created += 1
                     elif name == "projeto_geral" and _norm(nome) not in pg_idx:
                         # Existe = mesmo índice da resolução (sem acento/caixa, com os apelidos de família):

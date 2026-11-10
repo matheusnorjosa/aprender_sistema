@@ -328,6 +328,7 @@ class TestAuditLog:
 class TestBackoffTiming:
     """Testes para validar tempos de backoff (fast-forward em testes)"""
 
+    @patch("random.uniform", new=lambda a, b: b)  # jitter no teto (#1969): o backoff cheio
     @patch("time.sleep")
     @patch("apps.core.services.gcal_google_client.GoogleCalendarClient.insert")
     def test_exponential_backoff_timing(self, mock_insert, mock_sleep, solicitacao_aprovada):

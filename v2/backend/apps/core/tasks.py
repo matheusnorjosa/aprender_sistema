@@ -233,8 +233,42 @@ def _mark_gcal_error(
     )
 
 
-@shared_task(name="apps.core.tasks.task_publish_solicitacao_to_gcal")
+def _pular_reentrega_obsoleta(task: Any, solicitation_id: int) -> dict[str, Any] | None:
+    """Descarta a mensagem reentregue (acks_late, #1970) quando a linha já não espera esta operação.
+
+    Publish, resync e cancel marcam a linha PENDING antes de enfileirar. Se a reentrega chega e a
+    linha não está mais PENDING, ou a operação terminou e só faltou o ack, ou uma ação mais nova
+    passou na frente. Rodar de novo marcaria ERROR numa linha certa (cancel) ou traria de volta um
+    evento que a pessoa removeu (publish). Roda antes do cliente OAuth: montar o cliente com token
+    revogado também rebaixaria a linha. Sem `redelivered` (1ª entrega ou chamada direta) não age.
+    """
+    from apps.core.models import Solicitacao
+
+    if not (task.request.delivery_info or {}).get("redelivered"):
+        return None
+    status = Solicitacao.objects.filter(pk=solicitation_id).values_list("gcal_status", flat=True).first()
+    if status == Solicitacao.GCalStatus.PENDING:
+        return None
+    logger.info("%s: reentrega de s%s descartada (gcal_status=%s)", task.name, solicitation_id, status)
+    return {
+        "action": "SKIP",
+        "solicitation_id": solicitation_id,
+        "external_event_id": None,
+        "summary": "reentrega descartada: a linha não espera mais esta operação",
+        "error": None,
+    }
+
+
+# acks_late + reject_on_worker_lost só aqui (#1970): a queda do worker devolve a mensagem para a fila,
+# e a guarda acima impede que a reentrega estrague a linha. Ver o comentário no bloco CELERY de settings.
+@shared_task(
+    bind=True,
+    name="apps.core.tasks.task_publish_solicitacao_to_gcal",
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
 def task_publish_solicitacao_to_gcal(
+    self: Any,
     solicitation_id: int,
     dry_run: bool = False,
     apply_blocked: bool = False,
@@ -264,6 +298,10 @@ def task_publish_solicitacao_to_gcal(
 
     from apps.core.models import AuditLog, Solicitacao, Usuario
     from apps.core.services.gcal_sync_service import apply_one_solicitacao
+
+    # A prévia não marca PENDING nem escreve: reentregue, só roda de novo.
+    if not dry_run and (pulo := _pular_reentrega_obsoleta(self, solicitation_id)):
+        return pulo
 
     # OAuth Phase 3: Verificar modo OAuth e criar cliente se necessário
     auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
@@ -439,8 +477,14 @@ def task_publish_solicitacao_to_gcal(
         }
 
 
-@shared_task(name="apps.core.tasks.task_cancel_solicitacao_from_gcal")
+@shared_task(
+    bind=True,
+    name="apps.core.tasks.task_cancel_solicitacao_from_gcal",
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
 def task_cancel_solicitacao_from_gcal(
+    self: Any,
     solicitation_id: int,
     operator_user_id: int | None = None,
 ) -> dict[str, Any]:
@@ -456,7 +500,7 @@ def task_cancel_solicitacao_from_gcal(
 
     Returns:
         dict: {
-            "action": "DELETE" | "ERROR",
+            "action": "DELETE" | "SKIP" | "ERROR",
             "solicitation_id": int,
             "external_event_id": str | None,
             "summary": str,
@@ -467,6 +511,9 @@ def task_cancel_solicitacao_from_gcal(
 
     from apps.core.models import AuditLog, Solicitacao, Usuario
     from apps.core.services.gcal_sync_service import cancel_solicitacao
+
+    if pulo := _pular_reentrega_obsoleta(self, solicitation_id):
+        return pulo
 
     # OAuth: create OAuth client if needed (fix #572)
     auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
@@ -910,6 +957,8 @@ def task_run_import_job(self: Any, import_job_id: int) -> dict[str, Any]:
 
     from django.db import transaction
 
+    from celery.exceptions import SoftTimeLimitExceeded
+
     from apps.core.models import AuditLog, ImportJob
     from apps.core.services.bloqueios_import import import_bloqueios_from_file
 
@@ -984,7 +1033,11 @@ def task_run_import_job(self: Any, import_job_id: int) -> dict[str, Any]:
 
     except Exception as exc:
         tb = traceback.format_exc()
-        err_msg = str(exc)
+        if isinstance(exc, SoftTimeLimitExceeded):
+            # str() daria "SoftTimeLimitExceeded()". O service desfaz o arquivo inteiro antes de chegar aqui (#1968).
+            err_msg = "Tempo esgotado: o import passou do limite de tempo e foi interrompido."
+        else:
+            err_msg = str(exc)
         logger.exception(f"task_run_import_job: erro ao executar job #{import_job_id}")
 
         try:

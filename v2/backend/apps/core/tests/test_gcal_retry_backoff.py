@@ -44,6 +44,7 @@ class TestRetryBackoff:
         assert result == "success"
         assert mock_func.call_count == 1
 
+    @patch("random.uniform", new=lambda a, b: b)  # jitter no teto (#1969): o backoff cheio
     @patch("apps.core.services.gcal.utils.time.sleep")
     def test_retry_429_rate_limit_until_success(self, mock_sleep):
         """
@@ -206,6 +207,7 @@ class TestRetryBackoff:
         # Deve usar Retry-After (5s) em vez de backoff exponencial
         assert mock_sleep.call_args[0][0] == 5.0
 
+    @patch("random.uniform", new=lambda a, b: b)  # jitter no teto (#1969): o backoff cheio
     @patch("apps.core.services.gcal.utils.time.sleep")
     def test_exponential_backoff_sequence(self, mock_sleep):
         """
@@ -274,3 +276,75 @@ class TestRetryBackoff:
         assert result == "success"
         assert mock_func.call_count == 2
         assert mock_sleep.call_count == 1
+
+
+# #1969: o sorteio do jitter fica nas pontas — `a` é o piso (50%), `b` o teto (100%, o valor de antes).
+def _no_piso():
+    return patch("random.uniform", new=lambda a, b: a)
+
+
+def _no_teto():
+    return patch("random.uniform", new=lambda a, b: b)
+
+
+def _http_error(status_code):
+    from googleapiclient.errors import HttpError
+
+    return HttpError(resp=Mock(status=status_code, reason="x"), content=b'{"error": {"message": "x"}}')
+
+
+class TestBackoffJitter1969:
+    """#1969: a espera entre tentativas varia de 50% a 100% do backoff, para os workers não baterem juntos."""
+
+    def _cinco_xx_tres_vezes(self):
+        return Mock(side_effect=[MockHttpError(500), MockHttpError(500), MockHttpError(500), "success"])
+
+    @patch("apps.core.services.gcal.utils.time.sleep")
+    def test_backoff_tem_jitter_piso_metade(self, mock_sleep):
+        with _no_piso():
+            _retry_with_backoff(self._cinco_xx_tres_vezes(), operation_name="t", max_retries=3, initial_delay=1.0)
+
+        assert [c.args[0] for c in mock_sleep.call_args_list] == [0.5, 1.0, 2.0]
+
+    @patch("apps.core.services.gcal.utils.time.sleep")
+    def test_backoff_jitter_nao_passa_do_teto(self, mock_sleep):
+        with _no_teto():
+            _retry_with_backoff(self._cinco_xx_tres_vezes(), operation_name="t", max_retries=3, initial_delay=1.0)
+
+        assert [c.args[0] for c in mock_sleep.call_args_list] == [1.0, 2.0, 4.0]
+
+    @patch("apps.core.services.gcal.utils.time.sleep")
+    def test_retry_after_nao_recebe_jitter(self, mock_sleep):
+        """Quem define a espera no Retry-After é o servidor."""
+        error = MockHttpError(429, "Rate Limit")
+        error.resp.get = Mock(return_value="5")
+
+        with _no_piso():
+            _retry_with_backoff(Mock(side_effect=[error, "success"]), operation_name="t", initial_delay=1.0)
+
+        assert [c.args[0] for c in mock_sleep.call_args_list] == [5.0]
+
+    def test_google_client_backoff_tem_jitter(self):
+        from apps.core.services.gcal_google_client import GoogleCalendarClient
+
+        client = GoogleCalendarClient.__new__(GoogleCalendarClient)
+        func = Mock(side_effect=[_http_error(503), _http_error(503), _http_error(503), "ok"])
+
+        with patch("apps.core.services.gcal_google_client.time.sleep") as mock_sleep, _no_piso():
+            assert client._retry_with_backoff(func) == "ok"
+
+        assert [c.args[0] for c in mock_sleep.call_args_list] == [0.5, 1.0, 2.0]
+
+    def test_oauth_client_backoff_tem_jitter(self):
+        from types import SimpleNamespace
+
+        from apps.core.services.gcal_oauth_client import OAuthCalendarClient
+
+        client = OAuthCalendarClient.__new__(OAuthCalendarClient)
+        client.credential = SimpleNamespace(user_id=7)
+        func = Mock(side_effect=[_http_error(503), _http_error(503), _http_error(503), "ok"])
+
+        with patch("apps.core.services.gcal_oauth_client.time.sleep") as mock_sleep, _no_piso():
+            assert client._retry_with_backoff(func) == "ok"
+
+        assert [c.args[0] for c in mock_sleep.call_args_list] == [0.5, 1.0, 2.0]

@@ -25,8 +25,10 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 import pytest
+from celery.exceptions import SoftTimeLimitExceeded
 
-from apps.core.models import AuditLog, ImportJob
+from apps.core.models import AuditLog, AvailabilityBlock, ImportJob
+from apps.core.services import bloqueios_import
 from apps.core.tasks import task_run_import_job
 
 User = get_user_model()
@@ -186,3 +188,56 @@ class TestTaskNotFound:
         result = task_run_import_job.run(import_job_id=999_999_999)
         assert result["action"] == "NOT_FOUND"
         assert result["error"] == "DoesNotExist"
+
+
+# Duas linhas válidas para o `user` acima ("Task User"), com data antes do corte do Formador.
+_CSV_DUAS_LINHAS = (
+    b"usuario,inicio,fim,tipo,motivo\n"
+    b"Task User,2026-03-01 08:00,2026-03-01 12:00,P,Consulta\n"
+    b"Task User,2026-03-02 08:00,2026-03-02 12:00,P,Consulta\n"
+)
+
+
+@pytest.mark.django_db(transaction=True)
+class TestTaskSoftTimeLimit:
+    """#1968: o limite brando no meio do import vira FAILED com motivo, e o arquivo é desfeito por inteiro."""
+
+    def test_soft_time_limit_no_meio_do_arquivo_falha_sem_gravar(self, user, monkeypatch):
+        job = ImportJob.objects.create(
+            user=user,
+            import_type=ImportJob.ImportType.BLOQUEIOS,
+            dry_run=False,
+            file=SimpleUploadedFile("duas.csv", _CSV_DUAS_LINHAS, content_type="text/csv"),
+        )
+        linha_real = bloqueios_import._process_row
+
+        def _estoura_na_linha_2(row, idx, *args):
+            if idx == 2:
+                raise SoftTimeLimitExceeded()
+            return linha_real(row, idx, *args)
+
+        monkeypatch.setattr(bloqueios_import, "_process_row", _estoura_na_linha_2)
+
+        result = task_run_import_job.run(import_job_id=job.id)
+
+        assert result["action"] == "FAILED"
+        job.refresh_from_db()
+        assert job.status == ImportJob.Status.FAILED
+        assert AvailabilityBlock.objects.count() == 0  # a linha 1 também foi desfeita
+        assert AuditLog.objects.filter(action="IMPORT_JOB_FAILED", details__import_job_id=job.id).count() == 1
+
+    def test_soft_time_limit_motivo_explicito(self, user):
+        job = _job(user, dry_run=True)
+
+        with patch(
+            "apps.core.services.bloqueios_import.import_bloqueios_from_file",
+            side_effect=SoftTimeLimitExceeded(),
+        ):
+            result = task_run_import_job.run(import_job_id=job.id)
+
+        assert result["action"] == "FAILED"
+        job.refresh_from_db()
+        assert job.status == ImportJob.Status.FAILED
+        assert "tempo esgotado" in job.error_message.lower()
+        audit = AuditLog.objects.get(action="IMPORT_JOB_FAILED", details__import_job_id=job.id)
+        assert "tempo esgotado" in audit.details["error"].lower()

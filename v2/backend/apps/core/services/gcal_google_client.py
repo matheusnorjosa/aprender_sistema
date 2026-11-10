@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import random
 import time
 from collections.abc import Callable
 from typing import TypeVar
@@ -137,10 +138,10 @@ class GoogleCalendarClient(CalendarClientAdapter):
                 # 429 (rate limit) ou 5xx (server error) → retry
                 if status == 429 or status >= 500:
                     if attempt < max_retries:
-                        # Backoff exponencial: 1s, 2s, 4s
-                        wait_time = 2**attempt
+                        # Backoff exponencial com jitter (#1969): até 1s, 2s, 4s
+                        wait_time = 2**attempt * random.uniform(0.5, 1.0)
                         logger.warning(
-                            f"Request failed with {status}, retrying in {wait_time}s "
+                            f"Request failed with {status}, retrying in {wait_time:.1f}s "
                             f"(attempt {attempt + 1}/{max_retries})"
                         )
                         time.sleep(wait_time)

@@ -8,10 +8,11 @@ Covers:
 - `/api/gcal/circuit-breaker/` endpoint (state + counters + RBAC)
 """
 
-# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false, reportPrivateUsage=false
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false, reportPrivateUsage=false, reportFunctionMemberAccess=false
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from unittest import mock
 
 from django.test import override_settings
@@ -114,6 +115,44 @@ class TestStateTransitions:
             _retry_with_circuit_breaker(fail, operation_name="half-open-fail", max_retries=0)
 
         assert get_circuit_state() == "open"
+
+
+def _aberto_alem_do_reset_timeout():
+    """Abre o circuito e recua a hora da abertura para além do reset_timeout."""
+    gcal_breaker.open()
+    gcal_breaker._state_storage.opened_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(
+        seconds=gcal_breaker.reset_timeout + 1
+    )
+
+
+class TestRecuperaSozinho:
+    """Vencido o reset_timeout, a próxima chamada passa como teste (half-open) e fecha o circuito.
+
+    A passagem de open para half-open só acontece dentro de `gcal_breaker.call()`. Quem lê
+    `current_state` antes e desiste nunca a dispara: o processo falha rápido até ser reiniciado.
+    """
+
+    def test_retry_with_circuit_breaker_testa_depois_do_reset_timeout(self):
+        _aberto_alem_do_reset_timeout()
+
+        assert _retry_with_circuit_breaker(lambda: "voltou", operation_name="probe") == "voltou"
+        assert get_circuit_state() == "closed"
+
+    @pytest.mark.django_db
+    def test_queue_gcal_sync_retry_tenta_depois_do_reset_timeout(self):
+        from apps.core.services.gcal.types import SyncOutcome
+        from apps.core.tasks import queue_gcal_sync_retry
+        from apps.core.tests.factories import SolicitacaoFactory
+
+        sol = SolicitacaoFactory(status="aprovado")
+        _aberto_alem_do_reset_timeout()
+        outcome = SyncOutcome(action="UPDATE", solicitation_id=sol.pk, external_event_id="asv2x", summary="ok")
+
+        with mock.patch("apps.core.services.gcal_sync_service.apply_one_solicitacao", return_value=outcome) as aplica:
+            resultado = queue_gcal_sync_retry.run(sol.pk)
+
+        aplica.assert_called_once()
+        assert resultado["action"] == "UPDATE"
 
 
 class TestRetryIntegration:

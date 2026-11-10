@@ -205,7 +205,7 @@ vs `/var/backups/aprender` na VM).
 │ Celery Worker: backup.perform_database_backup              │
 │ - Validates environment                                     │
 │ - Executes backup_db.sh                                     │
-│ - Monitors execution (1h timeout)                           │
+│ - Monitors execution (Celery limit: 25 min)                 │
 │ - Retries on failure (3x, exponential backoff)             │
 └─────────────────────┬───────────────────────────────────────┘
                       │
@@ -497,7 +497,7 @@ Expected output:
 Backup tasks automatically retry on failure:
 - **Max retries**: 3
 - **Delay**: 5 minutes (300s) with exponential backoff
-- **Timeout**: 1 hour per backup attempt
+- **Timeout**: the Celery limit, not the 1h `timeout` of `subprocess.run` (which never fires, M24-02). At 25 min (`CELERY_TASK_SOFT_TIME_LIMIT`, #1968) the task gets `SoftTimeLimitExceeded`: logged, sent to Sentry, re-raised, no retry. At 30 min (`CELERY_TASK_TIME_LIMIT`) the process is killed.
 
 ### Sentry Alerts
 
@@ -516,7 +516,7 @@ Failures are sent to Sentry when `SENTRY_DSN` is configured:
 | `Permission denied: /backups` | Bind-mount ausente ou dono errado | Criar `/var/backups/aprender` no host (0755, dono = UID do `appuser`); o root FS do container é `read_only`, só o mount é gravável |
 | Nada em `/backups` e nenhum erro | `docker compose exec` no serviço errado | O `/backups` só existe no **`worker`** (bind-mount do serviço `worker` em `docker-compose.prod.yml`) |
 | `S3 upload FAILED (offsite copy missing)` | `aws` CLI **não existe na imagem** | Ver [S3/MinIO Setup](#s3minio-setup-opt-in-hoje-não-funcional). O backup **local** segue válido — o script não re-roda o `pg_dump` (bloco de upload S3 de `backup_db.sh`) |
-| `Backup timed out` | Banco grande (>1h) | Aumentar o `timeout` de `subprocess.run` em `tasks_backup.py` (task `perform_database_backup`) |
+| `SoftTimeLimitExceeded` no log do backup | Dump passou de 25 min (limite brando do Celery, #1968; o `timeout` de 1h do `subprocess.run` nunca chega) | Dar a `perform_database_backup` `soft_time_limit`/`time_limit` próprios, abaixo do `visibility_timeout` do Redis (3600 s), em `tasks_backup.py` |
 
 ## Disaster Recovery
 

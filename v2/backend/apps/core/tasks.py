@@ -19,11 +19,14 @@ import json
 import logging
 from datetime import date
 from io import StringIO
-from typing import Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from django.core.management import call_command
 
 from celery import shared_task  # type: ignore[attr-defined]
+
+if TYPE_CHECKING:
+    from apps.core.models import Solicitacao
 
 logger = logging.getLogger(__name__)
 
@@ -233,12 +236,84 @@ def _mark_gcal_error(
     )
 
 
-@shared_task(name="apps.core.tasks.task_publish_solicitacao_to_gcal")
+def _pular_reentrega_obsoleta(
+    task: Any,
+    solicitation_id: int,
+    operacao: Literal["publish", "reenvio", "cancel"],
+    travada: Solicitacao | None = None,
+) -> dict[str, Any] | None:
+    """Descarta a mensagem (acks_late, #1970) quando a linha já não espera esta operação.
+
+    `redelivered` quer dizer que a mensagem voltou para a fila, não que ela já rodou: o kombu marca
+    também a que o worker só tinha reservado (prefetch) e devolveu no restart sem começar. Por isso
+    quem decide é a linha, e cada operação olha o sinal dela:
+
+    - `publish` (Publicar e Reenviar marcam PENDING antes de enfileirar): só na reentrega; descarta
+      se a linha saiu de PENDING. Rodar de novo traria de volta um evento que a pessoa removeu.
+    - `reenvio` (reapply em lote, que não marca PENDING): em toda entrega; descarta se a linha está
+      NONE, a mesma recusa de `motivo_nao_publicavel(reenvio=True)`. Entre enfileirar e rodar a
+      pessoa pode ter removido o evento, e o cancel zera o hash e o id: o upsert adotaria o
+      `asv2{id}` cancelado e o traria de volta.
+    - `cancel`: só na reentrega; descarta se não há o que remover (sem `external_event_id` e fora
+      de PUBLISHED, a mesma pré-condição de `cancel_solicitacao`). Com o evento vinculado o cancel
+      roda mesmo fora de PENDING: uma resync que terminou antes dele não desfaz o pedido de remover.
+
+    Roda duas vezes. A primeira, sem lock e antes do cliente OAuth, é atalho: montar o cliente com
+    token revogado também rebaixaria a linha. A que vale é a segunda, com a linha `travada` pelo
+    `select_for_update`: um cancel de outro worker pode commitar entre as duas leituras.
+    """
+    from apps.core.models import Solicitacao
+
+    reentregue = bool((task.request.delivery_info or {}).get("redelivered"))
+    if operacao != "reenvio" and not reentregue:
+        return None
+    if travada is not None:
+        linha = {"gcal_status": travada.gcal_status, "external_event_id": travada.external_event_id}
+    else:
+        linha = Solicitacao.objects.filter(pk=solicitation_id).values("gcal_status", "external_event_id").first()
+    if linha is None:
+        return None
+    status = linha["gcal_status"]
+    if operacao == "publish":
+        obsoleta = status != Solicitacao.GCalStatus.PENDING
+    elif operacao == "reenvio":
+        obsoleta = status == Solicitacao.GCalStatus.NONE
+    else:
+        obsoleta = not linha["external_event_id"] and status != Solicitacao.GCalStatus.PUBLISHED
+    if not obsoleta:
+        return None
+    logger.info(
+        "%s: %s de s%s descartado (gcal_status=%s, reentregue=%s)",
+        task.name,
+        operacao,
+        solicitation_id,
+        status,
+        reentregue,
+    )
+    return {
+        "action": "SKIP",
+        "solicitation_id": solicitation_id,
+        "external_event_id": None,
+        "summary": "descartado: a linha não espera mais esta operação",
+        "error": None,
+    }
+
+
+# acks_late + reject_on_worker_lost só aqui (#1970): a queda do worker devolve a mensagem para a fila,
+# e a guarda acima impede que a reentrega estrague a linha. Ver o comentário no bloco CELERY de settings.
+@shared_task(
+    bind=True,
+    name="apps.core.tasks.task_publish_solicitacao_to_gcal",
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
 def task_publish_solicitacao_to_gcal(
+    self: Any,
     solicitation_id: int,
     dry_run: bool = False,
     apply_blocked: bool = False,
     operator_user_id: int | None = None,
+    reenvio: bool = False,
 ) -> dict[str, Any]:
     """
     Publica uma Solicitacao no Google Calendar (via Celery).
@@ -250,6 +325,10 @@ def task_publish_solicitacao_to_gcal(
         dry_run: Se True, não persiste mudanças no DB/Calendar
         apply_blocked: Se True, aplica mesmo sem GCAL_CLIENT configurado
         operator_user_id: ID do usuário operador (OAuth mode)
+        reenvio: True no reapply em lote, que não marca PENDING. A task então não exige PENDING na
+            reentrega, mas em toda entrega descarta a linha que voltou a NONE (a pessoa removeu o
+            evento depois de enfileirar). O cancel zera o hash e o id, então o upsert sozinho não
+            protegeria: adotaria o evento cancelado. Ver `_pular_reentrega_obsoleta`.
 
     Returns:
         dict: {
@@ -264,6 +343,11 @@ def task_publish_solicitacao_to_gcal(
 
     from apps.core.models import AuditLog, Solicitacao, Usuario
     from apps.core.services.gcal_sync_service import apply_one_solicitacao
+
+    # A prévia não marca PENDING nem escreve: reentregue, só roda de novo.
+    operacao: Literal["publish", "reenvio"] = "reenvio" if reenvio else "publish"
+    if not dry_run and (pulo := _pular_reentrega_obsoleta(self, solicitation_id, operacao)):
+        return pulo
 
     # OAuth Phase 3: Verificar modo OAuth e criar cliente se necessário
     auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
@@ -362,6 +446,8 @@ def task_publish_solicitacao_to_gcal(
             # não segura publish/cancel/edição reais enquanto espera o Google.
             qs = Solicitacao.objects.all() if dry_run else Solicitacao.objects.select_for_update()
             s = qs.get(id=solicitation_id)
+            if not dry_run and (pulo := _pular_reentrega_obsoleta(self, solicitation_id, operacao, travada=s)):
+                return pulo
 
             # Aplicar publicação (com cliente OAuth se disponível)
             outcome = apply_one_solicitacao(s, dry_run=dry_run, apply_blocked=apply_blocked, client=client)
@@ -439,8 +525,14 @@ def task_publish_solicitacao_to_gcal(
         }
 
 
-@shared_task(name="apps.core.tasks.task_cancel_solicitacao_from_gcal")
+@shared_task(
+    bind=True,
+    name="apps.core.tasks.task_cancel_solicitacao_from_gcal",
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
 def task_cancel_solicitacao_from_gcal(
+    self: Any,
     solicitation_id: int,
     operator_user_id: int | None = None,
 ) -> dict[str, Any]:
@@ -456,7 +548,7 @@ def task_cancel_solicitacao_from_gcal(
 
     Returns:
         dict: {
-            "action": "DELETE" | "ERROR",
+            "action": "DELETE" | "SKIP" | "ERROR",
             "solicitation_id": int,
             "external_event_id": str | None,
             "summary": str,
@@ -467,6 +559,9 @@ def task_cancel_solicitacao_from_gcal(
 
     from apps.core.models import AuditLog, Solicitacao, Usuario
     from apps.core.services.gcal_sync_service import cancel_solicitacao
+
+    if pulo := _pular_reentrega_obsoleta(self, solicitation_id, "cancel"):
+        return pulo
 
     # OAuth: create OAuth client if needed (fix #572)
     auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
@@ -507,6 +602,8 @@ def task_cancel_solicitacao_from_gcal(
         with transaction.atomic():
             # Buscar solicitação (com lock de linha)
             s = Solicitacao.objects.select_for_update().get(id=solicitation_id)
+            if pulo := _pular_reentrega_obsoleta(self, solicitation_id, "cancel", travada=s):
+                return pulo
 
             # Cancelar evento no Calendar e limpar campos
             outcome = cancel_solicitacao(s, client=client)
@@ -910,6 +1007,8 @@ def task_run_import_job(self: Any, import_job_id: int) -> dict[str, Any]:
 
     from django.db import transaction
 
+    from celery.exceptions import SoftTimeLimitExceeded
+
     from apps.core.models import AuditLog, ImportJob
     from apps.core.services.bloqueios_import import import_bloqueios_from_file
 
@@ -984,7 +1083,11 @@ def task_run_import_job(self: Any, import_job_id: int) -> dict[str, Any]:
 
     except Exception as exc:
         tb = traceback.format_exc()
-        err_msg = str(exc)
+        if isinstance(exc, SoftTimeLimitExceeded):
+            # str() daria "SoftTimeLimitExceeded()". O service desfaz o arquivo inteiro antes de chegar aqui (#1968).
+            err_msg = "Tempo esgotado: o import passou do limite de tempo e foi interrompido."
+        else:
+            err_msg = str(exc)
         logger.exception(f"task_run_import_job: erro ao executar job #{import_job_id}")
 
         try:
@@ -1034,8 +1137,9 @@ def queue_gcal_sync_retry(
     """
     Retry GCal sync when circuit breaker closes (Gap 6 - PLAN_maturity_gaps.md).
 
-    This task is queued when the circuit breaker is open. It waits for the
-    circuit to close before attempting to sync.
+    This task is queued when the circuit breaker is open. Each run attempts the
+    sync; while the breaker is open it raises CircuitBreakerError and the task
+    retries in 60s. Once reset_timeout elapses, the call is the half-open probe.
 
     Args:
         solicitation_id: ID of the Solicitacao to sync
@@ -1046,18 +1150,10 @@ def queue_gcal_sync_retry(
         dict: Result with action, status, and any errors
     """
     from apps.core.models import AuditLog, Solicitacao
-    from apps.core.services.gcal.circuit_breaker import gcal_breaker
 
-    # Check circuit breaker state
-    if str(gcal_breaker.current_state) == "open":
-        # Circuit still open, retry later
-        logger.info(
-            f"Circuit breaker still open for Solicitacao #{solicitation_id}, "
-            f"retrying in 60s (attempt {self.request.retries + 1}/{self.max_retries})"
-        )
-        raise self.retry(countdown=60)
-
-    # Circuit is closed or half-open, attempt sync
+    # Tenta sempre: quem decide é o `gcal_breaker.call()` lá dentro. Aberto e dentro do reset_timeout,
+    # ele levanta CircuitBreakerError (o `except` abaixo reagenda); vencido o prazo, passa a half-open
+    # e deixa esta chamada testar. Ler `current_state` antes e desistir nunca disparava essa passagem.
     try:
         s = Solicitacao.objects.get(id=solicitation_id)
 

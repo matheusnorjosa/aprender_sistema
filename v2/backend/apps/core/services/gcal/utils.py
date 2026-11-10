@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import random
 import time
 from collections.abc import Callable
 from typing import TypeVar, cast
@@ -35,10 +36,10 @@ def _retry_with_backoff(
 
     Estratégia:
     - 1 tentativa inicial + até 3 retries (total: 4 tentativas)
-    - Backoff: 1s, 2s, 4s
+    - Backoff: até 1s, 2s, 4s (50–100% de cada um, jitter #1969)
     - Retry apenas em: 429 (rate limit), 5xx (server errors)
     - Não retry em: 4xx (exceto 429)
-    - Respeita Retry-After header se presente
+    - Respeita Retry-After até o teto `initial_delay * 2**max_retries` (8s); acima dele, desiste
     - Trata 409/412 como sucesso (idempotência)
 
     Args:
@@ -78,9 +79,9 @@ def _retry_with_backoff(
                 # googleapiclient.errors.HttpError
                 status_code = e.resp.status
 
-                # Extrair Retry-After header
+                # Retry-After: o httplib2.Response guarda os cabeçalhos em minúsculas
                 if hasattr(e.resp, "get"):
-                    retry_after = e.resp.get("Retry-After")
+                    retry_after = e.resp.get("retry-after")
             elif "429" in error_str:
                 status_code = 429
             elif "500" in error_str or "502" in error_str or "503" in error_str or "504" in error_str:
@@ -124,14 +125,23 @@ def _retry_with_backoff(
                 logger.error(f"{operation_name}: Failed after {attempt + 1} attempts. Last error: {error_str[:200]}")
                 raise
 
-            # Calcular delay
-            if retry_after:
-                try:
-                    delay = float(retry_after)
-                except (ValueError, TypeError):
-                    delay = initial_delay * (2**attempt)
+            # Calcular delay. O Retry-After vale até o teto: o mesmo retry roda no request do gunicorn,
+            # sob select_for_update, e quem pede mais espera que isso faz a operação desistir.
+            try:
+                espera_do_servidor = float(retry_after) if retry_after else None
+            except (ValueError, TypeError):
+                espera_do_servidor = None
+            teto = initial_delay * (2**max_retries)
+            if espera_do_servidor is not None and espera_do_servidor > teto:
+                logger.error(
+                    f"{operation_name}: Retry-After {espera_do_servidor:.0f}s passa do teto de {teto:.0f}s, aborting"
+                )
+                raise
+            if espera_do_servidor is not None and espera_do_servidor >= 0:
+                delay = espera_do_servidor
             else:
-                delay = initial_delay * (2**attempt)
+                # Jitter (#1969): workers que falham juntos não retentam juntos. O Retry-After fica sem jitter.
+                delay = initial_delay * (2**attempt) * random.uniform(0.5, 1.0)
 
             logger.info(f"{operation_name}: Retrying in {delay:.1f}s...")
             time.sleep(delay)
@@ -181,7 +191,7 @@ def _retry_with_circuit_breaker(
     Execute function with retry, backoff, AND circuit breaker protection.
 
     Combines _retry_with_backoff with circuit breaker pattern.
-    If circuit is open, raises CircuitBreakerError immediately.
+    If the circuit is open and reset_timeout has not elapsed, raises CircuitBreakerError without calling.
     Failed operations count toward circuit breaker failure threshold.
 
     Args:
@@ -199,13 +209,9 @@ def _retry_with_circuit_breaker(
     """
     from .circuit_breaker import CircuitBreakerError, gcal_breaker
 
-    # Check circuit state first
-    if str(gcal_breaker.current_state) == "open":
-        logger.warning(f"{operation_name}: Circuit breaker is OPEN, failing fast")
-        raise CircuitBreakerError(gcal_breaker)
-
     try:
-        # Use circuit breaker to track success/failure
+        # O breaker decide: aberto dentro do reset_timeout, levanta sem chamar; vencido o prazo, passa
+        # a half-open e esta chamada testa. Ler `current_state` antes e desistir travava no aberto.
         result = gcal_breaker.call(
             _retry_with_backoff,
             func,

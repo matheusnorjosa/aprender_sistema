@@ -218,6 +218,31 @@ describe('Registros de Turmas sem rolagem horizontal', () => {
     }
   });
 
+  test('a 1700 px (DEF-23): a cidade não fica espremida; etapas e observações na linha expandida', async () => {
+    definirLarguraTela(1700);
+    renderPagina('registros');
+    const linha = await linhaPelaAcao(`Editar: ${REGISTRO}`);
+
+    expect(cabecalhos()).toEqual([
+      'Município - UF',
+      'Coleção',
+      'Projeto',
+      'Ano',
+      'Alunos',
+      'Profs.',
+      'Status Turma',
+      'Chaves',
+      'Usa AVALIAR',
+      'Ações',
+    ]);
+
+    fireEvent.click(within(linha).getByRole('button', { name: `Expandir linha de ${REGISTRO}` }));
+    const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
+    for (const texto of ['Observação do FORMAR', 'Obs. AVALIAR', 'Importados']) {
+      expect(expandida.getByText(texto)).toBeInTheDocument();
+    }
+  });
+
   test('a 360 px: só município, ano e o menu de ações', async () => {
     definirLarguraTela(360);
     const { container } = renderPagina('registros');

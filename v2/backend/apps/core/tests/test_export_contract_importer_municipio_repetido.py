@@ -111,6 +111,19 @@ def test_duas_grafias_no_mesmo_csv_criam_um_municipio(tmp_path):
     assert de_novo["would_skip_same"] == 2
 
 
+def test_segunda_grafia_com_ativo_diferente_conta_como_update_e_nao_e_gravada(tmp_path):
+    """A 2ª grafia conta como a 1ª (setdefault): ativo diferente é would_update, que o create-only não grava."""
+    csv = f"{MUNICIPIO_HEADER}\nAcaraú,ACARAU,CE,,true\nAcarau,ACARAU,CE,,false\n"
+    path = _write_export(tmp_path, {"municipio": csv})
+
+    seco = ExportContractImporter(path=path).run()["por_entidade"]["municipio"]
+    ExportContractImporter(path=path, apply=True, allow=("municipio",)).run()
+
+    assert (seco["would_create"], seco["would_update"]) == (1, 1)
+    assert _acarau_ce() == 1
+    assert Municipio.objects.get(uf="CE", nome="Acaraú").ativo is True
+
+
 def test_homonimo_em_outra_uf_e_municipio_sem_uf_seguem_casando(tmp_path):
     """Controle positivo: chaves diferentes não são repetição, e cada linha casa a id da sua UF."""
     ce = MunicipioFactory(nome="Acaraú", uf="CE")

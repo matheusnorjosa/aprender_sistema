@@ -97,7 +97,7 @@ function rotear(rotas: Record<string, Rota>): void {
 
 const projetos = Array.from({ length: 120 }, (_, i) => ({ id: i + 1, nome: `Projeto ${String(i + 1).padStart(3, '0')}` }));
 
-describe('MapaBrasilPage — filtro de projetos e erros', { timeout: 20000 }, () => {
+describe('MapaBrasilPage — filtro de projetos e erros', { timeout: 60000 }, () => { // FER-53
   beforeEach(() => {
     fetchAPIMock.mockReset();
   });

@@ -111,6 +111,22 @@ def test_reads_manifest(tmp_path):
     assert report["manifest"]["snapshot_date"] == "2026-05-19"
 
 
+def test_relatorio_leva_so_os_metadados_do_manifest_sem_nomes(tmp_path):
+    """SEG-17: o manifest real traz listas com nomes de pessoas; o relatório (e a saída --json) não as repete."""
+    path = _write_export(tmp_path, {"dat_area": "nome,descricao\nA,d\n"})
+    fp = f"{path}/manifest.json"
+    with open(fp, encoding="utf-8") as f:
+        m = json.load(f)
+    m.update(contrato_versao="v40", pessoas_informadas=["Pessoa Ficticia Um"], caixas_compartilhadas=["Pessoa Dois"])
+    with open(fp, "w", encoding="utf-8") as f:
+        json.dump(m, f)
+
+    report = ExportContractImporter(path=path).run()
+
+    assert report["manifest"] == {"generated_at": "2026-06-02", "snapshot_date": "2026-05-19", "contrato_versao": "v40"}
+    assert "Pessoa" not in json.dumps(report, default=str)
+
+
 # ───────── classificação por entidade (master, baixo risco) ─────────
 def test_classify_dat_area(tmp_path):
     # DATArea não tem campo comparável no export → existência decide create vs skip (sem update).

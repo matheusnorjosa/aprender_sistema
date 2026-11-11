@@ -105,6 +105,13 @@ def test_bom_no_csv_nao_some_com_a_primeira_coluna(tmp_path):
     assert r["contrato_faltando"] == _SEM_FALTA
 
 
+def test_bom_no_cabecalho_nao_vira_coluna_faltando(tmp_path):
+    """Fila do CON-12 (d): a conferência das colunas lê o cabeçalho com utf-8-sig; com BOM, `cpf` não some."""
+    path = _arquivos(tmp_path, {"usuario": "﻿cpf,email,nome_completo\n"})
+    r = ExportContractImporter(path=path).run()
+    assert r["contrato_faltando"] == _SEM_FALTA
+
+
 def test_bom_no_manifest_e_lido(tmp_path):
     path = _arquivos(tmp_path, {"dat_area": "nome,descricao\nA,d\n"})
     manifest = {"snapshot_date": "2026-11-10", "entities": {"dat_area": {"file_csv": "dat_area.csv"}}}

@@ -1225,6 +1225,10 @@ def _marca_da_linha(r: dict[str, str]) -> bool:
     return bool((r.get("external_event_id") or "").strip()) or _to_bool(r.get("na_agenda_google"))
 
 
+# SEG-17: chaves do manifest que entram no relatório; o resto (listas com nomes de pessoas) fica de fora.
+_MANIFEST_NO_RELATORIO = ("snapshot_date", "generated_at", "extraido_em", "contrato_versao", "contrato_subversao")
+
+
 class ExportContractImporter:
     """Importer dry-run-first do export-contract. Veja docstring do módulo."""
 
@@ -2692,7 +2696,8 @@ class ExportContractImporter:
             "apply": self.apply,
             "apply_blocked": apply_blocked,
             "allow": list(self.allow),
-            "manifest": manifest,
+            # SEG-17: o manifest real traz listas com nomes de pessoas; o relatório (e o --json) leva só metadados.
+            "manifest": {k: manifest[k] for k in _MANIFEST_NO_RELATORIO if k in manifest},
             # CON-12: só nomes de arquivo e de coluna; com algo aqui, `applied` fica vazio.
             "contrato_faltando": contrato_faltando,
             "por_entidade": por_entidade,

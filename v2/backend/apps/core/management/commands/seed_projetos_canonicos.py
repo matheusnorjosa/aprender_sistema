@@ -55,7 +55,8 @@ PROJETOS_CANONICOS: list[tuple[str, str]] = [
     # Nome do export (decisão do dono, 06/10/2026): o duplicado "NL e AMMA Português e Matemática" foi apagado.
     ("NL E AMMA PORT E MAT", "SUPER"),
     ("Novo Lendo", "SUPER"),
-    ("Projeto Amma", "SUPER"),
+    # Nome de produção (decisão do dono, 11/11/2026); a canon-key casa com o antigo "Projeto Amma".
+    ("PROJETO AMMA", "SUPER"),
     ("Projeto Amma 1", "SUPER"),
     ("Projeto Amma 2", "SUPER"),
     ("Projeto Catavento 2", "SUPER"),

@@ -191,7 +191,13 @@ class Command(BaseCommand):
             actor=actor,
             gcal_verificado=self._ler_verificado(opts.get("gcal_verificado")),
         )
-        report = importer.run()
+        try:
+            report = importer.run()
+        except ValueError as e:
+            # ISS-1658 (#2210): cadastro com município repetido para a carga; quem roda lê a mensagem, sem traceback.
+            if str(e).startswith("município repetido no cadastro"):
+                raise CommandError(str(e)) from e
+            raise
 
         if opts["json"]:
             self.stdout.write(json.dumps(report, ensure_ascii=False, indent=2))

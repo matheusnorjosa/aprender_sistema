@@ -62,6 +62,7 @@ const ROUTE_TO_MENU_KEY: Record<string, string> = {
   '/mapa-brasil': 'mapa-brasil',
   '/dat/admin': 'dat-admin',
   '/dat/admin/equipe-gerencia': 'dat-importacoes',
+  '/dat/admin/feedbacks': 'dat-feedbacks',
   '/dat/admin/gerencias': 'dat-admin',
   '/dat/admin/produtos': 'dat-admin',
   '/dat/cadastros': 'dat-cadastros',
@@ -91,6 +92,7 @@ const MENU_KEY_TO_PARENT: Record<string, string> = {
   'dat-cadastros': 'dat-submenu',
   'dat-importacoes': 'dat-submenu',
   'dat-registros': 'dat-submenu',
+  'dat-feedbacks': 'dat-submenu',
   'minhas-solicitacoes': 'solicitacoes-submenu',
   'nova-solicitacao': 'solicitacoes-submenu',
   'publicacao-setor': 'solicitacoes-submenu',
@@ -415,6 +417,7 @@ export function AppSidebar({
                   <Menu.Item key="dat-importacoes"><Link to="/dat/importacoes">Importações</Link></Menu.Item>
                 )}
                 <Menu.Item key="dat-registros"><Link to="/dat/registros">Registros de Turmas</Link></Menu.Item>
+                <Menu.Item key="dat-feedbacks"><Link to="/dat/admin/feedbacks">Feedbacks</Link></Menu.Item>
               </SubMenu>
             )}
 

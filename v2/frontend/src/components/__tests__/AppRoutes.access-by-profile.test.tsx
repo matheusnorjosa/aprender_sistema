@@ -7,7 +7,7 @@
  * mensagem precisa ser genérica ("Recurso indisponível" — OWASP: não
  * vazar nome de policy/recurso).
  *
- * 10 atores canônicos × 16 rotas críticas = matriz declarativa.
+ * 10 atores canônicos × 17 rotas críticas = matriz declarativa.
  *
  * Foco: gate de rota. Conteúdo da página é responsabilidade dos testes
  * próprios. Mockamos APIs internas para evitar fetch real.
@@ -70,6 +70,11 @@ vi.mock('../../api/availability', () => ({
   // FiltersBar chama getGerencias ao montar a página mensal; sem este stub a
   // chamada vira unhandled rejection que derruba o processo do vitest (exit 1).
   getGerencias: vi.fn().mockResolvedValue([]),
+}));
+vi.mock('../../api/feedback', () => ({
+  listFeedbacks: vi.fn().mockResolvedValue({ count: 0, next: null, previous: null, results: [] }),
+  exportarFeedbacks: vi.fn(),
+  TIPOS_FEEDBACK: [],
 }));
 vi.mock('../../api/deslocamentos', () => ({
   listDeslocamentos: vi.fn().mockResolvedValue({ count: 0, next: null, previous: null, results: [] }),
@@ -152,6 +157,7 @@ const CRITICAL_ROUTES = [
   '/compras-materiais',
   '/dat/compras-materiais',
   '/dat/admin',
+  '/dat/admin/feedbacks',
   '/dat/importacoes',
 ] as const;
 
@@ -198,6 +204,7 @@ const ACTORS: ActorSnapshot[] = [
       [EDITAR]: true,
       ...COMPRAS,
       '/dat/admin': true,
+      '/dat/admin/feedbacks': true, // Feedbacks (11/11/2026): manage_admin_registries
       // PR 10: o DAT aprova (base 5) e opera a pré-agenda (seção Controle).
       '/solicitacoes/aprovacoes': true,
       '/controle': true,

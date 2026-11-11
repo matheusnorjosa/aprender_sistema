@@ -48,6 +48,7 @@ const AcoesTimelinePage = lazy(() => import('../pages/Controle/AcoesTimelinePage
 const GerenciasPage = lazy(() => import('../pages/AdminDAT/GerenciasPage'));
 const ProdutosPage = lazy(() => import('../pages/AdminDAT/ProdutosPage'));
 const ProjetosGeraisPage = lazy(() => import('../pages/AdminDAT/ProjetosGeraisPage'));
+const FeedbacksPage = lazy(() => import('../pages/AdminDAT/FeedbacksPage'));
 
 function PageLoader(): JSX.Element {
   return (
@@ -149,6 +150,8 @@ export function AppRoutes({ user }: AppRoutesProps): JSX.Element {
         <Route path="/dat/admin/produtos" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ProdutosPage /></RequirePolicy>} />
         <Route path="/dat/admin/projetos-gerais" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ProjetosGeraisPage /></RequirePolicy>} />
         <Route path="/dat/admin/configuracoes" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ConfiguracoesPage /></RequirePolicy>} />
+        {/* Feedback de uso (11/11/2026): lê o superusuário e o DAT, a mesma capacidade da API. */}
+        <Route path="/dat/admin/feedbacks" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><FeedbacksPage /></RequirePolicy>} />
         <Route path="/dat/admin/equipe-gerencia" element={<RequirePolicy allow={podeImportarPelaTela}><EquipeGerenciaImportPage /></RequirePolicy>} />
         <Route path="/dat/cadastros" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><CadastrosPage /></RequirePolicy>} />
         <Route path="/dat/compras-materiais" element={<RequirePolicy policy="view_compras_stats" policies={policies}><DATComprasPage /></RequirePolicy>} />

@@ -21,10 +21,23 @@ from django.db import transaction
 
 import pandas as pd
 
-from apps.core.imports.normalization import normalize_active_flag, normalize_blank, normalize_uf
+from apps.core.imports.normalization import norm_text, normalize_active_flag, normalize_blank, normalize_uf
 from apps.core.imports.row_errors import registrar_erro_import
 from apps.core.models import Municipio
 from apps.core.services.options_cache import invalidate_municipios_options_cache
+
+
+def municipio_com_mesma_chave(nome: str, uf: str, *, excluir_id: int | None = None) -> Municipio | None:
+    """O município já cadastrado com a mesma chave: nome sem acento e sem caixa, UF em caixa alta (ISS-1658).
+
+    É a chave que o importador da virada usa (#2210, que para a carga se ela se repetir). A tela de municípios e
+    o upload passam por aqui para não criar a cópia "Acarau" ao lado de "Acaraú".
+    """
+    alvo = norm_text(nome)
+    for mun in Municipio.objects.filter(uf__iexact=(uf or "").strip()).exclude(pk=excluir_id).order_by("pk"):
+        if norm_text(mun.nome) == alvo:
+            return mun
+    return None
 
 
 def import_municipios_from_file(*, path: str, dry_run: bool = True) -> dict[str, Any]:
@@ -56,6 +69,10 @@ def import_municipios_from_file(*, path: str, dry_run: bool = True) -> dict[str,
     }
 
     rows = _load_file(path)
+    # ISS-1658: índice da chave (nome sem acento e sem caixa, UF) montado uma vez; a linha casa por ele.
+    indice: dict[tuple[str, str], Municipio] = {}
+    for mun in Municipio.objects.order_by("pk"):
+        indice.setdefault((norm_text(mun.nome), (mun.uf or "").upper()), mun)
 
     # ASQ-016: savepoint-per-row. Outer atomic still owns the dry-run
     # rollback; inner atomic isolates one bad row from the rest.
@@ -63,7 +80,7 @@ def import_municipios_from_file(*, path: str, dry_run: bool = True) -> dict[str,
         for idx, row in enumerate(rows, start=1):
             try:
                 with transaction.atomic():  # savepoint
-                    _process_row(row, idx, stats, pendencias)
+                    _process_row(row, idx, stats, pendencias, indice)
             except Exception:
                 stats["skipped"]["other"] += 1
                 pendencias["outros"].append(
@@ -168,6 +185,7 @@ def _process_row(
     linha_num: int,
     stats: dict[str, Any],
     pendencias: dict[str, list[dict[str, Any]]],
+    indice: dict[tuple[str, str], Municipio],
 ) -> None:
     """Processa um registro de municipio."""
     nome = row.get("nome", "").strip()
@@ -185,9 +203,9 @@ def _process_row(
         pendencias["uf_missing"].append({"linha": linha_num, "erro": "UF ausente", "municipio": nome})
         return
 
-    existing = Municipio.objects.filter(nome__iexact=nome, uf=uf).first()
+    existing = indice.get((norm_text(nome), uf))
     if not existing:
-        Municipio.objects.create(
+        indice[(norm_text(nome), uf)] = Municipio.objects.create(
             nome=nome,
             uf=uf,
             ibge_code=ibge_code or None,

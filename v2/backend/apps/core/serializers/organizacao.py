@@ -40,6 +40,27 @@ class MunicipioSerializer(serializers.ModelSerializer):
         fields = ["id", "nome", "uf", "ibge_code", "ativo"]
         read_only_fields = ["id"]
 
+    def validate_uf(self, value: str) -> str:
+        return (value or "").strip().upper()
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        """ISS-1658: recusa a cópia que só muda acento ou caixa (a chave do importador da virada, #2210)."""
+        from apps.core.services.municipios_import import municipio_com_mesma_chave
+
+        instance = getattr(self, "instance", None)
+        nome = attrs.get("nome", getattr(instance, "nome", ""))
+        uf = attrs.get("uf", getattr(instance, "uf", ""))
+        igual = municipio_com_mesma_chave(nome, uf, excluir_id=getattr(instance, "pk", None))
+        if igual is not None:
+            raise serializers.ValidationError(
+                {
+                    "nome": [
+                        f"Já existe o município {igual.nome} - {igual.uf} (mesmo nome, sem contar acento e maiúsculas)."
+                    ]
+                }
+            )
+        return attrs
+
 
 class MunicipioOptionSerializer(serializers.ModelSerializer):
     """

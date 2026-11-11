@@ -33,7 +33,7 @@ ALLOW_PAYLOAD_INVALID = 400
 
 
 # ============================================================================
-# Snapshot literal — 10 atores × 12 recursos
+# Snapshot literal — 10 atores × 14 recursos
 # ============================================================================
 #
 # REGRA:
@@ -202,6 +202,19 @@ EXPECTED_MATRIX: dict[str, dict[str, int]] = {
         "Apoio de Coordenação": DENY,
         "Formador": DENY,
     },
+    # Feedback de uso (11/11/2026): lista e CSV só do superusuário e do DAT (manage_admin_registries).
+    "feedback_leitura": {
+        "Superuser": ALLOW,
+        "DAT": ALLOW,
+        "Controle": DENY,
+        "Diretoria": DENY,
+        "Gerente": DENY,
+        "Gerente da Superintendência": DENY,
+        "Assistente Administrativo do Controle": DENY,
+        "Coordenador": DENY,
+        "Apoio de Coordenação": DENY,
+        "Formador": DENY,
+    },
 }
 
 
@@ -225,10 +238,11 @@ def test_matrix_snapshot_is_unchanged():
     )
 
 
-def test_matrix_resource_count_is_thirteen():
-    """Matriz tem 13 recursos (PR 8 #1313: 8 → 11; import pela tela, 2026-10-02: 12; escrita em gerências, 2026-10-19: 13)."""
-    assert len(ACCESS_MATRIX) == 13, (
-        f"ACCESS_MATRIX tem {len(ACCESS_MATRIX)} recursos; esperado 13. "
+def test_matrix_resource_count_is_fourteen():
+    """Matriz tem 14 recursos (PR 8 #1313: 8 → 11; import pela tela, 2026-10-02: 12; escrita em gerências,
+    2026-10-19: 13; leitura de feedback, 2026-11-11: 14)."""
+    assert len(ACCESS_MATRIX) == 14, (
+        f"ACCESS_MATRIX tem {len(ACCESS_MATRIX)} recursos; esperado 14. "
         "Adicione recurso em RESOURCES + ACCESS_MATRIX + EXPECTED_MATRIX juntos."
     )
 

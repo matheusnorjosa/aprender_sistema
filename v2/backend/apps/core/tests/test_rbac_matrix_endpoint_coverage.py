@@ -71,6 +71,8 @@ MATRIX_ENDPOINT_COVERAGE: dict[str, list[str]] = {
     # gerencias_escrita: POST representa a escrita (mesmo gate em `GerenciaViewSet.get_permissions`);
     # a leitura é `IsAuthenticated`. Método a método em test_gerencias_escrita_so_dat.py.
     "gerencias_escrita": ["/api/gerencias/", "/api/gerencias/<id>/"],
+    # feedback_leitura: GET da lista representa também o CSV (mesmo gate); um a um em test_feedback.py.
+    "feedback_leitura": ["/api/feedback/", "/api/feedback/exportar/"],
 }
 
 

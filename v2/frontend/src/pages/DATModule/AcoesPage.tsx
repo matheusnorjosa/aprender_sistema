@@ -475,7 +475,7 @@ export default function AcoesPage(): JSX.Element {
     {
       title: 'Progresso',
       key: 'progresso',
-      responsive: VISIVEL_A_PARTIR.xxl,
+      responsive: VISIVEL_A_PARTIR.detalhe,
       width: 120,
       render: (_: unknown, record: AcaoRecord) => {
         const progress = calculateProgress(record);

@@ -186,7 +186,9 @@ describe('Gestão de Ações: Observações com a observação da carta, sem Ár
     renderPagina('acoes');
     const linha = await linhaPelaAcao(`Editar: ${ACAO}`);
 
-    expect(cabecalhos()).toContain('Progresso');
+    // DEF-25: a 1.600 px a soma das larguras deixava ~119 px para município, projeto e coordenador;
+    // o Progresso (que repete as 4 etapas da linha) foi para a linha expandida.
+    expect(cabecalhos()).not.toContain('Progresso');
     expect(cabecalhos()).toContain('Observações');
     expect(within(linha).getByText('Carta entregue na secretaria')).toBeInTheDocument();
     expect(cabecalhos()).not.toContain('Área');

@@ -282,7 +282,7 @@ _COLUNAS_OBRIGATORIAS: dict[str, tuple[str, ...]] = {
         "external_event_id",
         "projetos",
     ),
-    "participation": ("evento_id", "role", "usuario_cpf", "match_procedencia", "usuario"),
+    "participation": ("evento_id", "role", "usuario_cpf", "match_procedencia", "usuario", "usuario_email"),
 }
 # O create-only aceita o solicitacao.csv e o participation.csv antigos; só a virada exige as colunas deles.
 _OBRIGATORIAS_SO_NA_VIRADA = frozenset({"solicitacao", "participation"})

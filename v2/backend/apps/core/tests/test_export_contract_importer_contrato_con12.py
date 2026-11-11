@@ -147,7 +147,7 @@ def test_virada_apply_sem_falta_grava(tmp_path, m):
     assert Solicitacao.objects.count() == 1
 
 
-@pytest.mark.parametrize("coluna", ["role", "match_procedencia", "usuario"])
+@pytest.mark.parametrize("coluna", ["role", "match_procedencia", "usuario", "usuario_email"])
 def test_virada_participation_sem_coluna_obrigatoria(tmp_path, m, coluna):
     path = _pacote(tmp_path, part_cols=_sem(_PART_COLS, coluna))
     r = ExportContractImporter(path=path, mode="virada").run()

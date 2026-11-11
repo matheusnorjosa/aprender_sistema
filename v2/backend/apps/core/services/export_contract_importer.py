@@ -1349,7 +1349,7 @@ class ExportContractImporter:
     def _contrato_faltando(self, manifest: dict[str, Any]) -> dict[str, Any]:
         """CON-12: arquivo e coluna obrigatória que faltam no pacote, só com nomes (nenhum valor de linha).
 
-        Arquivo: o declarado em `manifest["entities"][*]["file_csv"]`, o da entidade do `--allow-entity`
+        Arquivo: o manifest.json, o declarado em `manifest["entities"][*]["file_csv"]`, o da entidade do `--allow-entity`
         (`gcal_adocao` lê o solicitacao.csv) e, na virada, solicitacao.csv e participation.csv. Coluna: as de
         `_COLUNAS_OBRIGATORIAS` que não estão no cabeçalho. O VALOR de `contrato_versao` não é conferido."""
         virada = self.mode == "virada"
@@ -1358,6 +1358,8 @@ class ExportContractImporter:
         exigidos = [f"{'solicitacao' if n == 'gcal_adocao' else n}.csv" for n in self.allow]
         if virada:
             exigidos += ["solicitacao.csv", "participation.csv"]
+        # Fila do CON-12 (b): sem o manifest.json (ou com --path errado) o pacote não é reconhecido.
+        exigidos.append("manifest.json")
         arquivos = sorted({a for a in declarados + exigidos if a and not os.path.exists(os.path.join(self.path, a))})
         colunas: dict[str, list[str]] = {}
         for name, obrigatorias in _COLUNAS_OBRIGATORIAS.items():

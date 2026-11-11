@@ -171,6 +171,20 @@ def test_manifest_declara_arquivo_que_nao_existe(tmp_path):
     assert r["contrato_faltando"] == {"arquivos": ["participation.csv"], "colunas": {}}
 
 
+def test_pacote_sem_manifest_e_fora_do_contrato_e_nao_grava(tmp_path):
+    """Fila do CON-12 (b): sem o manifest.json (ou --path errado) o pacote não é reconhecido; antes passava calado."""
+    import os
+
+    path = _arquivos(tmp_path, {"dat_area": "nome,descricao\nArea Sem Manifest,d\n"})
+    os.remove(os.path.join(path, "manifest.json"))
+
+    r = ExportContractImporter(path=path, apply=True, allow=("dat_area",)).run()
+
+    assert r["contrato_faltando"]["arquivos"] == ["manifest.json"]
+    assert r["applied"] == {}
+    assert not DATArea.objects.filter(nome="Area Sem Manifest").exists()
+
+
 def test_allow_entity_sem_o_csv_e_recusado(tmp_path):
     path = _arquivos(tmp_path, {"dat_area": "nome,descricao\nArea Nova,d\n"})
     antes = Usuario.objects.count()

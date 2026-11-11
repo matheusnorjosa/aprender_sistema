@@ -52,7 +52,7 @@ E um cadastro operacional simples (CRUD + import em massa), sem fluxo de aprovac
 
 ### Campos do model
 
-`usuario` (FK `Usuario`, `on_delete=PROTECT`, `related_name="deslocamentos"`), `origem` (CharField 200), `destino` (CharField 200), `start_date` (DateField), `end_date` (DateField), `observacao` (TextField, opcional), `external_hash` (CharField 64, `unique=True`, `db_index`, idempotencia de import), `created_at`, `updated_at`. Indices em `(usuario, start_date, end_date)` e `(external_hash)`.
+`usuario` (FK `Usuario`, `on_delete=PROTECT`, `related_name="deslocamentos"`), `origem` (CharField 200), `destino` (CharField 200), `start_date` (DateField), `end_date` (DateField), `observacao` (TextField, opcional), `meio_transporte` (CharField 20, opcional, choices `Deslocamento.MeioTransporte`: `AVIAO` Avião, `ONIBUS` Ônibus, `CARRO_PROPRIO` Carro próprio, `CARRO_EMPRESA` Carro da empresa, `UBER_TAXI` Uber/Táxi, `OUTRO` Outro; lista aprovada pelo dono em 11/11/2026, migration `0135`; registro antigo e o importado ficam `null`, porque a planilha não tem a coluna e o import não lê o campo; no `DeslocamentoSerializer` valor fora da lista dá 400 e vazio (`""` ou `null`) grava `null`; teste `test_deslocamento_meio_transporte.py`), `external_hash` (CharField 64, `unique=True`, `db_index`, idempotencia de import), `created_at`, `updated_at`. Indices em `(usuario, start_date, end_date)` e `(external_hash)`.
 
 > **Inexistente / nao usar:** nao ha management command de import (so o endpoint DRF). A funcao legada `etl_upsert_deslocamento` **nao existe** no codigo atual — o import passa exclusivamente por `import_deslocamentos_from_file` + `ImportDeslocamentosView`.
 

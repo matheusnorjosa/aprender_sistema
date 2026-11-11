@@ -75,6 +75,7 @@ class DeslocamentoSerializer(serializers.ModelSerializer):
 
     Fields:
         - id, usuario, origem, destino, start_date, end_date, observacao
+        - meio_transporte: opcional (`Deslocamento.MeioTransporte`); vazio grava null (11/11/2026)
         - usuario_nome (read-only): Nome do usuário, ou "Usuario #id" (nunca o login, que é o CPF)
         - pode_editar (read-only): se quem pede pode editar e excluir a linha (a tela só mostra os
           botões aí). Mesma regra de `DeslocamentoViewSet._ensure_owner_or_delegate`.
@@ -104,6 +105,7 @@ class DeslocamentoSerializer(serializers.ModelSerializer):
             "start_date",
             "end_date",
             "observacao",
+            "meio_transporte",
             "external_hash",
             "created_at",
             "updated_at",
@@ -115,6 +117,10 @@ class DeslocamentoSerializer(serializers.ModelSerializer):
             # de delegação (validada em DeslocamentoViewSet.perform_create).
             "usuario": {"required": False},
         }
+
+    def validate_meio_transporte(self, value: str | None) -> str | None:
+        """Vazio ("" ou null) grava null: um só jeito de dizer "sem meio de transporte"."""
+        return value or None
 
     def get_usuario_nome(self, obj: Deslocamento) -> str:
         """Nome do usuário, ou "Usuario #id": nunca o login (CPF)."""

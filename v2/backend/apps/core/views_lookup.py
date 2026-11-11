@@ -294,9 +294,9 @@ class UsuarioLookup(APIView):
     `projeto_id` (PR 9, P9-5): só pessoas da gerência do projeto do evento. Sem ele, as das gerências
     onde quem busca tem papel G/C/A (`scope_usuarios_por_gerencia`).
 
-    `role` aceita vários papéis separados por vírgula (`Formador,Coordenador`): a lista de
+    `role` aceita vários papéis separados por vírgula (`Formador,Coordenador,Gerente`): a lista de
     formadores da Nova Solicitação oferece também os coordenadores do setor (decisão do dono,
-    05/10/2026: coordenador que atua no evento entra como formador). `avaliavel` = função
+    05/10/2026: coordenador que atua no evento entra como formador) e os gerentes (11/11/2026). `avaliavel` = função
     Formador sem a função Coordenador (`filtrar_formadores_avaliaveis`).
 
     PR 5 hardening RBAC (2026-04-30):

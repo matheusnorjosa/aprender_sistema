@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("core", "0134_solicitacao_projeto_2"),
+        ("core", "0135_feedback"),
     ]
 
     operations = [

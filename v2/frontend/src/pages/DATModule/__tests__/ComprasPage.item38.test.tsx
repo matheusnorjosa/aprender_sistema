@@ -163,6 +163,23 @@ describe('Compras sem rolagem horizontal', () => {
     }
   });
 
+  test('a 1700 px (DEF-25): Utilizado e Tipo Compra ficam na linha expandida, não espremem as colunas', async () => {
+    definirLarguraTela(1700);
+    renderPagina();
+    const linha = await linhaPelaAcao(`Editar: ${COMPRA}`);
+
+    const nomes = screen.getAllByRole('columnheader').map((c) => c.textContent?.trim() ?? '');
+    expect(nomes).not.toContain('Utilizado');
+    expect(nomes).not.toContain('Tipo Compra');
+    expect(nomes).toContain('Disponível');
+
+    fireEvent.click(within(linha).getByRole('button', { name: `Expandir linha de ${COMPRA}` }));
+    const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
+    for (const texto of ['Utilizado', 'Tipo Compra', 'Primeira compra']) {
+      expect(expandida.getByText(texto)).toBeInTheDocument();
+    }
+  });
+
   test('a 390 px: só o produto (com projeto e município) e o menu de ações', async () => {
     definirLarguraTela(390);
     const { container } = renderPagina();

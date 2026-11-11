@@ -454,7 +454,7 @@ export default function ComprasPage(): JSX.Element {
       title: 'Utilizado',
       dataIndex: 'quantidade_utilizada',
       key: 'utilizado',
-      responsive: VISIVEL_A_PARTIR.xxl,
+      responsive: VISIVEL_A_PARTIR.detalhe,
       width: 100,
       align: 'right' as const,
       render: (val: number | null) => val?.toLocaleString('pt-BR') || 0,
@@ -499,7 +499,7 @@ export default function ComprasPage(): JSX.Element {
       title: 'Tipo Compra',
       dataIndex: 'tipo_compra',
       key: 'tipo_compra',
-      responsive: VISIVEL_A_PARTIR.xxl,
+      responsive: VISIVEL_A_PARTIR.detalhe,
       render: (tipo: string | null) => renderTipoCompraTag(tipo),
     },
     {

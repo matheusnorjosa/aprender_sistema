@@ -15,6 +15,7 @@ Fixtures sintéticos, sem dado pessoal.
 
 from __future__ import annotations
 
+import io
 import json
 from typing import Any
 
@@ -138,3 +139,18 @@ def test_homonimo_em_outra_uf_e_municipio_sem_uf_seguem_casando(tmp_path):
     assert (seco["would_create"], seco["would_reject"]) == (3, 0)
     assert r["applied"]["plano_formacao"] == 3
     assert set(PlanoFormacoes.objects.values_list("municipio_id", flat=True)) == {ce.pk, pi.pk, sem_uf.pk}
+
+
+def test_comando_mostra_o_municipio_repetido_como_erro_do_comando_e_nao_traceback(tmp_path):
+    """Fila do ISS-1658 (d): quem roda o import_export_contract lê a mensagem, sem o traceback do ValueError."""
+    from django.core.management import call_command
+    from django.core.management.base import CommandError
+
+    a = MunicipioFactory(nome="Acaraú", uf="CE")
+    b = MunicipioFactory(nome="Acarau", uf="CE")
+    path = _plano(tmp_path, "Acarau,CE")
+
+    with pytest.raises(CommandError, match="município repetido") as exc:
+        call_command("import_export_contract", path=path, stdout=io.StringIO())
+
+    assert f"m{a.pk}" in str(exc.value) and f"m{b.pk}" in str(exc.value)

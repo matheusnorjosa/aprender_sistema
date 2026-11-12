@@ -56,6 +56,7 @@ from apps.core.models.dat_cadastro import DATCadastro
 from apps.core.models.dat_compra import DATCompra
 from apps.core.models.dat_coordenador import DATArea, DATCoordenador
 from apps.core.models.dat_registro import DATRegistro
+from apps.core.models.feedback import Feedback
 from apps.core.models.formacao import Formacao
 from apps.core.models.gcal_copia import GCalCopiaCursor
 from apps.core.models.group_classificacao import GroupClassificacao
@@ -132,4 +133,6 @@ __all__ = [
     "RegistroConclusaoAcao",
     "FeriadoLocal",
     "NotificacaoInterna",
+    # Feedback de uso
+    "Feedback",
 ]

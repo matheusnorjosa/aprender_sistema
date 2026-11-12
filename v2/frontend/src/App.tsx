@@ -31,6 +31,7 @@ import { FullscreenLoader } from './components/FullscreenLoader';
 import { AppSidebar } from './components/AppSidebar';
 import { AppHeader } from './components/AppHeader';
 import { AppRoutes } from './components/AppRoutes';
+import { FeedbackButton } from './components/FeedbackButton';
 import { AcessoContext, montarAcesso } from './contexts/AcessoContext';
 import { useResponsive, sidebarSobrepondo } from './hooks/useResponsive';
 import { useGCalAlertsPolling } from './hooks/useGCalAlertsPolling';
@@ -379,6 +380,8 @@ function AppContent(): JSX.Element {
             >
               <AppRoutes user={user} />
             </Content>
+            {/* Fixo no canto inferior direito; dentro do Layout inerte, sai do Tab com a sidebar sobreposta. */}
+            <FeedbackButton />
           </Layout>
         </Layout>
       </AcessoContext.Provider>

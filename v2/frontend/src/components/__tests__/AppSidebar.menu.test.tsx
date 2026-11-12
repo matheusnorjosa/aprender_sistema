@@ -94,7 +94,7 @@ const DASHBOARDS_CHILDREN = [
 
 type DashboardsChild = (typeof DASHBOARDS_CHILDREN)[number];
 
-const DAT_CHILDREN = ['Administração', 'Cadastros', 'Importações', 'Registros de Turmas'] as const;
+const DAT_CHILDREN = ['Administração', 'Cadastros', 'Importações', 'Registros de Turmas', 'Feedbacks'] as const;
 const CONTROLE_CHILDREN = ['Ações', 'Compras', 'Coordenadores', 'Painel de Controle', 'Plano Anual', 'Pré-agenda'] as const;
 const SOLICITACOES_CHILDREN = ['Minhas Solicitações', 'Nova Solicitação', 'Publicar na agenda'] as const;
 
@@ -140,7 +140,8 @@ const ACTORS: ActorSnapshot[] = [
     // Sem Dashboard Geral (view_overview_dashboard é da Diretoria). O seed dá view_map_metrics ao DAT.
     expectedDashboardsChildren: ['Dashboard Compras', 'Dashboard Equipe', 'Dashboard GCal', 'Mapa do Brasil'],
     // Importação pela tela é só do superusuário (decisão do dono, 02/10/2026).
-    expectedDatChildren: ['Administração', 'Cadastros', 'Registros de Turmas'],
+    // Feedbacks (11/11/2026): manage_admin_registries, como o resto do submenu.
+    expectedDatChildren: ['Administração', 'Cadastros', 'Registros de Turmas', 'Feedbacks'],
     expectedControleChildren: TODO_O_CONTROLE,
     // Sem "Publicar na agenda" (é da Apoio de Coordenação, `publish_setor_solicitacao`).
     expectedSolicitacoesChildren: ['Minhas Solicitações', 'Nova Solicitação'],

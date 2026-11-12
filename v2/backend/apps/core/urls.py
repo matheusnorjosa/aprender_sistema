@@ -38,6 +38,7 @@ from .views import (  # ASQ-005: async imports; DAT Module ViewSets; Plano Forma
 )
 
 # Imports de módulos isolados (GAP-001 fix)
+from .views.feedback import FeedbackViewSet
 from .views.me import ChangePasswordView, MeEventsListView, MeExportView, MePoliciesView
 from .views.stats import HomeStatsView
 from .views_auth import csrf_token, login, logout, ping
@@ -146,6 +147,7 @@ router.register(r"dat/plano-formacoes", PlanoFormacoesViewSet, basename="plano-f
 router.register(r"ciclos-acoes", CicloAcoesViewSet, basename="ciclo-acoes")
 router.register(r"acoes-instancia", AcaoInstanciaViewSet, basename="acao-instancia")
 router.register(r"notificacoes-internas", NotificacaoInternaViewSet, basename="notificacao-interna")
+router.register(r"feedback", FeedbackViewSet, basename="feedback")  # botão "Dar feedback" (11/11/2026)
 
 urlpatterns = [
     path("", api_root, name="api-root"),

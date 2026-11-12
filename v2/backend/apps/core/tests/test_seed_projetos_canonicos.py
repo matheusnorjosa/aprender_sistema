@@ -102,3 +102,19 @@ def test_seed_nao_recria_os_duplicados_apagados(g1):
     ProjetoFactory(nome="NL E AMMA PORT E MAT", fluxo="SUPER", gerencia=g1)
     call_command("seed_projetos_canonicos")
     assert not Projeto.objects.filter(nome__in=["Educação Financeira", "NL e AMMA Português e Matemática"]).exists()
+
+
+def test_projeto_amma_com_o_nome_novo():
+    """Decisão do dono (11/11/2026): "Projeto Amma" passou a se chamar "PROJETO AMMA" em produção."""
+    nomes = [n for n, _ in PROJETOS_CANONICOS]
+    assert "PROJETO AMMA" in nomes
+    assert "Projeto Amma" not in nomes
+
+
+@pytest.mark.parametrize("nome_no_banco", ["PROJETO AMMA", "Projeto Amma"])
+def test_seed_nao_duplica_o_projeto_amma(g1, nome_no_banco):
+    """O banco com o nome novo (produção) ou o antigo (dev): o seed casa pela canon-key e não cria outro."""
+    ProjetoFactory(nome=nome_no_banco, fluxo="SUPER", gerencia=g1)
+    call_command("seed_projetos_canonicos")
+    assert Projeto.objects.filter(nome__iexact="projeto amma").count() == 1
+    assert Projeto.objects.filter(nome__iexact="projeto amma").get().nome == nome_no_banco

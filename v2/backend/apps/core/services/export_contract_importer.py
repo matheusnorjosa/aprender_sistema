@@ -29,7 +29,7 @@ import json
 import os
 import re
 import unicodedata
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
@@ -298,6 +298,23 @@ def _norm(s: str) -> str:
     s = unicodedata.normalize("NFKD", (s or "").strip())
     s = "".join(c for c in s if not unicodedata.combining(c))
     return re.sub(r"\s+", " ", s).upper()
+
+
+def _indice_por_nome(linhas: Iterable[tuple[int, str]], prefixo: str, rotulo: str) -> dict[str, int]:
+    """Índice norm(nome) → id de um catálogo cujo `nome` é unique byte a byte. Duas grafias com a mesma chave
+    ('Formação' e 'Formacao') levantam ValueError com as ids, em vez de o último registro vencer calado (ISS-1658 b)."""
+    idx: dict[str, int] = {}
+    repetidos: dict[str, list[int]] = {}
+    for pk, nome in sorted(linhas):
+        key = _norm(nome)
+        if key in idx:
+            repetidos.setdefault(key, [idx[key]]).append(pk)
+        else:
+            idx[key] = pk
+    if repetidos:
+        lista = "; ".join(f"{k} → {', '.join(f'{prefixo}{i}' for i in ids)}" for k, ids in repetidos.items())
+        raise ValueError(f"{rotulo} no cadastro: {lista}; junte as cópias antes do import")
+    return idx
 
 
 def _gerencia_da_linha(setor: str) -> tuple[Gerencia | None, str]:
@@ -1398,8 +1415,14 @@ class ExportContractImporter:
         return projeto_geral_index()  # com os apelidos de família (decisão do dono, 06/10/2026)
 
     def _tipo_evento_index(self) -> dict[str, int]:
-        """Índice norm(nome) → tipo_evento_id (resolver FK de solicitacao por nome do tipo)."""
-        return {_norm(n): tid for tid, n in TipoEvento.objects.values_list("id", "nome")}
+        """Índice norm(nome) → tipo_evento_id (resolver FK de solicitacao por nome do tipo).
+
+        Chave repetida ('Formação' e 'Formacao') levanta ValueError com as ids, como o município (ISS-1658 b)."""
+        return _indice_por_nome(TipoEvento.objects.values_list("id", "nome"), "t", "tipo de evento repetido")
+
+    def _dat_area_index(self) -> dict[str, int]:
+        """Índice norm(nome) → dat_area_id; chave repetida levanta ValueError com as ids (ISS-1658 b)."""
+        return _indice_por_nome(DATArea.objects.values_list("id", "nome"), "a", "área do DAT repetida")
 
     def _resolve_solicitante(self, r: dict[str, str], cpf_idx: dict[str, int]) -> int | None:
         """Pessoa dona do evento (v16.4, RELAY 57), já resolvida pelo sheets em `solicitante_cpf` (cascata
@@ -1496,7 +1519,7 @@ class ExportContractImporter:
         if name == "dat_area":
             # DATArea não tem campo comparável vindo do export (export traz só nome/descricao;
             # 'descricao' não existe no model). → existência decide create vs skip.
-            idx = {_norm(n) for n in DATArea.objects.values_list("nome", flat=True)}
+            idx = self._dat_area_index()
             for r in rows:
                 nome = (r.get("nome") or "").strip()
                 if not nome:
@@ -1648,7 +1671,8 @@ class ExportContractImporter:
             tally["reject_reasons"] = reasons
 
         elif name == "tipo_evento":
-            idx = {_norm(n): {"cor": (c or "")} for n, c in TipoEvento.objects.values_list("nome", "cor")}
+            cor_por_id = dict(TipoEvento.objects.values_list("id", "cor"))
+            idx = {k: {"cor": (cor_por_id[tid] or "")} for k, tid in self._tipo_evento_index().items()}
             for r in rows:
                 nome = (r.get("nome") or "").strip()
                 if not nome:
@@ -2842,12 +2866,15 @@ class ExportContractImporter:
                 created = 0
                 pg_idx = self._projeto_geral_index() if name == "projeto_geral" else {}
                 mun_idx = self._municipio_index() if name == "municipio" else {}
+                # Existe = mesmo índice do classify (sem acento/caixa): 'Formacao' não recria 'Formação' (ISS-1658 b).
+                area_idx = self._dat_area_index() if name == "dat_area" else {}
+                tipo_idx = self._tipo_evento_index() if name == "tipo_evento" else {}
                 for r in self._load(name):
                     nome = (r.get("nome") or "").strip()
                     if not nome:
                         continue
-                    if name == "dat_area" and not DATArea.objects.filter(nome__iexact=nome).exists():
-                        DATArea.objects.create(nome=nome)
+                    if name == "dat_area" and _norm(nome) not in area_idx:
+                        area_idx[_norm(nome)] = DATArea.objects.create(nome=nome).pk
                         created += 1
                     elif name == "municipio":
                         # Existe = mesmo índice do classify (sem acento/caixa): 'Acarau' não recria 'Acaraú'.
@@ -2866,12 +2893,12 @@ class ExportContractImporter:
                         )
                         pg_idx[_norm(nome)] = novo_pg.pk
                         created += 1
-                    elif name == "tipo_evento" and not TipoEvento.objects.filter(nome__iexact=nome).exists():
-                        TipoEvento.objects.create(
+                    elif name == "tipo_evento" and _norm(nome) not in tipo_idx:
+                        tipo_idx[_norm(nome)] = TipoEvento.objects.create(
                             nome=nome,
                             descricao=(r.get("descricao") or ""),
                             cor=(r.get("cor") or ""),
-                        )
+                        ).pk
                         created += 1
                 applied[name] = created
             if {"dat_compra", "dat_registro"} & set(self.allow):

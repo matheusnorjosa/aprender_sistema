@@ -21,6 +21,8 @@ import { apagarAvisoDoLogin, lerAvisoDoLogin } from '../utils/storage';
 
 vi.mock('../components/AppSidebar', () => ({ AppSidebar: () => <div>SIDEBAR</div> }));
 vi.mock('../components/AppHeader', () => ({ AppHeader: () => <div>HEADER</div> }));
+// O afterEach tira todos os globais, inclusive o matchMedia do setup, que o botão de feedback lê.
+vi.mock('../components/FeedbackButton', () => ({ FeedbackButton: () => null }));
 vi.mock('../pages/Auth/LoginPage', () => ({ default: () => <div>LOGIN_PAGE</div> }));
 vi.mock('../hooks/useGCalAlertsPolling', () => ({
   useGCalAlertsPolling: () => ({ alerts: { errors: 0, warnings: 0 } }),

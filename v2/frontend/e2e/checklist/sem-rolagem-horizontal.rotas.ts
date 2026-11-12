@@ -400,6 +400,8 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     estados: [expandida(T.projetoGeral, 'Usa AVALIAR', [360, 768])],
   },
   { path: '/dat/admin/configuracoes', perfil: 'dat', marco: 'Configurações do Sistema' },
+  // Feedback de uso (11/11/2026): o seed não cria feedback; mede os filtros e a tabela vazia.
+  { path: '/dat/admin/feedbacks', perfil: 'dat', marco: 'Feedbacks' },
   // Importação pela tela: só superusuário (decisão do dono, 02/10/2026).
   { path: '/dat/admin/equipe-gerencia', perfil: 'superusuario', marco: 'Importação de Vínculos' },
   {

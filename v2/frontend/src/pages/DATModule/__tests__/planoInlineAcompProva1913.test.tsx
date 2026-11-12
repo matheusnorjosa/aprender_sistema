@@ -90,7 +90,7 @@ describe('#1913: edição inline de Acompanhamento e Prova', () => {
         { timeout: 10000 },
       );
     },
-    25000,
+    60000, // FER-53: no CI com cobertura passa de 25 s; localmente ~11 s
   );
 
   test(
@@ -113,6 +113,6 @@ describe('#1913: edição inline de Acompanhamento e Prova', () => {
         { timeout: 10000 },
       );
     },
-    25000,
+    60000, // FER-53: no CI com cobertura passa de 25 s; localmente ~11 s
   );
 });

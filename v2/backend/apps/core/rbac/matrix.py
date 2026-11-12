@@ -18,7 +18,7 @@ de revisão no PR.
 
 ## Escopo desta primeira versão (decisão stakeholder, opção `c` híbrida)
 
-- **10 atores** (`ACTORS`) × **12 recursos** (`RESOURCES`) = 120 cases parametrizados
+- **10 atores** (`ACTORS`) × **14 recursos** (`RESOURCES`) = 140 cases parametrizados
   (começou com 8 × 8 = 64; o PR 8 e o import pela tela ampliaram)
 - **Sem scope cases** (Coord vs gerência X vs Y) — esses ficam em tests
   dedicados (`test_deslocamento_rbac.py`, `test_availability_monthly_rbac.py`).
@@ -163,6 +163,9 @@ RESOURCES: Final[tuple[ResourceCase, ...]] = (
     # destroy (mesmo gate em `GerenciaViewSet.get_permissions`); método a método em
     # test_gerencias_escrita_so_dat.py. Corpo vazio: o gate aprova e o serializer responde 400.
     ResourceCase("gerencias_escrita", "POST", "/api/gerencias/"),
+    # Feedback de uso (11/11/2026): a leitura representa lista e exportar (mesmo gate em
+    # `FeedbackViewSet.get_permissions`); o envio (POST) é de qualquer pessoa logada.
+    ResourceCase("feedback_leitura", "GET", "/api/feedback/"),
 )
 
 
@@ -370,6 +373,21 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
         GERENTE: DENY,
         GERENTE_SUPER: DENY,
         ASST_ADMIN_CONTROLE: DENY,  # 19/10: idem Controle (vínculo EQUIPE no Controle)
+        COORDENADOR: DENY,
+        APOIO: DENY,
+        FORMADOR: DENY,
+    },
+    #
+    # Feedback de uso (pedido do dono, 11/11/2026): quem lê e exporta é o superusuário e o DAT,
+    # `HasPerm("manage_admin_registries")`, a capacidade das telas de administração do DAT.
+    "feedback_leitura": {
+        SUPERUSER: ALLOW,
+        DAT: ALLOW,  # manage_admin_registries (pacote ADMIN_OPERACIONAL)
+        CONTROLE: DENY,
+        DIRETORIA: DENY,
+        GERENTE: DENY,
+        GERENTE_SUPER: DENY,
+        ASST_ADMIN_CONTROLE: DENY,
         COORDENADOR: DENY,
         APOIO: DENY,
         FORMADOR: DENY,

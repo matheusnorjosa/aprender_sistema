@@ -564,6 +564,8 @@ REST_FRAMEWORK = {
         "change_password": "20/min",
         # OAuth connect (GAP-3): conectar conta Google no /pre-agenda, anti-abuso por usuario.
         "oauth": "10/hour",
+        # Botão "Dar feedback" (11/11/2026): por pessoa, contra envio em rajada.
+        "feedback": "20/hour",
     },
     # Bind throttle identity to the real client behind NUM_PROXIES trusted hops
     # (#1660). Without it, get_ident concatenates the whole X-Forwarded-For chain,
@@ -643,6 +645,7 @@ if ENVIRONMENT == "development":
         "change_password": "200/min",
         # OAuth connect: relaxado em dev/testes (prod usa 10/hour, bloco acima).
         "oauth": "1000/hour",
+        "feedback": "1000/hour",
     }
 
 # ================================================================

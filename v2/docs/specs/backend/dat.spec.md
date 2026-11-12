@@ -20,6 +20,8 @@ sources_of_truth:
   - v2/backend/apps/core/services/dat_registro_split.py
   - v2/backend/apps/core/rbac/matrix.py
   - v2/backend/apps/core/rbac/policies.py
+  - v2/backend/apps/core/views/feedback.py
+  - v2/backend/apps/core/models/feedback.py
 owner: backend
 supersedes:
   - v2/docs/_archive/SPEC_DAT_REGISTROS.md
@@ -97,6 +99,7 @@ Rotas DRF (prefixo `/api/`, registradas em [`urls.py`](../../../backend/apps/cor
 | Registros (turmas) | `dat/registros/` | `DATRegistroViewSet` | `@action export(CSV) / stats`; filtro por `ano` + ordenação por `ano`/`municipio__nome`/`projeto__nome` (default `["municipio__nome","projeto__nome","ano"]`, #1996) |
 | Projetos Gerais | `projetos-gerais/` | `ProjetoGeralViewSet` | `@action projetos`; `projetos_count` (ativos) só na leitura: a escrita trava a linha (`LockOnWriteMixin`) e o PostgreSQL recusa FOR UPDATE com GROUP BY |
 | Ações DAT (legacy) | `dat/acoes/` | `DATAcoesListCreateView` | model `AcaoDAT` |
+| Feedback de uso | `feedback/` | `FeedbackViewSet` (`views/feedback.py`) | `POST` de qualquer pessoa logada; `GET` (lista) e `@action exportar` (CSV) do superusuário e do DAT |
 
 **RBAC (idioma `permission_classes=[HasPerm("codename")]`; ver [rbac.spec](rbac.spec.md)):**
 
@@ -111,8 +114,11 @@ Rotas DRF (prefixo `/api/`, registradas em [`urls.py`](../../../backend/apps/cor
 | `DATCadastroViewSet` | só `manage_admin_registries` | `execute_restricted_operations` | `DATCadastroViewSet.get_permissions` (`dat_module.py`) |
 | `DATRegistroViewSet` | só `manage_admin_registries` | `execute_restricted_operations` | `DATRegistroViewSet.get_permissions` (`dat.py`) |
 | `ProjetoGeralViewSet` | `list`/`retrieve`/`projetos` → `IsAuthenticated`; resto → `manage_admin_registries` | `execute_restricted_operations` | `ProjetoGeralViewSet.get_permissions` (`dat.py`) |
+| `FeedbackViewSet` | `create` → `IsAuthenticated`; `list`/`exportar` → `manage_admin_registries` | — (sem update nem destroy) | `FeedbackViewSet.get_permissions` (`feedback.py`) |
 
 Notas: a composition OR do #1220 vale só para Coordenador/Ação. Em Compras, a Policy `CanViewComprasStats` (#1233) governa o **CRUD inteiro**, não apenas a action `stats` — mantém paridade de capabilities com a OR anterior, mas o nome sugere escopo menor do que o real. Ver [`rbac/policies.py`](../../../backend/apps/core/rbac/policies.py) e [`rbac/matrix.py`](../../../backend/apps/core/rbac/matrix.py).
+
+**Feedback de uso (pedido do dono, 11/11/2026).** `Feedback` (`models/feedback.py`, migration `0135`) guarda quem enviou (`usuario`, FK `SET_NULL`), `nota` (1 a 5, `CheckConstraint` no banco), `tipo` (`ELOGIO`, `PROBLEMA`, `SUGESTAO`, `DUVIDA`), `comentario` (opcional, até 2.000 caracteres no serializer), `pagina` (a rota da tela: tem de começar por `/`, perde query string e âncora e é cortada em 200) e `created_at`. Não guarda user-agent, IP nem e-mail. O `POST /api/feedback/` grava `usuario=request.user` (o do corpo é ignorado), com throttle `feedback` por pessoa (20/h em produção). A lista (`GET /api/feedback/`, paginada, mais recentes primeiro) e o CSV (`GET /api/feedback/exportar/`, BOM UTF-8, `sanitize_csv_value`, throttle `export`) aceitam `tipo`, `nota`, `desde` e `ate` (dias de Fortaleza, inclusivos) e são só de quem tem `manage_admin_registries` (o superusuário e o DAT, pelo pacote `ADMIN_OPERACIONAL`; o Controle não). A pessoa aparece pelo nome (`str(usuario)`, nunca CPF nem login; "Usuário removido" se a conta saiu). Matriz viva: recurso `feedback_leitura` (D31 em [`rbac_authorization_matrix.md`](../../rbac_authorization_matrix.md)). Tela: `/dat/admin/feedbacks` ([pages.spec.md](../frontend/pages.spec.md)).
 
 ## Fluxos principais
 
@@ -138,6 +144,7 @@ Notas: a composition OR do #1220 vale só para Coordenador/Ação. Em Compras, a
 - [`tests/test_controle_dat_api.py`](../../../backend/apps/core/tests/test_controle_dat_api.py) — RBAC e filtros de `/api/dat/acoes/` (legacy `AcaoDAT`).
 - [`tests/test_dat_tipo_acao_choices.py`](../../../backend/apps/core/tests/test_dat_tipo_acao_choices.py) — choices/normalização de `TipoAcaoDAT` + data migration `0057`.
 - [`tests/test_etl_dat_cadastros.py`](../../../backend/apps/core/tests/test_etl_dat_cadastros.py) — import legacy idempotente.
+- [`tests/test_feedback.py`](../../../backend/apps/core/tests/test_feedback.py) — feedback de uso: envio, validação, quem lê, filtros e CSV sem CPF.
 - [`tests/test_imports_pela_tela_so_superusuario.py`](../../../backend/apps/core/tests/test_imports_pela_tela_so_superusuario.py) — import pela tela só para superusuário (o DAT recebe 403).
 
 ## Pontos de atenção / dívidas conhecidas

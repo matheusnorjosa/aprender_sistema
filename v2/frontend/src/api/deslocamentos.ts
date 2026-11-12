@@ -33,7 +33,12 @@ export interface DeslocamentoRecord {
   start_date: string; // ISO 8601 date
   end_date: string; // ISO 8601 date
   observacao?: string;
+  /** Opcional; `null` em registro antigo ou importado (a planilha não tem a coluna). */
+  meio_transporte: MeioTransporte | null;
 }
+
+/** Valores de `Deslocamento.MeioTransporte` (lista aprovada pelo dono, 11/11/2026). */
+export type MeioTransporte = 'AVIAO' | 'ONIBUS' | 'CARRO_PROPRIO' | 'CARRO_EMPRESA' | 'UBER_TAXI' | 'OUTRO';
 
 /**
  * Formador elegível para o select, já filtrado pela gerência do usuário logado.
@@ -71,6 +76,7 @@ export interface DeslocamentoPayload {
   start_date: string; // YYYY-MM-DD
   end_date: string; // YYYY-MM-DD
   observacao?: string;
+  meio_transporte?: MeioTransporte | null;
 }
 
 /**

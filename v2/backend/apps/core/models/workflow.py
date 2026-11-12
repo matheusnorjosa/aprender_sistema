@@ -35,7 +35,25 @@ class Deslocamento(models.Model):
     destino = models.CharField(max_length=200, help_text="Municipio/local de destino")
     start_date = models.DateField(help_text="Data de inicio do deslocamento")
     end_date = models.DateField(help_text="Data de fim do deslocamento")
+
+    class MeioTransporte(models.TextChoices):
+        """Meio de transporte (lista aprovada pelo dono, 11/11/2026)."""
+
+        AVIAO = "AVIAO", "Avião"
+        ONIBUS = "ONIBUS", "Ônibus"
+        CARRO_PROPRIO = "CARRO_PROPRIO", "Carro próprio"
+        CARRO_EMPRESA = "CARRO_EMPRESA", "Carro da empresa"
+        UBER_TAXI = "UBER_TAXI", "Uber/Táxi"
+        OUTRO = "OUTRO", "Outro"
+
     observacao = models.TextField(null=True, blank=True, help_text="Observacoes sobre o deslocamento")
+    meio_transporte = models.CharField(
+        max_length=20,
+        choices=MeioTransporte.choices,
+        null=True,
+        blank=True,
+        help_text="Meio de transporte; vazio em registro antigo ou importado (a planilha não tem a coluna)",
+    )
     external_hash = models.CharField(
         max_length=64,
         unique=True,

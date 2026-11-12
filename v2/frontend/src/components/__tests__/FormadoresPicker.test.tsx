@@ -20,9 +20,9 @@ describe('FormadoresPicker — projeto do evento no lookup (PR 9)', () => {
     render(<FormadoresPicker value={[]} onChange={vi.fn()} projetoId={123} />);
     const campo = screen.getByRole('combobox');
     fireEvent.focus(campo);
-    await waitFor(() => expect(lookupUsuariosMock).toHaveBeenCalledWith('', 'Formador,Coordenador', 123));
+    await waitFor(() => expect(lookupUsuariosMock).toHaveBeenCalledWith('', 'Formador,Coordenador,Gerente', 123));
     fireEvent.change(campo, { target: { value: 'an' } });
-    await waitFor(() => expect(lookupUsuariosMock).toHaveBeenCalledWith('an', 'Formador,Coordenador', 123));
+    await waitFor(() => expect(lookupUsuariosMock).toHaveBeenCalledWith('an', 'Formador,Coordenador,Gerente', 123));
   });
 
   test('cada formador escolhido tem um botão "Remover" que o teclado alcança', () => {

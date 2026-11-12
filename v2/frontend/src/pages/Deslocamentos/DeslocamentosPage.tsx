@@ -18,8 +18,8 @@
  *
  * Sem rolagem horizontal (G30, padrão responsivo): ResponsiveTable. Sempre na linha o formador e
  * as ações (AcoesLinha; no celular, o menu "Mais ações"); Data Início sobe a partir de sm, Destino
- * e Data Fim de md, Origem de lg e a Observação (texto longo) só de xxl. O que some vai para a
- * linha expandida.
+ * e Data Fim de md, Origem de lg e o Meio de transporte e a Observação (texto longo) só de xxl. O
+ * que some vai para a linha expandida.
  */
 
 import { useState, useEffect, useCallback, useRef, ChangeEvent, JSX } from 'react';
@@ -56,6 +56,7 @@ import {
   updateDeslocamento,
   deleteDeslocamento,
   type DeslocamentoRecord,
+  type MeioTransporte,
   type DeslocamentoFilters as FiltersType,
   type FormadorOption as UsuarioOptionType,
 } from '../../api/deslocamentos';
@@ -71,6 +72,16 @@ const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 const { TextArea } = Input;
 
+/** Meio de transporte: opções do Select e rótulo da lista, na ordem do dono (11/11/2026). */
+const MEIOS_TRANSPORTE: { value: MeioTransporte; label: string }[] = [
+  { value: 'AVIAO', label: 'Avião' },
+  { value: 'ONIBUS', label: 'Ônibus' },
+  { value: 'CARRO_PROPRIO', label: 'Carro próprio' },
+  { value: 'CARRO_EMPRESA', label: 'Carro da empresa' },
+  { value: 'UBER_TAXI', label: 'Uber/Táxi' },
+  { value: 'OUTRO', label: 'Outro' },
+];
+
 /** Form values type */
 /** Quem a linha representa: nomeia o expandir e as ações ("Editar: deslocamento de Maria em 10/11/2026"). */
 function nomeDoDeslocamento(registro: DeslocamentoRecord): string {
@@ -84,6 +95,7 @@ interface FormValuesType {
   start_date: Dayjs;
   end_date: Dayjs;
   observacao?: string;
+  meio_transporte?: MeioTransporte | undefined;
 }
 
 export default function DeslocamentosPage(): JSX.Element {
@@ -213,6 +225,7 @@ export default function DeslocamentosPage(): JSX.Element {
       start_date: dayjs(record.start_date),
       end_date: dayjs(record.end_date),
       observacao: record.observacao || '',
+      meio_transporte: record.meio_transporte ?? undefined,
     });
     setModalVisible(true);
   };
@@ -230,6 +243,7 @@ export default function DeslocamentosPage(): JSX.Element {
         start_date: values.start_date.format('YYYY-MM-DD'),
         end_date: values.end_date.format('YYYY-MM-DD'),
         observacao: values.observacao || '',
+        meio_transporte: values.meio_transporte ?? null,
       };
 
       if (modalMode === 'create') {
@@ -311,6 +325,14 @@ export default function DeslocamentosPage(): JSX.Element {
       responsive: VISIVEL_A_PARTIR.md,
       width: 112,
       render: (_, record) => dayjs(record.end_date).format('DD/MM/YYYY'),
+    },
+    {
+      title: 'Meio de transporte',
+      dataIndex: 'meio_transporte',
+      key: 'meio_transporte',
+      responsive: VISIVEL_A_PARTIR.xxl,
+      ellipsis: true,
+      render: (_, record) => MEIOS_TRANSPORTE.find((m) => m.value === record.meio_transporte)?.label ?? '-',
     },
     {
       title: 'Observação',
@@ -528,6 +550,10 @@ export default function DeslocamentosPage(): JSX.Element {
               </Form.Item>
             </Col>
           </Row>
+
+          <Form.Item name="meio_transporte" label="Meio de transporte">
+            <Select placeholder="Selecione (opcional)" allowClear options={MEIOS_TRANSPORTE} />
+          </Form.Item>
 
           <Form.Item
             name="observacao"

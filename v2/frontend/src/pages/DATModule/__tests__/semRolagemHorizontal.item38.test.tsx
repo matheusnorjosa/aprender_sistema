@@ -110,15 +110,16 @@ function semLarguraForcada(container: HTMLElement): void {
 }
 
 describe('Gestão de Ações sem rolagem horizontal', () => {
-  test('a 1280 px: o fluxo e o coordenador na linha, sem coluna fixa nem largura forçada', async () => {
+  test('a 1280 px (DEF-25): o fluxo na linha e o coordenador na linha expandida, sem largura forçada', async () => {
     const { container } = renderPagina('acoes');
     const linha = await linhaPelaAcao(`Editar: ${ACAO}`);
 
+    // A soma das larguras fixas (Coleção, 4 etapas, ações) deixava 64 a 103 px entre 992 e 1.599 px para
+    // município, projeto e coordenador; sem o coordenador, os dois que ficam têm 96 a 155 px.
     expect(cabecalhos()).toEqual([
       'Município - UF',
       'Projeto',
       'Coleção',
-      'Coordenador',
       'Carta',
       'Contato',
       'Reunião',
@@ -127,6 +128,10 @@ describe('Gestão de Ações sem rolagem horizontal', () => {
     ]);
     expect(within(linha).getByRole('button', { name: `Excluir: ${ACAO}` })).toBeInTheDocument();
     semLarguraForcada(container);
+
+    fireEvent.click(within(linha).getByRole('button', { name: `Expandir linha de ${ACAO}` }));
+    const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
+    expect(expandida.getByText('Josefa Coordenadora')).toBeInTheDocument();
   });
 
   test('a 1280 px: a Coleção fica na linha e ordena (o "reagrupar por família", #1897)', async () => {
@@ -189,6 +194,7 @@ describe('Gestão de Ações: Observações com a observação da carta, sem Ár
     // DEF-25: a 1.600 px a soma das larguras deixava ~119 px para município, projeto e coordenador;
     // o Progresso (que repete as 4 etapas da linha) foi para a linha expandida.
     expect(cabecalhos()).not.toContain('Progresso');
+    expect(cabecalhos()).toContain('Coordenador'); // DEF-25: volta à linha a partir de 1.600 px
     expect(cabecalhos()).toContain('Observações');
     expect(within(linha).getByText('Carta entregue na secretaria')).toBeInTheDocument();
     expect(cabecalhos()).not.toContain('Área');

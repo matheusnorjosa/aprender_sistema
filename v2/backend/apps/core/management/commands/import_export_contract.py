@@ -59,6 +59,13 @@ if TYPE_CHECKING:
     from argparse import ArgumentParser
 
 # Contagens do lote E2 (produto e ligação das compras), impressas quando não são zero.
+# Mensagens do importador para cadastro com chave repetida (ISS-1658): viram CommandError, sem traceback.
+_CADASTRO_REPETIDO = (
+    "município repetido no cadastro",
+    "tipo de evento repetido no cadastro",
+    "área do DAT repetida no cadastro",
+)
+
 _CONTADORES_DO_PRODUTO = (
     "erp_ja_no_banco",
     "gemeo_no_catalogo",
@@ -194,8 +201,9 @@ class Command(BaseCommand):
         try:
             report = importer.run()
         except ValueError as e:
-            # ISS-1658 (#2210): cadastro com município repetido para a carga; quem roda lê a mensagem, sem traceback.
-            if str(e).startswith("município repetido no cadastro"):
+            # ISS-1658 (#2210): cadastro com chave repetida (município, tipo de evento, área do DAT) para a carga;
+            # quem roda lê a mensagem, sem traceback.
+            if str(e).startswith(_CADASTRO_REPETIDO):
                 raise CommandError(str(e)) from e
             raise
 

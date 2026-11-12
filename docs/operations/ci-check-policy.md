@@ -15,12 +15,18 @@ sozinho **não** diz como o check bloqueia o merge — há três mecanismos (col
 **Enforcement**):
 
 - **ruleset (direto)** — listado nos `required_status_checks` do ruleset `Protect main`.
-  Só vale para checks **sempre-reportantes** (sem `if:`/`paths` que os pulem), senão o
-  merge fica *pending* eterno.
-- **via agregador `[required] tests`** — jobs **condicionais** de backend (rodam só com
-  `backend_changed`; ficam `skipped` fora disso). NÃO entram direto no ruleset (o `skipped`
-  travaria PR sem impacto backend); são enforçados pelo `needs` + assert do agregador, que
-  **sempre reporta** (`if: always()`).
+  Só vale para checks **sempre-reportantes**, em job simples (sem `matrix`, sem `uses:` de
+  workflow reutilizável) de workflow sem `paths` no `pull_request`. Workflow pulado por
+  `paths` deixa o check *pending* eterno; job com `matrix` publica `nome (valor)` e o context
+  exigido nunca chega. Já job pulado por `if:` conta como **sucesso** para o GitHub: o risco
+  aí é passar sem rodar.
+- **via agregador** — o job do ruleset é um agregador com `needs` + assert e `if: always()`
+  (**sempre reporta**), que só passa quando cada job agregado deu o resultado esperado.
+  - `[required] tests` agrega os jobs **condicionais** de backend (rodam só com
+    `backend_changed`; fora disso o assert exige `skipped`).
+  - `[required] build/lint do frontend` agrega `frontend lint e build` e as 6 partes do
+    Vitest (`frontend unit (parte N/6)`), e aplica o piso de cobertura na junção.
+  - `[required] checklist tests (meta, a11y, security)` agrega as 3 partes do checklist.
 - **path-filtered — exceção** — jobs com `paths:` no gatilho de `pull_request` não reportam
   em PR fora dos paths → não entram no ruleset sem antes remover o `paths` (ver exceções abaixo).
 
@@ -34,9 +40,12 @@ sozinho **não** diz como o check bloqueia o merge — há três mecanismos (col
 | `[required] backend typecheck (pyright)` | `ci.yaml` | via agregador `[required] tests` |
 | `[required] docker parity (backend)` | `ci.yaml` | via agregador `[required] tests` |
 | `[required] backend migrate-integrity` | `ci.yaml` | via agregador `[required] tests` |
-| `[required] build/lint do frontend` | `frontend-ci.yml` | ruleset (direto) |
+| `[required] build/lint do frontend` | `frontend-ci.yml` (agregador do lint/build e das partes do Vitest) | ruleset (direto) |
+| `[required] frontend lint e build` | `frontend-ci.yml` | via agregador `[required] build/lint do frontend` |
+| `[required] frontend unit (parte N/6)` | `frontend-ci.yml` (matrix) | via agregador `[required] build/lint do frontend` |
 | `[required] react doctor quality gate` | `frontend-ci.yml` | ruleset (direto) |
-| `[required] checklist tests (meta, a11y, security)` | `frontend-ci.yml` | ruleset (direto) |
+| `[required] checklist tests (meta, a11y, security)` | `frontend-ci.yml` (agregador das partes) | ruleset (direto) |
+| `[required] checklist (parte N/3)` | `frontend-ci.yml` (matrix) | via agregador `[required] checklist tests (meta, a11y, security)` |
 | `[required] dependency review` | `dependency-review-scorecard.yml` | ruleset (direto) |
 | `[required] Python Dependencies` | `security-scan.yml` | ruleset (direto) |
 | `[required] Frontend Dependencies` | `security-scan.yml` | ruleset (direto) |
@@ -101,9 +110,11 @@ Executados por `schedule` ou `workflow_dispatch`:
 ## Regras de governança
 
 - Todo novo check de PR deve ser classificado como `required` ou `info` no próprio nome.
-- Só checks `required` **sempre-reportantes** entram direto no ruleset. Condicionais de
-  backend (rodam com `backend_changed`) são enforçados pelo agregador `[required] tests`
-  (`needs` + assert); nunca vão direto ao ruleset (o `skipped` travaria PR sem impacto backend).
+- Só checks `required` **sempre-reportantes**, em job simples, entram direto no ruleset.
+  Condicionais de backend (rodam com `backend_changed`) são enforçados pelo agregador
+  `[required] tests` (`needs` + assert); nunca vão direto ao ruleset (pulado por `if:` conta
+  como sucesso e deixaria passar sem rodar). Jobs com `matrix` (as partes do frontend) também
+  só valem por um agregador com `if: always()` que confere o `result` de cada um.
 - Workflow que publica check `required` não deve usar `paths` no gatilho de `pull_request`
   (senão o check não reporta em PR fora dos paths e o ruleset fica *pending* eterno).
 - Checks `info` podem usar `continue-on-error`, com artifact/log para análise posterior.

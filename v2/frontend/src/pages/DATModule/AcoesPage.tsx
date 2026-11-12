@@ -381,7 +381,9 @@ export default function AcoesPage(): JSX.Element {
       title: 'Coordenador',
       dataIndex: 'coordenador_nome',
       key: 'coordenador',
-      responsive: VISIVEL_A_PARTIR.md,
+      // DEF-25: entre 992 e 1.599 px a soma das larguras fixas deixava 64 a 103 px por coluna sem largura;
+      // o coordenador vai para a linha expandida até 1.600 px e o município e o projeto respiram.
+      responsive: VISIVEL_A_PARTIR.xxl,
       ellipsis: true,
     },
     {

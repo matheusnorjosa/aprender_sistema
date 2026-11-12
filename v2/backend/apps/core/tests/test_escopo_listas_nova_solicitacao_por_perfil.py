@@ -113,7 +113,7 @@ _PERFIS = [
 @pytest.mark.parametrize(("perfil", "so_o_setor", "_cria"), _PERFIS)
 def test_listas_oferecidas(mundo, perfil, so_o_setor, _cria):
     user = mundo["perfis"][perfil]
-    formadores = _ids_oferecidos(user, "Formador,Coordenador")
+    formadores = _ids_oferecidos(user, "Formador,Coordenador,Gerente")
     responsaveis = _ids_oferecidos(user, "Coordenador")
     if so_o_setor is None:
         assert formadores is None and responsaveis is None, "perfil sem acesso às listas da Nova Solicitação"

@@ -50,7 +50,7 @@ vi.mock('../../../api/datModule', () => ({
 import ComprasPage from '../ComprasPage';
 
 // Tela pesada (AntD + filtros + tabela + modal): na CI passa dos 5 s padrão.
-vi.setConfig({ testTimeout: 30_000 });
+vi.setConfig({ testTimeout: 60_000 }); // FER-53: estourava 30 s no CI com cobertura
 
 const DAT = ['view_compras_stats', 'access_controle_section', 'run_daily_operations', 'execute_restricted_operations'];
 

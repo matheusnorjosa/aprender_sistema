@@ -112,6 +112,14 @@ async function networkFirstWithCache(request) {
       return cached;
     }
 
+    // DEF-27: abrir uma página sem conexão mostra a página amigável, não o JSON da API.
+    if (request.mode === 'navigate') {
+      const paginaOffline = await caches.match('/offline.html');
+      if (paginaOffline) {
+        return paginaOffline;
+      }
+    }
+
     // Return offline JSON response for API requests
     return new Response(
       JSON.stringify({

@@ -491,7 +491,8 @@ class TestGcalSyncRetryTask:
         assert resultado["action"] == "ERROR"
         assert resultado["error"] == "Google fora do ar"
         assert any(
-            r.exc_info and isinstance(r.exc_info[1], DatabaseError) for r in caplog.records
+            r.name == "apps.core.tasks" and r.exc_info and isinstance(r.exc_info[1], DatabaseError)
+            for r in caplog.records
         ), "a falha do registro não foi para o log"
 
     def test_retry_com_breaker_aberto_desfaz_a_gravacao_parcial_e_pede_nova_tentativa(self, retry_solicitacao):
@@ -532,7 +533,7 @@ def _rodar_e_guardar_os_atomics(chamar_task, alvo, resposta):
     blocos = {}
 
     def espiar(execute, sql, params, many, context):
-        if _travou_a_solicitacao([{"sql": sql}]):
+        if "google" not in blocos and _travou_a_solicitacao([{"sql": sql}]):
             blocos["trava"] = list(connection.atomic_blocks)
             blocos["trava_sids"] = list(connection.savepoint_ids)
         return execute(sql, params, many, context)
@@ -598,6 +599,9 @@ class TestTravaDuraAChamadaAoGoogle:
         ), "o atomic da trava fechou antes da chamada ao Google"
         assert blocos["travou_antes"], "a task chamou o Google antes de travar a linha"
         ate_o_savepoint_da_task = len(fora_sids) + 1
+        assert (
+            len(blocos["trava_sids"]) >= ate_o_savepoint_da_task
+        ), "sem savepoint da task: a comparação não prova nada"
         assert (
             blocos["google_sids"][:ate_o_savepoint_da_task] == blocos["trava_sids"][:ate_o_savepoint_da_task]
         ), "a chamada ao Google rodou num outro bloco aberto pelo mesmo Atomic"

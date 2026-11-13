@@ -1065,25 +1065,53 @@ def queue_gcal_sync_retry(
 
     # Circuit is closed or half-open, attempt sync
     try:
-        s = Solicitacao.objects.get(id=solicitation_id)
+        from django.db import transaction
 
-        from apps.core.services.gcal_sync_service import apply_one_solicitacao
+        # ART-01: lock de linha + atomic, como o publish e o cancel (#1726): a trava dura a chamada ao
+        # Google, e o `except` fica FORA deste bloco. Se a tentativa falha, o rollback deixa a linha como
+        # o publish a deixou, e o except não remarca ERROR (o do publish remarca): fora da trava, a marca
+        # poderia apagar o PUBLISHED de um publish concorrente.
+        with transaction.atomic():
+            # A prévia não escreve na linha: sem lock, como no publish.
+            qs = Solicitacao.objects.all() if dry_run else Solicitacao.objects.select_for_update()
+            s = qs.get(id=solicitation_id)
 
-        outcome = apply_one_solicitacao(s, dry_run=dry_run, apply_blocked=apply_blocked)
-
-        # Log successful retry
-        if not dry_run:
-            AuditLog.objects.create(
-                usuario=None,
-                action=AuditLog.Action.GCAL_RETRY_SUCCESS,
-                model_name="Solicitacao",
-                details={
-                    "solicitacao_id": s.id,
-                    "action": outcome.action,
-                    "external_event_id": outcome.external_event_id,
+            # O publish que caiu no breaker enfileirou esta tentativa e deixou a linha em ERROR. Outro
+            # estado, lido sob a trava, quer dizer que alguém agiu depois: NONE = tiraram do Google (seguir
+            # traria o evento de volta), PUBLISHED = outro publish já fez, PENDING = há publish ou cancel
+            # mais novo na fila. A tentativa então não chama o Google.
+            if s.gcal_status != Solicitacao.GCalStatus.ERROR:
+                logger.info(
+                    "queue_gcal_sync_retry: Solicitacao #%s mudou desde a falha (gcal_status=%s); nada a fazer",
+                    s.id,
+                    s.gcal_status,
+                )
+                return {
+                    "action": "SKIP",
+                    "solicitation_id": s.id,
+                    "external_event_id": s.external_event_id,
+                    "summary": f"Solicitação #{s.id}: mudou desde a falha ({s.gcal_status}), nada a fazer",
                     "retry_attempt": self.request.retries + 1,
-                },
-            )
+                    "error": None,
+                }
+
+            from apps.core.services.gcal_sync_service import apply_one_solicitacao
+
+            outcome = apply_one_solicitacao(s, dry_run=dry_run, apply_blocked=apply_blocked)
+
+            # Log successful retry
+            if not dry_run:
+                AuditLog.objects.create(
+                    usuario=None,
+                    action=AuditLog.Action.GCAL_RETRY_SUCCESS,
+                    model_name="Solicitacao",
+                    details={
+                        "solicitacao_id": s.id,
+                        "action": outcome.action,
+                        "external_event_id": outcome.external_event_id,
+                        "retry_attempt": self.request.retries + 1,
+                    },
+                )
 
         return {
             "action": outcome.action,
@@ -1115,6 +1143,24 @@ def queue_gcal_sync_retry(
 
         # Other errors - log and propagate
         logger.exception(f"Error during GCal retry for #{solicitation_id}")
+        # O rollback desfez a marca que o apply grava; o erro novo fica no AuditLog, que não toca a linha.
+        # Se nem o registro grava (banco fora), a task ainda devolve o ERROR em vez de levantar.
+        if not dry_run:
+            try:
+                AuditLog.objects.create(
+                    usuario=None,
+                    action=AuditLog.Action.PUBLISH_GCAL_ERROR,
+                    model_name="Solicitacao",
+                    details={
+                        "solicitacao_id": solicitation_id,
+                        "operation": "retry",
+                        "error": str(e)[:500],
+                        "dry_run": dry_run,
+                        "apply_blocked": apply_blocked,
+                    },
+                )
+            except Exception:
+                logger.exception("Falha ao registrar o erro da nova tentativa da Solicitacao #%s", solicitation_id)
         return {
             "action": "ERROR",
             "solicitation_id": solicitation_id,

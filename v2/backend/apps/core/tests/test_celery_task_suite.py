@@ -12,6 +12,7 @@ Refs: Issue #846, TESTING_POLICY.md
 from __future__ import annotations
 
 from datetime import timedelta
+from functools import partial
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -281,7 +282,7 @@ class TestGcalSyncRetryTask:
         """A prévia não escreve na linha e não trava, como no publish.
 
         RED (publicacao): antes do ART-01 a task fazia `Solicitacao.objects.get(id=...)` puro, fora de atomic().
-        Este teste só vê o FOR UPDATE no SQL; que a trava dura a chamada ao Google é o teste seguinte.
+        Este teste só vê o FOR UPDATE no SQL; que a trava dura a chamada ao Google é o TestTravaDuraAChamadaAoGoogle.
         """
         from apps.core.tasks import queue_gcal_sync_retry
 
@@ -294,39 +295,25 @@ class TestGcalSyncRetryTask:
         assert resultado["error"] is None
         assert _travou_a_solicitacao(consultas.captured_queries) is not dry_run
 
-    def test_retry_chama_o_google_com_a_linha_ainda_presa(self, retry_solicitacao):
-        """A trava sai dentro do atomic aberto pela task, e o apply (a chamada ao Google) roda ainda nele.
-
-        O teste roda dentro da transação do pytest: ali nenhum FOR UPDATE se solta e o select_for_update nunca
-        levanta. Por isso ele compara a pilha de savepoints. Pega as duas regressões que o teste do SQL não vê
-        (revisão do DEF-16, F1): travar num atomic que fecha antes do apply, e a trava cai antes do Google; e
-        travar fora de atomic, que em produção dá TransactionManagementError em toda tentativa. Um atomic
-        interno em volta do apply continua aceito.
+    def test_retry_confere_o_erro_na_linha_travada(self, retry_solicitacao):
+        """A conferência do ERROR é feita na linha travada (revisão do DEF-16, R2T-1). Simula o cancel que termina
+        entre uma leitura sem trava e o FOR UPDATE: logo antes do SELECT ... FOR UPDATE, a mesma conexão grava o
+        estado que o cancel deixa. Quem conferisse antes da trava veria ERROR e traria o evento de volta ao Google.
         """
         from apps.core.tasks import queue_gcal_sync_retry
 
-        pilhas = {}
-
-        def espiar(execute, sql, params, many, context):
+        def cancel_termina_antes_da_trava(execute, sql, params, many, context):
             if _travou_a_solicitacao([{"sql": sql}]):
-                pilhas["trava"] = list(connection.savepoint_ids)
+                Solicitacao.objects.filter(pk=retry_solicitacao.pk).update(
+                    gcal_status=Solicitacao.GCalStatus.NONE, external_event_id=None
+                )
             return execute(sql, params, many, context)
 
-        def aplicar(s, **_kwargs):
-            pilhas["apply"] = list(connection.savepoint_ids)
-            return _sincronizou(s)
-
-        fora = list(connection.savepoint_ids)
-        with connection.execute_wrapper(espiar), patch(_APPLY, side_effect=aplicar):
+        with connection.execute_wrapper(cancel_termina_antes_da_trava), patch(_APPLY) as aplicar:
             resultado = queue_gcal_sync_retry(retry_solicitacao.id)
 
-        assert resultado["error"] is None
-        assert "trava" in pilhas, "a task não travou a linha"
-        assert len(pilhas["trava"]) > len(fora), "travou fora de um atomic aberto pela task"
-        ate_o_atomic_da_task = len(fora) + 1
-        assert (
-            pilhas["apply"][:ate_o_atomic_da_task] == pilhas["trava"][:ate_o_atomic_da_task]
-        ), "o atomic da trava fechou antes da chamada ao Google"
+        aplicar.assert_not_called()
+        assert resultado["action"] == "SKIP"
 
     @pytest.mark.parametrize(
         "gcal_status, external_event_id",
@@ -483,6 +470,25 @@ class TestGcalSyncRetryTask:
             "apply_blocked": False,
         }
 
+    def test_retry_que_falha_sem_conseguir_registrar_devolve_o_erro(self, retry_solicitacao):
+        """Se o registro da falha também falha (banco fora do ar), a task devolve o ERROR de sempre em vez de
+        levantar (revisão do DEF-16, R2C-6).
+
+        RED: o AuditLog do except não tinha try, e o DatabaseError subia.
+        """
+        from django.db import DatabaseError
+
+        from apps.core.tasks import queue_gcal_sync_retry
+
+        with (
+            patch(_APPLY, side_effect=_grava_e_levanta(RuntimeError("Google fora do ar"))),
+            patch.object(AuditLog.objects, "create", side_effect=DatabaseError("banco fora do ar")),
+        ):
+            resultado = queue_gcal_sync_retry(retry_solicitacao.id)
+
+        assert resultado["action"] == "ERROR"
+        assert resultado["error"] == "Google fora do ar"
+
     def test_retry_com_breaker_aberto_desfaz_a_gravacao_parcial_e_pede_nova_tentativa(self, retry_solicitacao):
         """CircuitBreakerError segue pedindo nova tentativa em 60 s, sem deixar gravação parcial nem registro de
         erro (a tentativa ainda vai rodar de novo).
@@ -508,6 +514,78 @@ class TestGcalSyncRetryTask:
         assert not AuditLog.objects.filter(
             action=AuditLog.Action.PUBLISH_GCAL_ERROR, details__solicitacao_id=retry_solicitacao.id
         ).exists()
+
+
+_CANCEL = "apps.core.services.gcal_sync_service.cancel_solicitacao"
+
+
+def _rodar_e_guardar_os_atomics(chamar_task, alvo, resposta):
+    """Roda a task e guarda a pilha de blocos atomic em dois momentos: no SELECT ... FOR UPDATE da Solicitacao e na
+    chamada ao Google (o alvo do patch). Compara por identidade: um atomic(savepoint=False) entra na pilha de
+    savepoints como None e não se distinguiria de outro (revisão do DEF-16, R2T-5)."""
+    blocos = {}
+
+    def espiar(execute, sql, params, many, context):
+        if _travou_a_solicitacao([{"sql": sql}]):
+            blocos["trava"] = list(connection.atomic_blocks)
+        return execute(sql, params, many, context)
+
+    def chamar_o_google(*_args, **_kwargs):
+        blocos["google"] = list(connection.atomic_blocks)
+        return resposta
+
+    fora = list(connection.atomic_blocks)
+    with connection.execute_wrapper(espiar), patch(alvo, side_effect=chamar_o_google):
+        resultado = chamar_task()
+    return fora, blocos, resultado
+
+
+class TestTravaDuraAChamadaAoGoogle:
+    """#1726 e ART-01: as 3 tasks do Google travam a linha num atomic aberto por elas e chamam o Google ainda dentro
+    dele. O teste roda dentro da transação do pytest, onde nenhum FOR UPDATE se solta e o select_for_update nunca
+    levanta; por isso compara a pilha de blocos atomic. Pega o que o teste do SQL não vê (revisão do DEF-16, F1 e
+    R2T-2): travar num atomic que fecha antes da chamada ao Google, e a trava cai antes dela; e travar fora de atomic,
+    que em produção dá TransactionManagementError. Um atomic interno em volta da chamada continua aceito."""
+
+    @pytest.mark.parametrize("task", ["publish", "cancel", "retry"])
+    def test_a_chamada_ao_google_roda_no_atomic_que_travou_a_linha(self, task_solicitacao, task):
+        from apps.core.services.gcal.sync import SyncOutcome
+        from apps.core.tasks import (
+            queue_gcal_sync_retry,
+            task_cancel_solicitacao_from_gcal,
+            task_publish_solicitacao_to_gcal,
+        )
+
+        sol = task_solicitacao
+        if task == "publish":
+            Solicitacao.objects.filter(pk=sol.pk).update(
+                gcal_status=Solicitacao.GCalStatus.NONE, external_event_id=None
+            )
+            alvo = _APPLY
+            resposta = SyncOutcome(
+                action="CREATE", solicitation_id=sol.id, external_event_id=f"asv2{sol.id}", summary=""
+            )
+            chamar = partial(task_publish_solicitacao_to_gcal, sol.id, dry_run=False)
+        elif task == "cancel":
+            alvo = _CANCEL
+            resposta = SyncOutcome(action="DELETE", solicitation_id=sol.id, external_event_id=None, summary="")
+            chamar = partial(task_cancel_solicitacao_from_gcal, sol.id)
+        else:
+            sol.mark_gcal(status=Solicitacao.GCalStatus.ERROR, payload_hash=None, error=_ERRO_DO_PUBLISH)
+            alvo = _APPLY
+            resposta = _sincronizou(sol)
+            chamar = partial(queue_gcal_sync_retry, sol.id)
+
+        fora, blocos, resultado = _rodar_e_guardar_os_atomics(chamar, alvo, resposta)
+
+        assert resultado["error"] is None
+        assert "trava" in blocos, "a task não travou a linha"
+        assert "google" in blocos, "a task não chamou o Google"
+        assert len(blocos["trava"]) > len(fora), "travou fora de um atomic aberto pela task"
+        ate_o_atomic_da_task = len(fora) + 1
+        assert len(blocos["google"]) >= ate_o_atomic_da_task and all(
+            a is b for a, b in zip(blocos["google"][:ate_o_atomic_da_task], blocos["trava"][:ate_o_atomic_da_task])
+        ), "o atomic da trava fechou antes da chamada ao Google"
 
 
 class TestNotificacoesTask:

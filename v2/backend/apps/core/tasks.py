@@ -1144,19 +1144,23 @@ def queue_gcal_sync_retry(
         # Other errors - log and propagate
         logger.exception(f"Error during GCal retry for #{solicitation_id}")
         # O rollback desfez a marca que o apply grava; o erro novo fica no AuditLog, que não toca a linha.
+        # Se nem o registro grava (banco fora), a task ainda devolve o ERROR em vez de levantar.
         if not dry_run:
-            AuditLog.objects.create(
-                usuario=None,
-                action=AuditLog.Action.PUBLISH_GCAL_ERROR,
-                model_name="Solicitacao",
-                details={
-                    "solicitacao_id": solicitation_id,
-                    "operation": "retry",
-                    "error": str(e)[:500],
-                    "dry_run": dry_run,
-                    "apply_blocked": apply_blocked,
-                },
-            )
+            try:
+                AuditLog.objects.create(
+                    usuario=None,
+                    action=AuditLog.Action.PUBLISH_GCAL_ERROR,
+                    model_name="Solicitacao",
+                    details={
+                        "solicitacao_id": solicitation_id,
+                        "operation": "retry",
+                        "error": str(e)[:500],
+                        "dry_run": dry_run,
+                        "apply_blocked": apply_blocked,
+                    },
+                )
+            except Exception:
+                logger.exception("Falha ao registrar o erro da nova tentativa da Solicitacao #%s", solicitation_id)
         return {
             "action": "ERROR",
             "solicitation_id": solicitation_id,

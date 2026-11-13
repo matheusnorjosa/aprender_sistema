@@ -80,7 +80,7 @@ Espelhada nas `--as-*` de [`index.css`](../frontend/src/index.css).
 
 **Status (tokens AntD, não são a marca):** sucesso `#52c41a` · aviso `#faad14` ·
 erro `#ff4d4f` · info `#1890ff`, com fundos `successBg #f6ffed` / `warningBg #fffbe6` /
-`errorBg #fff2f0`. O **vermelho de erro** é semanticamente reservado — ver seção 4. No tema
+`errorBg #fff2f0` (no tema claro, derivado do red-7: `#ffe8e6`). O **vermelho de erro** é semanticamente reservado — ver seção 4. No tema
 claro o `colorError` não é o `#ff4d4f`, que reprova como texto: é o red-7 `#cf1322` (seção 3).
 
 ---
@@ -152,7 +152,7 @@ botão `danger`, em 19 arquivos (por exemplo o "Sim, excluir" das telas do DAT, 
 Grupos, de Deslocamentos, de Aprovações e da Pré-agenda). O "Excluir" de texto citado acima é
 outro botão: fica no `Modal` em JSX, dentro da árvore, e melhorou; o "Sim, excluir" que ele abre
 não melhorou. Os diálogos de `Modal.useModal` (`CartaoEvento`, `HorarioDoEvento` e `PublicacaoSetorPage`) herdam o tema e
-estão certos. O conserto do código é item à parte: `ConfigProvider.config({ holderRender })` com
+estão certos. O conserto do código é o item DEF-33 do quadro da liberação: `ConfigProvider.config({ holderRender })` com
 o tema ativo, ou migrar para `Modal.useModal`, também troca o azul `#1677ff` do botão primário
 desses diálogos pelo verde da marca. Contagem: buscar `Modal.(confirm|info|error|warning)({` em
 `src` e olhar quais têm `okType: 'danger'` ou `danger: true`.

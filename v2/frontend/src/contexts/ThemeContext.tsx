@@ -191,6 +191,14 @@ export function ThemeProvider({ children }: ThemeProviderProps): JSX.Element {
         iconSize: 16,
         collapsedIconSize: 16,
       },
+      // A11y (WCAG AA, DEF-28): o hover que o AntD deriva do red-7 (#db373f) dá 3,87:1 no fundo rosado
+      // do botão danger de texto ("Excluir" dos modais) e 4,04:1 na página; pressionado, 1,96:1. Hover
+      // entre o red-7 e o red-8 (o pressionado segue no red-8, #a8071a): 5,77:1 no rosado, 6,02:1 na
+      // página e 6,75:1 com texto branco. Fundo do pressionado no red-2: 4,73:1.
+      Button: isDark ? {} : {
+        colorErrorHover: '#b80c1e',
+        colorErrorBgActive: '#ffccc7',
+      },
       Table: isDark ? {
         headerBg: '#1f1f1f',
         rowHoverBg: '#262626',

@@ -16,13 +16,13 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
-import { theme, type GlobalToken } from 'antd';
+import { Button, ConfigProvider, theme, type GlobalToken, type ThemeConfig } from 'antd';
 
 import { BRAND_COLORS, ThemeProvider, useTheme, type ThemeContextValue } from '../ThemeContext';
 
 type Rgb = [number, number, number];
 
-function tokensDoTemaClaro(): GlobalToken {
+function configDoTemaClaro(): ThemeConfig {
   let valor: ThemeContextValue | undefined;
   function Leitor(): null {
     valor = useTheme();
@@ -34,7 +34,11 @@ function tokensDoTemaClaro(): GlobalToken {
     </ThemeProvider>,
   );
   expect(valor!.isDark).toBe(false);
-  return theme.getDesignToken(valor!.antThemeConfig);
+  return valor!.antThemeConfig;
+}
+
+function tokensDoTemaClaro(): GlobalToken {
+  return theme.getDesignToken(configDoTemaClaro());
 }
 
 /** Onde o texto aparece no tema claro: Card, campo (Input, Select) e Modal usam os fundos do AntD. */
@@ -69,27 +73,104 @@ describe('Tema claro: vermelho de erro e texto de exemplo com contraste AA', { t
   });
 
   test('texto de exemplo do login (App.css, vence o token): 4,5:1 no campo branco', () => {
-    const exemplo = valorNoAppCss('.login-page .login-card .ant-input::placeholder', 'color');
+    const exemplo = valorNoCss(appCss, '.login-page .login-card .ant-input::placeholder', 'color');
     // A senha (Input.Password) tem a mesma cor, na mesma regra.
-    expect(valorNoAppCss('.login-page .login-card .ant-input-affix-wrapper input::placeholder', 'color')).toBe(exemplo);
-    const campo = valorNoAppCss('.login-page .login-card .ant-input', 'background-color');
+    expect(valorNoCss(appCss, '.login-page .login-card .ant-input-affix-wrapper input::placeholder', 'color')).toBe(exemplo);
+    const campo = valorNoCss(appCss, '.login-page .login-card .ant-input', 'background-color');
     expect(contraste(exemplo, campo), `${exemplo} sobre ${campo}`).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('texto de exemplo dos <input> comuns (index.css, fora do token): 4,5:1 no campo branco', () => {
+    // O token só pinta os campos do AntD. O <input> comum (filtros da Disponibilidade) ficava com o
+    // cinza do preflight do Tailwind, #9ca3af: 2,54:1. A regra fica no `@layer base` para sair logo
+    // depois do preflight e vencê-lo; os seletores do AntD e do login são mais fortes e seguem valendo.
+    const exemplo = valorNoCss(indexCss, 'input::placeholder', 'color', '@layer base');
+    expect(valorNoCss(indexCss, 'textarea::placeholder', 'color', '@layer base')).toBe(exemplo);
+    // O <input> comum fica com o fundo branco do navegador, também no tema escuro (sem color-scheme).
+    expect(contraste(exemplo, '#ffffff'), `${exemplo} sobre o campo branco`).toBeGreaterThanOrEqual(4.5);
   });
 });
 
-// `?raw` de CSS volta vazio no Vitest (CSS desligado): lê o arquivo do disco.
-const appCss = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../App.css'), 'utf-8');
+/**
+ * Botão `danger`: o AntD pinta o hover com o `colorErrorHover`, e o pressionado do botão de texto com o
+ * `colorErrorHover` sobre o `colorErrorBgActive`. Derivados do red-7, davam 3,87:1 no hover e 1,96:1
+ * no pressionado do "Excluir" dos modais (o botão pinta o próprio fundo rosado, em qualquer lugar).
+ * O teste lê o CSS que o AntD gera com o tema, porque o ajuste é token do componente Button.
+ */
+describe('Tema claro: botão danger com contraste AA no hover e no pressionado', { timeout: 20000 }, () => {
+  test.each([
+    ['text', 'hover'],
+    ['text', 'active'],
+    ['link', 'hover'],
+    ['link', 'active'],
+    ['outlined', 'hover'],
+    ['outlined', 'active'],
+    ['solid', 'hover'],
+    ['solid', 'active'],
+  ] as const)('variante %s, estado %s: 4,5:1', (variante, estado) => {
+    render(
+      <ConfigProvider theme={configDoTemaClaro()}>
+        <Button danger type="text">
+          Excluir
+        </Button>
+        <Button danger type="link">
+          Excluir
+        </Button>
+        <Button danger>Excluir</Button>
+        <Button danger type="primary">
+          Excluir
+        </Button>
+      </ConfigProvider>,
+    );
+    const { cor, fundo } = estiloDoBotaoDanger(variante, estado);
+    // Sem fundo na regra (link e contorno): mede no branco, na página e no cartão do login.
+    const fundos = fundo ? [fundo] : ['#ffffff', BRAND_COLORS.pageBackground, BRAND_COLORS.primaryLight];
+    for (const f of fundos) {
+      expect(contraste(cor, f), `${variante} ${estado}: ${cor} sobre ${f}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});
 
-/** Valor da propriedade na regra do App.css que lista exatamente este seletor. */
-function valorNoAppCss(seletor: string, propriedade: string): string {
+/** Cor do texto e fundo próprio do botão danger nesta variante e neste estado, no CSS que o AntD gerou. */
+function estiloDoBotaoDanger(
+  variante: 'text' | 'link' | 'outlined' | 'solid',
+  estado: 'hover' | 'active',
+): { cor: string; fundo: string | undefined } {
+  const alvo = `.ant-btn-color-dangerous.ant-btn-variant-${variante}:not(:disabled):not(.ant-btn-disabled):${estado}`;
+  const regra = Array.from(document.styleSheets)
+    .flatMap((folha) => Array.from(folha.cssRules))
+    .filter((r): r is CSSStyleRule => 'selectorText' in r)
+    .find((r) => r.selectorText.split(',').some((s) => s.trim().endsWith(alvo)));
+  if (!regra) throw new Error(`o AntD não gerou regra para: ${alvo}`);
+  const fundo = regra.style.getPropertyValue('background-color') || regra.style.getPropertyValue('background') || undefined;
+  // Botão cheio: o texto é branco sobre o fundo da regra.
+  return { cor: variante === 'solid' ? '#ffffff' : regra.style.getPropertyValue('color'), fundo };
+}
+
+// `?raw` de CSS volta vazio no Vitest (CSS desligado): lê o arquivo do disco.
+const lerCss = (arquivo: string): string =>
+  readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../..', arquivo), 'utf-8');
+const appCss = lerCss('App.css');
+const indexCss = lerCss('index.css');
+
+/**
+ * Valor da propriedade na regra que lista exatamente este seletor. Com `bloco` (ex.: '@layer base'),
+ * procura só dentro dele; sem, só no nível de cima da folha.
+ */
+function valorNoCss(css: string, seletor: string, propriedade: string, bloco?: string): string {
   const folha = document.createElement('style');
-  folha.textContent = appCss;
+  folha.textContent = css;
   document.head.appendChild(folha);
   try {
-    const regra = Array.from(folha.sheet?.cssRules ?? [])
+    let regras = Array.from(folha.sheet?.cssRules ?? []);
+    if (bloco) {
+      const grupo = regras.find((r) => r.cssText.startsWith(`${bloco} `)) as CSSGroupingRule | undefined;
+      regras = Array.from(grupo?.cssRules ?? []);
+    }
+    const regra = regras
       .filter((r): r is CSSStyleRule => 'selectorText' in r)
       .find((r) => r.selectorText.split(',').map((s) => s.trim()).includes(seletor));
-    if (!regra) throw new Error(`App.css não tem regra para: ${seletor}`);
+    if (!regra) throw new Error(`sem regra${bloco ? ` em ${bloco}` : ''} para: ${seletor}`);
     return regra.style.getPropertyValue(propriedade);
   } finally {
     folha.remove();

@@ -226,6 +226,7 @@ def test_evento_sem_coordenador_conta_como_responsavel_para_quem_criou():
     titular = UsuarioFactory()
     sol = SolicitacaoFactory(usuario=titular, coordenador=None)
     SolicitacaoFactory(usuario=titular, coordenador=UsuarioFactory())
+    SolicitacaoFactory(coordenador=None)  # controle: sem coordenador, criado por outra pessoa, não entra
 
     data = build_lgpd_export_data(titular, include_audit=False)
 

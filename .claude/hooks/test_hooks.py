@@ -116,6 +116,11 @@ CONTEXT_CASES = [
     ("secret placeholder", write("x.py", 'password = "changeme1"'), "segredo hardcoded", False),
     ("N+1 in view", edit("apps/core/views_y.py", "Foo.objects.filter(a=1)"), "Possivel N+1", True),
     ("CP-06 bad commit msg", bash('git commit -m "bad message"'), "CP-06", True),
+    # FER-55: o piso do vitest muda; o hook aponta para a SSOT em vez de copiar numeros.
+    ("vitest coverage aponta a SSOT", bash("cd v2/frontend && npx vitest run --coverage"), "thresholds de v2/frontend/vitest.config.ts", True),
+    ("vitest coverage sem piso copiado", bash("cd v2/frontend && npx vitest run --coverage"), "statements 44", False),
+    # O defeito do FER-55 foi o piso parado: o lembrete tem que dizer que se sobe, nao so que nao se baixa.
+    ("vitest coverage manda subir o piso", bash("cd v2/frontend && npx vitest run --coverage"), "sobe o piso", True),
 ]
 for name, payload, sub, want in CONTEXT_CASES:
     _, out = run_py("context-injector.py", payload)
@@ -274,8 +279,8 @@ else:
 # report
 # --------------------------------------------------------------------------
 # Piso anti-vacuidade: um harness que roda pouco passa por nao testar sem ninguem
-# perceber. 54 casos com PowerShell presente (Windows e o runner do CI, que tem
-# `pwsh`), 47 sem. Abaixo de 45, algo sumiu — e sumir em silencio e o defeito que
+# perceber. 57 casos com PowerShell presente (Windows e o runner do CI, que tem
+# `pwsh`), 50 sem. Abaixo de 45, algo sumiu — e sumir em silencio e o defeito que
 # este arquivo existe para pegar.
 MINIMO = 45
 

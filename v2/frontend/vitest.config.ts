@@ -11,7 +11,7 @@ export default defineConfig({
   test: {
     globals: true,
     // Mitigacao de flakiness do suite: alguns testes de componente sao sensiveis a
-    // timing (findByRole estoura sob carga do CI) e a isolamento no `singleThread`
+    // timing (findByRole estoura sob carga do CI) e a isolamento entre arquivos
     // (ex.: DatImportsLegacyRemoval, useTableFilters), falhando de forma nao-
     // deterministica e bloqueando ate PRs que nem tocam o frontend (#1691/#1696).
     // `retry` re-executa o teste que falha; uma falha DETERMINISTICA continua falhando
@@ -28,12 +28,11 @@ export default defineConfig({
     setupFiles: './src/test/setup.ts',
     include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
+    // Sem limite de workers: o Vitest 4 usa N-1 núcleos (3 no runner de 4 vCPU). O antigo
+    // `poolOptions.threads.singleThread` foi removido no Vitest 4 e nunca valeu aqui (o CI só
+    // imprimia DEPRECATED). NÃO trocar por `maxWorkers: 1`/`fileParallelism: false`: a suíte
+    // ficaria serial (~3x mais lenta). O CI ganha tempo dividindo a suíte em partes (frontend-ci.yml).
     pool: 'threads',
-    poolOptions: {
-      threads: {
-        singleThread: true,
-      },
-    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],

@@ -37,7 +37,7 @@ const MODOS = {
     marcador: '<!-- as-frontend-report -->',
     titulo: '## Relatório do frontend',
     nota: 'este comentário é atualizado a cada push.',
-    origemSize: 'Vem do job `[required] build/lint do frontend`; falta quando o build não passou.',
+    origemSize: 'Vem do job `[required] frontend lint e build`; falta quando o build não passou.',
     origemLighthouse: 'Vem do job `[info] lighthouse CI`; falta quando o job não rodou ou quebrou antes de medir.',
   },
   mensal: {

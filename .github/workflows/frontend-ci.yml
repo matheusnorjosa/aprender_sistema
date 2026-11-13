@@ -63,12 +63,12 @@ jobs:
       env:
         REACT_DOCTOR_MIN_SCORE: '75'
 
-  build-lint-frontend:
-    name: "[required] build/lint do frontend"
+  # Lint, build e guards do frontend, em paralelo com as partes do Vitest. Quem bloqueia o merge
+  # é o agregador `build-lint-frontend` (o nome do ruleset), que exige este job verde.
+  frontend-build:
+    name: "[required] frontend lint e build"
     runs-on: ubuntu-latest
-    # 45, não 30: com 1.985 testes (05/11) a cobertura leva ~32 min num runner de 2 vCPU (medido em container Linux
-    # --cpus=2) e o job estourava os 30. Os mais lentos são as telas AntD com modal (GruposPage.salvar, ApprovalsPage).
-    timeout-minutes: 45
+    timeout-minutes: 15
 
     defaults:
       run:
@@ -91,9 +91,6 @@ jobs:
     - name: Build with Vite
       id: build
       run: npm run build
-
-    - name: Run tests (gate de cobertura — ratchet no baseline)
-      run: npm run test:coverage
 
     - name: Check bundle sizes
       run: npm run size
@@ -136,10 +133,117 @@ jobs:
         path: v2/frontend/dist
         retention-days: 1
 
-  checklist-tests:
-    name: "[required] checklist tests (meta, a11y, security)"
+  # Testes de unidade (Vitest) em 6 partes paralelas (FER-54, 12/11/2026). Numa parte só, a
+  # suíte levava 18 a 37 min com os 3 workers do runner de 4 vCPU (o Vitest 4 já usa N-1; não há
+  # o que ganhar em workers). Cada parte coleta a cobertura SEM o piso (cobertura parcial
+  # reprovaria); o piso de vitest.config.ts vale uma vez só, na junção feita pelo agregador.
+  frontend-unit:
+    name: "[required] frontend unit (parte ${{ matrix.shard }}/${{ strategy.job-total }})"
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
+
+    defaults:
+      run:
+        working-directory: v2/frontend
+
+    steps:
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
+
+    - uses: ./.github/actions/setup-node-deps
+
+    - name: Vitest com cobertura (parte ${{ matrix.shard }}/${{ strategy.job-total }}, sem o piso)
+      run: >-
+        npx vitest run --coverage
+        --coverage.thresholds.statements=0 --coverage.thresholds.branches=0
+        --coverage.thresholds.functions=0 --coverage.thresholds.lines=0
+        --reporter=default --reporter=github-actions --reporter=blob
+        --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+
+    # `overwrite`: um `gh run rerun --failed` refaz a parte com o mesmo nome de artefato.
+    # 7 dias: a junção de um re-run usa os relatórios das partes que passaram na tentativa anterior.
+    - name: Upload do relatório da parte (blob)
+      if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
+      with:
+        name: vitest-blob-${{ matrix.shard }}
+        path: v2/frontend/.vitest-reports/
+        include-hidden-files: true
+        if-no-files-found: error
+        overwrite: true
+        retention-days: 7
+
+  # Check do ruleset. `always()`: para o GitHub, job pulado conta como sucesso, então este job
+  # precisa rodar sempre e reprovar quando uma das partes falhou, foi cancelada ou pulada.
+  # Não trocar por `!cancelled()`: com o run cancelado, o agregador ficaria pulado (= sucesso).
+  # Nome de ruleset nunca vai em job com matrix (o GitHub acrescenta os valores ao nome e o
+  # check exigido nunca chegaria).
+  build-lint-frontend:
+    name: "[required] build/lint do frontend"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [frontend-build, frontend-unit]
+    if: ${{ always() }}
+
+    defaults:
+      run:
+        working-directory: v2/frontend
+
+    steps:
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
+
+    - name: Conferir lint/build e as partes do Vitest
+      env:
+        BUILD: ${{ needs.frontend-build.result }}
+        UNIT: ${{ needs.frontend-unit.result }}
+      run: |
+        echo "frontend lint e build: $BUILD"
+        echo "frontend unit (todas as partes): $UNIT"
+        if [ "$BUILD" != "success" ] || [ "$UNIT" != "success" ]; then
+          echo "::error::O gate do frontend exige lint/build e todas as partes do Vitest verdes (veja os jobs acima)."
+          exit 1
+        fi
+
+    - uses: ./.github/actions/setup-node-deps
+
+    - name: Baixar os relatórios das partes
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      with:
+        pattern: vitest-blob-*
+        path: v2/frontend/.vitest-reports
+        merge-multiple: true
+
+    # Não poder medir não é aprovar: sem as 6 partes, a junção cobriria só parte da suíte. Confere
+    # o nome de cada parte (blob-i-6.json), não só a quantidade. O 6 acompanha a matrix de
+    # `frontend-unit`; mudou lá, muda aqui.
+    - name: Conferir que chegaram as 6 partes
+      run: |
+        ls .vitest-reports
+        for i in 1 2 3 4 5 6; do
+          if [ ! -f ".vitest-reports/blob-$i-6.json" ]; then
+            echo "::error::Falta o relatório da parte $i/6. Os relatórios expiram em 7 dias; depois disso, use 'Re-run all jobs'."
+            exit 1
+          fi
+        done
+
+    # `--coverage` é o que aplica o piso de vitest.config.ts na junção: sem ele, o piso some calado.
+    - name: Juntar as partes e aplicar o piso de cobertura (vitest.config.ts)
+      run: npx vitest run --merge-reports --coverage
+
+  # Checklist (Playwright) em 3 partes paralelas (FER-54). Cada parte sobe o próprio backend com o
+  # seed e roda um terço dos testes; o check do ruleset é o agregador `checklist-tests`.
+  checklist-shard:
+    name: "[required] checklist (parte ${{ matrix.shard }}/${{ strategy.job-total }})"
+    runs-on: ubuntu-latest
+    # 20: a parte mais lenta levou 9m50s num runner lento (12/11), com 2m48s só de subir o backend.
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     env:
       CHECKLIST_PLAYWRIGHT_WORKERS: '2'
 
@@ -196,6 +300,10 @@ jobs:
         } >> v2/infra/.env
 
         export IMAGE_TAG=latest
+        # Sem reciclagem de worker do gunicorn só neste job: com max_requests=1000, cada parte
+        # reciclava workers no meio do run e o proxy do Vite devolvia "socket hang up" (500) em
+        # 1-2 requisições por run, a maior fonte de flaky do checklist (medido em 12/11/2026).
+        export GUNICORN_MAX_REQUESTS=0
         compose() {
           docker compose -f v2/infra/docker-compose.yml -f v2/infra/docker-compose.override.yml "$@"
         }
@@ -231,8 +339,8 @@ jobs:
         compose exec -T web python manage.py migrate --noinput
         compose exec -T web python manage.py seed_frontend_contract_data
 
-    - name: Run checklist tests
-      run: npm run test:checklist -- --workers=${CHECKLIST_PLAYWRIGHT_WORKERS}
+    - name: Run checklist tests (parte ${{ matrix.shard }}/${{ strategy.job-total }})
+      run: npm run test:checklist -- --workers=${CHECKLIST_PLAYWRIGHT_WORKERS} --shard=${{ matrix.shard }}/${{ strategy.job-total }}
       env:
         STRICT_SECURITY_HEADERS: '0'
 
@@ -246,10 +354,31 @@ jobs:
       if: always()
       continue-on-error: true
       with:
-        name: checklist-test-results
+        name: checklist-test-results-${{ matrix.shard }}
         path: v2/frontend/test-results
         if-no-files-found: ignore
+        overwrite: true
         retention-days: 7
+
+  # Check do ruleset para o checklist; mesma regra do `build-lint-frontend`: roda sempre e só
+  # passa com as 3 partes verdes.
+  checklist-tests:
+    name: "[required] checklist tests (meta, a11y, security)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    needs: [checklist-shard]
+    if: ${{ always() }}
+
+    steps:
+    - name: Conferir as partes do checklist
+      env:
+        RESULT: ${{ needs.checklist-shard.result }}
+      run: |
+        echo "checklist (todas as partes): $RESULT"
+        if [ "$RESULT" != "success" ]; then
+          echo "::error::O checklist exige todas as partes verdes (veja os jobs 'checklist (parte N/3)')."
+          exit 1
+        fi
 
   e2e-journeys:
     name: "[info] e2e journeys"
@@ -324,6 +453,8 @@ jobs:
         } >> v2/infra/.env
 
         export IMAGE_TAG=latest
+        # Mesmo motivo do checklist: sem reciclagem de worker do gunicorn no meio do run.
+        export GUNICORN_MAX_REQUESTS=0
         compose() {
           docker compose -f v2/infra/docker-compose.yml -f v2/infra/docker-compose.override.yml "$@"
         }
@@ -386,7 +517,7 @@ jobs:
   lighthouse-ci:
     name: "[info] lighthouse CI"
     runs-on: ubuntu-latest
-    needs: [build-lint-frontend, changes]
+    needs: [frontend-build, changes]
     if: github.event_name == 'pull_request' && needs.changes.outputs.frontend == 'true'
     timeout-minutes: 12
 
@@ -438,7 +569,7 @@ jobs:
     name: "[info] frontend PR report"
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [changes, build-lint-frontend, lighthouse-ci]
+    needs: [changes, frontend-build, lighthouse-ci]
     if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.changes.outputs.frontend == 'true' }}
     permissions:
       contents: read

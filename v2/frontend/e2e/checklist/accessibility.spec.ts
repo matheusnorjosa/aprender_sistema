@@ -94,6 +94,8 @@ test.describe('Checklist: Acessibilidade (axe-core)', () => {
   }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
+    // Servidor de dev frio na 1ª navegação da parte: sem esperar o login, o axe varria página vazia.
+    await expect(page.locator('#login-title')).toBeVisible({ timeout: 15_000 });
 
     const accessibilityScanResults = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
@@ -126,6 +128,7 @@ test.describe('Checklist: Acessibilidade (axe-core)', () => {
   test('🔴 formulários devem ter labels associados', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
+    await expect(page.locator('#login-title')).toBeVisible({ timeout: 15_000 });
 
     const results = await new AxeBuilder({ page })
       .include('form, [role="form"], input, select, textarea')
@@ -145,6 +148,7 @@ test.describe('Checklist: Acessibilidade (axe-core)', () => {
   test('🔴 imagens devem ter alt text', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
+    await expect(page.locator('#login-title')).toBeVisible({ timeout: 15_000 });
 
     const results = await new AxeBuilder({ page })
       .include('img')
@@ -161,6 +165,7 @@ test.describe('Checklist: Acessibilidade (axe-core)', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await waitForLoadingOverlayToDisappear(page);
+    await expect(page.locator('#login-title')).toBeVisible({ timeout: 15_000 });
 
     const results = await new AxeBuilder({ page })
       .exclude('.ant-spin-fullscreen')

@@ -108,15 +108,17 @@ que **não existe** — nem o arquivo, nem o diretório `apps/core/data/`.)*
 | Lado | Threshold configurado | Enforçado no CI? |
 |---|---|---|
 | Backend | **85%** — `v2/backend/pytest.ini` (`fail_under = 85`) | ✅ sim — `.github/workflows/ci.yaml` (`coverage report --fail-under=85`) |
-| Frontend | **ratchet no baseline medido** (valores por métrica em `thresholds` de `v2/frontend/vitest.config.ts`, a SSOT; sobe a cada leva de testes — #1800) | ✅ sim — `.github/workflows/frontend-ci.yml` roda o Vitest com cobertura em 6 partes e aplica os thresholds uma vez, na junção (`vitest --merge-reports --coverage`) do `[required] build/lint do frontend` |
+| Frontend | **ratchet no baseline medido**: o menor valor de cada métrica nas 3 últimas junções verdes da CI, arredondado para baixo, menos 2 pontos (valores em `thresholds` de `v2/frontend/vitest.config.ts`, a SSOT; sobe quando a cobertura sobe e só desce com justificativa no PR — #1800, FER-55) | ✅ sim — `.github/workflows/frontend-ci.yml` roda o Vitest com cobertura em 6 partes e aplica os thresholds uma vez, na junção (`vitest --merge-reports --coverage`) do `[required] build/lint do frontend` |
 
 Política e histórico do gate de 85%: [analysis/COVERAGE_POLICY.md](./analysis/COVERAGE_POLICY.md).
 O alvo de 90% (Fase 2) segue como meta, não como gate.
 
 > O gate de cobertura do frontend foi ligado em #1800 (`npm run test:coverage` no `frontend-ci.yml`;
 > desde o FER-54, 12/11/2026, a suíte roda em 6 partes e o piso vale na junção das partes);
-> os thresholds são um **ratchet** sobre o baseline real medido em `vitest.config.ts` (SSOT), que
-> sobe a cada leva de testes — não uma meta fixa de 70%.
+> os thresholds são um **ratchet** sobre o baseline real medido em `vitest.config.ts` (SSOT), não
+> uma meta fixa de 70%. O piso ficou parado de 26/08 (#1867) a 13/11/2026 enquanto a cobertura
+> subia de ~45% para ~82%: chegou a ficar 37 a 43 pontos abaixo do medido, e uma queda grande
+> passaria. O FER-55 o recalibrou pela regra da tabela.
 
 ## Baseline CI
 

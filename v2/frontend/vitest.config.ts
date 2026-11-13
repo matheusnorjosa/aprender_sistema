@@ -47,22 +47,16 @@ export default defineConfig({
         '**/e2e/**',
         'src/main.tsx',
       ],
-      // Ratchet de cobertura fixado no baseline REAL medido, não numa meta aspiracional.
-      // O gate estava DORMENTE (CI rodava `vitest` sem `--coverage`); ligado em #1800 no
-      // piso de então (~42%). Sobe a cada leva de testes: #1815 (clientes de API) + #1816
-      // (hooks) levaram a 44/34/32/44; agora, pós #1825 (4 páginas críticas), o suite mede
-      // 45.33/35.29/33.68/45.85 — fixado ~0.3-0.8pt abaixo pra travar a regressão sem
-      // reprovar por flutuação. Cobertura é determinística num suite verde, então a margem
-      // só protege de teste flaky que perca as retries.
-      // #1867: statements/lines 45→44 — a remoção do hook morto `useCrudOperations`
-      // (~300 ln, coberto ~100% pelo próprio teste, também removido) tirou um bloco de
-      // ALTA cobertura da média, baixando statements 45.33→44.83. Não é regressão de
-      // código VIVO — é artefato do denominador ao remover dead code + seu teste.
+      // Piso de cobertura, aplicado na junção das partes do Vitest na CI (frontend-ci.yml).
+      // Regra: o menor valor de cada métrica nas 3 últimas junções verdes (linha "All files"
+      // do log), arredondado para baixo, menos 2 pontos. FER-55, 13/11/2026: mínimo medido
+      // 81.62/73.99/75.65/82.85 → 79/71/73/80. Ratchet: subir quando a cobertura subir;
+      // baixar só com justificativa no PR.
       thresholds: {
-        statements: 44,
-        branches: 35,
-        functions: 33,
-        lines: 44,
+        statements: 79,
+        branches: 71,
+        functions: 73,
+        lines: 80,
       },
     },
   },

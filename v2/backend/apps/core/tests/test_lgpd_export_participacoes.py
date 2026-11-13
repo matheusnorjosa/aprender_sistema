@@ -177,8 +177,56 @@ def test_dossie_traz_os_eventos_em_que_o_titular_e_o_formador_avaliado():
 
     data = build_lgpd_export_data(titular, include_audit=False)
 
-    assert [linha["id"] for linha in data["events_as_evaluated_formador"]] == [sol.pk]
-    assert export_counts(data)["events_as_evaluated_formador"] == 1
+    assert [linha["id"] for linha in data["events_as_formador_to_evaluate"]] == [sol.pk]
+    assert export_counts(data)["events_as_formador_to_evaluate"] == 1
+
+
+CAMPOS_DO_EVENTO_NO_DOSSIE = {
+    "id",
+    "status",
+    "inicio",
+    "fim",
+    "municipio__nome",
+    "projeto__nome",
+    "projeto_2__nome",
+    "tipo_evento__nome",
+}
+
+
+def test_eventos_da_fk_levam_so_os_campos_do_evento():
+    """As seções da FK não levam a observação, o local nem quem criou o evento (dado de outra pessoa)."""
+    titular = UsuarioFactory()
+    autora = UsuarioFactory(email="autora.do.evento@exemplo.org")
+    SolicitacaoFactory(
+        usuario=autora,
+        coordenador=titular,
+        pretende_avaliar_formador=True,
+        formador_avaliado=titular,
+        observacoes="nota interna do evento",
+        local="sala X do evento",
+    )
+
+    data = build_lgpd_export_data(titular, include_audit=False)
+
+    [responsavel] = data["events_as_responsible"]
+    assert set(responsavel) == CAMPOS_DO_EVENTO_NO_DOSSIE | {"coordenador_acompanha"}
+    [avaliar] = data["events_as_formador_to_evaluate"]
+    assert set(avaliar) == CAMPOS_DO_EVENTO_NO_DOSSIE
+    assert data["solicitations_created"] == []
+    texto = json.dumps(data, default=str)
+    for fora in ("nota interna do evento", "sala X do evento", "autora.do.evento@exemplo.org"):
+        assert fora not in texto
+
+
+def test_evento_sem_coordenador_conta_como_responsavel_para_quem_criou():
+    """Mesma regra de Meus eventos, da agenda e das horas: sem a FK, o responsável é quem criou o evento."""
+    titular = UsuarioFactory()
+    sol = SolicitacaoFactory(usuario=titular, coordenador=None)
+    SolicitacaoFactory(usuario=titular, coordenador=UsuarioFactory())
+
+    data = build_lgpd_export_data(titular, include_audit=False)
+
+    assert [linha["id"] for linha in data["events_as_responsible"]] == [sol.pk]
 
 
 def test_trilha_conta_as_participacoes():

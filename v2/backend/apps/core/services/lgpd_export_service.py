@@ -15,6 +15,7 @@ import datetime
 from decimal import Decimal
 from typing import Any
 
+from django.db.models import Q
 from django.utils import timezone
 
 # Chaves de contagem expostas na trilha de auditoria (o FATO, nunca a PII).
@@ -22,7 +23,7 @@ COUNT_KEYS = (
     "solicitations_created",
     "event_participations",
     "events_as_responsible",
-    "events_as_evaluated_formador",
+    "events_as_formador_to_evaluate",
     "availability_blocks",
     "approvals_made",
 )
@@ -135,16 +136,18 @@ def build_lgpd_export_data(user: Any, *, include_audit: bool = True, include_gca
         )
     )
 
-    # Eventos em que o titular e o coordenador responsavel (FK `coordenador`) ou o formador que quem criou
-    # pretende avaliar (FK `formador_avaliado`): fatos sobre a pessoa que nao dependem de `Participation`
-    # (o admin do Django troca a FK sem acertar a participacao). O mesmo evento pode sair tambem em
-    # `event_participations`.
+    # Eventos em que o titular e o coordenador responsavel ou o formador que quem criou pretende avaliar
+    # (FK `formador_avaliado`; e intencao, nao avaliacao feita, e so o dossie a mostra ao formador):
+    # fatos sobre a pessoa que nao dependem de `Participation` (o admin do Django troca a FK sem acertar
+    # a participacao). Responsavel segue a regra de Meus eventos, da agenda e das horas: a FK `coordenador`
+    # ou, sem ela, quem criou. O mesmo evento pode sair tambem em `event_participations` e em
+    # `solicitations_created`.
     data["events_as_responsible"] = list(
-        Solicitacao.objects.filter(coordenador=user)
+        Solicitacao.objects.filter(Q(coordenador=user) | Q(coordenador__isnull=True, usuario=user))
         .order_by("inicio", "id")
         .values(*_CAMPOS_DO_EVENTO, "coordenador_acompanha")
     )
-    data["events_as_evaluated_formador"] = list(
+    data["events_as_formador_to_evaluate"] = list(
         Solicitacao.objects.filter(formador_avaliado=user).order_by("inicio", "id").values(*_CAMPOS_DO_EVENTO)
     )
 

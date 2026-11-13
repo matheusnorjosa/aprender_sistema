@@ -28,8 +28,10 @@ Reúne a parte **organizacional** da conformidade LGPD. Veredito da auditoria de
   exportação (portabilidade). Exclusão via **anonimização** (`apps/core/services/anonimizacao.py`).
   O dossiê da exportação sai de um lugar só (`apps/core/services/lgpd_export_service.py`, usado pelo
   `/api/me/export/` e pelo comando `lgpd_export`): dados da conta, eventos criados, participações em
-  eventos em qualquer papel, eventos em que a pessoa é a coordenadora responsável ou a formadora
-  avaliada, bloqueios de agenda, registros de coordenador do DAT casados por CPF, aprovações feitas, as
+  eventos em qualquer papel, eventos em que a pessoa é a coordenadora responsável (a FK ou, sem ela, quem
+  criou, como em Meus eventos) ou a formadora que quem criou pretende avaliar (é intenção, não avaliação
+  feita, e só o dossiê a mostra à formadora; sai pelo art. 18, II), bloqueios de agenda, registros de
+  coordenador do DAT casados por CPF, aprovações feitas, as
   últimas 100 ações da pessoa na trilha de auditoria e, no download pela tela, os metadados da conta
   Google (sem tokens). O que ainda não entra está no `ART-23` de `v2/docs/audits/ACHADOS_REAIS.md`.
 - **Retenção/expurgo** automático: AuditLog e artefatos de importação (tasks Celery beat).

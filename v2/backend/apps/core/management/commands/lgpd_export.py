@@ -120,7 +120,7 @@ class Command(BaseCommand):
         self.stdout.write(f"  - Solicitations created: {counts['solicitations_created']}")
         self.stdout.write(f"  - Event participations: {counts['event_participations']}")
         self.stdout.write(f"  - Events as responsible: {counts['events_as_responsible']}")
-        self.stdout.write(f"  - Events as evaluated formador: {counts['events_as_evaluated_formador']}")
+        self.stdout.write(f"  - Events as formador to evaluate: {counts['events_as_formador_to_evaluate']}")
         self.stdout.write(f"  - Availability blocks: {counts['availability_blocks']}")
         self.stdout.write(f"  - Approvals made: {counts['approvals_made']}")
         if include_audit and isinstance(data["audit_logs"], list):

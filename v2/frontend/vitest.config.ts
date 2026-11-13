@@ -48,13 +48,15 @@ export default defineConfig({
         'src/main.tsx',
       ],
       // Piso de cobertura, aplicado na junção das partes do Vitest na CI (frontend-ci.yml).
-      // Regra: o menor valor de cada métrica nas 3 últimas junções verdes (linha "All files"
-      // do log), arredondado para baixo, menos 2 pontos. FER-55, 13/11/2026: mínimo medido
-      // 81.62/73.99/75.65/82.85 → 79/71/73/80. Ratchet: subir quando a cobertura subir;
-      // baixar só com justificativa no PR.
+      // Regra: o menor valor de cada métrica na junção do próprio PR e nas 2 junções verdes
+      // mais recentes (linha "All files" do log), arredondado para baixo, menos 2 pontos.
+      // Quem acrescenta testes sobe o piso num commit final do PR, com a CI verde; baixar só
+      // com justificativa no PR. Comando e detalhes: v2/docs/TESTING_POLICY.md, seção Cobertura.
+      // FER-55, 13/11/2026: runs 43472545900, 43469156123 e 43466157890 → mínimo
+      // 81.69/74.08/75.77/82.92 → 79/72/73/80 (a junção do #2229, base deste PR, mede o mesmo).
       thresholds: {
         statements: 79,
-        branches: 71,
+        branches: 72,
         functions: 73,
         lines: 80,
       },

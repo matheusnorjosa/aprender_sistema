@@ -485,7 +485,7 @@ def test_context(command: str) -> str:
 
     if "vitest" in command:
         parts.append("### Frontend (vitest)")
-        parts.append("- Coverage: ratchet no baseline (statements 44 / branches 35 / functions 33 / lines 44) -- nao baixar")
+        parts.append("- Coverage: piso em thresholds de v2/frontend/vitest.config.ts (SSOT; regra do ratchet em v2/docs/TESTING_POLICY.md, secao Cobertura) -- nao baixar sem justificativa no PR")
         parts.append("- Pool: single-thread (race condition protection)")
         parts.append("- Environment: jsdom")
         parts.append("- Run: `cd v2/frontend && npx vitest`")

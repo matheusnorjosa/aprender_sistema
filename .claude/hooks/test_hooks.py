@@ -116,6 +116,9 @@ CONTEXT_CASES = [
     ("secret placeholder", write("x.py", 'password = "changeme1"'), "segredo hardcoded", False),
     ("N+1 in view", edit("apps/core/views_y.py", "Foo.objects.filter(a=1)"), "Possivel N+1", True),
     ("CP-06 bad commit msg", bash('git commit -m "bad message"'), "CP-06", True),
+    # FER-55: o piso do vitest muda; o hook aponta para a SSOT em vez de copiar numeros.
+    ("vitest coverage aponta a SSOT", bash("cd v2/frontend && npx vitest run --coverage"), "thresholds de v2/frontend/vitest.config.ts", True),
+    ("vitest coverage sem piso copiado", bash("cd v2/frontend && npx vitest run --coverage"), "statements 44", False),
 ]
 for name, payload, sub, want in CONTEXT_CASES:
     _, out = run_py("context-injector.py", payload)

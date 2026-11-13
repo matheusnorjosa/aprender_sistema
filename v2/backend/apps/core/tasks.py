@@ -1065,25 +1065,32 @@ def queue_gcal_sync_retry(
 
     # Circuit is closed or half-open, attempt sync
     try:
-        s = Solicitacao.objects.get(id=solicitation_id)
+        from django.db import transaction
 
-        from apps.core.services.gcal_sync_service import apply_one_solicitacao
+        # ART-01: lock de linha + atomic, como o publish e o cancel (#1726) — sem a trava, o retry
+        # desfazia um publish ou cancel concorrente (lost update). O `except` fica FORA deste bloco.
+        with transaction.atomic():
+            # A prévia não escreve na linha: sem lock, como no publish.
+            qs = Solicitacao.objects.all() if dry_run else Solicitacao.objects.select_for_update()
+            s = qs.get(id=solicitation_id)
 
-        outcome = apply_one_solicitacao(s, dry_run=dry_run, apply_blocked=apply_blocked)
+            from apps.core.services.gcal_sync_service import apply_one_solicitacao
 
-        # Log successful retry
-        if not dry_run:
-            AuditLog.objects.create(
-                usuario=None,
-                action=AuditLog.Action.GCAL_RETRY_SUCCESS,
-                model_name="Solicitacao",
-                details={
-                    "solicitacao_id": s.id,
-                    "action": outcome.action,
-                    "external_event_id": outcome.external_event_id,
-                    "retry_attempt": self.request.retries + 1,
-                },
-            )
+            outcome = apply_one_solicitacao(s, dry_run=dry_run, apply_blocked=apply_blocked)
+
+            # Log successful retry
+            if not dry_run:
+                AuditLog.objects.create(
+                    usuario=None,
+                    action=AuditLog.Action.GCAL_RETRY_SUCCESS,
+                    model_name="Solicitacao",
+                    details={
+                        "solicitacao_id": s.id,
+                        "action": outcome.action,
+                        "external_event_id": outcome.external_event_id,
+                        "retry_attempt": self.request.retries + 1,
+                    },
+                )
 
         return {
             "action": outcome.action,

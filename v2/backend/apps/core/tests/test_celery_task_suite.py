@@ -15,6 +15,8 @@ from datetime import timedelta
 from unittest.mock import patch
 from uuid import uuid4
 
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 import pytest
@@ -223,6 +225,140 @@ class TestCancelTask:
 
             assert result["action"] == "ERROR"
             assert "GCal API down" in result["error"]
+
+
+_APPLY = "apps.core.services.gcal_sync_service.apply_one_solicitacao"
+_CAMPOS_GCAL = ("gcal_status", "gcal_payload_hash", "gcal_last_error", "gcal_last_sync_at")
+
+
+def _estado_gcal(sol):
+    return Solicitacao.objects.filter(pk=sol.pk).values(*_CAMPOS_GCAL).get()
+
+
+def _travou_a_solicitacao(consultas) -> bool:
+    return any("FOR UPDATE" in q["sql"] and 'FROM "core_solicitacao"' in q["sql"] for q in consultas)
+
+
+def _sincronizou(sol):
+    from apps.core.services.gcal.sync import SyncOutcome
+
+    return SyncOutcome(
+        action="UPDATE",
+        solicitation_id=sol.id,
+        external_event_id=sol.external_event_id,
+        summary=f"Solicitação #{sol.id}",
+    )
+
+
+def _grava_e_levanta(erro):
+    """Imita o apply_one_solicitacao que falha: marca ERROR na linha e relança."""
+
+    def aplicar(s, **_kwargs):
+        s.mark_gcal(status=Solicitacao.GCalStatus.ERROR, error="gravação parcial")
+        raise erro
+
+    return aplicar
+
+
+class TestGcalSyncRetryTask:
+    """ART-01: a nova tentativa depois do circuit breaker aberto (queue_gcal_sync_retry) grava como o
+    publish e o cancel do #1726: linha travada dentro de atomic(), com o except fora do bloco."""
+
+    @pytest.mark.parametrize("dry_run", [True, False], ids=["previa", "publicacao"])
+    def test_retry_trava_a_linha_so_fora_do_dry_run(self, task_solicitacao, dry_run):
+        """Sem a trava, a nova tentativa desfazia um publish ou cancel feito ao mesmo tempo (lost update).
+        A prévia não escreve na linha e não trava, como no publish.
+
+        RED (publicacao): hoje a task faz `Solicitacao.objects.get(id=...)` puro, fora de atomic().
+        """
+        from apps.core.tasks import queue_gcal_sync_retry
+
+        with (
+            patch(_APPLY, return_value=_sincronizou(task_solicitacao)),
+            CaptureQueriesContext(connection) as consultas,
+        ):
+            resultado = queue_gcal_sync_retry(task_solicitacao.id, dry_run=dry_run)
+
+        assert resultado["error"] is None
+        assert _travou_a_solicitacao(consultas.captured_queries) is not dry_run
+
+    def test_retry_que_da_certo_grava_o_audit_log(self, task_solicitacao):
+        from apps.core.tasks import queue_gcal_sync_retry
+
+        with patch(_APPLY, return_value=_sincronizou(task_solicitacao)):
+            resultado = queue_gcal_sync_retry(task_solicitacao.id)
+
+        assert resultado == {
+            "action": "UPDATE",
+            "solicitation_id": task_solicitacao.id,
+            "external_event_id": task_solicitacao.external_event_id,
+            "summary": f"Solicitação #{task_solicitacao.id}",
+            "retry_attempt": 1,
+            "error": None,
+        }
+        audit = AuditLog.objects.get(
+            action=AuditLog.Action.GCAL_RETRY_SUCCESS, details__solicitacao_id=task_solicitacao.id
+        )
+        assert audit.details == {
+            "solicitacao_id": task_solicitacao.id,
+            "action": "UPDATE",
+            "external_event_id": task_solicitacao.external_event_id,
+            "retry_attempt": 1,
+        }
+
+    def test_retry_de_solicitacao_que_sumiu_devolve_does_not_exist(self):
+        from apps.core.tasks import queue_gcal_sync_retry
+
+        assert queue_gcal_sync_retry(999_999_999) == {
+            "action": "ERROR",
+            "solicitation_id": 999_999_999,
+            "external_event_id": None,
+            "summary": "Solicitação #999999999 não encontrada",
+            "error": "DoesNotExist",
+        }
+
+    def test_retry_que_falha_desfaz_a_gravacao_parcial_e_devolve_error(self, task_solicitacao):
+        """O except roda fora do bloco e devolve o mesmo ERROR de hoje; o rollback desfaz o que o
+        apply_one_solicitacao gravou antes de levantar.
+
+        RED: hoje a task roda fora de atomic() e a gravação parcial fica.
+        """
+        from apps.core.tasks import queue_gcal_sync_retry
+
+        antes = _estado_gcal(task_solicitacao)
+        with patch(_APPLY, side_effect=_grava_e_levanta(RuntimeError("Google fora do ar"))):
+            resultado = queue_gcal_sync_retry(task_solicitacao.id)
+
+        assert resultado == {
+            "action": "ERROR",
+            "solicitation_id": task_solicitacao.id,
+            "external_event_id": None,
+            "summary": "Erro ao sincronizar: Google fora do ar",
+            "error": "Google fora do ar",
+        }
+        assert _estado_gcal(task_solicitacao) == antes
+
+    def test_retry_com_breaker_aberto_desfaz_a_gravacao_parcial_e_pede_nova_tentativa(self, task_solicitacao):
+        """CircuitBreakerError segue pedindo nova tentativa em 60 s, agora sem deixar gravação parcial.
+
+        RED: hoje a task roda fora de atomic() e a gravação parcial fica.
+        """
+        from celery.exceptions import Retry
+
+        from apps.core.services.gcal.circuit_breaker import CircuitBreakerError, gcal_breaker
+        from apps.core.tasks import queue_gcal_sync_retry
+
+        erro = CircuitBreakerError(gcal_breaker)
+        antes = _estado_gcal(task_solicitacao)
+        with (
+            patch(_APPLY, side_effect=_grava_e_levanta(erro)),
+            patch.object(queue_gcal_sync_retry, "retry", side_effect=Retry()) as nova_tentativa,
+            pytest.raises(Retry),
+        ):
+            queue_gcal_sync_retry(task_solicitacao.id)
+
+        nova_tentativa.assert_called_once_with(countdown=60, exc=erro)
+        assert _estado_gcal(task_solicitacao) == antes
 
 
 class TestNotificacoesTask:

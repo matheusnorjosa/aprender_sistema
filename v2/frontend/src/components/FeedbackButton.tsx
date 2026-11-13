@@ -8,11 +8,23 @@
  * acessível e marcam como "selecionadas" todas as anteriores à escolhida. Nota e tipo são rádios
  * nativos, com um `name` por grupo (é ele que faz as setas do teclado andarem entre as opções); o
  * desenho do modelo fica no rótulo de cada rádio.
+ * Cores: as do modelo no tema claro e as do tema ativo no escuro (`coresDaCaixa`).
  * Montado uma vez no layout logado (App.tsx), atrás do fundo da sidebar sobreposta (z-index 998).
  */
-import { useId, useState, type JSX, type ReactNode } from 'react';
+import { useContext, useId, useState, type CSSProperties, type JSX, type ReactNode } from 'react';
 import { useLocation } from 'react-router';
-import { Button, ConfigProvider, Form, Grid, Input, Modal, message, theme, type ThemeConfig } from 'antd';
+import {
+  Button,
+  ConfigProvider,
+  Form,
+  Grid,
+  Input,
+  Modal,
+  message,
+  theme,
+  type GlobalToken,
+  type ThemeConfig,
+} from 'antd';
 import {
   BulbOutlined,
   LikeOutlined,
@@ -25,7 +37,7 @@ import {
 } from '@ant-design/icons';
 import { COMENTARIO_MAX, TIPOS_FEEDBACK, enviarFeedback, type TipoFeedback } from '../api/feedback';
 import type { ErroHttp } from '../api/config';
-import { BRAND_COLORS } from '../contexts/ThemeContext';
+import ThemeContext, { BRAND_COLORS } from '../contexts/ThemeContext';
 
 interface Valores {
   nota?: number;
@@ -58,27 +70,82 @@ const DESCRICAO_DO_TIPO: Record<TipoFeedback, string> = {
   DUVIDA: 'Uma pergunta sobre o uso do sistema.',
 };
 
-// Verde de destaque (nota escolhida e pílula "Muito bom"): a marca a 15% sobre o branco, mais forte
-// que o fundo do painel (`--as-primary-light`).
-const VERDE_DESTAQUE = 'color-mix(in srgb, var(--as-primary) 15%, white)';
+interface CoresDaCaixa {
+  titulo: string;
+  painel: string;
+  destaque: string;
+  mancha: string;
+  textoDoBom: string;
+  vermelho: string;
+  discreto: string;
+}
 
-// Detalhe do canto (modelo do dono): duas manchas verde-claras, como uma onda. É só fundo: não cobre
-// o botão fechar nem o texto.
-const DETALHE_DO_CANTO = [
-  `radial-gradient(130px 96px at 100% 0, ${BRAND_COLORS.primaryLight} 0 68%, transparent 70%)`,
-  `radial-gradient(220px 150px at 100% 0, ${BRAND_COLORS.primaryLight}99 0 66%, transparent 68%)`,
-].join(', ');
+/**
+ * Cores da caixa que mudam com o tema. O resto vem direto dos tokens do tema ativo: superfície
+ * (colorBgElevated), borda (colorBorder), acento dos indicadores (colorPrimary) e verde de texto
+ * (colorLink); no claro, os dois verdes são o da marca.
+ * No escuro, painel, destaque e mancha são o acento misturado à superfície, com contraste medido
+ * no fundo #1f1f1f: título 5,2:1; número escolhido no painel 4,6:1; estrela escolhida no destaque
+ * 3,2:1; vermelho 5,9:1 (5,1:1 no painel). O terciário do escuro dá 4,4:1: o texto discreto é o
+ * secundário.
+ */
+function coresDaCaixa(token: GlobalToken, escuro: boolean): CoresDaCaixa {
+  const tom = (pct: number): string => `color-mix(in srgb, ${token.colorPrimary} ${pct}%, ${token.colorBgContainer})`;
+  if (escuro) {
+    return {
+      titulo: token.colorLink,
+      painel: tom(12),
+      destaque: tom(20),
+      mancha: tom(7),
+      textoDoBom: token.colorText,
+      vermelho: token.red8,
+      discreto: token.colorTextSecondary,
+    };
+  }
+  return {
+    titulo: BRAND_COLORS.primaryDark,
+    painel: BRAND_COLORS.primaryLight,
+    // A marca a 15% sobre o branco: mais forte que o fundo do painel.
+    destaque: tom(15),
+    mancha: `${BRAND_COLORS.primaryLight}99`,
+    textoDoBom: BRAND_COLORS.primaryDark,
+    // Vermelho 7: 4,7:1 no painel e 5,6:1 no branco (o colorError do AntD dá 3,3:1 no branco).
+    vermelho: token.red7,
+    discreto: token.colorTextTertiary,
+  };
+}
 
-// O AntD não dá prop para o botão fechar: aqui ele vira um círculo branco de 40 px (alvo de toque)
-// sobre o detalhe do canto. O `button.` do seletor passa a especificidade do AntD sem `!important`.
+function useCoresDaCaixa(): { token: GlobalToken; escuro: boolean; cores: CoresDaCaixa } {
+  const { token } = theme.useToken();
+  // Sem ThemeProvider (teste de componente) vale o claro, como em ApprovalsPage.
+  const escuro = useContext(ThemeContext)?.isDark === true;
+  return { token, escuro, cores: coresDaCaixa(token, escuro) };
+}
+
+// Detalhe do canto (modelo do dono): duas manchas, como uma onda. É só fundo: não cobre o botão
+// fechar nem o texto.
+function detalheDoCanto(cores: CoresDaCaixa): string {
+  return [
+    `radial-gradient(130px 96px at 100% 0, ${cores.painel} 0 68%, transparent 70%)`,
+    `radial-gradient(220px 150px at 100% 0, ${cores.mancha} 0 66%, transparent 68%)`,
+  ].join(', ');
+}
+
+// O AntD não dá prop para o botão fechar: aqui ele vira um círculo de 40 px (alvo de toque) na cor
+// da superfície (branco no claro), sobre o detalhe do canto. O `button.` do seletor passa a
+// especificidade do AntD sem `!important`. As variáveis `--fb-*` vêm do fundo da caixa.
 const FECHAR_EM_CIRCULO = [
   '[&_button.ant-modal-close]:end-3',
   '[&_button.ant-modal-close]:top-3',
   '[&_button.ant-modal-close]:size-10',
   '[&_button.ant-modal-close]:rounded-full',
-  '[&_button.ant-modal-close]:bg-white',
+  '[&_button.ant-modal-close]:bg-[color:var(--fb-superficie)]',
   '[&_button.ant-modal-close]:shadow',
 ].join(' ');
+
+// Texto de exemplo no discreto da caixa. No escuro, o App.css pinta o de todo input com o terciário
+// (4,4:1); o `[placeholder]` sobe a especificidade acima dessa regra.
+const TEXTO_DE_EXEMPLO = '[&.ant-input[placeholder]::placeholder]:text-[color:var(--fb-exemplo)]';
 
 function juntarIds(...ids: Array<string | undefined>): string {
   return ids.filter(Boolean).join(' ');
@@ -93,13 +160,13 @@ function mensagemDeErro(error: unknown): string {
 
 /** Pergunta em negrito, com o asterisco de obrigatório, e a dica embaixo. */
 function Enunciado({ base, pergunta, dica }: { base: string; pergunta: string; dica: string }): JSX.Element {
-  const { token } = theme.useToken();
+  const { token, cores } = useCoresDaCaixa();
   return (
     <div className="min-w-0">
       <p id={`${base}-pergunta`} className="m-0 font-semibold">
         {pergunta}
-        {/* Vermelho 7: 4,7:1 no fundo do painel. O obrigatório chega ao leitor de tela pelo aria-required. */}
-        <span aria-hidden="true" style={{ color: token.red7 }}>
+        {/* O obrigatório chega ao leitor de tela pelo aria-required. */}
+        <span aria-hidden="true" style={{ color: cores.vermelho }}>
           {' *'}
         </span>
       </p>
@@ -118,12 +185,12 @@ function EscolhaDaNota({
   'aria-invalid': invalido,
   'aria-required': obrigatorio,
 }: CampoDoForm<number>): JSX.Element {
-  const { token } = theme.useToken();
+  const { token, cores } = useCoresDaCaixa();
   const base = useId();
   return (
     <div
       className="flex flex-col gap-3 rounded-xl p-4 sm:flex-row sm:items-center sm:justify-between"
-      style={{ background: BRAND_COLORS.primaryLight }}
+      style={{ background: cores.painel }}
     >
       <Enunciado base={base} pergunta="Como você avalia o sistema hoje?" dica="Escolha uma nota de 1 a 5." />
       <div
@@ -151,11 +218,11 @@ function EscolhaDaNota({
                   className="peer sr-only"
                 />
                 <span
-                  className="grid size-11 place-items-center rounded-lg border bg-white text-xl peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary"
+                  className="grid size-11 place-items-center rounded-lg border text-xl peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[color:var(--fb-acento)]"
                   style={
                     escolhida
-                      ? { borderWidth: 2, borderColor: BRAND_COLORS.primary, background: VERDE_DESTAQUE, color: BRAND_COLORS.primary }
-                      : { borderColor: token.colorBorder, color: token.colorTextTertiary }
+                      ? { borderWidth: 2, borderColor: token.colorPrimary, background: cores.destaque, color: token.colorPrimary }
+                      : { borderColor: token.colorBorder, background: token.colorBgElevated, color: token.colorTextTertiary }
                   }
                 >
                   <Estrela aria-hidden />
@@ -163,7 +230,7 @@ function EscolhaDaNota({
                 <span
                   aria-hidden="true"
                   className={escolhida ? 'font-semibold' : undefined}
-                  style={{ color: escolhida ? BRAND_COLORS.primary : token.colorTextSecondary }}
+                  style={{ color: escolhida ? token.colorLink : token.colorTextSecondary }}
                 >
                   {valor}
                 </span>
@@ -176,7 +243,7 @@ function EscolhaDaNota({
           <span className="rounded-full px-2 py-0.5" style={{ background: token.colorFillSecondary, color: token.colorTextSecondary }}>
             Muito ruim
           </span>
-          <span className="rounded-full px-2 py-0.5" style={{ background: VERDE_DESTAQUE, color: BRAND_COLORS.primaryDark }}>
+          <span className="rounded-full px-2 py-0.5" style={{ background: cores.destaque, color: cores.textoDoBom }}>
             Muito bom
           </span>
         </div>
@@ -193,13 +260,14 @@ function EscolhaDoTipo({
   'aria-invalid': invalido,
   'aria-required': obrigatorio,
 }: CampoDoForm<TipoFeedback>): JSX.Element {
-  const { token } = theme.useToken();
+  const { token, escuro, cores } = useCoresDaCaixa();
   const base = useId();
+  // No escuro, o tom 7 ou 8 da paleta: o 6 fica abaixo de 3:1 no cartão escuro.
   const icones: Record<TipoFeedback, ReactNode> = {
-    ELOGIO: <LikeOutlined aria-hidden style={{ color: BRAND_COLORS.primary }} />,
-    PROBLEMA: <WarningOutlined aria-hidden style={{ color: token.red6 }} />,
-    SUGESTAO: <BulbOutlined aria-hidden style={{ color: token.blue6 }} />,
-    DUVIDA: <QuestionCircleOutlined aria-hidden style={{ color: token.purple6 }} />,
+    ELOGIO: <LikeOutlined aria-hidden style={{ color: token.colorPrimary }} />,
+    PROBLEMA: <WarningOutlined aria-hidden style={{ color: escuro ? token.red7 : token.red6 }} />,
+    SUGESTAO: <BulbOutlined aria-hidden style={{ color: escuro ? token.blue7 : token.blue6 }} />,
+    DUVIDA: <QuestionCircleOutlined aria-hidden style={{ color: escuro ? token.purple8 : token.purple6 }} />,
   };
   return (
     <div>
@@ -222,11 +290,11 @@ function EscolhaDoTipo({
           return (
             <label
               key={tipo}
-              className="flex cursor-pointer flex-col gap-1 rounded-xl border bg-white p-3 shadow-sm has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary"
+              className="flex cursor-pointer flex-col gap-1 rounded-xl border p-3 shadow-sm has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[color:var(--fb-acento)]"
               style={
                 escolhido
-                  ? { borderColor: BRAND_COLORS.primary, background: BRAND_COLORS.primaryLight, boxShadow: `0 0 0 1px ${BRAND_COLORS.primary}` }
-                  : { borderColor: token.colorBorder }
+                  ? { borderColor: token.colorPrimary, background: cores.painel, boxShadow: `0 0 0 1px ${token.colorPrimary}` }
+                  : { borderColor: token.colorBorder, background: token.colorBgElevated }
               }
             >
               <span className="flex items-start justify-between gap-2">
@@ -239,7 +307,9 @@ function EscolhaDoTipo({
                   onChange={() => onChange?.(tipo)}
                   aria-labelledby={`${base}-${tipo}`}
                   aria-describedby={`${base}-${tipo}-descricao`}
-                  className="m-0 size-4 cursor-pointer accent-primary"
+                  className="m-0 size-4 cursor-pointer"
+                  // No escuro, o rádio nativo também fica escuro (sem o círculo branco do navegador).
+                  style={{ accentColor: token.colorPrimary, colorScheme: escuro ? 'dark' : undefined }}
                 />
               </span>
               <span id={`${base}-${tipo}`} className="font-semibold">
@@ -259,21 +329,27 @@ function EscolhaDoTipo({
 export function FeedbackButton(): JSX.Element {
   const location = useLocation();
   const compacto = !Grid.useBreakpoint().sm;
-  const { token } = theme.useToken();
+  const { token, cores } = useCoresDaCaixa();
   const idComentario = useId();
   const [aberto, setAberto] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [form] = Form.useForm<Valores>();
 
-  // AA (4,5:1) nesta caixa: o AntD pinta o erro do campo com o colorError (3,3:1 no branco) e o texto
-  // de exemplo com 25% de preto (1,8:1); aqui ficam no vermelho 7 (5,6:1) e no terciário (4,7:1).
-  // A borda verde do comentário (modelo) é o colorPrimaryBorder: 3,8:1 no branco.
+  // AA nesta caixa: o erro do campo no vermelho da caixa e o contador no texto discreto (o colorError
+  // e o terciário do escuro não chegam a 4,5:1). A borda verde do comentário (modelo) é o
+  // colorPrimaryBorder: 3,8:1 no branco; no escuro vale a borda dos inputs escuros (App.css).
   const temaDaCaixa: ThemeConfig = {
-    token: { colorError: token.red7 },
     components: {
-      Input: { colorBorder: token.colorPrimaryBorder, colorTextPlaceholder: token.colorTextTertiary, borderRadius: 12 },
+      Form: { colorError: cores.vermelho },
+      Input: { colorBorder: token.colorPrimaryBorder, colorTextDescription: cores.discreto, borderRadius: 12 },
     },
   };
+  const fundoDaCaixa = {
+    backgroundImage: detalheDoCanto(cores),
+    '--fb-superficie': token.colorBgElevated,
+    '--fb-acento': token.colorPrimary,
+    '--fb-exemplo': cores.discreto,
+  } as CSSProperties;
 
   const fechar = (): void => {
     setAberto(false);
@@ -315,14 +391,14 @@ export function FeedbackButton(): JSX.Element {
         open={aberto}
         width={640}
         className={FECHAR_EM_CIRCULO}
-        styles={{ content: { backgroundImage: DETALHE_DO_CANTO }, header: { background: 'transparent', marginBottom: 2 } }}
+        styles={{ content: fundoDaCaixa, header: { background: 'transparent', marginBottom: 2 } }}
         // Só o título dá nome à caixa; o subtítulo fica no corpo, ao lado do ícone (que sai do título para baixo).
         title={
           <span
             className="relative block pe-12 ps-16 text-xl font-bold leading-7 sm:text-[22px]"
-            style={{ color: BRAND_COLORS.primaryDark }}
+            style={{ color: cores.titulo }}
           >
-            <MessageOutlined aria-hidden className="absolute start-0 top-0.5 text-[48px]" style={{ color: BRAND_COLORS.primary }} />
+            <MessageOutlined aria-hidden className="absolute start-0 top-0.5 text-[48px]" style={{ color: token.colorPrimary }} />
             Enviar feedback
           </span>
         }
@@ -369,12 +445,13 @@ export function FeedbackButton(): JSX.Element {
                 maxLength={COMENTARIO_MAX}
                 showCount
                 placeholder="Escreva seu comentário aqui..."
+                classNames={{ textarea: TEXTO_DE_EXEMPLO }}
               />
             </Form.Item>
           </Form>
           {/* Transparência (LGPD): não está no modelo, mas fica, discreta, perto do envio. O mt-6 garante
               24 px abaixo da caixa de texto, onde fica o contador (22 px); no celular a margem do item é 12 px. */}
-          <p className="mt-6 text-xs" style={{ color: token.colorTextTertiary }}>
+          <p className="mt-6 text-xs" style={{ color: cores.discreto }}>
             Seu nome e a tela em que você está vão junto.
           </p>
         </ConfigProvider>

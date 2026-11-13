@@ -4,7 +4,7 @@
  */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ConfigProvider, message } from 'antd';
+import { ConfigProvider, message, theme } from 'antd';
 import ptBR from 'antd/locale/pt_BR';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
@@ -15,6 +15,7 @@ vi.mock('../../api/feedback', async (importOriginal) => ({
 }));
 
 import { enviarFeedback } from '../../api/feedback';
+import { ThemeProvider, useTheme, type ThemeContextValue } from '../../contexts/ThemeContext';
 import { definirLarguraTela } from '../../test/larguraTela';
 import { FeedbackButton } from '../FeedbackButton';
 
@@ -125,6 +126,37 @@ describe('FeedbackButton', { timeout: 20000 }, () => {
     expect(tipos.size).toBe(1);
     expect([...notas][0]).not.toBe('');
     expect([...tipos][0]).not.toBe([...notas][0]);
+  });
+
+  test('tema escuro: caixinhas, cartões e acento vêm do tema, sem fundo branco fixo', async () => {
+    let tema: ThemeContextValue | undefined;
+    function ComTemaDoApp() {
+      tema = useTheme();
+      return (
+        <ConfigProvider locale={ptBR} theme={tema.antThemeConfig}>
+          <MemoryRouter>
+            <FeedbackButton />
+          </MemoryRouter>
+        </ConfigProvider>
+      );
+    }
+    const user = userEvent.setup();
+    render(
+      <ThemeProvider>
+        <ComTemaDoApp />
+      </ThemeProvider>,
+    );
+    act(() => tema!.setThemeMode('dark'));
+    const { colorBgElevated: superficie, colorPrimary: acento } = theme.getDesignToken(tema!.antThemeConfig);
+    expect(superficie).not.toBe('#ffffff');
+
+    const caixa = await abrir(user);
+    await marcar(user, caixa, '4: bom');
+
+    // A caixinha da estrela é o irmão do input; o cartão é o rótulo inteiro.
+    expect(within(caixa).getByRole('radio', { name: '1: muito ruim' }).nextElementSibling).toHaveStyle({ backgroundColor: superficie });
+    expect(within(caixa).getByRole('radio', { name: 'Elogio' }).closest('label')).toHaveStyle({ backgroundColor: superficie });
+    expect(within(caixa).getByRole('radio', { name: '4: bom' }).nextElementSibling).toHaveStyle({ borderColor: acento });
   });
 
   test('no celular o botão é só o ícone, com nome acessível', () => {

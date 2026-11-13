@@ -26,7 +26,10 @@ em `citacoes-apagadas-allowlist.txt` e `adr-numeros-allowlist.txt`. Toda entrada
 carrega motivo; as temporárias dizem quando sair, e saíram (o Lote C removeu as
 três dele no dia seguinte).
 
-**Ratchet sobre piso medido** — cobertura vitest, subida 3× em 4 dias. Usado no
+**Ratchet sobre piso medido** — cobertura vitest, subida 3× em 4 dias e depois
+parada 79 dias (#1867 a FER-55), com a cobertura subindo de ~45% para ~82%: a
+regra «sobe a cada leva de testes» não dizia quem sobe nem quando. Ratchet sem
+dono e sem gatilho vira piso morto; o FER-55 deu os dois. O padrão também é usado no
 `check_issue_drift`. O piso é por raiz, e o gate imprime «aperte o piso» quando
 a contagem cai. **Aperte no mesmo PR**: entre dois merges o piso ficou 27 com a
 realidade em 22, e 5 vagas de folga não quebram nada visivelmente — que é o que

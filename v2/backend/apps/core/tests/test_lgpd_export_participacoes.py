@@ -174,6 +174,9 @@ def test_dossie_traz_os_eventos_em_que_o_titular_e_o_formador_avaliado():
     titular = UsuarioFactory()
     sol = SolicitacaoFactory(pretende_avaliar_formador=True, formador_avaliado=titular)
     _participa(sol, titular, Participation.Role.FORMADOR)
+    # controle: o titular é formador num evento em que quem criou pretende avaliar outra pessoa
+    do_colega = SolicitacaoFactory(pretende_avaliar_formador=True, formador_avaliado=UsuarioFactory())
+    _participa(do_colega, titular, Participation.Role.FORMADOR)
 
     data = build_lgpd_export_data(titular, include_audit=False)
 
@@ -274,6 +277,9 @@ def test_download_de_quem_conectou_o_google_sai_com_os_metadados_e_sem_tokens():
 def test_comando_do_admin_exporta_conta_inativa_com_google_e_conta_as_secoes(tmp_path):
     titular = UsuarioFactory(cpf=CPF_EXEMPLO, is_active=False)
     _participa(SolicitacaoFactory(), titular, Participation.Role.COORDENADOR)
+    SolicitacaoFactory(coordenador=titular)
+    SolicitacaoFactory(coordenador=titular)
+    SolicitacaoFactory(pretende_avaliar_formador=True, formador_avaliado=titular)
     _credencial_google(titular)
     out = tmp_path / "export.json"
     saida = io.StringIO()
@@ -284,5 +290,9 @@ def test_comando_do_admin_exporta_conta_inativa_com_google_e_conta_as_secoes(tmp
     assert [linha["role"] for linha in data["event_participations"]] == [Participation.Role.COORDENADOR]
     assert data["gcal_credentials"]["google_email"] == "operacao@example.invalid"
     assert "Event participations: 1" in saida.getvalue()
+    assert "Events as responsible: 2" in saida.getvalue()
+    assert "Events as formador to evaluate: 1" in saida.getvalue()
     log = AuditLog.objects.filter(action=AuditLog.Action.EXPORT).latest("created_at")
-    assert log.details["counts"]["event_participations"] == 1
+    contagens = log.details["counts"]
+    assert (contagens["event_participations"], contagens["events_as_responsible"]) == (1, 2)
+    assert contagens["events_as_formador_to_evaluate"] == 1

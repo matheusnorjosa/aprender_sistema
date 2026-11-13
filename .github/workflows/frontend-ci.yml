@@ -164,6 +164,7 @@ jobs:
         --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
     # `overwrite`: um `gh run rerun --failed` refaz a parte com o mesmo nome de artefato.
+    # 7 dias: a junção de um re-run usa os relatórios das partes que passaram na tentativa anterior.
     - name: Upload do relatório da parte (blob)
       if: ${{ !cancelled() }}
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
@@ -173,10 +174,11 @@ jobs:
         include-hidden-files: true
         if-no-files-found: error
         overwrite: true
-        retention-days: 1
+        retention-days: 7
 
   # Check do ruleset. `always()`: para o GitHub, job pulado conta como sucesso, então este job
   # precisa rodar sempre e reprovar quando uma das partes falhou, foi cancelada ou pulada.
+  # Não trocar por `!cancelled()`: com o run cancelado, o agregador ficaria pulado (= sucesso).
   # Nome de ruleset nunca vai em job com matrix (o GitHub acrescenta os valores ao nome e o
   # check exigido nunca chegaria).
   build-lint-frontend:
@@ -214,17 +216,20 @@ jobs:
         path: v2/frontend/.vitest-reports
         merge-multiple: true
 
-    # Não poder medir não é aprovar: sem as 6 partes, a junção cobriria só parte da suíte.
-    # O número acompanha a matrix de `frontend-unit`; mudou lá, muda aqui.
+    # Não poder medir não é aprovar: sem as 6 partes, a junção cobriria só parte da suíte. Confere
+    # o nome de cada parte (blob-i-6.json), não só a quantidade. O 6 acompanha a matrix de
+    # `frontend-unit`; mudou lá, muda aqui.
     - name: Conferir que chegaram as 6 partes
       run: |
-        n="$(find .vitest-reports -maxdepth 1 -name 'blob-*.json' | wc -l)"
-        echo "relatórios recebidos: $n"
-        if [ "$n" -ne 6 ]; then
-          echo "::error::Esperava 6 relatórios do Vitest (um por parte); chegaram $n."
-          exit 1
-        fi
+        ls .vitest-reports
+        for i in 1 2 3 4 5 6; do
+          if [ ! -f ".vitest-reports/blob-$i-6.json" ]; then
+            echo "::error::Falta o relatório da parte $i/6. Os relatórios expiram em 7 dias; depois disso, use 'Re-run all jobs'."
+            exit 1
+          fi
+        done
 
+    # `--coverage` é o que aplica o piso de vitest.config.ts na junção: sem ele, o piso some calado.
     - name: Juntar as partes e aplicar o piso de cobertura (vitest.config.ts)
       run: npx vitest run --merge-reports --coverage
 
@@ -233,7 +238,8 @@ jobs:
   checklist-shard:
     name: "[required] checklist (parte ${{ matrix.shard }}/${{ strategy.job-total }})"
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 20: a parte mais lenta levou 9m50s num runner lento (12/11), com 2m48s só de subir o backend.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:

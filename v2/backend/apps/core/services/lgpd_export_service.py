@@ -20,7 +20,7 @@ from django.utils import timezone
 # Chaves de contagem expostas na trilha de auditoria (o FATO, nunca a PII).
 COUNT_KEYS = (
     "solicitations_created",
-    "events_as_formador",
+    "event_participations",
     "availability_blocks",
     "approvals_made",
 )
@@ -50,6 +50,7 @@ def build_lgpd_export_data(user: Any, *, include_audit: bool = True, include_gca
         AvailabilityBlock,
         DATCoordenador,
         GoogleOAuthCredential,
+        Participation,
         Solicitacao,
     )
 
@@ -96,14 +97,26 @@ def build_lgpd_export_data(user: Any, *, include_audit: bool = True, include_gca
         )
     )
 
-    # Eventos onde o titular e' formador (formadores = M2M com Usuario).
-    data["events_as_formador"] = list(
-        Solicitacao.objects.filter(formadores=user).values(
-            "id",
-            "status",
-            "inicio",
-            "fim",
-            "municipio__nome",
+    # Eventos em que o titular participa, em qualquer papel (SEG-10/ART-17). A participacao mora em
+    # `Participation`; o M2M `Solicitacao.formadores` ficou sem escrita (0 linhas em producao em
+    # 13/11/2026). So a linha do proprio titular: a observacao de outros participantes nao entra, nem a
+    # observacao do evento.
+    data["event_participations"] = list(
+        Participation.objects.filter(usuario=user)
+        .order_by("solicitacao__inicio", "solicitacao_id", "role")
+        .values(
+            "solicitacao_id",
+            "role",
+            "ch_horas",
+            "observacao",
+            "created_at",
+            "solicitacao__status",
+            "solicitacao__inicio",
+            "solicitacao__fim",
+            "solicitacao__municipio__nome",
+            "solicitacao__projeto__nome",
+            "solicitacao__projeto_2__nome",
+            "solicitacao__tipo_evento__nome",
         )
     )
 

@@ -24,9 +24,10 @@
   color: var(--as-primary-dark);
 }
 
+/* Texto de exemplo: 4,57:1 no campo branco (WCAG AA, DEF-28; com 0,45 dava 2,40:1) */
 .login-page .login-card .ant-input::placeholder,
 .login-page .login-card .ant-input-affix-wrapper input::placeholder {
-  color: rgba(0, 75, 61, 0.45);
+  color: rgba(0, 75, 61, 0.71);
 }
 
 .login-page .login-card .ant-input:hover,

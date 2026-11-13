@@ -9,6 +9,7 @@ sources_of_truth:
   - v2/frontend/e2e/checklist/sem-rolagem-horizontal.spec.ts
   - v2/frontend/src/components/ResponsiveTable.tsx
   - v2/frontend/src/components/AcoesLinha.tsx
+  - v2/frontend/src/contexts/__tests__/ThemeContext.contraste.test.tsx
 ---
 
 # Princípios de UX
@@ -53,6 +54,7 @@ evento separado no Google; o limite de 10 conta os horários de todos os cartõe
 | Limite | Onde é cobrado hoje |
 |---|---|
 | WCAG 2.1 AA (axe `wcag2a`, `wcag2aa`, `wcag21aa`) | [`accessibility.spec.ts`](../../../frontend/e2e/checklist/accessibility.spec.ts), job `[required] checklist tests`. Cobre o login, `/perfil`, `/dat/admin/usuarios` (C1), as 7 rotas do C2 (`/dat/admin/grupos`, `/setores`, `/funcoes`, `/gerencias`, `/municipios`, `/produtos`, `/projetos-gerais`), `/dat/admin/projetos` (marca de série, 01/10/2026), desde o item 36, `/solicitacoes/minhas`, `/solicitacoes/meus-eventos`, Aprovações, Publicar na agenda e Pré-agenda, a Nova Solicitação (28/10/2026) e, desde o G26 (06/11/2026), a edição de solicitação (`/solicitacoes/:id/editar`), `/controle/acoes`, `/controle/compras`, `/dat/registros` e a troca obrigatória de senha e, desde 11/11/2026, `/dat/admin/feedbacks`, a 360 e 1280 px, mais o erro de carga das opções em Gerências e Produtos e o vazio com filtro de Produtos: **cada PR de tela acrescenta suas telas** |
+| Contraste AA do vermelho de erro e do texto de exemplo, que o axe não mede (o erro só aparece depois de validar; o `::placeholder` fica fora da regra de contraste dele) | [`ThemeContext.contraste.test.tsx`](../../../frontend/src/contexts/__tests__/ThemeContext.contraste.test.tsx), nos tokens do tema claro (página, card, campo, modal e o cartão do login), job `[required] frontend unit`, desde o DEF-28 (13/11/2026); o tema escuro fica para o DEF-29 |
 | Teclado e leitor de tela nos componentes do padrão | E2E `menu-lateral-teclado`, `mais-acoes-teclado` e `excluir-em-uso-foco` no mesmo job |
 | Core Web Vitals: LCP < 2,5 s, CLS < 0,1, JS inicial < 200 KB | [`performance.spec.ts`](../../../frontend/e2e/checklist/performance.spec.ts), mesmo job (mede a página inicial) |
 | Sem rolagem horizontal em 360/768/1024/1280 | [`sem-rolagem-horizontal.spec.ts`](../../../frontend/e2e/checklist/sem-rolagem-horizontal.spec.ts) com ratchet de `PENDENTES`, que zerou no G30 (06/11/2026): toda rota medida passa |

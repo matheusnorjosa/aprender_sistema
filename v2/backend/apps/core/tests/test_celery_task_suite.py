@@ -11,6 +11,7 @@ Refs: Issue #846, TESTING_POLICY.md
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 from functools import partial
 from unittest.mock import patch
@@ -470,7 +471,7 @@ class TestGcalSyncRetryTask:
             "apply_blocked": False,
         }
 
-    def test_retry_que_falha_sem_conseguir_registrar_devolve_o_erro(self, retry_solicitacao):
+    def test_retry_que_falha_sem_conseguir_registrar_devolve_o_erro(self, retry_solicitacao, caplog):
         """Se o registro da falha também falha (banco fora do ar), a task devolve o ERROR de sempre em vez de
         levantar (revisão do DEF-16, R2C-6).
 
@@ -481,6 +482,7 @@ class TestGcalSyncRetryTask:
         from apps.core.tasks import queue_gcal_sync_retry
 
         with (
+            caplog.at_level(logging.ERROR, logger="apps.core.tasks"),
             patch(_APPLY, side_effect=_grava_e_levanta(RuntimeError("Google fora do ar"))),
             patch.object(AuditLog.objects, "create", side_effect=DatabaseError("banco fora do ar")),
         ):
@@ -488,6 +490,9 @@ class TestGcalSyncRetryTask:
 
         assert resultado["action"] == "ERROR"
         assert resultado["error"] == "Google fora do ar"
+        assert any(
+            r.exc_info and isinstance(r.exc_info[1], DatabaseError) for r in caplog.records
+        ), "a falha do registro não foi para o log"
 
     def test_retry_com_breaker_aberto_desfaz_a_gravacao_parcial_e_pede_nova_tentativa(self, retry_solicitacao):
         """CircuitBreakerError segue pedindo nova tentativa em 60 s, sem deixar gravação parcial nem registro de
@@ -522,22 +527,27 @@ _CANCEL = "apps.core.services.gcal_sync_service.cancel_solicitacao"
 def _rodar_e_guardar_os_atomics(chamar_task, alvo, resposta):
     """Roda a task e guarda a pilha de blocos atomic em dois momentos: no SELECT ... FOR UPDATE da Solicitacao e na
     chamada ao Google (o alvo do patch). Compara por identidade: um atomic(savepoint=False) entra na pilha de
-    savepoints como None e não se distinguiria de outro (revisão do DEF-16, R2T-5)."""
+    savepoints como None e não se distinguiria de outro (revisão do DEF-16, R2T-5). Guarda também os savepoints, que
+    distinguem o mesmo objeto Atomic aberto duas vezes, e se a trava veio antes da chamada (R3-codigo-testes-1)."""
     blocos = {}
 
     def espiar(execute, sql, params, many, context):
         if _travou_a_solicitacao([{"sql": sql}]):
             blocos["trava"] = list(connection.atomic_blocks)
+            blocos["trava_sids"] = list(connection.savepoint_ids)
         return execute(sql, params, many, context)
 
     def chamar_o_google(*_args, **_kwargs):
         blocos["google"] = list(connection.atomic_blocks)
+        blocos["google_sids"] = list(connection.savepoint_ids)
+        blocos["travou_antes"] = "trava" in blocos
         return resposta
 
     fora = list(connection.atomic_blocks)
+    fora_sids = list(connection.savepoint_ids)
     with connection.execute_wrapper(espiar), patch(alvo, side_effect=chamar_o_google):
         resultado = chamar_task()
-    return fora, blocos, resultado
+    return fora, fora_sids, blocos, resultado
 
 
 class TestTravaDuraAChamadaAoGoogle:
@@ -576,7 +586,7 @@ class TestTravaDuraAChamadaAoGoogle:
             resposta = _sincronizou(sol)
             chamar = partial(queue_gcal_sync_retry, sol.id)
 
-        fora, blocos, resultado = _rodar_e_guardar_os_atomics(chamar, alvo, resposta)
+        fora, fora_sids, blocos, resultado = _rodar_e_guardar_os_atomics(chamar, alvo, resposta)
 
         assert resultado["error"] is None
         assert "trava" in blocos, "a task não travou a linha"
@@ -586,6 +596,11 @@ class TestTravaDuraAChamadaAoGoogle:
         assert len(blocos["google"]) >= ate_o_atomic_da_task and all(
             a is b for a, b in zip(blocos["google"][:ate_o_atomic_da_task], blocos["trava"][:ate_o_atomic_da_task])
         ), "o atomic da trava fechou antes da chamada ao Google"
+        assert blocos["travou_antes"], "a task chamou o Google antes de travar a linha"
+        ate_o_savepoint_da_task = len(fora_sids) + 1
+        assert (
+            blocos["google_sids"][:ate_o_savepoint_da_task] == blocos["trava_sids"][:ate_o_savepoint_da_task]
+        ), "a chamada ao Google rodou num outro bloco aberto pelo mesmo Atomic"
 
 
 class TestNotificacoesTask:

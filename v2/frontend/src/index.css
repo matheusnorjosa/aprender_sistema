@@ -21,6 +21,19 @@
   --as-primary-dark-accent: #2FA37D;
 }
 
+/*
+ * Texto de exemplo dos <input>/<textarea> comuns (fora do AntD): o preflight do Tailwind pinta com
+ * #9ca3af, 2,54:1 no campo branco. Este é o cinza do colorTextPlaceholder do tema claro: 4,76:1
+ * (WCAG AA, DEF-28). No @layer base sai logo depois do preflight e o vence; os campos do AntD e do
+ * login (App.css) têm seletor mais forte. Sem color-scheme, o campo comum segue branco no escuro.
+ */
+@layer base {
+  input::placeholder,
+  textarea::placeholder {
+    color: rgba(0, 0, 0, 0.55);
+  }
+}
+
 /* Clean reset - let Ant Design handle styling */
 * {
   margin: 0;

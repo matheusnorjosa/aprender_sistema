@@ -80,7 +80,8 @@ Espelhada nas `--as-*` de [`index.css`](../frontend/src/index.css).
 
 **Status (tokens AntD, não são a marca):** sucesso `#52c41a` · aviso `#faad14` ·
 erro `#ff4d4f` · info `#1890ff`, com fundos `successBg #f6ffed` / `warningBg #fffbe6` /
-`errorBg #fff2f0`. O **vermelho de erro** é semanticamente reservado — ver seção 4.
+`errorBg #fff2f0` (no tema claro, derivado do red-7: `#ffe8e6`). O **vermelho de erro** é semanticamente reservado — ver seção 4. No tema
+claro o `colorError` não é o `#ff4d4f`, que reprova como texto: é o red-7 `#cf1322` (seção 3).
 
 ---
 
@@ -98,6 +99,9 @@ Dois conjuntos de token AntD (`lightThemeTokens` / `darkThemeTokens`) trocados p
 | Fundo elevado | (default AntD) | `#262626` |
 | Borda | (default AntD) | `#424242` / secundária `#303030` |
 | Texto terciário | `rgba(0,0,0,.55)` (fix a11y ↓) | `rgba(255,255,255,.45)` |
+| Texto de exemplo (`colorTextPlaceholder`) | `rgba(0,0,0,.55)` (fix a11y ↓) | default AntD; `rgba(255,255,255,.45)` no Input e no Select (`App.css`); DEF-29 |
+| Vermelho de erro (`colorError`, seed) | `#cf1322`, o red-7 (fix a11y ↓) | default AntD, derivado de `#ff4d4f`; DEF-29 |
+| Botão `danger`: hover / fundo do pressionado (só no `Button`) | `#b80c1e` / `#ffccc7`, o red-2 (fix a11y ↓) | default AntD; DEF-29 |
 
 **Fix de a11y no tema claro:** o default AntD para texto terciário é `rgba(0,0,0,.45)` ≈
 `#8c8c8c`, que dá só **3.36:1** em branco (reprova o mínimo 4.5:1 de texto — SC 1.4.3),
@@ -114,6 +118,60 @@ direto. Alcance: `Button type="link"` (ícones do `AcoesLinha`, "Limpar seleçã
 de expandir das tabelas e os ícones e links do `Typography`. O `<a>` comum (e o `<Link>` do
 react-router) **não** passa pelo token: o preflight do Tailwind (`a { color: inherit }`) vence o
 reset do AntD e ele herda a cor do texto. Teste: `contexts/__tests__/ThemeContext.link.test.tsx`.
+
+**Fix de a11y no vermelho de erro (DEF-28, 13/11/2026):** o `colorError` padrão, `#ff4d4f`,
+pinta a mensagem de erro do `Form` e o asterisco do obrigatório, e o `colorErrorText` (o mesmo
+tom) pinta o `Text type="danger"`. O `#ff4d4f` dava **3,27:1** no branco (card, campo, modal),
+**2,91:1** na página `#f0f2f5` e **2,74:1** no cartão verde-claro `#E5EDE5` do login e da troca
+de senha, onde também aparecem erros do `Form`. Agora é o red-7 `#cf1322`: **5,57:1**, **4,97:1**
+e **4,66:1**. O vermelho de mesmo matiz mais perto do `#ff4d4f` que passa nos três fundos,
+`#d2162a`, quase não se distingue do red-7 (ΔE OKLab 0,009), mas fica em 4,52:1 no cartão do
+login e o hover que o AntD tira dele dá 4,38:1 no branco. O red-7 já era o vermelho AA da caixa
+de feedback e da tela Compras. O `colorError` é token **seed**: o AntD tira dele o hover, o
+active e os fundos, então o vermelho escurece em tudo o que desenha dentro do `ConfigProvider`
+do `App.tsx` (borda do campo com erro, botão `danger`, contador do `Badge`; exceção logo abaixo,
+nos diálogos estáticos), e o `Alert` de erro fica com fundo `#ffe8e6` e borda `#f58d8c`
+(eram `#fff2f0` e `#ffccc7`). O texto branco do botão `danger` primário e do contador vai de
+3,27:1 para 5,57:1. O hover que o AntD deriva do red-7, `#db373f`, reprovava no botão `danger`:
+**3,87:1** no hover do botão de texto, que pinta o próprio fundo rosado `#ffe8e6` em qualquer lugar
+(o "Excluir" dos modais de Ações, Cadastros, Compras, Coordenadores e Registros do DAT), **1,96:1**
+pressionado (sobre `#f58d8c`) e 4,04:1 na página no botão de link e de contorno. Por isso o tema
+claro ajusta dois tokens só do `Button`: o hover vai para `#b80c1e`, entre o red-7 e o red-8
+(**5,77:1** no rosado, **6,02:1** na página, **5,65:1** no cartão do login, **6,75:1** com o texto
+branco do botão primário), e o fundo do pressionado vai para o red-2 `#ffccc7` (**4,73:1**). O
+pressionado segue no red-8 `#a8071a`, então o hover fica mais escuro que o normal e mais claro que
+o pressionado. O botão `variant="filled"`, sem uso hoje, ainda reprova no hover (3,42:1).
+
+**Fora do alcance: os diálogos estáticos (`Modal.confirm`, `Modal.info`, `Modal.error`,
+`Modal.warning`).** Eles abrem fora da árvore do `ConfigProvider`, com o tema global do AntD
+(`ConfigProvider.config`), que o projeto não configura. Por isso nada do tema claro chega a eles:
+nem o red-7, nem o hover `#b80c1e`, nem o fundo `#ffccc7` do pressionado. Neles o botão `danger`
+segue no `#ff4d4f`, com o texto branco em **3,27:1**, e no hover `#ff7875` em **2,56:1**; o
+`Text type="danger"` dentro do conteúdo também segue no `#ff4d4f`. São 22 diálogos estáticos com
+botão `danger`, em 19 arquivos (por exemplo o "Sim, excluir" das telas do DAT, de Usuários, de
+Grupos, de Deslocamentos, de Aprovações e da Pré-agenda). O "Excluir" de texto citado acima é
+outro botão: fica no `Modal` em JSX, dentro da árvore, e melhorou; o "Sim, excluir" que ele abre
+não melhorou. Os diálogos de `Modal.useModal` (`CartaoEvento`, `HorarioDoEvento` e `PublicacaoSetorPage`) herdam o tema e
+estão certos. O conserto do código é o item DEF-33 do quadro da liberação: `ConfigProvider.config({ holderRender })` com
+o tema ativo, ou migrar para `Modal.useModal`, também troca o azul `#1677ff` do botão primário
+desses diálogos pelo verde da marca. Contagem: buscar `Modal.(confirm|info|error|warning)({` em
+`src` e olhar quais têm `okType: 'danger'` ou `danger: true`.
+
+**Fix de a11y no texto de exemplo (DEF-28):** o `colorTextPlaceholder` era o quaternário
+`rgba(0,0,0,.25)` ≈ `#bfbfbf`, **1,83:1** no campo. Agora é o cinza do terciário,
+`rgba(0,0,0,.55)`: **4,76:1** no campo, no card e no modal e **4,63:1** na página (com `.54` a
+página cairia para 4,47:1). O texto desabilitado continua no quaternário. O AntD usa o mesmo
+token no fundo do `Avatar` sem cor, que fica cinza-médio (o ícone branco vai de 1,83:1 para
+4,76:1). No login, o `App.css` pinta o texto de exemplo com o verde da marca e vence o token: o
+alfa foi de .45 (2,40:1) para .71 (**4,57:1** no campo branco). O token não chega ao `<input>` e ao
+`<textarea>` comuns (fora do AntD, como os filtros da Disponibilidade): neles valia o cinza do
+preflight do Tailwind, `#9ca3af` (**2,54:1**). Uma regra no `@layer base` do `index.css` dá a eles
+o mesmo `rgba(0,0,0,.55)`; ela sai depois do preflight e perde para os seletores do AntD e do
+login. Sem `color-scheme`, o campo comum fica branco também no tema escuro (4,76:1 lá também; vale
+lembrar no DEF-29). O axe do checklist não mede o
+erro nem o texto de exemplo: o erro só aparece depois de validar, e o `::placeholder` fica fora
+da regra de contraste dele. Tema escuro: DEF-29. Teste:
+`contexts/__tests__/ThemeContext.contraste.test.tsx`.
 
 **Fix de a11y no "Carregando..." de tela cheia** (`components/FullscreenLoader.tsx`): o AntD
 pinta o texto em branco sobre a máscara `colorBgMask` = `rgba(0,0,0,.45)`, que na página

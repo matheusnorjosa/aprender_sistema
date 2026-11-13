@@ -109,7 +109,7 @@ function coresDaCaixa(token: GlobalToken, escuro: boolean): CoresDaCaixa {
     destaque: tom(15),
     mancha: `${BRAND_COLORS.primaryLight}99`,
     textoDoBom: BRAND_COLORS.primaryDark,
-    // Vermelho 7: 4,7:1 no painel e 5,6:1 no branco (o colorError do AntD dá 3,3:1 no branco).
+    // Vermelho 7, o colorError do tema claro desde o DEF-28: 4,7:1 no painel e 5,6:1 no branco.
     vermelho: token.red7,
     discreto: token.colorTextTertiary,
   };
@@ -335,8 +335,8 @@ export function FeedbackButton(): JSX.Element {
   const [enviando, setEnviando] = useState(false);
   const [form] = Form.useForm<Valores>();
 
-  // AA nesta caixa: o erro do campo no vermelho da caixa e o contador no texto discreto (o colorError
-  // e o terciário do escuro não chegam a 4,5:1). A borda verde do comentário (modelo) é o
+  // AA nesta caixa: o erro do campo no vermelho da caixa e o contador no texto discreto (no escuro, o
+  // colorError e o terciário não chegam a 4,5:1). A borda verde do comentário (modelo) é o
   // colorPrimaryBorder: 3,8:1 no branco; no escuro vale a borda dos inputs escuros (App.css).
   const temaDaCaixa: ThemeConfig = {
     components: {

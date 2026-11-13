@@ -126,6 +126,13 @@ const lightThemeTokens = {
   // que dá só 3.36:1 em branco (ex.: labels do Descriptions) e reprova 4.5:1. Escurecemos
   // para rgba(0,0,0,0.55)≈#737373 (~4.8:1). Só aumenta contraste — mudança sutil.
   colorTextTertiary: 'rgba(0, 0, 0, 0.55)',
+  // A11y (WCAG AA, DEF-28): o vermelho de erro do AntD (#ff4d4f) dá 3,27:1 no branco e 2,74:1 no
+  // cartão verde-claro do login. O red-7 dá 5,57:1 no branco, 4,97:1 na página e 4,66:1 no cartão
+  // do login. É token SEED: o AntD deriva dele o colorErrorText (o mesmo tom), o hover e os fundos.
+  colorError: '#cf1322',
+  // Texto de exemplo (placeholder): o default é o quaternário rgba(0,0,0,0.25), 1,83:1 no campo.
+  // O cinza do terciário dá 4,76:1 no campo e 4,63:1 na página; o texto desabilitado segue no quaternário.
+  colorTextPlaceholder: 'rgba(0, 0, 0, 0.55)',
 };
 
 export function ThemeProvider({ children }: ThemeProviderProps): JSX.Element {
@@ -183,6 +190,14 @@ export function ThemeProvider({ children }: ThemeProviderProps): JSX.Element {
         groupTitleColor: '#ffffff',
         iconSize: 16,
         collapsedIconSize: 16,
+      },
+      // A11y (WCAG AA, DEF-28): o hover que o AntD deriva do red-7 (#db373f) dá 3,87:1 no fundo rosado
+      // do botão danger de texto ("Excluir" dos modais) e 4,04:1 na página; pressionado, 1,96:1. Hover
+      // entre o red-7 e o red-8 (o pressionado segue no red-8, #a8071a): 5,77:1 no rosado, 6,02:1 na
+      // página e 6,75:1 com texto branco. Fundo do pressionado no red-2: 4,73:1.
+      Button: isDark ? {} : {
+        colorErrorHover: '#b80c1e',
+        colorErrorBgActive: '#ffccc7',
       },
       Table: isDark ? {
         headerBg: '#1f1f1f',

@@ -21,8 +21,23 @@ from django.utils import timezone
 COUNT_KEYS = (
     "solicitations_created",
     "event_participations",
+    "events_as_responsible",
+    "events_as_evaluated_formador",
     "availability_blocks",
     "approvals_made",
+)
+
+# Campos do evento nas secoes que listam eventos pelo titular. A observacao do evento fica de fora: e texto
+# livre de quem criou e pode citar outras pessoas.
+_CAMPOS_DO_EVENTO = (
+    "id",
+    "status",
+    "inicio",
+    "fim",
+    "municipio__nome",
+    "projeto__nome",
+    "projeto_2__nome",
+    "tipo_evento__nome",
 )
 
 
@@ -97,8 +112,8 @@ def build_lgpd_export_data(user: Any, *, include_audit: bool = True, include_gca
         )
     )
 
-    # Eventos em que o titular participa, em qualquer papel (SEG-10/ART-17). A participacao mora em
-    # `Participation`; o M2M `Solicitacao.formadores` ficou sem escrita (0 linhas em producao em
+    # Eventos em que o titular participa, em qualquer papel (ART-17). A participacao mora em
+    # `Participation`; o M2M `Solicitacao.formadores` nao e gravado pela API (0 linhas em producao em
     # 13/11/2026). So a linha do proprio titular: a observacao de outros participantes nao entra, nem a
     # observacao do evento.
     data["event_participations"] = list(
@@ -118,6 +133,19 @@ def build_lgpd_export_data(user: Any, *, include_audit: bool = True, include_gca
             "solicitacao__projeto_2__nome",
             "solicitacao__tipo_evento__nome",
         )
+    )
+
+    # Eventos em que o titular e o coordenador responsavel (FK `coordenador`) ou o formador que quem criou
+    # pretende avaliar (FK `formador_avaliado`): fatos sobre a pessoa que nao dependem de `Participation`
+    # (o admin do Django troca a FK sem acertar a participacao). O mesmo evento pode sair tambem em
+    # `event_participations`.
+    data["events_as_responsible"] = list(
+        Solicitacao.objects.filter(coordenador=user)
+        .order_by("inicio", "id")
+        .values(*_CAMPOS_DO_EVENTO, "coordenador_acompanha")
+    )
+    data["events_as_evaluated_formador"] = list(
+        Solicitacao.objects.filter(formador_avaliado=user).order_by("inicio", "id").values(*_CAMPOS_DO_EVENTO)
     )
 
     # Blocos de disponibilidade (dono = `usuario`, nao `formador`).
@@ -168,7 +196,8 @@ def build_lgpd_export_data(user: Any, *, include_audit: bool = True, include_gca
                 "has_credential": True,
                 "google_email": gcal_cred.google_email,
                 "created_at": gcal_cred.created_at.isoformat(),
-                "last_used_at": (gcal_cred.last_used_at.isoformat() if gcal_cred.last_used_at else None),
+                # A credencial nao guarda o ultimo uso: `updated_at` e a ultima renovacao ou alteracao.
+                "updated_at": gcal_cred.updated_at.isoformat(),
                 "tokens": "(excluded for security)",
             }
         else:

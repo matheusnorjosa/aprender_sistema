@@ -128,8 +128,9 @@ e **4,66:1**. O vermelho de mesmo matiz mais perto do `#ff4d4f` que passa nos tr
 `#d2162a`, quase não se distingue do red-7 (ΔE OKLab 0,009), mas fica em 4,52:1 no cartão do
 login e o hover que o AntD tira dele dá 4,38:1 no branco. O red-7 já era o vermelho AA da caixa
 de feedback e da tela Compras. O `colorError` é token **seed**: o AntD tira dele o hover, o
-active e os fundos, então o vermelho escurece em toda tela (borda do campo com erro, botão
-`danger`, contador do `Badge`), e o `Alert` de erro fica com fundo `#ffe8e6` e borda `#f58d8c`
+active e os fundos, então o vermelho escurece em tudo o que desenha dentro do `ConfigProvider`
+do `App.tsx` (borda do campo com erro, botão `danger`, contador do `Badge`; exceção logo abaixo,
+nos diálogos estáticos), e o `Alert` de erro fica com fundo `#ffe8e6` e borda `#f58d8c`
 (eram `#fff2f0` e `#ffccc7`). O texto branco do botão `danger` primário e do contador vai de
 3,27:1 para 5,57:1. O hover que o AntD deriva do red-7, `#db373f`, reprovava no botão `danger`:
 **3,87:1** no hover do botão de texto, que pinta o próprio fundo rosado `#ffe8e6` em qualquer lugar
@@ -140,6 +141,21 @@ claro ajusta dois tokens só do `Button`: o hover vai para `#b80c1e`, entre o re
 branco do botão primário), e o fundo do pressionado vai para o red-2 `#ffccc7` (**4,73:1**). O
 pressionado segue no red-8 `#a8071a`, então o hover fica mais escuro que o normal e mais claro que
 o pressionado. O botão `variant="filled"`, sem uso hoje, ainda reprova no hover (3,42:1).
+
+**Fora do alcance: os diálogos estáticos (`Modal.confirm`, `Modal.info`, `Modal.error`,
+`Modal.warning`).** Eles abrem fora da árvore do `ConfigProvider`, com o tema global do AntD
+(`ConfigProvider.config`), que o projeto não configura. Por isso nada do tema claro chega a eles:
+nem o red-7, nem o hover `#b80c1e`, nem o fundo `#ffccc7` do pressionado. Neles o botão `danger`
+segue no `#ff4d4f`, com o texto branco em **3,27:1**, e no hover `#ff7875` em **2,56:1**; o
+`Text type="danger"` dentro do conteúdo também segue no `#ff4d4f`. São 22 diálogos estáticos com
+botão `danger`, em 19 arquivos (por exemplo o "Sim, excluir" das telas do DAT, de Usuários, de
+Grupos, de Deslocamentos, de Aprovações e da Pré-agenda). O "Excluir" de texto citado acima é
+outro botão: fica no `Modal` em JSX, dentro da árvore, e melhorou; o "Sim, excluir" que ele abre
+não melhorou. Os diálogos de `Modal.useModal` (`CartaoEvento`, `HorarioDoEvento` e `PublicacaoSetorPage`) herdam o tema e
+estão certos. O conserto do código é item à parte: `ConfigProvider.config({ holderRender })` com
+o tema ativo, ou migrar para `Modal.useModal`, também troca o azul `#1677ff` do botão primário
+desses diálogos pelo verde da marca. Contagem: buscar `Modal.(confirm|info|error|warning)({` em
+`src` e olhar quais têm `okType: 'danger'` ou `danger: true`.
 
 **Fix de a11y no texto de exemplo (DEF-28):** o `colorTextPlaceholder` era o quaternário
 `rgba(0,0,0,.25)` ≈ `#bfbfbf`, **1,83:1** no campo. Agora é o cinza do terciário,

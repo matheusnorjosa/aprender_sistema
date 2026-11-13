@@ -1,20 +1,20 @@
 {
   "schema": 1,
-  "sequence": 96,
-  "release": "v2026.11.13-56fd2c5",
+  "sequence": 97,
+  "release": "v2026.11.13-e085479",
   "backend": {
     "repo": "norjosamatheus/aprender-backend",
-    "digest": "sha256:f17717b691ad5a948bd2312d3b0187467734c9918e48a0e35836ccf169139e3f"
+    "digest": "sha256:4bbbdf4c5bdba125421eb7f4805e74efe22cd52bb376b1e327ae7933e6c8a86e"
   },
   "frontend": {
     "repo": "norjosamatheus/aprender-frontend",
-    "digest": "sha256:d1af0f1e2ab2d1089e2bfc4e1a1dcaddf27e7b81ab6a6f61a1d9573c18bc7b5a"
+    "digest": "sha256:4778fbf302ae673c2e1b5975f570e964a0d20d797a538ff82e9c59a7e40743ec"
   },
   "rollback": false,
-  "issued_at": "2026-11-13T20:22:26Z",
-  "expires_at": "2026-11-14T20:22:26Z",
+  "issued_at": "2026-11-13T20:59:08Z",
+  "expires_at": "2026-11-14T20:59:08Z",
   "promoted_by": "promote.yml",
-  "run_url": "https://github.com/matheusnorjosa/aprender_sistema/actions/runs/43498702488",
-  "commit": "56fd2c5",
-  "prev_sequence": 95
+  "run_url": "https://github.com/matheusnorjosa/aprender_sistema/actions/runs/43506383664",
+  "commit": "e085479",
+  "prev_sequence": 96
 }

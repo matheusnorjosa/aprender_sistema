@@ -160,7 +160,7 @@ jobs:
         npx vitest run --coverage
         --coverage.thresholds.statements=0 --coverage.thresholds.branches=0
         --coverage.thresholds.functions=0 --coverage.thresholds.lines=0
-        --reporter=default --reporter=blob
+        --reporter=default --reporter=github-actions --reporter=blob
         --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
     # `overwrite`: um `gh run rerun --failed` refaz a parte com o mesmo nome de artefato.
@@ -226,7 +226,7 @@ jobs:
         fi
 
     - name: Juntar as partes e aplicar o piso de cobertura (vitest.config.ts)
-      run: npx vitest --merge-reports --coverage
+      run: npx vitest run --merge-reports --coverage
 
   # Checklist (Playwright) em 3 partes paralelas (FER-54). Cada parte sobe o próprio backend com o
   # seed e roda um terço dos testes; o check do ruleset é o agregador `checklist-tests`.
@@ -447,6 +447,8 @@ jobs:
         } >> v2/infra/.env
 
         export IMAGE_TAG=latest
+        # Mesmo motivo do checklist: sem reciclagem de worker do gunicorn no meio do run.
+        export GUNICORN_MAX_REQUESTS=0
         compose() {
           docker compose -f v2/infra/docker-compose.yml -f v2/infra/docker-compose.override.yml "$@"
         }

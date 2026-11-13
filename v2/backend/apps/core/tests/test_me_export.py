@@ -34,7 +34,7 @@ def test_build_lgpd_export_data_traz_dados_do_titular():
     assert data["personal_data"]["telefone"] == "(85) 90000-0000"
     assert data["export_info"]["purpose"].startswith("LGPD Data Portability")
     # Seções esperadas presentes (listas mesmo que vazias).
-    for key in ("solicitations_created", "events_as_formador", "availability_blocks", "approvals_made"):
+    for key in ("solicitations_created", "event_participations", "availability_blocks", "approvals_made"):
         assert isinstance(data[key], list)
 
 

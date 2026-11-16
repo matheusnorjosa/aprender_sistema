@@ -103,11 +103,14 @@ def test_calendar_accessible_200_true_403_404_false(efeito, esperado):
     assert cliente.calendar_accessible(ORG) is esperado
 
 
-def test_calendar_accessible_500_propaga():
+def test_calendar_accessible_500_propaga(settings):
     cliente = _cliente_sem_rede()
-    cliente.service.calendars.return_value.get.return_value.execute.side_effect = _http_error(500)
-    with patch("apps.core.services.gcal_oauth_client.time.sleep"), pytest.raises(HttpError):
+    execute = cliente.service.calendars.return_value.get.return_value.execute
+    execute.side_effect = _http_error(500)
+    with pytest.raises(HttpError):
         cliente.calendar_accessible(ORG)
+    # A repetição do 5xx é a da biblioteca (FER-60), com o limite curto do caminho da tela.
+    execute.assert_called_once_with(num_retries=settings.GCAL_REQUEST_MAX_RETRIES)
 
 
 # ---------------------------------------------------------------------------

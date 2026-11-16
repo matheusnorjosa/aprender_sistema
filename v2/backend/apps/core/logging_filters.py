@@ -16,8 +16,11 @@ from apps.core.pii import redact_cpf
 # PII patterns para o PIIRedactionFilter.
 # S6 (auditoria 14/10, C5): sem backtracking quadrático; mesma forma e mesma explicação de
 # `services/gcal/minimize.py` (uma cadeia `a@b.c+d@e.f` casa num só match, um e-mail por `@`).
-_EMAIL = r"[\w.+-]+@[\w-]+\.[\w.-]+"
+# FER-60: o `@` também casa codificado (`%40`), como sai na URI do Google (aviso de repetição da
+# biblioteca e texto do HttpError). O `%` não é aceito na parte local, então não há ambiguidade.
+_EMAIL = r"[\w.+-]+(?:@|%40)[\w-]+\.[\w.-]+"
 _EMAIL_RE = re.compile(rf"(?<![\w.+-]){_EMAIL}(?:(?=\+){_EMAIL})*")
+_ARROBA_RE = re.compile(r"@|%40")
 
 # Atributos que todo LogRecord tem. O resto veio do `extra=` de quem logou (ou de outro filtro).
 _ATRIBUTOS_PADRAO = frozenset(vars(logging.LogRecord("", 0, "", 0, "", (), None))) | {"message", "asctime"}
@@ -86,7 +89,7 @@ class PIIRedactionFilter(logging.Filter):
     @staticmethod
     def _mask_email(m: re.Match[str]) -> str:
         # Cada trecho após um `@` é o domínio daquele e-mail seguido, numa cadeia, do `+local` do próximo.
-        return "".join(f"***@{trecho.split('+', 1)[0]}" for trecho in m.group(0).split("@")[1:])
+        return "".join(f"***@{trecho.split('+', 1)[0]}" for trecho in _ARROBA_RE.split(m.group(0))[1:])
 
     @classmethod
     def _redigir(cls, valor: object) -> object:

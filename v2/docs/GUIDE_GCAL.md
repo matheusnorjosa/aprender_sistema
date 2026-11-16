@@ -704,15 +704,16 @@ try:
         operation_name=f"GCal CANCEL #{s.id}",
     )
 except Exception as e:
-    # 404 = já foi deletado (idempotência OK)
-    if "404" not in str(e):
-        raise
+    # 404/410 = o evento já saiu do Google (idempotência OK), pelo status do erro
+    if not _ja_saiu_do_google(e):
+        ...
 ```
 
 > **Circuit breaker** (`apps/core/services/gcal/circuit_breaker.py`, `gcal_breaker`): as chamadas
 > ao Google Calendar (create/update/cancel) passam por `_retry_with_circuit_breaker`, que **falha
 > rápido** enquanto o circuito está aberto (após uma sequência de falhas), evitando martelar a API.
-> O retry/backoff (`_retry_with_backoff`) roda por dentro do breaker.
+> A repetição (5xx, 429, cota, rede) é a da biblioteca do Google, dentro do cliente
+> (`execute(num_retries=...)`); o breaker conta 1 falha por operação, depois dessas repetições (FER-60).
 
 ## 5. Comandos Úteis
 

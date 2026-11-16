@@ -45,6 +45,20 @@ def test_filtro_redige_apos_interpolar_args_lazy():
     assert "***@y.com" in out and "<cpf>" in out
 
 
+def test_filtro_mascara_email_codificado_na_uri_do_google():
+    # FER-60: o aviso de repetição da biblioteca do Google (e o texto do HttpError) trazem a URI,
+    # onde o calendarId de e-mail sai com o `@` codificado como `%40`.
+    rec = _record(
+        "Sleeping %.2f seconds before retry 1 of 1 for request: GET %s, after 503",
+        1.12,
+        "https://www.googleapis.com/calendar/v3/calendars/fulana%40aprendereditora.com.br/events?alt=json",
+    )
+    PIIRedactionFilter().filter(rec)
+    out = rec.getMessage()
+    assert "fulana" not in out
+    assert "/calendars/***@aprendereditora.com.br/events" in out
+
+
 def test_filtro_nao_altera_mensagem_sem_pii():
     rec = _record("processado 42 registros com sucesso")
     PIIRedactionFilter().filter(rec)

@@ -3,7 +3,7 @@ AS v2 — GCal Sync Service Package
 
 Modular package containing all Google Calendar sync functionality:
 - types: SyncOutcome dataclass, Action type alias
-- utils: Retry with backoff, payload hashing
+- utils: execução única com 409/412 como sucesso e disjuntor (a repetição é a do cliente, FER-60), payload hashing
 - client: CalendarClientAdapter base class
 - validation: Event ID validation and generation
 - payload: Event payload building functions
@@ -34,7 +34,7 @@ from apps.core.services.gcal.sync import apply_one_solicitacao, cancel_solicitac
 from apps.core.services.gcal.types import Action, SyncOutcome
 
 # Utils
-from apps.core.services.gcal.utils import _payload_hash, _retry_with_backoff
+from apps.core.services.gcal.utils import _payload_hash
 
 # Validation
 from apps.core.services.gcal.validation import _event_id_for, _validate_event_id
@@ -45,7 +45,6 @@ __all__ = [
     "SyncOutcome",
     # Utils
     "_payload_hash",
-    "_retry_with_backoff",
     # Client
     "CalendarClientAdapter",
     # Validation

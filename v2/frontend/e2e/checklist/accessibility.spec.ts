@@ -232,24 +232,25 @@ test.describe('Checklist: Navegação por Teclado', () => {
     // Tab para o primeiro elemento focável
     await page.keyboard.press('Tab');
 
-    // Verifica se o elemento focado tem indicador visual
-    const hasFocusIndicator = await page.evaluate(() => {
+    // Antes, o teste passava quando nada recebia foco e comparava a borda com ela mesma (FER-57).
+    const foco = await page.evaluate(() => {
       const el = document.activeElement;
-      if (!el || el === document.body) return true; // Ignora se nada focado
-
-      const styles = window.getComputedStyle(el);
-      const hasOutline =
-        styles.outline !== 'none' && styles.outline !== '0px none';
-      const hasBoxShadow = styles.boxShadow !== 'none';
-      const hasBorder = styles.border !== styles.getPropertyValue('border');
-
-      return hasOutline || hasBoxShadow || hasBorder;
+      if (!el || el === document.body) return null;
+      const s = window.getComputedStyle(el);
+      return {
+        alvo: `${el.tagName.toLowerCase()}.${(el as HTMLElement).className}`,
+        focusVisible: el.matches(':focus-visible'),
+        contorno: s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0,
+        sombra: s.boxShadow !== 'none',
+      };
     });
 
+    expect(foco, 'o Tab tem de levar o foco a algum elemento').not.toBeNull();
+    expect(foco?.focusVisible, `foco de teclado sem :focus-visible em ${foco?.alvo}`).toBe(true);
     expect(
-      hasFocusIndicator,
-      'Elemento focado deve ter indicador visual'
-    ).toBeTruthy();
+      foco?.contorno || foco?.sombra,
+      `elemento focado sem contorno nem sombra: ${foco?.alvo}`
+    ).toBe(true);
   });
 
   test('🔴 skip link deve existir', async ({ page }) => {
@@ -396,16 +397,24 @@ test.describe('Checklist: Formulários Acessíveis', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const requiredInputs = await page.locator('input[required], select[required], textarea[required]').all();
+    // O AntD marca o obrigatório no rótulo (.ant-form-item-required) e põe aria-required no campo,
+    // sem o atributo `required`. Antes o teste buscava `[required]`, achava 0 e passava (FER-57).
+    const campos = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('label.ant-form-item-required')).map((rotulo) => {
+        const id = rotulo.getAttribute('for');
+        const campo = id ? document.getElementById(id) : null;
+        return {
+          rotulo: (rotulo.textContent || '').trim(),
+          achou: campo !== null,
+          marcado: campo?.getAttribute('aria-required') === 'true' || !!campo?.hasAttribute('required'),
+        };
+      })
+    );
 
-    for (const input of requiredInputs) {
-      const hasAriaRequired = await input.getAttribute('aria-required');
-      const hasRequiredAttr = await input.getAttribute('required');
-
-      expect(
-        hasAriaRequired === 'true' || hasRequiredAttr !== null,
-        'Campos obrigatórios devem ter required ou aria-required'
-      ).toBeTruthy();
+    expect(campos.length, 'a tela de login tem campos obrigatórios (CPF e Senha)').toBeGreaterThan(0);
+    for (const campo of campos) {
+      expect(campo.achou, `rótulo "${campo.rotulo}" sem campo ligado`).toBe(true);
+      expect(campo.marcado, `campo "${campo.rotulo}" sem aria-required nem required`).toBe(true);
     }
   });
 
@@ -444,9 +453,12 @@ test.describe('Checklist: Acessibilidade — páginas autenticadas (axe-core)', 
   // sobrescrevemos com um titular autenticado (a rota registrada por último vence no
   // Playwright) para rodar o axe em páginas LOGADAS — antes o gate só cobria a home
   // anônima. Foco em /perfil: renderiza só do prop `user`, sem dados extras a mockar.
-  const AUTH_PAGES = [{ path: '/perfil', name: 'Perfil' }];
+  // O service worker do app (/sw.js) atende o fetch antes do page.route: sem bloqueá-lo, o mock
+  // do titular era ignorado e a página caía no Login (FER-57).
+  test.use({ serviceWorkers: 'block' });
+  const AUTH_PAGES = [{ path: '/perfil', name: 'Perfil', titulo: 'Meu perfil' }];
 
-  for (const { path, name } of AUTH_PAGES) {
+  for (const { path, name, titulo } of AUTH_PAGES) {
     test(`🔴 ${name} (${path}) sem violações críticas de acessibilidade (autenticado)`, async ({
       page,
     }) => {
@@ -454,6 +466,8 @@ test.describe('Checklist: Acessibilidade — páginas autenticadas (axe-core)', 
       await page.goto(path);
       await page.waitForLoadState('networkidle');
       await waitForLoadingOverlayToDisappear(page);
+      // Sem isto o axe auditava o Login quando o mock era ignorado, e o teste passava (FER-57).
+      await expect(page.getByRole('heading', { name: titulo })).toBeVisible();
 
       const results = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])

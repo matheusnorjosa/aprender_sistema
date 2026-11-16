@@ -64,6 +64,8 @@ export const CHECKLIST_AUTH_USER = {
  * o App carregar `user`/policies e renderizar rotas protegidas (ex.: /perfil). Páginas com
  * dados próprios exigem mockar seus endpoints à parte.
  */
+// ⚠️ Quem depende destes mocks precisa de `test.use({ serviceWorkers: 'block' })`: o service worker
+// do app (/sw.js) atende o fetch antes do page.route e a resposta simulada é ignorada (FER-57).
 export async function mockChecklistAuthenticated(
   page: Page,
   user: Record<string, unknown> = CHECKLIST_AUTH_USER

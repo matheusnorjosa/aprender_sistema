@@ -7,10 +7,6 @@
 # Core Framework
 Django==5.2.17
 djangorestframework==3.18.2
-djangorestframework-simplejwt==5.5.1
-
-# Authentication & Authorization
-django-allauth==65.18.0
 
 # Task Queue
 celery==5.5.3
@@ -23,7 +19,6 @@ redis==5.2.1
 
 # Database
 psycopg2-binary==2.9.12
-django-db-connection-pool==1.2.6
 
 # CORS & Middleware
 django-cors-headers==4.9.0
@@ -44,7 +39,6 @@ cryptography==50.0.0
 google-api-python-client==2.197.0
 google-auth==2.55.0
 google-auth-httplib2==0.4.0
-google-auth-oauthlib==1.4.0
 httplib2==0.32.0  # import direto nos clients GCal (transporte http com timeout)
 
 # Production Server

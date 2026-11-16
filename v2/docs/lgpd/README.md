@@ -40,7 +40,9 @@ Reúne a parte **organizacional** da conformidade LGPD. Veredito da auditoria de
   segredos fail-closed, redação de PII no log, minimização de PII na transferência ao Google.
 - **Atribuição de licenças**: `/THIRD-PARTY-NOTICES.txt`, gerado a cada build do frontend em `dist/` pelo
   `rollup-plugin-license` (`frontend/vite.config.ts`). O build falha se uma dependência do bundle não tiver
-  licença ou tiver uma fora da lista permitida (MIT, ISC, 0BSD, BSD, Apache-2.0, Hippocratic-2.1; nada AGPL). FER-63.
+  licença ou tiver uma fora da lista permitida (MIT, ISC, 0BSD, BSD, Apache-2.0, Hippocratic-2.1; nada AGPL), em
+  todas as versões que entrarem. FER-63. Limite: só pacotes com código JS no bundle são checados; um pacote que entre só
+  como CSS, fonte ou imagem (ex.: `@fontsource/*`) precisa de conferência e atribuição à mão.
 
 ## Achado operacional pendente (fora deste scaffold)
 

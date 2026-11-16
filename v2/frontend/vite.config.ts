@@ -17,6 +17,8 @@ const ANALYZE: boolean = process.env.ANALYZE === 'true'
 // dist/THIRD-PARTY-NOTICES.txt (servido em /THIRD-PARTY-NOTICES.txt). Só passam as licenças desta lista;
 // qualquer outra, ou pacote sem licença, faz o build falhar e vai para o dono decidir (nada AGPL).
 // Hippocratic-2.1: react-leaflet, aceita antes (memória reference-license-audit-agpl).
+// Limite: o plugin só vê pacotes com código JS no bundle; um pacote que entre só como CSS, fonte ou
+// imagem (ex.: @fontsource/*) não é checado e precisa de conferência à mão.
 const LICENCAS_PERMITIDAS = '(MIT OR ISC OR 0BSD OR BSD-2-Clause OR BSD-3-Clause OR Apache-2.0 OR Hippocratic-2.1)'
 
 // https://vite.dev/config/
@@ -35,6 +37,9 @@ export default defineConfig({
       ...license({
         thirdParty: {
           includePrivate: false,
+          // Sem isto o plugin guarda só a 1ª versão de um pacote que entra em duas (ex.: @ant-design/icons
+          // 5 e 6): a outra sairia do arquivo e da trava.
+          multipleVersions: true,
           output: { file: fileURLToPath(new URL('./dist/THIRD-PARTY-NOTICES.txt', import.meta.url)) },
           allow: { test: LICENCAS_PERMITIDAS, failOnUnlicensed: true, failOnViolation: true },
         },

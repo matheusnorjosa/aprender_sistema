@@ -59,6 +59,15 @@ def test_filtro_mascara_email_codificado_na_uri_do_google():
     assert "/calendars/***@aprendereditora.com.br/events" in out
 
 
+def test_filtro_mascara_email_codificado_com_mais_na_parte_local():
+    # FER-60, rodada 3: na URI o `+` do endereço vira `%2B`; sem tratar, o nome antes dele vazava.
+    rec = _record("POST https://www.googleapis.com/calendar/v3/calendars/joao.silva%2Bagenda%40dominio.com.br/events")
+    PIIRedactionFilter().filter(rec)
+    out = rec.getMessage()
+    assert "joao" not in out and "silva" not in out and "agenda" not in out
+    assert "/calendars/***@dominio.com.br/events" in out
+
+
 def test_log_da_biblioteca_do_google_tem_destino_proprio_filtrado():
     # FER-60: no worker do Celery a raiz é trocada (worker_hijack_root_logger) e perde o filtro.
     # O aviso de repetição do googleapiclient precisa do próprio handler com o filtro de PII,

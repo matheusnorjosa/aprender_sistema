@@ -11,7 +11,9 @@ Regras:
 - `payload.py` redige `observacoes` inteira e só depois corta a descrição em 5000 (cortar antes partia
   um e-mail no limite do corte e o pedaço ia sem redação).
 - A regex de `minimize.py` e `logging_filters.py` só começa no início de uma sequência (lookbehind)
-  e redige exatamente o que a antiga redigia (equivalência medida contra a regex antiga).
+  e redige exatamente o que a antiga redigia (equivalência medida contra a regex antiga). Exceção desde
+  o FER-60: o filtro de log também redige o e-mail codificado de URI (`%40`, `%2B`), que a antiga e o
+  `minimize.py` não tratam; esse caso tem teste próprio em `test_pii_log_redaction.py`.
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportMissingParameterType=false, reportUnknownParameterType=false
@@ -48,6 +50,11 @@ _ADVERSARIOS = [
     "a@b.c+" + "a" * 200_000,
     ".@a-" * 50_000,
     "1" * 200_000,
+    # FER-60: o filtro de log também casa o e-mail codificado de URI (`%40`, `%2B`).
+    "%2B" * 70_000,
+    "a%2B" * 50_000,
+    "1%40" * 50_000,
+    "a%40b.c+" * 25_000,
 ]
 
 

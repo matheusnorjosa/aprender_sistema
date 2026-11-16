@@ -16,10 +16,12 @@ from apps.core.pii import redact_cpf
 # PII patterns para o PIIRedactionFilter.
 # S6 (auditoria 14/10, C5): sem backtracking quadrático; mesma forma e mesma explicação de
 # `services/gcal/minimize.py` (uma cadeia `a@b.c+d@e.f` casa num só match, um e-mail por `@`).
-# FER-60: o `@` também casa codificado (`%40`), como sai na URI do Google (aviso de repetição da
-# biblioteca e texto do HttpError). O `%` não é aceito na parte local, então não há ambiguidade.
-_EMAIL = r"[\w.+-]+(?:@|%40)[\w-]+\.[\w.-]+"
-_EMAIL_RE = re.compile(rf"(?<![\w.+-]){_EMAIL}(?:(?=\+){_EMAIL})*")
+# FER-60: na URI do Google (aviso de repetição da biblioteca e texto do HttpError) o e-mail sai
+# codificado: `@` como `%40` e `+` como `%2B`, que entra na parte local. O `(?!(?<=%)2[Bb])` impede
+# começar no `2B` de um `%2B` (sem ele, cada `%2B` de uma sequência longa seria um novo começo e o tempo
+# ficaria quadrático; medido linear em 200 mil caracteres hostis).
+_EMAIL = r"(?:[\w.+-]|%2[Bb])+(?:@|%40)[\w-]+\.[\w.-]+"
+_EMAIL_RE = re.compile(rf"(?<![\w.+-])(?!(?<=%)2[Bb]){_EMAIL}(?:(?=\+){_EMAIL})*")
 _ARROBA_RE = re.compile(r"@|%40")
 
 # Atributos que todo LogRecord tem. O resto veio do `extra=` de quem logou (ou de outro filtro).

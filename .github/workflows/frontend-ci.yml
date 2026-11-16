@@ -36,11 +36,18 @@ jobs:
           fetch-depth: 0
       - id: filter
         shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        # Falha fechada (FER-56): se o git diff der erro, conta como "mexeu no frontend" e os jobs
+        # [info] rodam. Antes, o erro caía no "grep -q ." e virava "sem frontend" calado.
         run: |
           if [ "${{ github.event_name }}" != "pull_request" ]; then
             # push na main já é path-filtrado (paths: v2/frontend/**) → sempre relevante.
             echo "frontend=true" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only "${{ github.event.pull_request.base.sha }}" HEAD -- v2/frontend/ | grep -q .; then
+          elif ! alterados=$(git diff --name-only "$BASE_SHA" HEAD -- v2/frontend/); then
+            echo "::warning::git diff falhou contra $BASE_SHA; tratando o PR como mudança de frontend"
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$alterados" ]; then
             echo "frontend=true" >> "$GITHUB_OUTPUT"
           else
             echo "frontend=false" >> "$GITHUB_OUTPUT"

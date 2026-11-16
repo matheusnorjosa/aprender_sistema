@@ -1,7 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { visualizer } from 'rollup-plugin-visualizer'
+import license from 'rollup-plugin-license'
 import { existsSync } from 'fs'
+import { fileURLToPath } from 'node:url'
 
 // Backend URL para proxy (servidor-side apenas)
 // PROXY_TARGET é usado apenas pelo servidor Vite, não pelo browser
@@ -10,6 +12,12 @@ const API_URL: string = process.env.PROXY_TARGET || (isDocker ? 'http://web:8000
 
 // Gap 8 - PLAN_maturity_gaps.md: Bundle analysis
 const ANALYZE: boolean = process.env.ANALYZE === 'true'
+
+// FER-63: licenças das dependências que entram no bundle, geradas a cada build em
+// dist/THIRD-PARTY-NOTICES.txt (servido em /THIRD-PARTY-NOTICES.txt). Só passam as licenças desta lista;
+// qualquer outra, ou pacote sem licença, faz o build falhar e vai para o dono decidir (nada AGPL).
+// Hippocratic-2.1: react-leaflet, aceita antes (memória reference-license-audit-agpl).
+const LICENCAS_PERMITIDAS = '(MIT OR ISC OR 0BSD OR BSD-2-Clause OR BSD-3-Clause OR Apache-2.0 OR Hippocratic-2.1)'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -23,6 +31,16 @@ export default defineConfig({
       brotliSize: true,
       template: 'treemap', // 'sunburst', 'treemap', 'network'
     }),
+    {
+      ...license({
+        thirdParty: {
+          includePrivate: false,
+          output: { file: fileURLToPath(new URL('./dist/THIRD-PARTY-NOTICES.txt', import.meta.url)) },
+          allow: { test: LICENCAS_PERMITIDAS, failOnUnlicensed: true, failOnViolation: true },
+        },
+      }),
+      apply: 'build' as const,
+    },
   ].filter(Boolean),
   server: {
     host: true, // Permite acesso externo (necessário para Docker)

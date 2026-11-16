@@ -175,11 +175,11 @@ def main(argv: list[str]) -> int:
         except OSError:
             continue
         try:
-            campos, fontes = doc_frontmatter.frontmatter(texto)
+            campos, fontes = doc_frontmatter.frontmatter(texto, rel)
         except ValueError as e:
             # Cabecalho quebrado e "nao poder medir": sai != 0 nomeando o arquivo,
             # em vez de contar a spec como "sem fonte".
-            raise SystemExit(f"{rel}: {e}") from e
+            raise SystemExit(str(e)) from e
         if not campos:
             continue  # nao e doc SDD; fora de escopo
         if campos.get("status", "").lower() in STATUS_FORA:

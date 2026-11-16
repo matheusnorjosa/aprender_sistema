@@ -148,7 +148,7 @@ def _specs_vivas(raiz: pathlib.Path):
             texto = p.read_text(encoding="utf-8")
         except OSError:
             continue
-        if doc_frontmatter.fora_de_escopo(texto):
+        if doc_frontmatter.fora_de_escopo(texto, rel):
             continue  # historico nao se corrige (ADR-017 item 5)
         yield rel, texto
 
@@ -167,7 +167,7 @@ def _guias_vivos(raiz: pathlib.Path):
             texto = p.read_text(encoding="utf-8")
         except OSError:
             continue
-        if doc_frontmatter.fora_de_escopo(texto):
+        if doc_frontmatter.fora_de_escopo(texto, rel):
             continue
         yield rel, texto
 

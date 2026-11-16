@@ -40,9 +40,9 @@ for dirpath, dirnames, filenames in os.walk(ROOT):
         rel = fp.replace(os.sep, "/")
         txt = open(fp, encoding="utf-8").read()
         try:
-            fields, _ = doc_frontmatter.frontmatter(txt)
+            fields, _ = doc_frontmatter.frontmatter(txt, rel)
         except ValueError as e:
-            errors.append(rel + ": " + " ".join(str(e).split()))
+            errors.append(" ".join(str(e).split()))
             continue
         if not fields:
             errors.append(rel + ": sem frontmatter YAML (--- ... ---)")

@@ -46,9 +46,13 @@ jobs:
       # Unica dependencia do job. Os portoes de doc leem o cabecalho das specs com
       # o PyYAML (`v2/backend/scripts/doc_frontmatter.py`, FER-64) e o check dos
       # [required] le os workflows com ele. Sem este step eles falham alto no
-      # import, nunca passam em silencio. Versao igual a do requirements.txt.
+      # import, nunca passam em silencio. A versao vem do requirements.txt (um pin
+      # so, o que o Dependabot atualiza); sem a linha la, o step falha.
       - name: PyYAML para os portoes de doc
-        run: python -m pip install --quiet "PyYAML==6.0.3"
+        run: |
+          set -euo pipefail
+          pin="$(grep -iE '^PyYAML==' v2/backend/requirements.txt)"
+          python -m pip install --quiet "$pin"
 
       - name: Links relativos quebrados (docs vivos)
         run: python scripts/check_doc_links.py

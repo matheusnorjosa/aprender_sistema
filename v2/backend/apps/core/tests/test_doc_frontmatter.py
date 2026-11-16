@@ -124,9 +124,25 @@ def test_lista_com_um_item_em_texto():
     assert fontes == ["a.py"]
 
 
-def test_cabecalho_sem_fechamento_nao_e_lido():
-    campos, fontes = frontmatter("---\nstatus: canonical\n\n# Doc sem o --- de fechamento\n")
-    assert campos == {} and fontes == []
+def test_cabecalho_sem_fechamento_falha_alto():
+    """O leitor antigo lia ate o fim do arquivo; tratar como 'sem cabecalho' tiraria o doc da medicao calado."""
+    with pytest.raises(ValueError, match="fechamento"):
+        frontmatter("---\nstatus: canonical\nsources_of_truth:\n  - a.py\n\n# Doc sem o fechamento\n")
+
+
+def test_chave_repetida_falha_alto():
+    """O YAML aceita chave repetida e fica com a ultima: a 1a lista sumiria da medicao sem aviso."""
+    texto = "---\nsources_of_truth:\n  - a.py\nstatus: canonical\nsources_of_truth:\n  - b.py\n---\n"
+    with pytest.raises(ValueError, match="sources_of_truth"):
+        frontmatter(texto)
+
+
+def test_erro_nomeia_o_arquivo():
+    texto = "---\nstatus: [quebrado\n---\n"
+    with pytest.raises(ValueError, match="v2/docs/plans/x.md"):
+        frontmatter(texto, origem="v2/docs/plans/x.md")
+    with pytest.raises(ValueError, match="v2/docs/plans/x.md"):
+        fora_de_escopo(texto, origem="v2/docs/plans/x.md")
 
 
 def test_um_leitor_so():

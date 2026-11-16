@@ -28,25 +28,51 @@ STATUS_FORA = {"historical", "stale", "superseded", "deprecated"}
 
 # Bloco do cabecalho: `---` na 1a linha ate a proxima linha que seja so `---`.
 _BLOCO = re.compile(r"\A---[ \t]*\r?\n(.*?)^---[ \t]*\r?$", re.S | re.M)
+_ABRE = re.compile(r"\A---[ \t]*\r?\n")
 
 
-def frontmatter(texto: str) -> tuple[dict[str, str], list[str]]:
+class _LeitorTexto(yaml.BaseLoader):
+    """`BaseLoader` (todo valor como texto) que recusa chave repetida.
+
+    O YAML aceita chave repetida e fica com a ultima, calado: uma segunda
+    `sources_of_truth:` apagaria a primeira lista da medicao.
+    """
+
+    def construct_mapping(self, node, deep=False):  # type: ignore[no-untyped-def]
+        vistas: set[str] = set()
+        for chave_no, _ in node.value:
+            chave = self.construct_object(chave_no, deep=deep)
+            if isinstance(chave, str):
+                if chave in vistas:
+                    raise yaml.constructor.ConstructorError(None, None, f"chave repetida: {chave}", chave_no.start_mark)
+                vistas.add(chave)
+        return super().construct_mapping(node, deep=deep)
+
+
+def _erro(origem: str, motivo: str) -> ValueError:
+    return ValueError(f"{origem}: frontmatter {motivo}" if origem else f"frontmatter {motivo}")
+
+
+def frontmatter(texto: str, origem: str = "") -> tuple[dict[str, str], list[str]]:
     """Devolve (campos escalares, itens de `sources_of_truth`).
 
     Sem frontmatter, devolve ({}, []) — o chamador distingue "nao e doc SDD" de
-    "e doc SDD que nao declara fonte", que sao coisas diferentes.
+    "e doc SDD que nao declara fonte", que sao coisas diferentes. Cabecalho que nao
+    se le levanta `ValueError`; `origem` (o caminho do doc) entra na mensagem.
     """
     m = _BLOCO.match(texto)
     if not m:
+        if _ABRE.match(texto):
+            raise _erro(origem, "aberto com --- e sem o --- de fechamento")
         return {}, []
     try:
-        dados = yaml.load(m.group(1), Loader=yaml.BaseLoader)
+        dados = yaml.load(m.group(1), Loader=_LeitorTexto)
     except yaml.YAMLError as e:
-        raise ValueError(f"frontmatter nao e YAML valido: {e}") from e
+        raise _erro(origem, f"nao e YAML valido: {e}") from e
     if dados is None:
         return {}, []
     if not isinstance(dados, dict):
-        raise ValueError(f"frontmatter nao e um mapa chave: valor (veio {type(dados).__name__})")
+        raise _erro(origem, f"nao e um mapa chave: valor (veio {type(dados).__name__})")
 
     campos = {str(k): v.strip() for k, v in dados.items() if isinstance(v, str) and k != "sources_of_truth"}
     bruto = dados.get("sources_of_truth", "")
@@ -55,16 +81,16 @@ def frontmatter(texto: str) -> tuple[dict[str, str], list[str]]:
     elif isinstance(bruto, list):
         fontes = [str(x).strip() for x in bruto if str(x).strip()]
     else:
-        raise ValueError("frontmatter: sources_of_truth tem de ser lista de caminhos")
+        raise _erro(origem, "com sources_of_truth que nao e lista de caminhos")
     return campos, fontes
 
 
-def status(texto: str) -> str:
+def status(texto: str, origem: str = "") -> str:
     """`status` do frontmatter, em minusculas. Vazio se nao houver."""
-    campos, _ = frontmatter(texto)
+    campos, _ = frontmatter(texto, origem)
     return campos.get("status", "").strip().lower()
 
 
-def fora_de_escopo(texto: str) -> bool:
+def fora_de_escopo(texto: str, origem: str = "") -> bool:
     """True quando o doc e registro historico e nao contrato vigente."""
-    return status(texto) in STATUS_FORA
+    return status(texto, origem) in STATUS_FORA

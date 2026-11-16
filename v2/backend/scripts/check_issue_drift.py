@@ -140,7 +140,7 @@ def _varre(raiz: pathlib.Path, fechadas: set[str]) -> list[tuple[str, int, str, 
                 texto = p.read_text(encoding="utf-8")
             except OSError:
                 continue
-            if doc_frontmatter.fora_de_escopo(texto):
+            if doc_frontmatter.fora_de_escopo(texto, rel):
                 continue
             for n, linha in enumerate(texto.split("\n"), 1):
                 if not ABERTO.search(linha) or CORRIGIDO.search(linha):

@@ -399,6 +399,30 @@ def test_sot_encolhendo_com_waiver_passa(tmp_path):
     assert r.returncode == 0, f"waiver justificado deveria satisfazer:\n{r.stdout}"
 
 
+def test_cabecalho_quebrado_no_pr_reprova_nomeando_a_spec(tmp_path):
+    raiz, base = _repo_com_spec(tmp_path)
+    escreve(raiz, SPEC_REL, "---\nstatus: [quebrado\n---\n\n# Pagamento\n")
+    commita(raiz, "docs(pagamento): cabecalho quebrado")
+
+    r = _run_range(raiz, base)
+    assert r.returncode != 0, f"cabecalho quebrado passou:\n{r.stdout}"
+    assert "pagamento.spec.md" in r.stdout + r.stderr, "a saida deve nomear a spec quebrada"
+
+
+def test_pr_que_conserta_cabecalho_quebrado_da_base_passa(tmp_path):
+    """A versao da base so serve de comparacao: se ela nao le, o PR que a conserta nao pode travar."""
+    raiz = cria_repo(tmp_path)
+    for f in FONTES:
+        escreve(raiz, f, "x = 1\n")
+    escreve(raiz, SPEC_REL, "---\nstatus: [quebrado\n---\n\n# Pagamento\n")
+    base = commita(raiz, "chore: base quebrada")
+    escreve(raiz, SPEC_REL, monta_spec(None, FONTES))
+    commita(raiz, "docs(pagamento): conserta cabecalho")
+
+    r = _run_range(raiz, base)
+    assert r.returncode == 0, f"consertar o cabecalho reprovou:\n{r.stdout}\n{r.stderr}"
+
+
 def test_sot_crescendo_nao_reprova(tmp_path):
     """Declarar mais fontes e o comportamento que se quer premiar."""
     raiz, base = _repo_com_spec(tmp_path, fontes=FONTES[:1])

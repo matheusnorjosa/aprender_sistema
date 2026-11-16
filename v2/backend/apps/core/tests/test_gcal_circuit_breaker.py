@@ -4,7 +4,7 @@ Tests for the GCal circuit breaker integration (ASQ-006 / #779).
 Covers:
 - State transitions CLOSED → OPEN → HALF_OPEN → CLOSED
 - Fast-fail behavior once open
-- `_retry_with_circuit_breaker` wrapping `_retry_with_backoff`
+- `_retry_with_circuit_breaker` wrapping `_executar_uma_vez` (no outer retry since FER-60)
 - `/api/gcal/circuit-breaker/` endpoint (state + counters + RBAC)
 """
 
@@ -12,7 +12,7 @@ Covers:
 
 from __future__ import annotations
 
-from unittest import mock
+import json
 
 from django.test import override_settings
 from rest_framework import status
@@ -20,6 +20,9 @@ from rest_framework.test import APIClient
 
 import pybreaker
 import pytest
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+from googleapiclient.http import HttpMockSequence
 
 from apps.core.services.gcal.circuit_breaker import (
     CircuitBreakerError,
@@ -29,6 +32,7 @@ from apps.core.services.gcal.circuit_breaker import (
     reset_circuit,
 )
 from apps.core.services.gcal.utils import _retry_with_circuit_breaker
+from apps.core.services.gcal_google_client import GoogleCalendarClient
 from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_pacote_do_controle
 
 
@@ -69,12 +73,12 @@ class TestStateTransitions:
 
         fail_max = getattr(gcal_breaker, "fail_max", 5)
 
-        # Each call counts as one breaker failure (max_retries=0 to disable backoff).
+        # Each call counts as one breaker failure (the outer layer does not retry since FER-60).
         # The last call may already raise CircuitBreakerError if the breaker tripped
         # mid-call, so accept either flavor.
         for _ in range(fail_max):
             with pytest.raises((FakeHttpError, CircuitBreakerError)):
-                _retry_with_circuit_breaker(failing, operation_name="test", max_retries=0)
+                _retry_with_circuit_breaker(failing, operation_name="test")
 
         assert is_circuit_open() is True
         assert get_circuit_state() == "open"
@@ -111,40 +115,77 @@ class TestStateTransitions:
             raise FakeHttpError(503)
 
         with pytest.raises((FakeHttpError, CircuitBreakerError)):
-            _retry_with_circuit_breaker(fail, operation_name="half-open-fail", max_retries=0)
+            _retry_with_circuit_breaker(fail, operation_name="half-open-fail")
 
         assert get_circuit_state() == "open"
 
 
+def _cliente_sobre(status_ate_o_ok: list[int]):
+    """GoogleCalendarClient de verdade sobre respostas HTTP prontas: os status dados e, no fim, um 200."""
+    respostas = [
+        ({"status": str(st)}, json.dumps({"error": {"code": st, "message": "x"}}).encode()) for st in status_ate_o_ok
+    ]
+    respostas.append(({"status": "200"}, json.dumps({"id": "asv2-1"}).encode()))
+    cliente = GoogleCalendarClient.__new__(GoogleCalendarClient)
+    cliente.service = build(
+        "calendar", "v3", http=HttpMockSequence(respostas), static_discovery=True, cache_discovery=False
+    )
+    return cliente
+
+
 class TestRetryIntegration:
-    """Ensure the breaker observes the same success/failure signal as the retry layer."""
+    """The breaker sees one logical operation: the client's own retries (FER-60) are invisible to it."""
 
-    def test_transient_error_that_eventually_succeeds_does_not_open_breaker(self):
-        calls = {"n": 0}
+    def test_transient_error_that_eventually_succeeds_does_not_open_breaker(self, monkeypatch):
+        monkeypatch.setattr("time.sleep", lambda _s: None)  # skip googleapiclient's real backoff
+        cliente = _cliente_sobre([503, 503])
 
-        def flaky():
-            calls["n"] += 1
-            if calls["n"] < 3:
-                raise FakeHttpError(503)
-            return "ok"
+        # O sucesso final zera o fail_counter de qualquer jeito: contar as falhas no momento em que
+        # o disjuntor as registra é o que prova que as repetições do cliente não chegam a ele.
+        falhas: list[BaseException] = []
 
-        with mock.patch("apps.core.services.gcal.utils.time.sleep"):  # skip real backoff
-            result = _retry_with_circuit_breaker(flaky, operation_name="flaky-then-ok", max_retries=3)
+        class _Ouvinte(pybreaker.CircuitBreakerListener):
+            def failure(self, cb, exc):
+                falhas.append(exc)
 
-        assert result == "ok"
+        ouvinte = _Ouvinte()
+        gcal_breaker.add_listener(ouvinte)
+        try:
+            result = _retry_with_circuit_breaker(
+                lambda: cliente.insert("cal", "asv2-1", {"summary": "x"}), operation_name="flaky-then-ok"
+            )
+        finally:
+            gcal_breaker.remove_listener(ouvinte)
+
+        assert result == {"id": "asv2-1"}
         assert get_circuit_state() == "closed"
+        assert falhas == []
+
+    def test_exhausted_client_retries_count_as_a_single_breaker_failure(self, monkeypatch):
+        monkeypatch.setattr("time.sleep", lambda _s: None)
+        cliente = _cliente_sobre([503] * 10)
+
+        with pytest.raises(HttpError):
+            _retry_with_circuit_breaker(
+                lambda: cliente.insert("cal", "asv2-1", {"summary": "x"}), operation_name="down"
+            )
+
+        assert gcal_breaker.fail_counter == 1
 
     def test_non_transient_4xx_does_not_retry_but_counts_toward_breaker(self):
         # 4xx errors are non-retryable, but they still surface through the breaker
         # as a single failure — matches current pybreaker semantics.
+        calls = {"n": 0}
+
         def forbidden():
+            calls["n"] += 1
             raise FakeHttpError(403, "forbidden")
 
         with pytest.raises(FakeHttpError):
-            _retry_with_circuit_breaker(forbidden, operation_name="auth-fail", max_retries=3)
+            _retry_with_circuit_breaker(forbidden, operation_name="auth-fail")
 
-        # One failure recorded, not several retries. fail_counter may be internal,
-        # but the breaker state should still be closed after a single 4xx.
+        assert calls["n"] == 1
+        assert gcal_breaker.fail_counter == 1
         assert get_circuit_state() == "closed"
 
 

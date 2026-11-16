@@ -65,7 +65,7 @@ class _Chamada:
     def __init__(self, funcao):
         self._funcao = funcao
 
-    def execute(self):
+    def execute(self, num_retries=0):
         return self._funcao()
 
 

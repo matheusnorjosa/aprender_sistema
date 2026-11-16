@@ -16,8 +16,13 @@ from apps.core.pii import redact_cpf
 # PII patterns para o PIIRedactionFilter.
 # S6 (auditoria 14/10, C5): sem backtracking quadrático; mesma forma e mesma explicação de
 # `services/gcal/minimize.py` (uma cadeia `a@b.c+d@e.f` casa num só match, um e-mail por `@`).
-_EMAIL = r"[\w.+-]+@[\w-]+\.[\w.-]+"
-_EMAIL_RE = re.compile(rf"(?<![\w.+-]){_EMAIL}(?:(?=\+){_EMAIL})*")
+# FER-60: na URI do Google (aviso de repetição da biblioteca e texto do HttpError) o e-mail sai
+# codificado: `@` como `%40` e `+` como `%2B`, que entra na parte local. O `(?!(?<=%)2[Bb])` impede
+# começar no `2B` de um `%2B` (sem ele, cada `%2B` de uma sequência longa seria um novo começo e o tempo
+# ficaria quadrático; medido linear em 200 mil caracteres hostis).
+_EMAIL = r"(?:[\w.+-]|%2[Bb])+(?:@|%40)[\w-]+\.[\w.-]+"
+_EMAIL_RE = re.compile(rf"(?<![\w.+-])(?!(?<=%)2[Bb]){_EMAIL}(?:(?=\+){_EMAIL})*")
+_ARROBA_RE = re.compile(r"@|%40")
 
 # Atributos que todo LogRecord tem. O resto veio do `extra=` de quem logou (ou de outro filtro).
 _ATRIBUTOS_PADRAO = frozenset(vars(logging.LogRecord("", 0, "", 0, "", (), None))) | {"message", "asctime"}
@@ -86,7 +91,7 @@ class PIIRedactionFilter(logging.Filter):
     @staticmethod
     def _mask_email(m: re.Match[str]) -> str:
         # Cada trecho após um `@` é o domínio daquele e-mail seguido, numa cadeia, do `+local` do próximo.
-        return "".join(f"***@{trecho.split('+', 1)[0]}" for trecho in m.group(0).split("@")[1:])
+        return "".join(f"***@{trecho.split('+', 1)[0]}" for trecho in _ARROBA_RE.split(m.group(0))[1:])
 
     @classmethod
     def _redigir(cls, valor: object) -> object:

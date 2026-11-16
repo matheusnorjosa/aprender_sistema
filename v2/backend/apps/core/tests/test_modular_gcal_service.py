@@ -28,12 +28,6 @@ class TestGCalServiceBackwardsCompatibility:
 
         assert SyncOutcome is not None
 
-    def test_retry_with_backoff_importable_from_legacy(self):
-        """_retry_with_backoff should be importable from gcal_sync_service."""
-        from apps.core.services.gcal_sync_service import _retry_with_backoff
-
-        assert callable(_retry_with_backoff)
-
     def test_payload_hash_importable_from_legacy(self):
         """_payload_hash should be importable from gcal_sync_service."""
         from apps.core.services.gcal_sync_service import _payload_hash
@@ -119,9 +113,9 @@ class TestGCalPackageDirectImports:
 
     def test_utils_module_importable(self):
         """Utils module should be importable."""
-        from apps.core.services.gcal.utils import _payload_hash, _retry_with_backoff
+        from apps.core.services.gcal.utils import _executar_uma_vez, _payload_hash
 
-        assert callable(_retry_with_backoff)
+        assert callable(_executar_uma_vez)
         assert callable(_payload_hash)
 
     def test_client_module_importable(self):
@@ -174,7 +168,7 @@ class TestGCalPackageStructure:
         import apps.core.services.gcal as gcal
 
         assert hasattr(gcal, "__all__")
-        assert len(gcal.__all__) == 15  # All exports
+        assert len(gcal.__all__) == 14  # All exports (_retry_with_backoff saiu no FER-60)
 
     def test_all_submodules_exist(self):
         """All submodules should be importable."""

@@ -235,7 +235,7 @@ def upsert_one(
                 eid = s.external_event_id
                 if not dry_run:
                     try:
-                        # RF05: Retry com backoff exponencial (PR19)
+                        # RF05: disjuntor + 409/412 como sucesso; a repetição é a do cliente (FER-60)
                         _retry_with_circuit_breaker(
                             lambda: client.delete(calendar_id, eid),
                             operation_name=f"GCal DELETE #{s.id}",
@@ -334,8 +334,8 @@ def upsert_one(
                         f"🔍 GCal INSERT #{s.id} - event_id={deterministic_eid}, "
                         f"attendees={len(payload.get('attendees', []))}, online={'conferenceData' in payload}"
                     )
-                    # RF05: Retry com backoff exponencial (PR19)
-                    # 409/412 voltam None (idempotência em utils._retry_with_backoff), apesar do tipo.
+                    # RF05: disjuntor + 409/412 como sucesso; a repetição é a do cliente (FER-60)
+                    # 409/412 voltam None (idempotência em utils._executar_uma_vez), apesar do tipo.
                     created = cast(
                         "JsonDict | None",
                         _retry_with_circuit_breaker(
@@ -418,7 +418,7 @@ def upsert_one(
 
             if not dry_run:
                 try:
-                    # RF05: Retry com backoff exponencial (PR19)
+                    # RF05: disjuntor + 409/412 como sucesso; a repetição é a do cliente (FER-60)
                     updated = _retry_with_circuit_breaker(
                         lambda: client.update(calendar_id, alvo, payload),
                         operation_name=f"GCal UPDATE #{s.id}",
@@ -565,7 +565,7 @@ def cancel_solicitacao(
         )
 
     try:
-        # Tentar deletar com retry/backoff
+        # Tentar deletar (a repetição é a do cliente, FER-60)
         _retry_with_circuit_breaker(
             lambda: client.delete(calendar_id, event_id),
             operation_name=f"GCal CANCEL #{s.id}",

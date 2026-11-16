@@ -2,7 +2,8 @@
 Testes Sprint 4 - Audit Log + Error Handling + Retry Policy
 
 Cobertura:
-- Retry/backoff exponencial em 429/5xx (mock fake client)
+- Retry/backoff exponencial em 429/5xx (cliente real sobre respostas HTTP prontas; desde o FER-60
+  o retry e o da biblioteca do Google, `execute(num_retries=...)`)
 - Persistência de gcal_last_error/gcal_last_sync_at
 - AuditLog com PUBLISH_GCAL_ERROR/PUBLISH_GCAL_SUCCESS
 - Endpoint de status (opcional)
@@ -14,6 +15,7 @@ Cobertura:
 
 from __future__ import annotations
 
+import json
 from datetime import timedelta
 from unittest.mock import MagicMock, Mock, patch
 
@@ -22,9 +24,12 @@ from rest_framework import status as http_status
 from rest_framework.test import APIClient
 
 import pytest
+from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from googleapiclient.http import HttpMockSequence
 
 from apps.core.models import AuditLog, Solicitacao
+from apps.core.services.gcal_google_client import GoogleCalendarClient
 from apps.core.tests.factories import (
     GroupFactory,
     MunicipioFactory,
@@ -80,73 +85,67 @@ def create_http_error(status_code, reason="Test error"):
     return HttpError(resp, b"Error content")
 
 
+class _HttpQueConta(HttpMockSequence):
+    """HttpMockSequence que conta as requisicoes que sairam."""
+
+    def __init__(self, respostas):
+        super().__init__(respostas)
+        self.chamadas = 0
+
+    def request(self, *args, **kwargs):
+        self.chamadas += 1
+        return super().request(*args, **kwargs)
+
+
+def _resposta(status_code, corpo):
+    return ({"status": str(status_code)}, json.dumps(corpo).encode())
+
+
+def _cliente_google_sobre(respostas):
+    """GoogleCalendarClient de verdade sobre respostas HTTP prontas (sem rede)."""
+    http = _HttpQueConta(list(respostas))
+    cliente = GoogleCalendarClient.__new__(GoogleCalendarClient)
+    cliente.service = build("calendar", "v3", http=http, static_discovery=True, cache_discovery=False)
+    return cliente, http
+
+
 @pytest.mark.django_db
 class TestRetryBackoff:
     """Testes de retry com backoff exponencial"""
 
-    @patch("apps.core.services.gcal_google_client.GoogleCalendarClient._retry_with_backoff")
+    @pytest.mark.parametrize(
+        "status_code, falhas",
+        [(429, 2), (503, 1)],
+        ids=["429-rate-limit", "5xx-server-error"],
+    )
     @patch("apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id")
-    def test_retry_on_429_rate_limit(self, mock_factory, mock_retry, solicitacao_aprovada):
+    def test_retry_on_429_and_5xx(self, mock_factory, monkeypatch, solicitacao_aprovada, status_code, falhas):
         """
-        Caso 1: Client deve fazer retry em 429 (rate limit) com backoff exponencial
+        Casos 1 e 2: o client faz retry em 429 (rate limit) e 5xx (server error) ate dar certo.
+
+        Desde o FER-60 o retry e o da biblioteca do Google, dentro do client: a publicacao
+        ve uma operacao so, que deu certo.
         """
         from apps.core.services.gcal_sync_service import apply_one_solicitacao
 
-        # Mock client que retorna erro 429 nas primeiras 2 tentativas
-        mock_client = MagicMock()
-        mock_calendar_id = "test-calendar-id"
-        mock_factory.return_value = (mock_client, mock_calendar_id)
-
-        # Simular comportamento de retry: falha 2x depois sucesso
-        call_count = 0
-
-        def side_effect_insert(*args, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            if call_count < 3:
-                raise create_http_error(429, "Rate Limit Exceeded")
-            return {"id": f"asv2{solicitacao_aprovada.id}", "summary": "Test"}
-
-        mock_client.insert.side_effect = side_effect_insert
-        mock_client.get.return_value = None  # Evento não existe ainda
-
-        # Aplicar (should retry and succeed)
-        outcome = apply_one_solicitacao(solicitacao_aprovada, dry_run=False, apply_blocked=True)
-
-        # Verificar que tentou 3 vezes (2 falhas + 1 sucesso)
-        assert call_count == 3
-        assert outcome.action == "CREATE"
-        assert outcome.external_event_id == f"asv2{solicitacao_aprovada.id}"
-
-    @patch("apps.core.services.gcal_google_client.GoogleCalendarClient._retry_with_backoff")
-    @patch("apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id")
-    def test_retry_on_5xx_server_error(self, mock_factory, mock_retry, solicitacao_aprovada):
-        """
-        Caso 2: Client deve fazer retry em 5xx (server error) com backoff exponencial
-        """
-        from apps.core.services.gcal_sync_service import apply_one_solicitacao
-
-        mock_client = MagicMock()
-        mock_calendar_id = "test-calendar-id"
-        mock_factory.return_value = (mock_client, mock_calendar_id)
-
-        # Simular 503 Service Unavailable
-        call_count = 0
-
-        def side_effect_insert(*args, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            if call_count < 2:
-                raise create_http_error(503, "Service Unavailable")
-            return {"id": f"asv2{solicitacao_aprovada.id}", "summary": "Test"}
-
-        mock_client.insert.side_effect = side_effect_insert
-        mock_client.get.return_value = None
+        monkeypatch.setattr("time.sleep", lambda _s: None)  # backoff da biblioteca sem esperar
+        event_id = f"asv2{solicitacao_aprovada.id}"
+        erro = _resposta(status_code, {"error": {"code": status_code, "message": "x"}})
+        cliente, http = _cliente_google_sobre(
+            [
+                _resposta(404, {"error": {"code": 404, "message": "Not Found"}}),  # get: evento nao existe
+                *[erro] * falhas,
+                _resposta(200, {"id": event_id, "summary": "Test"}),
+            ]
+        )
+        mock_factory.return_value = (cliente, "test-calendar-id")
 
         outcome = apply_one_solicitacao(solicitacao_aprovada, dry_run=False, apply_blocked=True)
 
-        assert call_count == 2
+        # 1 get + insert com as falhas e o sucesso
+        assert http.chamadas == 1 + falhas + 1
         assert outcome.action == "CREATE"
+        assert outcome.external_event_id == event_id
 
     @patch("apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id")
     def test_no_retry_on_404_not_found(self, mock_factory, solicitacao_aprovada):
@@ -322,47 +321,3 @@ class TestAuditLog:
         assert "error" in audit_log.details
         assert audit_log.details["dry_run"] is False
         assert audit_log.details["apply_blocked"] is True
-
-
-@pytest.mark.django_db
-class TestBackoffTiming:
-    """Testes para validar tempos de backoff (fast-forward em testes)"""
-
-    @patch("time.sleep")
-    @patch("apps.core.services.gcal_google_client.GoogleCalendarClient.insert")
-    def test_exponential_backoff_timing(self, mock_insert, mock_sleep, solicitacao_aprovada):
-        """
-        Caso 9: Backoff deve seguir padrão exponencial (1s, 2s, 4s)
-        """
-        from apps.core.services.gcal_google_client import GoogleCalendarClient
-
-        # Criar client real mas mockar método insert
-        client = GoogleCalendarClient.__new__(GoogleCalendarClient)
-
-        # Simular 3 tentativas com 429
-        call_count = 0
-
-        def side_effect(*args, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            if call_count < 4:
-                raise create_http_error(429, "Rate Limit")
-            return {"id": "test-id", "summary": "Test"}
-
-        mock_insert.side_effect = side_effect
-
-        # Executar retry_with_backoff (método real)
-        try:
-            result = client._retry_with_backoff(lambda: mock_insert("calendar-id", "event-id", {}))
-        except HttpError:
-            pass  # Esperado se max_retries for atingido
-
-        # Verificar que sleep foi chamado com backoff exponencial
-        if mock_sleep.call_count > 0:
-            sleep_calls = [call[0][0] for call in mock_sleep.call_args_list]
-            # Deve ser [1, 2, 4] ou similar (depende de max_retries)
-            assert len(sleep_calls) >= 1
-            # Primeiro sleep deve ser 2^0 = 1
-            assert sleep_calls[0] == 1
-            if len(sleep_calls) > 1:
-                assert sleep_calls[1] == 2

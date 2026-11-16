@@ -1195,7 +1195,7 @@ def test_patch_descricao_do_cliente_oauth_manda_so_a_descricao_sem_convite(setti
     chamadas: list[dict[str, Any]] = []
 
     class _Requisicao:
-        def execute(self) -> dict[str, Any]:
+        def execute(self, num_retries: int = 0) -> dict[str, Any]:
             return {"id": "evt1"}
 
     class _Eventos:

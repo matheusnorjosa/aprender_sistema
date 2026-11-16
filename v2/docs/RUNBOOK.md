@@ -836,8 +836,8 @@ $DC up -d web worker beat
 **Causa:** Muitas requisições simultâneas à Google Calendar API.
 
 **Comportamento esperado:**
-- Cliente implementa retry com exponential backoff (1s, 2s, 4s)
-- Até 3 tentativas automáticas
+- O cliente repete pela própria biblioteca do Google (`execute(num_retries=3)`), com espera aleatória de até 2, 4 e 8 s
+- Até 3 repetições automáticas (4 chamadas no total), numa camada só (FER-60)
 - Se continuar falhando, revisar batch_size em comandos de sync
 
 ### **Comandos de Sync com Cliente Real**

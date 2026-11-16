@@ -6,7 +6,7 @@ apps.core.services.gcal package.
 
 For new code, prefer importing directly from:
 - apps.core.services.gcal.types (Action, SyncOutcome)
-- apps.core.services.gcal.utils (_retry_with_backoff, _payload_hash)
+- apps.core.services.gcal.utils (_payload_hash)
 - apps.core.services.gcal.client (CalendarClientAdapter)
 - apps.core.services.gcal.validation (_validate_event_id, _event_id_for)
 - apps.core.services.gcal.payload (build_*, compute_payload_hash)
@@ -23,7 +23,6 @@ from apps.core.services.gcal import (  # Types; Utils; Client; Validation; Paylo
     SyncOutcome,
     _event_id_for,
     _payload_hash,
-    _retry_with_backoff,
     _validate_event_id,
     apply_one_solicitacao,
     build_attendees_for_solicitacao,
@@ -41,7 +40,6 @@ __all__ = [
     "SyncOutcome",
     # Utils
     "_payload_hash",
-    "_retry_with_backoff",
     # Client
     "CalendarClientAdapter",
     # Validation

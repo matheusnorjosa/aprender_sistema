@@ -45,6 +45,50 @@ def test_filtro_redige_apos_interpolar_args_lazy():
     assert "***@y.com" in out and "<cpf>" in out
 
 
+def test_filtro_mascara_email_codificado_na_uri_do_google():
+    # FER-60: o aviso de repetição da biblioteca do Google (e o texto do HttpError) trazem a URI,
+    # onde o calendarId de e-mail sai com o `@` codificado como `%40`.
+    rec = _record(
+        "Sleeping %.2f seconds before retry 1 of 1 for request: GET %s, after 503",
+        1.12,
+        "https://www.googleapis.com/calendar/v3/calendars/fulana%40aprendereditora.com.br/events?alt=json",
+    )
+    PIIRedactionFilter().filter(rec)
+    out = rec.getMessage()
+    assert "fulana" not in out
+    assert "/calendars/***@aprendereditora.com.br/events" in out
+
+
+def test_filtro_mascara_email_codificado_com_mais_na_parte_local():
+    # FER-60, rodada 3: na URI o `+` do endereço vira `%2B`; sem tratar, o nome antes dele vazava.
+    rec = _record("POST https://www.googleapis.com/calendar/v3/calendars/joao.silva%2Bagenda%40dominio.com.br/events")
+    PIIRedactionFilter().filter(rec)
+    out = rec.getMessage()
+    assert "joao" not in out and "silva" not in out and "agenda" not in out
+    assert "/calendars/***@dominio.com.br/events" in out
+
+
+def test_log_da_biblioteca_do_google_tem_destino_proprio_filtrado():
+    # FER-60: no worker do Celery a raiz é trocada (worker_hijack_root_logger) e perde o filtro.
+    # O aviso de repetição do googleapiclient precisa do próprio handler com o filtro de PII,
+    # sem subir para a raiz.
+    from django.conf import settings
+
+    conf = settings.LOGGING["loggers"]["googleapiclient"]
+    assert conf["propagate"] is False
+    handlers = settings.LOGGING["handlers"]
+    assert conf["handlers"]
+    assert all("pii_redaction" in handlers[h]["filters"] for h in conf["handlers"])
+
+    logger = logging.getLogger("googleapiclient.http")
+    alvo = logging.getLogger("googleapiclient")
+    assert logger.parent is alvo or logger.propagate
+    # Só o StreamHandler do LOGGING; o pytest pendura os handlers de captura dele no mesmo logger.
+    do_sistema: list[logging.Handler] = [h for h in alvo.handlers if type(h) is logging.StreamHandler]
+    assert do_sistema
+    assert all(any(isinstance(f, PIIRedactionFilter) for f in h.filters) for h in do_sistema)
+
+
 def test_filtro_nao_altera_mensagem_sem_pii():
     rec = _record("processado 42 registros com sucesso")
     PIIRedactionFilter().filter(rec)

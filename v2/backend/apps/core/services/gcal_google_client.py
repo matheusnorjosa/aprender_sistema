@@ -11,9 +11,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import time
-from collections.abc import Callable
-from typing import TypeVar
 
 from django.conf import settings
 
@@ -23,13 +20,11 @@ from google_auth_httplib2 import AuthorizedHttp
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+from apps.core.services.gcal.utils import NUM_RETRIES_GOOGLE
 from apps.core.services.gcal_sync_service import CalendarClientAdapter
 from apps.core.types import CalendarId, EventId, JsonDict
 
 logger = logging.getLogger(__name__)
-
-# Type variable para retry genérico
-T = TypeVar("T")
 
 
 class GoogleCalendarClient(CalendarClientAdapter):
@@ -42,7 +37,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
 
     Características:
     - sendUpdates='none' (não envia emails aos participantes)
-    - Retry exponencial para 429/5xx
+    - Repetição da própria biblioteca do Google (`execute(num_retries=...)`, FER-60)
     - Tratamento de 404 como None/idempotente
     - Idempotência via event.id
     """
@@ -110,45 +105,6 @@ class GoogleCalendarClient(CalendarClientAdapter):
         except json.JSONDecodeError:
             raise ValueError("Invalid credentials: not a file or valid JSON")
 
-    def _retry_with_backoff(self, func: Callable[[], T], max_retries: int = 3) -> T:
-        """
-        Executa função com retry exponencial para 429/5xx.
-
-        Args:
-            func: Função a executar
-            max_retries: Número máximo de retries
-
-        Returns:
-            Resultado da função
-
-        Raises:
-            HttpError: Se todas as tentativas falharem
-        """
-        for attempt in range(max_retries + 1):
-            try:
-                return func()
-            except HttpError as e:
-                status = e.resp.status
-
-                # 404 não deve fazer retry (esperado em alguns casos)
-                if status == 404:
-                    raise
-
-                # 429 (rate limit) ou 5xx (server error) → retry
-                if status == 429 or status >= 500:
-                    if attempt < max_retries:
-                        # Backoff exponencial: 1s, 2s, 4s
-                        wait_time = 2**attempt
-                        logger.warning(
-                            f"Request failed with {status}, retrying in {wait_time}s "
-                            f"(attempt {attempt + 1}/{max_retries})"
-                        )
-                        time.sleep(wait_time)
-                        continue
-
-                # Outros erros ou max retries atingido
-                raise
-
     def get(self, calendar_id: CalendarId, event_id: EventId) -> JsonDict | None:
         """
         Busca evento por ID.
@@ -162,10 +118,14 @@ class GoogleCalendarClient(CalendarClientAdapter):
         """
 
         def _get():
-            return self.service.events().get(calendarId=calendar_id, eventId=event_id).execute()
+            return (
+                self.service.events()
+                .get(calendarId=calendar_id, eventId=event_id)
+                .execute(num_retries=NUM_RETRIES_GOOGLE)
+            )
 
         try:
-            return self._retry_with_backoff(_get)
+            return _get()
         except HttpError as e:
             if e.resp.status == 404:
                 # Evento não existe
@@ -199,10 +159,10 @@ class GoogleCalendarClient(CalendarClientAdapter):
                     sendUpdates=send_updates,
                     conferenceDataVersion=1,  # RF06: Necessário para criar Google Meet
                 )
-                .execute()
+                .execute(num_retries=NUM_RETRIES_GOOGLE)
             )
 
-        return self._retry_with_backoff(_insert)
+        return _insert()
 
     def update(self, calendar_id: CalendarId, event_id: EventId, payload: JsonDict) -> JsonDict:
         """
@@ -232,10 +192,10 @@ class GoogleCalendarClient(CalendarClientAdapter):
                     sendUpdates=send_updates,
                     conferenceDataVersion=1,  # RF06: Necessário para atualizar Google Meet
                 )
-                .execute()
+                .execute(num_retries=NUM_RETRIES_GOOGLE)
             )
 
-        return self._retry_with_backoff(_update)
+        return _update()
 
     def delete(self, calendar_id: CalendarId, event_id: EventId) -> None:
         """
@@ -252,11 +212,11 @@ class GoogleCalendarClient(CalendarClientAdapter):
             return (
                 self.service.events()
                 .delete(calendarId=calendar_id, eventId=event_id, sendUpdates=send_updates)
-                .execute()
+                .execute(num_retries=NUM_RETRIES_GOOGLE)
             )
 
         try:
-            self._retry_with_backoff(_delete)
+            _delete()
         except HttpError as e:
             if e.resp.status == 404:
                 # Evento já não existe → idempotente
@@ -275,7 +235,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
 
         def _list_calendars():
             # Usando calendarList API para listar calendários do usuário
-            calendar_list = self.service.calendarList().list().execute()
+            calendar_list = self.service.calendarList().list().execute(num_retries=settings.GCAL_REQUEST_MAX_RETRIES)
             items = calendar_list.get("items", [])
 
             # Formatar para estrutura consistente
@@ -288,7 +248,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
                 for cal in items
             ]
 
-        return self._retry_with_backoff(_list_calendars, max_retries=settings.GCAL_REQUEST_MAX_RETRIES)
+        return _list_calendars()
 
     def list_events(
         self,
@@ -323,7 +283,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
             if time_max:
                 params["timeMax"] = time_max
 
-            result = self.service.events().list(**params).execute()
+            result = self.service.events().list(**params).execute(num_retries=settings.GCAL_REQUEST_MAX_RETRIES)
             items = result.get("items", [])
 
             return [
@@ -340,7 +300,7 @@ class GoogleCalendarClient(CalendarClientAdapter):
                 for evt in items
             ]
 
-        return self._retry_with_backoff(_list_events, max_retries=settings.GCAL_REQUEST_MAX_RETRIES)
+        return _list_events()
 
     def health_check(self) -> JsonDict:
         """

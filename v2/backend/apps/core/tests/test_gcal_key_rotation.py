@@ -64,11 +64,11 @@ def _credencial(access: bytes, refresh: bytes) -> GoogleOAuthCredential:
 @pytest.fixture
 def _banco_devolve_memoryview(monkeypatch):
     """Simula o psycopg2 de produção: o BinaryField chega como `memoryview`."""
-    original = GoogleOAuthCredential.from_db.__func__
+    original = GoogleOAuthCredential.from_db  # já ligado à classe
 
     def from_db(cls, db, field_names, values):
         values = [memoryview(v) if isinstance(v, bytes) else v for v in values]
-        return original(cls, db, field_names, values)
+        return original(db, field_names, values)
 
     monkeypatch.setattr(GoogleOAuthCredential, "from_db", classmethod(from_db))
 
@@ -266,6 +266,7 @@ class TestComando:
 
         assert (resultado.recifradas, resultado.so_com_fallback) == (2, 1)
         audit = AuditLog.objects.filter(action=AuditLog.Action.GCAL_ENCRYPTION_KEY_ROTATION).last()
+        assert audit is not None
         assert audit.details["credentials_from_fallback"] == 1
 
     def test_credencial_que_nao_abre_vira_command_error(self, monkeypatch, chaves):

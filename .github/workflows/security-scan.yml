@@ -78,14 +78,15 @@ jobs:
           # Sem --ignore-vuln desde 2026-09-30. Os dois ignores antigos (PYSEC-2024-271,
           # flask-cors; PYSEC-2025-183, PyJWT; TTL vencido em 2026-08-20) nao casavam mais
           # nada: este arquivo resolve flask-cors 6.0.5 e PyJWT 2.15.1, e o pip-audit deu 0
-          # vulnerabilidades sem eles (161 pacotes). Precisou ignorar de novo? --ignore-vuln
+          # vulnerabilidades sem eles (161 pacotes). O PyJWT saiu da arvore em 2026-11-16 (FER-61,
+          # vinha so do simplejwt, sem uso). Precisou ignorar de novo? --ignore-vuln
           # com motivo e data de revisao no comentario.
           pip-audit -r requirements.txt --format json > pip-audit-report.json
 
       # O que a IMAGEM DE PRODUCAO instala: Dockerfile.prod copia requirements-prod.txt, e o
-      # step acima audita outro arquivo (requirements.txt). O requirements-prod.txt tem
-      # django-db-connection-pool, que puxa SQLAlchemy e sqlparams: 3 pacotes da imagem que o
-      # pip-audit nao via. O Trivy do [required] Container Scan ja varre a imagem, mas so
+      # step acima audita outro arquivo (requirements.txt). As duas listas nao sao iguais (a de
+      # producao ja teve django-db-connection-pool, so dela, ate o FER-61 de 2026-11-16), e uma
+      # arvore transitiva da producao que o pip-audit nao visse ficaria sem gate de CVE. O Trivy do [required] Container Scan ja varre a imagem, mas so
       # HIGH/CRITICAL com fix publicado; aqui vale qualquer severidade, com ou sem fix.
       # Resolucao separada de proposito: a arvore transitiva da producao e a que o pip monta
       # so com este arquivo. !cancelled(): roda e reporta mesmo se o step acima falhar.

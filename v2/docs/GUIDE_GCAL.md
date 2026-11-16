@@ -873,23 +873,47 @@ Tokens OAuth (access/refresh) são criptografados em repouso usando **Fernet** (
 
 ### Rotação de Chave
 
-A rotação é zero-downtime via management command:
+A troca é sem parada (FER-59, `MultiFernet`). `GCAL_ENCRYPTION_KEY` é a chave principal: cifra e decifra.
+`GCAL_ENCRYPTION_KEY_FALLBACKS` (opcional) lista chaves antigas, separadas por vírgula, que só decifram.
+As duas chegam a web, worker, beat e migrate pelo mesmo `stack.env`.
 
 ```bash
-# 1. Gerar nova chave Fernet
+# 1. Gerar nova chave Fernet (fora do servidor; guardar no gerenciador de senhas)
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 
-# 2. Executar rotação (descriptografa com antiga, re-criptografa com nova)
-python manage.py rotate_gcal_encryption_key \
-  --old-key="CHAVE_ATUAL" \
-  --new-key="CHAVE_NOVA_GERADA"
+# 2. No Portainer: só acrescentar GCAL_ENCRYPTION_KEY_FALLBACKS=<nova> (a principal segue a antiga);
+#    atualizar a stack. Assim todo container já sabe abrir o que a nova cifrar.
 
-# 3. Atualizar GCAL_ENCRYPTION_KEY no Portainer com a nova chave
+# 3. No Portainer: GCAL_ENCRYPTION_KEY=<nova> e GCAL_ENCRYPTION_KEY_FALLBACKS=<antiga>; atualizar a stack.
+#    Enquanto os containers são recriados, os velhos abrem a nova (passo 2) e os novos abrem a antiga.
 
-# 4. Reiniciar containers (web, worker, beat)
+# 4. Recifrar tudo com a principal (uma transação; se uma credencial não abrir, nada é gravado)
+python manage.py rotate_gcal_encryption_key
+
+# 5. Tirar GCAL_ENCRYPTION_KEY_FALLBACKS no Portainer e atualizar a stack.
 ```
 
-A rotação cria entrada no AuditLog com ação `GCAL_ENCRYPTION_KEY_ROTATION`.
+O comando não recebe chave por argumento e nunca a imprime. A rotação cria entrada no AuditLog com ação
+`GCAL_ENCRYPTION_KEY_ROTATION` (`credentials_updated`, `credentials_from_fallback` e `fallbacks_count`,
+sem chave). O comando só manda seguir para o passo 5 quando tudo indica que a chave mudou. Ele avisa e
+**não** manda tirar FALLBACKS em três casos: não há FALLBACKS; a principal também está em FALLBACKS; ou
+nenhuma credencial estava cifrada com uma chave de FALLBACKS (passo 3 não aplicado naquele container, ou
+tudo já recifrado). Nos três, conferir o passo 3 antes de qualquer coisa.
+
+Antes do passo 5, conferir que o comando terminou com sucesso: tirar a chave antiga antes disso deixa
+ilegível o que não foi recifrado. **Se o passo 4 falhar**, nada foi gravado e a stack segue funcionando
+com as duas chaves; o log diz qual credencial (`pk`) não abre. Corrija ou peça reconexão dessa pessoa e
+rode de novo. Para desistir, volte ao estado do passo 2 (principal antiga, nova em FALLBACKS) e **mantenha
+a nova em FALLBACKS**: no estado do passo 3 os tokens renovados já foram gravados com ela.
+
+**Guarde a chave antiga** (fora do servidor, no gerenciador de senhas) até vencer a retenção dos backups
+feitos antes da troca (7 dias por padrão, `BACKUP_OPERATIONS.md`). Para restaurar um desses backups, ponha
+a antiga de volta em `GCAL_ENCRYPTION_KEY_FALLBACKS`, atualize a stack, rode o passo 4 de novo e só tire
+FALLBACKS quando o comando mandar (os tokens restaurados seguem cifrados com a antiga até a rotação).
+
+**A troca de chave não invalida os tokens no Google.** Se o motivo é vazamento do banco ou de um backup
+junto com a chave, quem tem a cópia ainda consegue usar os refresh tokens: além da troca, as pessoas
+precisam desconectar e reconectar a conta Google (ou revogar o acesso do app na conta Google delas).
 
 ### Arquivos Relevantes
 
@@ -897,6 +921,7 @@ A rotação cria entrada no AuditLog com ação `GCAL_ENCRYPTION_KEY_ROTATION`.
 - `apps/core/management/commands/rotate_gcal_encryption_key.py` — comando
 - `apps/core/models/integracao.py` — GoogleOAuthCredential (BinaryField)
 - `apps/core/tests/test_google_oauth.py` — testes de encrypt/decrypt/rotation
+- `apps/core/tests/test_gcal_key_rotation.py` — chave antiga em FALLBACKS, atomicidade e comando (FER-59)
 
 ## 9. Histórico
 

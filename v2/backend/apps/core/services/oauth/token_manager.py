@@ -17,6 +17,7 @@ from __future__ import annotations
 import base64
 import logging
 import os
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
@@ -26,7 +27,7 @@ from django.db.models import OuterRef, QuerySet, Subquery
 from django.utils import timezone
 
 import requests
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 
 from apps.core.models import AuditLog, GoogleOAuthCredential, Usuario
 from apps.core.services.db_retry import retry_on_deadlock
@@ -84,9 +85,38 @@ def _get_fernet_key() -> bytes:
     )
 
 
+def _get_fallback_keys() -> list[str]:
+    """Chaves antigas, só para decifrar: `GCAL_ENCRYPTION_KEY_FALLBACKS`, separadas por vírgula (FER-59)."""
+    raw: str = os.getenv("GCAL_ENCRYPTION_KEY_FALLBACKS", "")
+    return [key.strip() for key in raw.split(",") if key.strip()]
+
+
+def _get_multifernet() -> MultiFernet:
+    """
+    Cifra com a chave principal (`GCAL_ENCRYPTION_KEY`) e decifra com ela ou com qualquer fallback.
+
+    É o que deixa a troca de chave sem parada: com a nova como principal e a antiga em
+    `GCAL_ENCRYPTION_KEY_FALLBACKS`, o que já está no banco continua abrindo enquanto
+    `rotate_encryption_key()` recifra tudo.
+
+    Raises:
+        ValueError: chave principal ausente em produção, ou alguma fallback malformada
+            (a mensagem nunca mostra a chave).
+    """
+    fernets: list[Fernet] = [Fernet(_get_fernet_key())]
+    for position, key in enumerate(_get_fallback_keys(), start=1):
+        try:
+            fernets.append(Fernet(key.encode("utf-8")))
+        except ValueError:
+            raise ValueError(
+                f"GCAL_ENCRYPTION_KEY_FALLBACKS: a chave na posição {position} não é uma chave Fernet válida."
+            ) from None
+    return MultiFernet(fernets)
+
+
 def encrypt_token(token: str) -> bytes:
     """
-    Criptografa token usando Fernet (AES-128-CBC + HMAC-SHA256).
+    Criptografa token usando Fernet (AES-128-CBC + HMAC-SHA256) com a chave principal.
 
     Args:
         token: Token em plaintext (access_token ou refresh_token)
@@ -97,13 +127,12 @@ def encrypt_token(token: str) -> bytes:
     Raises:
         ValueError: Se chave de criptografia não estiver configurada
     """
-    fernet: Fernet = Fernet(_get_fernet_key())
-    return fernet.encrypt(token.encode("utf-8"))
+    return _get_multifernet().encrypt(token.encode("utf-8"))
 
 
 def decrypt_token(encrypted: bytes | memoryview) -> str:
     """
-    Descriptografa token criptografado com Fernet.
+    Descriptografa token criptografado com Fernet (chave principal ou qualquer fallback).
 
     Args:
         encrypted: Token criptografado (bytes ou memoryview do PostgreSQL)
@@ -112,12 +141,11 @@ def decrypt_token(encrypted: bytes | memoryview) -> str:
         str: Token em plaintext
 
     Raises:
-        InvalidToken: Se token estiver corrompido ou chave incorreta
+        InvalidToken: Se token estiver corrompido ou nenhuma chave configurada o abrir
     """
     if isinstance(encrypted, memoryview):
         encrypted = bytes(encrypted)
-    fernet: Fernet = Fernet(_get_fernet_key())
-    return fernet.decrypt(encrypted).decode("utf-8")
+    return _get_multifernet().decrypt(encrypted).decode("utf-8")
 
 
 # Aliases for backward compatibility (used internally with underscore prefix)
@@ -340,77 +368,86 @@ def revoke_token(credential: GoogleOAuthCredential) -> bool:
 # ============================================================================
 
 
-def rotate_encryption_key(old_key: str, new_key: str) -> int:
+@dataclass(frozen=True)
+class RotacaoResultado:
+    """Resultado de `rotate_encryption_key()` (FER-59).
+
+    `so_com_fallback` conta as credenciais que NÃO abriam com a principal antes da rotação.
+    Zero com credenciais no banco quer dizer que a chave não mudou neste processo
+    (ex.: `GCAL_ENCRYPTION_KEY` ainda com a antiga) ou que tudo já tinha sido recifrado.
     """
-    Rotaciona GCAL_ENCRYPTION_KEY sem downtime.
 
-    **Processo zero-downtime**:
-    1. Descriptografa todos os tokens com chave antiga
-    2. Re-criptografa com chave nova
-    3. Salva no banco
-    4. Atualizar .env com nova chave
-    5. Restart aplicação
+    recifradas: int
+    so_com_fallback: int
 
-    Args:
-        old_key: Chave Fernet antiga (base64-encoded)
-        new_key: Chave Fernet nova (base64-encoded)
+
+def rotate_encryption_key() -> RotacaoResultado:
+    """
+    Recifra todos os tokens com a chave principal (`GCAL_ENCRYPTION_KEY`), sem parada (FER-59).
+
+    **Troca de chave sem parada** (passo a passo: GUIDE_GCAL.md, seção 8):
+    1. `GCAL_ENCRYPTION_KEY_FALLBACKS=<nova>` e reiniciar (todo processo já abre a nova);
+    2. `GCAL_ENCRYPTION_KEY=<nova>` e `GCAL_ENCRYPTION_KEY_FALLBACKS=<antiga>` e reiniciar
+       (o sistema segue abrindo os tokens antigos e já cifra os novos com a nova);
+    3. Rodar esta função (`python manage.py rotate_gcal_encryption_key`);
+    4. Tirar `GCAL_ENCRYPTION_KEY_FALLBACKS` e reiniciar.
+
+    Tudo numa transação, com as credenciais travadas (`select_for_update`) contra o refresh que roda
+    ao mesmo tempo: se uma credencial não abrir com nenhuma chave, nada é gravado.
+    As chaves vêm só do ambiente; nunca são recebidas por argumento nem registradas.
 
     Returns:
-        int: Número de credenciais atualizadas
+        RotacaoResultado: credenciais recifradas e quantas só abriam com uma chave de FALLBACKS
 
     Raises:
-        InvalidToken: Se chave antiga incorreta
-
-    Usage:
-        # Management command: python manage.py rotate_gcal_encryption_key
-
-        >>> from cryptography.fernet import Fernet
-        >>> old_key = os.getenv("GCAL_ENCRYPTION_KEY")
-        >>> new_key = Fernet.generate_key().decode()
-        >>> count = rotate_encryption_key(old_key, new_key)
-        >>> print(f"✅ {count} credenciais atualizadas")
-        >>> # Atualizar .env e restart
+        InvalidToken: Se alguma credencial não abrir com nenhuma chave configurada
+        ValueError: Se a chave principal faltar em produção ou alguma fallback for malformada
     """
-    old_fernet: Fernet = Fernet(old_key.encode("utf-8"))
-    new_fernet: Fernet = Fernet(new_key.encode("utf-8"))
+    multifernet: MultiFernet = _get_multifernet()
+    principal: Fernet = Fernet(_get_fernet_key())
+    fallbacks_count: int = len(_get_fallback_keys())
+    if fallbacks_count == 0:
+        logger.warning(
+            "Rotação sem GCAL_ENCRYPTION_KEY_FALLBACKS: os tokens só são recifrados com a mesma chave principal."
+        )
 
-    credentials: Any = GoogleOAuthCredential.objects.all()
     count: int = 0
-
-    logger.info(f"🔄 Iniciando rotação de chave ({credentials.count()} credenciais)")
-
-    for cred in credentials:
-        try:
-            # Descriptografar com chave antiga
-            access_token = old_fernet.decrypt(cred.access_token_encrypted).decode("utf-8")
-            refresh_token = old_fernet.decrypt(cred.refresh_token_encrypted).decode("utf-8")
-
-            # Re-criptografar com chave nova
-            cred.access_token_encrypted = new_fernet.encrypt(access_token.encode("utf-8"))
-            cred.refresh_token_encrypted = new_fernet.encrypt(refresh_token.encode("utf-8"))
+    so_com_fallback: int = 0
+    with transaction.atomic():
+        credentials: Any = GoogleOAuthCredential.objects.select_for_update().order_by("pk")
+        for cred in credentials:
+            # bytes(): em produção o psycopg2 devolve memoryview para o BinaryField.
+            tokens: tuple[bytes, bytes] = (bytes(cred.access_token_encrypted), bytes(cred.refresh_token_encrypted))
+            try:
+                for token in tokens:
+                    principal.decrypt(token)
+            except InvalidToken:
+                so_com_fallback += 1
+            try:
+                cred.access_token_encrypted = multifernet.rotate(tokens[0])
+                cred.refresh_token_encrypted = multifernet.rotate(tokens[1])
+            except InvalidToken:
+                logger.error("Rotação desfeita: a credencial pk=%s não abre com nenhuma chave configurada.", cred.pk)
+                raise
             cred.save(update_fields=["access_token_encrypted", "refresh_token_encrypted"])
-
             count += 1
-            logger.info(f"  ✅ Rotacionada: {cred.google_email}")
 
-        except InvalidToken:
-            logger.error(f"  ❌ Chave antiga incorreta para: {cred.google_email}")
-            raise
-        except Exception as e:
-            logger.error(f"  ❌ Erro ao rotacionar {cred.google_email}: {e}")
-            raise
+        # Auditoria (PA-05)
+        AuditLog.objects.create(
+            usuario=None,
+            action=AuditLog.Action.GCAL_ENCRYPTION_KEY_ROTATION,
+            model_name="GoogleOAuthCredential",
+            details={
+                "credentials_updated": count,
+                "credentials_from_fallback": so_com_fallback,
+                "fallbacks_count": fallbacks_count,
+                "status": "success",
+            },
+        )
 
-    logger.info(f"✅ Rotação concluída: {count}/{credentials.count()} credenciais atualizadas")
-
-    # Auditoria (PA-05)
-    AuditLog.objects.create(
-        usuario=None,
-        action=AuditLog.Action.GCAL_ENCRYPTION_KEY_ROTATION,
-        model_name="GoogleOAuthCredential",
-        details={
-            "credentials_updated": count,
-            "status": "success",
-        },
+    logger.info(
+        "Rotação concluída: %s credenciais recifradas com a chave principal (%s só abriam com FALLBACKS).",
+        count,
+        so_com_fallback,
     )
-
-    return count
+    return RotacaoResultado(recifradas=count, so_com_fallback=so_com_fallback)

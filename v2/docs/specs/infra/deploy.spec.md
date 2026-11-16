@@ -169,6 +169,10 @@ Presentes (valores no Portainer; secrets marcados `[s]`): `DB_HOST`, `DB_NAME`, 
 `GCAL_OAUTH_CLIENT_ID`, `GCAL_OAUTH_CLIENT_SECRET`[s], `GCAL_OAUTH_REDIRECT_URI`, `GCAL_ENCRYPTION_KEY`[s],
 `GCAL_ALLOWED_DOMAIN`, `BACKUP_AGE_RECIPIENT`, `IMAGE_TAG`.
 
+**Opcional, só durante uma troca de chave:** `GCAL_ENCRYPTION_KEY_FALLBACKS`[s] (chaves antigas que só decifram;
+passo a passo na seção 8 do `GUIDE_GCAL.md`, FER-59). Fica ausente fora da troca, de uma troca desistida ou da
+restauração de um backup anterior a ela; nesses casos só sai quando o `rotate_gcal_encryption_key` mandar.
+
 **Ausentes (significativo):** `SENTRY_DSN` (→ Sentry off), `BACKUP_DIR` (→ default `/backups`, que hoje **é**
 gravável no `worker` graças ao bind-mount do #1455), `INCLUDE_DEV_TOOLS`/`INCLUDE_ETL` (→ defaults off, correto).
 

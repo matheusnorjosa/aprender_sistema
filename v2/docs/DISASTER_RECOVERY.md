@@ -247,7 +247,12 @@ docker compose exec -T web python -c "from django.core.cache import cache; cache
 #    Efeito colateral aceito num incidente de credencial: isso também limpa o
 #    cache de capabilities/options (o app repopula sob demanda).
 
-# 2. Rotacionar chave de criptografia GCal
+# 2. Rotacionar chave de criptografia GCal. Antes do comando, na stack: (a) FALLBACKS=<nova>
+#    e atualizar a stack; (b) GCAL_ENCRYPTION_KEY=<nova> e FALLBACKS=<antiga> e atualizar a
+#    stack de novo. Depois do comando, tirar o FALLBACKS e atualizar a stack.
+#    Passo a passo e o que fazer se falhar: GUIDE_GCAL.md, seção 8.
+#    A troca NÃO invalida os tokens no Google: se o banco ou um backup vazou junto com a
+#    chave, as pessoas também precisam desconectar e reconectar a conta Google.
 docker compose exec web python manage.py rotate_gcal_encryption_key
 
 # 3. Regenerar SECRET_KEY

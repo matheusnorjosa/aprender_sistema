@@ -67,7 +67,6 @@ def patch_decrypt_for_memoryview(monkeypatch):
 
     Cobertura:
     - _decrypt_token: usado por refresh_access_token_safe, disconnect
-    - Fernet.decrypt: usado diretamente por rotate_encryption_key
     """
     import apps.core.services.google_oauth as oauth_module
 
@@ -83,19 +82,6 @@ def patch_decrypt_for_memoryview(monkeypatch):
         return original_decrypt(encrypted)
 
     monkeypatch.setattr(oauth_module, "_decrypt_token", decrypt_with_memoryview_support)
-
-    # Patch 2: Fernet.decrypt (usado diretamente por rotate_encryption_key)
-    original_fernet_decrypt = Fernet.decrypt
-
-    def fernet_decrypt_with_memoryview_support(self, token, ttl=None):
-        # Converter memoryview para bytes se necessário
-        if hasattr(token, "tobytes"):
-            token = token.tobytes()
-        elif not isinstance(token, (bytes, str)):
-            token = bytes(token)
-        return original_fernet_decrypt(self, token, ttl)
-
-    monkeypatch.setattr(Fernet, "decrypt", fernet_decrypt_with_memoryview_support)
 
 
 @pytest.fixture
@@ -320,30 +306,32 @@ class TestGoogleOAuthServiceUnit:
         assert audit is not None, "Deve criar AuditLog"
         assert audit.usuario == google_oauth_credential.user
 
-    def test_rotate_encryption_key(self, google_oauth_credential):
+    def test_rotate_encryption_key(self, google_oauth_credential, monkeypatch):
         """
-        GAP-2: Rotação de chave zero-downtime.
+        GAP-2 / FER-59: Rotação de chave sem parada (MultiFernet).
 
         Valida:
-        - Rotação com chave antiga/nova funciona
+        - Com a nova como principal e a antiga em GCAL_ENCRYPTION_KEY_FALLBACKS, a rotação recifra
         - Tokens descriptografáveis com chave nova
         - Contador de credenciais atualizadas correto
+        Casos de borda (atomicidade, chave malformada, comando): test_gcal_key_rotation.py.
         """
         # Obter chave atual (usada pela fixture para criar tokens)
         from apps.core.services.google_oauth import _get_fernet_key
 
-        current_key_bytes = _get_fernet_key()
-        old_key = current_key_bytes.decode() if isinstance(current_key_bytes, bytes) else current_key_bytes
+        old_key = _get_fernet_key().decode()
 
-        # Gerar chave nova
+        # Gerar chave nova: vira a principal; a antiga fica só para decifrar
         new_key = Fernet.generate_key().decode()
+        monkeypatch.setenv("GCAL_ENCRYPTION_KEY", new_key)
+        monkeypatch.setenv("GCAL_ENCRYPTION_KEY_FALLBACKS", old_key)
 
         # Antes: tokens criptografados com chave antiga
         old_encrypted_access = google_oauth_credential.access_token_encrypted
 
         # Rotacionar
-        count = rotate_encryption_key(old_key, new_key)
-        assert count == 1, "Deve atualizar 1 credencial"
+        resultado = rotate_encryption_key()
+        assert resultado.recifradas == 1, "Deve atualizar 1 credencial"
 
         # Depois: tokens criptografáveis com chave nova
         google_oauth_credential.refresh_from_db()

@@ -23,8 +23,11 @@ import sys
 from pathlib import Path
 
 
-def check_env_variable(name, required=True, format_check=None):
-    """Verifica se variável de ambiente existe e está no formato correto."""
+def check_env_variable(name, required=True, format_check=None, secret=False):
+    """Verifica se variável de ambiente existe e está no formato correto.
+
+    ``secret=True``: não mostra nenhum trecho do valor, só o tamanho (FER-59).
+    """
     value = os.getenv(name)
 
     if not value:
@@ -39,6 +42,10 @@ def check_env_variable(name, required=True, format_check=None):
         if not format_check(value):
             print(f"❌ {name}: FORMATO INVÁLIDO")
             return False
+
+    if secret:
+        print(f"✅ {name}: definida ({len(value)} caracteres, valor não exibido)")
+        return True
 
     # Mostrar apenas os primeiros/últimos caracteres para segurança
     if len(value) > 40:
@@ -131,7 +138,8 @@ def main():
 
     all_valid &= check_env_variable(
         "GCAL_OAUTH_CLIENT_SECRET",
-        required=True
+        required=True,
+        secret=True
     )
 
     all_valid &= check_env_variable(
@@ -143,7 +151,8 @@ def main():
     all_valid &= check_env_variable(
         "GCAL_ENCRYPTION_KEY",
         required=True,
-        format_check=validate_fernet_key
+        format_check=validate_fernet_key,
+        secret=True
     )
 
     print()
@@ -161,6 +170,17 @@ def main():
         "GCAL_AUTH_MODE",
         required=False
     )
+
+    # FER-59: chaves antigas só para decifrar durante a troca de chave. Não mostra nenhum trecho delas.
+    fallbacks = [k.strip() for k in os.getenv("GCAL_ENCRYPTION_KEY_FALLBACKS", "").split(",") if k.strip()]
+    invalidas = [i for i, k in enumerate(fallbacks, start=1) if not validate_fernet_key(k)]
+    if not fallbacks:
+        print("⚠️  GCAL_ENCRYPTION_KEY_FALLBACKS: ausente (opcional; só durante a troca de chave)")
+    elif invalidas:
+        print(f"❌ GCAL_ENCRYPTION_KEY_FALLBACKS: chave(s) inválida(s) na(s) posição(ões) {invalidas}")
+        all_valid = False
+    else:
+        print(f"✅ GCAL_ENCRYPTION_KEY_FALLBACKS: {len(fallbacks)} chave(s) antiga(s) válida(s)")
 
     print()
 

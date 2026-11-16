@@ -58,27 +58,51 @@ for _fluxo in (sys.stdout, sys.stderr):
         pass
 
 
-def _filtra_pr_por_caminho(doc: Any) -> bool:
-    """O `pull_request` do workflow tem `paths` ou `paths-ignore`?
+_GATILHOS_DE_PR = ("pull_request", "pull_request_target")
 
-    O PyYAML le a chave `on` como o booleano True (YAML 1.1); aceitar as duas.
+
+def _gatilhos(doc: Any) -> Any:
+    """O `on:` do workflow. O PyYAML le a chave `on` como o booleano True (YAML 1.1); aceitar as duas."""
+    return doc.get("on", doc.get(True))
+
+
+def _roda_no_pr(doc: Any) -> bool:
+    """Algum gatilho de PR? Sem ele (so `workflow_call`, so `push`), o job nao publica check no PR."""
+    gatilhos: Any = _gatilhos(doc)
+    if isinstance(gatilhos, str):
+        return gatilhos in _GATILHOS_DE_PR
+    if isinstance(gatilhos, (list, dict)):
+        return any(g in gatilhos for g in _GATILHOS_DE_PR)
+    return False
+
+
+def _filtra_pr_por_caminho(doc: Any) -> bool:
+    """O gatilho de PR do workflow tem `paths` ou `paths-ignore`?
+
+    Conservador: um `push` sem filtro no mesmo workflow tambem publicaria o check no commit do
+    PR, mas exigir um context assim ja e fragil; bloquear aqui so acontece se alguem o exigir.
     """
-    gatilhos: Any = doc.get("on", doc.get(True))
+    gatilhos: Any = _gatilhos(doc)
     if not isinstance(gatilhos, dict):
         return False
-    pr: Any = cast("dict[str, Any]", gatilhos).get("pull_request")
-    return isinstance(pr, dict) and ("paths" in pr or "paths-ignore" in pr)
+    for chave in _GATILHOS_DE_PR:
+        pr: Any = cast("dict[str, Any]", gatilhos).get(chave)
+        if isinstance(pr, dict) and ("paths" in pr or "paths-ignore" in pr):
+            return True
+    return False
 
 
 def _jobs(raiz: pathlib.Path) -> tuple[dict[str, str], dict[str, str], list[str]]:
     """{context: arquivo}, {nome: por que nao vira context}, e os workflows ilegiveis.
 
     O context que o GitHub publica e o `name:` do job; na ausencia dele, o id.
-    Tres casos em que o nome do job NAO e o context exigivel (FER-56):
+    Quatro casos em que o nome do job NAO e o context exigivel (FER-56):
       - `strategy.matrix`: publica `nome (valor)`, uma vez por combinacao;
       - `uses:` de workflow reutilizavel: publica `caller / callee`;
       - `paths`/`paths-ignore` no `pull_request`: o PR que nao toca o caminho
-        nao roda o workflow, e o check exigido fica pendente para sempre.
+        nao roda o workflow, e o check exigido fica pendente para sempre;
+      - workflow sem gatilho de PR (`workflow_call`, so `push`): o job nao publica
+        nada no commit do PR (o chamado aparece como `caller / callee`).
     Ler com YAML de verdade, nao com grep: a medicao que motivou este script
     errou duas vezes por glob (`*.yml*` nao casa `ci.yaml`, o arquivo com mais
     jobs do repositorio) e por regex de aspas.
@@ -115,6 +139,7 @@ def _jobs(raiz: pathlib.Path) -> tuple[dict[str, str], dict[str, str], list[str]
             ilegiveis.append(p.name)
             continue
         filtrado = _filtra_pr_por_caminho(doc)
+        no_pr = _roda_no_pr(doc)
         jobs: dict[str, Any] = cast("dict[str, Any]", doc).get("jobs") or {}
         for jid, job in jobs.items():
             nome = jid
@@ -125,6 +150,10 @@ def _jobs(raiz: pathlib.Path) -> tuple[dict[str, str], dict[str, str], list[str]
                 motivo = "matrix: o GitHub publica `nome (valor)`"
             elif isinstance(job, dict) and "uses" in job:
                 motivo = "uses: o workflow reutilizavel publica `caller / callee`"
+            elif not no_pr:
+                motivo = (
+                    "sem gatilho pull_request: o job nao publica check no PR (workflow_call vira `caller / callee`)"
+                )
             elif filtrado:
                 motivo = "paths no pull_request: o PR fora do caminho deixa o check pendente"
             if motivo:
@@ -258,7 +287,7 @@ def main(argv: list[str]) -> int:
         print("Um context exigido que ninguem emite deixa o PR 'Expected' para sempre")
         print("e trava o merge. Renomeie o job de volta, ou tire o context do ruleset.")
         if any(n in nao_publicam for n in fantasmas):
-            print("Job com matrix, uses ou paths nao publica o proprio nome: ponha o nome exigido")
+            print("Job com matrix, uses, paths ou sem gatilho de PR nao publica o proprio nome: ponha o nome exigido")
             print("num job simples, um agregador com `if: always()` que confere `needs.<parte>.result`.")
         return 1
 

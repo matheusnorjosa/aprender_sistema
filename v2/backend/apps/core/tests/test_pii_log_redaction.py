@@ -59,6 +59,27 @@ def test_filtro_mascara_email_codificado_na_uri_do_google():
     assert "/calendars/***@aprendereditora.com.br/events" in out
 
 
+def test_log_da_biblioteca_do_google_tem_destino_proprio_filtrado():
+    # FER-60: no worker do Celery a raiz é trocada (worker_hijack_root_logger) e perde o filtro.
+    # O aviso de repetição do googleapiclient precisa do próprio handler com o filtro de PII,
+    # sem subir para a raiz.
+    from django.conf import settings
+
+    conf = settings.LOGGING["loggers"]["googleapiclient"]
+    assert conf["propagate"] is False
+    handlers = settings.LOGGING["handlers"]
+    assert conf["handlers"]
+    assert all("pii_redaction" in handlers[h]["filters"] for h in conf["handlers"])
+
+    logger = logging.getLogger("googleapiclient.http")
+    alvo = logging.getLogger("googleapiclient")
+    assert logger.parent is alvo or logger.propagate
+    # Só o StreamHandler do LOGGING; o pytest pendura os handlers de captura dele no mesmo logger.
+    do_sistema: list[logging.Handler] = [h for h in alvo.handlers if type(h) is logging.StreamHandler]
+    assert do_sistema
+    assert all(any(isinstance(f, PIIRedactionFilter) for f in h.filters) for h in do_sistema)
+
+
 def test_filtro_nao_altera_mensagem_sem_pii():
     rec = _record("processado 42 registros com sucesso")
     PIIRedactionFilter().filter(rec)

@@ -140,13 +140,26 @@ class TestRetryIntegration:
         monkeypatch.setattr("time.sleep", lambda _s: None)  # skip googleapiclient's real backoff
         cliente = _cliente_sobre([503, 503])
 
-        result = _retry_with_circuit_breaker(
-            lambda: cliente.insert("cal", "asv2-1", {"summary": "x"}), operation_name="flaky-then-ok"
-        )
+        # O sucesso final zera o fail_counter de qualquer jeito: contar as falhas no momento em que
+        # o disjuntor as registra é o que prova que as repetições do cliente não chegam a ele.
+        falhas: list[BaseException] = []
+
+        class _Ouvinte(pybreaker.CircuitBreakerListener):
+            def failure(self, cb, exc):
+                falhas.append(exc)
+
+        ouvinte = _Ouvinte()
+        gcal_breaker.add_listener(ouvinte)
+        try:
+            result = _retry_with_circuit_breaker(
+                lambda: cliente.insert("cal", "asv2-1", {"summary": "x"}), operation_name="flaky-then-ok"
+            )
+        finally:
+            gcal_breaker.remove_listener(ouvinte)
 
         assert result == {"id": "asv2-1"}
         assert get_circuit_state() == "closed"
-        assert gcal_breaker.fail_counter == 0
+        assert falhas == []
 
     def test_exhausted_client_retries_count_as_a_single_breaker_failure(self, monkeypatch):
         monkeypatch.setattr("time.sleep", lambda _s: None)

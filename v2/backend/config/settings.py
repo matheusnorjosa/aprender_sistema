@@ -812,6 +812,15 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
+        # FER-60: o aviso de repetição do Google ("Sleeping ... before retry ... <URI>") sai deste
+        # logger, com o calendarId na URI (e-mail como %40). No worker do Celery a raiz é trocada
+        # (worker_hijack_root_logger) e perde o pii_redaction; com handler próprio e sem subir, a
+        # linha passa pelo filtro em qualquer processo.
+        "googleapiclient": {
+            "handlers": ["console_json"] if ENVIRONMENT in ["production", "staging"] else ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
     },
 }
 

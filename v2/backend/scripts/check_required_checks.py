@@ -49,6 +49,7 @@ import os
 import pathlib
 import subprocess
 import sys
+from typing import Any, cast
 
 for _fluxo in (sys.stdout, sys.stderr):
     try:
@@ -57,10 +58,27 @@ for _fluxo in (sys.stdout, sys.stderr):
         pass
 
 
-def _jobs(raiz: pathlib.Path) -> tuple[dict[str, str], list[str]]:
-    """{context: arquivo}, e a lista de workflows ilegiveis.
+def _filtra_pr_por_caminho(doc: Any) -> bool:
+    """O `pull_request` do workflow tem `paths` ou `paths-ignore`?
+
+    O PyYAML le a chave `on` como o booleano True (YAML 1.1); aceitar as duas.
+    """
+    gatilhos: Any = doc.get("on", doc.get(True))
+    if not isinstance(gatilhos, dict):
+        return False
+    pr: Any = cast("dict[str, Any]", gatilhos).get("pull_request")
+    return isinstance(pr, dict) and ("paths" in pr or "paths-ignore" in pr)
+
+
+def _jobs(raiz: pathlib.Path) -> tuple[dict[str, str], dict[str, str], list[str]]:
+    """{context: arquivo}, {nome: por que nao vira context}, e os workflows ilegiveis.
 
     O context que o GitHub publica e o `name:` do job; na ausencia dele, o id.
+    Tres casos em que o nome do job NAO e o context exigivel (FER-56):
+      - `strategy.matrix`: publica `nome (valor)`, uma vez por combinacao;
+      - `uses:` de workflow reutilizavel: publica `caller / callee`;
+      - `paths`/`paths-ignore` no `pull_request`: o PR que nao toca o caminho
+        nao roda o workflow, e o check exigido fica pendente para sempre.
     Ler com YAML de verdade, nao com grep: a medicao que motivou este script
     errou duas vezes por glob (`*.yml*` nao casa `ci.yaml`, o arquivo com mais
     jobs do repositorio) e por regex de aspas.
@@ -80,9 +98,10 @@ def _jobs(raiz: pathlib.Path) -> tuple[dict[str, str], list[str]]:
 
     d = raiz / ".github" / "workflows"
     nomes: dict[str, str] = {}
+    nao_publicam: dict[str, str] = {}
     ilegiveis: list[str] = []
     if not d.is_dir():
-        return nomes, ilegiveis
+        return nomes, nao_publicam, ilegiveis
 
     for p in sorted(list(d.glob("*.yml")) + list(d.glob("*.yaml"))):
         try:
@@ -95,12 +114,24 @@ def _jobs(raiz: pathlib.Path) -> tuple[dict[str, str], list[str]]:
         if not isinstance(doc, dict):
             ilegiveis.append(p.name)
             continue
-        for jid, job in (doc.get("jobs") or {}).items():
+        filtrado = _filtra_pr_por_caminho(doc)
+        jobs: dict[str, Any] = cast("dict[str, Any]", doc).get("jobs") or {}
+        for jid, job in jobs.items():
             nome = jid
             if isinstance(job, dict) and isinstance(job.get("name"), str):
                 nome = job["name"]
-            nomes[nome] = p.name
-    return nomes, ilegiveis
+            motivo = None
+            if isinstance(job, dict) and isinstance(job.get("strategy"), dict) and "matrix" in job["strategy"]:
+                motivo = "matrix: o GitHub publica `nome (valor)`"
+            elif isinstance(job, dict) and "uses" in job:
+                motivo = "uses: o workflow reutilizavel publica `caller / callee`"
+            elif filtrado:
+                motivo = "paths no pull_request: o PR fora do caminho deixa o check pendente"
+            if motivo:
+                nao_publicam[nome] = f"{p.name} ({motivo})"
+            else:
+                nomes[nome] = p.name
+    return nomes, nao_publicam, ilegiveis
 
 
 def _exigidos_da_api(branch: str) -> set[str] | None:
@@ -159,7 +190,7 @@ def main(argv: list[str]) -> int:
         print(f"ERRO: repo-root nao encontrado: {raiz}", file=sys.stderr)
         return 2
 
-    nomes, ilegiveis = _jobs(raiz)
+    nomes, nao_publicam, ilegiveis = _jobs(raiz)
     for nome in ilegiveis:
         print(f"AVISO: workflow ilegivel, fora da medida: {nome}")
 
@@ -188,7 +219,7 @@ def main(argv: list[str]) -> int:
         print("configurado nao devolve lista vazia. Nada foi verificado aqui.")
         return 0
 
-    declarados = {n for n in nomes if n.startswith("[required]")}
+    declarados = {n for n in (set(nomes) | set(nao_publicam)) if n.startswith("[required]")}
     fantasmas = sorted(exigidos - set(nomes))
     rotulo_falso = sorted(declarados - exigidos)
 
@@ -197,7 +228,7 @@ def main(argv: list[str]) -> int:
         print("AVISO — jobs que dizem [required] mas o ruleset NAO exige:")
         for n in rotulo_falso:
             print(f"  {n}")
-            print(f"      {nomes[n]}")
+            print(f"      {nomes.get(n) or nao_publicam[n]}")
         print()
         print("O nome informa errado sobre a protecao do repositorio. Corrigir e acao")
         print("de admin no ruleset (adicionar o context) ou tirar o rotulo do nome.")
@@ -212,7 +243,7 @@ def main(argv: list[str]) -> int:
     ]
     if rotulo_falso:
         resumo += ["| job | workflow |", "| --- | --- |"]
-        resumo += [f"| `{n}` | `{nomes[n]}` |" for n in rotulo_falso]
+        resumo += [f"| `{n}` | `{nomes.get(n) or nao_publicam[n]}` |" for n in rotulo_falso]
         resumo.append("")
     _resumo(resumo)
 
@@ -221,9 +252,14 @@ def main(argv: list[str]) -> int:
         print("BLOQUEIO — contexts exigidos que NENHUM job produz:")
         for n in fantasmas:
             print(f"  {n}")
+            if n in nao_publicam:
+                print(f"      existe em {nao_publicam[n]}")
         print()
         print("Um context exigido que ninguem emite deixa o PR 'Expected' para sempre")
         print("e trava o merge. Renomeie o job de volta, ou tire o context do ruleset.")
+        if any(n in nao_publicam for n in fantasmas):
+            print("Job com matrix, uses ou paths nao publica o proprio nome: ponha o nome exigido")
+            print("num job simples, um agregador com `if: always()` que confere `needs.<parte>.result`.")
         return 1
 
     print()

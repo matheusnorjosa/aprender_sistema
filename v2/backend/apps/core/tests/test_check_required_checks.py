@@ -157,3 +157,82 @@ def test_workflow_ilegivel_nao_derruba(tmp_path):
     r = _run(tmp_path, ["[required] lint"])
     assert r.returncode == 0, f"YAML quebrado derrubou o gate:\n{r.stdout}\n{r.stderr}"
     assert "quebrado.yml" in r.stdout, "o arquivo ilegivel deveria ser reportado"
+
+
+# FER-56 (13/11/2026): o nome literal do job nao e o context que o GitHub publica em tres casos.
+# Um nome exigido que cai num deles da "OK" aqui e deixa todo PR "Expected" para sempre.
+
+WF_MATRIX = """\
+name: CI
+on: [pull_request]
+jobs:
+  unit:
+    name: "[required] unit"
+    strategy:
+      matrix:
+        shard: [1, 2]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok
+"""
+
+WF_USES = """\
+name: CI
+on: [pull_request]
+jobs:
+  tests:
+    name: "[required] tests"
+    uses: ./.github/workflows/reutilizavel.yml
+"""
+
+WF_PATHS = """\
+name: CI
+on:
+  pull_request:
+    paths: ["v2/frontend/**"]
+jobs:
+  lint:
+    name: "[required] lint"
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok
+"""
+
+
+def test_nome_exigido_em_job_com_matrix_bloqueia(tmp_path):
+    """Com matrix, o GitHub publica `nome (valor)`; o nome puro nunca chega."""
+    _monta(tmp_path, {"ci.yml": WF_MATRIX})
+    r = _run(tmp_path, ["[required] unit"])
+    assert r.returncode == 1, f"nome exigido em job com matrix passou:\n{r.stdout}"
+    assert "[required] unit" in r.stdout and "matrix" in r.stdout
+
+
+def test_nome_exigido_em_job_com_uses_bloqueia(tmp_path):
+    """Workflow reutilizavel publica `caller / callee`; o nome do caller sozinho nunca chega."""
+    _monta(tmp_path, {"ci.yml": WF_USES})
+    r = _run(tmp_path, ["[required] tests"])
+    assert r.returncode == 1, f"nome exigido em job com uses passou:\n{r.stdout}"
+    assert "[required] tests" in r.stdout and "uses" in r.stdout
+
+
+def test_nome_exigido_em_workflow_com_paths_bloqueia(tmp_path):
+    """Workflow pulado por `paths` deixa o check pendente: o PR que nao toca o caminho trava."""
+    _monta(tmp_path, {"ci.yml": WF_PATHS})
+    r = _run(tmp_path, ["[required] lint"])
+    assert r.returncode == 1, f"nome exigido em workflow com paths passou:\n{r.stdout}"
+    assert "[required] lint" in r.stdout and "paths" in r.stdout
+
+
+def test_matrix_uses_e_paths_fora_do_exigido_nao_bloqueiam(tmp_path):
+    """Partes com matrix e workflows filtrados que o ruleset nao exige sao o caso normal (agregador)."""
+    _monta(tmp_path, {"ci.yml": WF, "m.yml": WF_MATRIX, "u.yml": WF_USES, "p.yml": WF_PATHS.replace("lint", "outro")})
+    r = _run(tmp_path, ["[required] lint"])
+    assert r.returncode == 0, f"job fora do exigido bloqueou:\n{r.stdout}"
+
+
+def test_paths_so_no_push_nao_bloqueia(tmp_path):
+    """O filtro que trava o check exigido e o do pull_request; o do push nao afeta o PR."""
+    wf = WF.replace("on: [pull_request]", 'on:\n  pull_request:\n  push:\n    paths: ["v2/**"]')
+    _monta(tmp_path, {"ci.yml": wf})
+    r = _run(tmp_path, ["[required] lint"])
+    assert r.returncode == 0, f"paths so no push bloqueou:\n{r.stdout}"

@@ -1,5 +1,10 @@
 import { Page } from '@playwright/test';
 
+// ⚠️ Com o service worker do app (/sw.js) ligado, as chamadas a /api/ feitas depois que ele assume a
+// página (o /api/me inclusive) passam por ele e não pelo page.route: o mock é ignorado. Quem precisa
+// que o mock vença usa `test.use({ serviceWorkers: 'block' })`; sem o bloqueio, a tela anônima vem do
+// 403 real do backend (FER-57).
+
 export interface ChecklistAuthBootstrapOptions {
   mockCsrf?: boolean;
   mockMeUnauthorized?: boolean;
@@ -64,8 +69,6 @@ export const CHECKLIST_AUTH_USER = {
  * o App carregar `user`/policies e renderizar rotas protegidas (ex.: /perfil). Páginas com
  * dados próprios exigem mockar seus endpoints à parte.
  */
-// ⚠️ Quem depende destes mocks precisa de `test.use({ serviceWorkers: 'block' })`: o service worker
-// do app (/sw.js) atende o fetch antes do page.route e a resposta simulada é ignorada (FER-57).
 export async function mockChecklistAuthenticated(
   page: Page,
   user: Record<string, unknown> = CHECKLIST_AUTH_USER

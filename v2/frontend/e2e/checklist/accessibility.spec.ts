@@ -241,16 +241,15 @@ test.describe('Checklist: Navegação por Teclado', () => {
         alvo: `${el.tagName.toLowerCase()}.${(el as HTMLElement).className}`,
         focusVisible: el.matches(':focus-visible'),
         contorno: s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0,
-        sombra: s.boxShadow !== 'none',
       };
     });
 
     expect(foco, 'o Tab tem de levar o foco a algum elemento').not.toBeNull();
     expect(foco?.focusVisible, `foco de teclado sem :focus-visible em ${foco?.alvo}`).toBe(true);
-    expect(
-      foco?.contorno || foco?.sombra,
-      `elemento focado sem contorno nem sombra: ${foco?.alvo}`
-    ).toBe(true);
+    // Alvo fixo: a sombra do botão primário do AntD existe mesmo sem foco, e o anel do campo fica no
+    // wrapper, não no input; aceitar sombra ou qualquer alvo deixaria o teste passar ou cair à toa.
+    expect(foco?.alvo, 'o 1º Tab deve cair no skip-link').toContain('skip-link');
+    expect(foco?.contorno, `elemento focado sem contorno: ${foco?.alvo}`).toBe(true);
   });
 
   test('🔴 skip link deve existir', async ({ page }) => {
@@ -449,7 +448,8 @@ test.describe('Checklist: Formulários Acessíveis', () => {
 });
 
 test.describe('Checklist: Acessibilidade — páginas autenticadas (axe-core)', () => {
-  // O bootstrap padrão (beforeEach) mocka /api/me como 401 -> tela anônima. Aqui
+  // O bootstrap padrão (beforeEach) mocka /api/me como 401 (com o SW ligado vale o 403 real do
+  // backend) -> tela anônima. Aqui
   // sobrescrevemos com um titular autenticado (a rota registrada por último vence no
   // Playwright) para rodar o axe em páginas LOGADAS — antes o gate só cobria a home
   // anônima. Foco em /perfil: renderiza só do prop `user`, sem dados extras a mockar.

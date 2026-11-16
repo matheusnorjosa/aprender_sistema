@@ -32,7 +32,8 @@ class GoogleOAuthCredential(models.Model):
 
     **Rotacao de chave**:
     - Management command: `python manage.py rotate_gcal_encryption_key`
-    - Zero downtime: le com chave antiga, salva com chave nova
+    - Sem parada (FER-59): a antiga fica em GCAL_ENCRYPTION_KEY_FALLBACKS (so decifra) enquanto
+      o comando recifra tudo com a principal
 
     Refs:
     - Sprint 1 (Issue #1): Modelo + Migration + Servico OAuth

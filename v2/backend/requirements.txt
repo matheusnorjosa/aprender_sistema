@@ -97,6 +97,9 @@ pytest-xdist==3.8.0
 # ================================================================
 python-dateutil==2.9.0.post0
 python-decouple==3.8
+# Leitor do cabecalho das docs nos portoes de CI (scripts/doc_frontmatter.py, FER-64);
+# ja vinha de carona pelo drf-spectacular e pelo bandit.
+PyYAML==6.0.3
 
 # ================================================================
 # Cache & Task Queue

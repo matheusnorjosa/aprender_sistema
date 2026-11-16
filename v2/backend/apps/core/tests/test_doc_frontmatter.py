@@ -89,10 +89,55 @@ def test_lista_vazia_e_lista_vazia_nao_ausencia():
     assert campos.get("status") == "canonical"
 
 
-def test_aspas_e_crases_sao_removidas():
-    texto = '---\nsources_of_truth:\n  - "a.py"\n  - `b.py`\n---\n'
+def test_aspas_sao_removidas():
+    texto = "---\nsources_of_truth:\n  - \"a.py\"\n  - 'b.py'\n---\n"
     _, fontes = frontmatter(texto)
     assert fontes == ["a.py", "b.py"]
+
+
+@pytest.mark.parametrize(
+    "bloco",
+    [
+        "sources_of_truth:\n  - `b.py`\n",  # a crase e reservada no YAML: nao abre valor
+        "status: [aberto\n",
+        "status: canonical\n  sources_of_truth: x\n",
+    ],
+)
+def test_yaml_invalido_falha_alto(bloco):
+    """Cabecalho quebrado nao pode ser lido como 'nao declara fonte' (verde por falta de dado)."""
+    with pytest.raises(ValueError, match="frontmatter"):
+        frontmatter(f"---\n{bloco}---\n")
+
+
+def test_valores_continuam_texto():
+    """O leitor nao converte tipos: data fica texto e commit so de digitos nao vira octal."""
+    campos, _ = frontmatter("---\nlast_verified: 2026-08-01\nverified_at_commit: 0123456\nativo: yes\n---\n")
+    assert campos == {
+        "last_verified": "2026-08-01",
+        "verified_at_commit": "0123456",
+        "ativo": "yes",
+    }
+
+
+def test_lista_com_um_item_em_texto():
+    _, fontes = frontmatter("---\nsources_of_truth: a.py\n---\n")
+    assert fontes == ["a.py"]
+
+
+def test_cabecalho_sem_fechamento_nao_e_lido():
+    campos, fontes = frontmatter("---\nstatus: canonical\n\n# Doc sem o --- de fechamento\n")
+    assert campos == {} and fontes == []
+
+
+def test_um_leitor_so():
+    """Os outros portoes usam este modulo; nenhum mantem leitor proprio de cabecalho."""
+    raiz = exige_raiz_do_repo()
+    drift = (raiz / "v2" / "backend" / "scripts" / "doc_drift_report.py").read_text(encoding="utf-8")
+    lint = (raiz / "scripts" / "check_doc_frontmatter.py").read_text(encoding="utf-8")
+    assert "def _frontmatter" not in drift
+    assert "doc_frontmatter.frontmatter(" in drift
+    assert "doc_frontmatter.frontmatter(" in lint
+    assert "re.S" not in lint and "FIELD" not in lint, "check_doc_frontmatter voltou a ter regex propria"
 
 
 def test_corpo_do_doc_nao_e_lido_como_frontmatter():
@@ -104,7 +149,13 @@ def test_corpo_do_doc_nao_e_lido_como_frontmatter():
 
 @pytest.mark.parametrize(
     "valor,esperado",
-    [("canonical", False), ("historical", True), ("STALE", True), ("draft", False), ("", False)],
+    [
+        ("canonical", False),
+        ("historical", True),
+        ("STALE", True),
+        ("draft", False),
+        ("", False),
+    ],
 )
 def test_fora_de_escopo(valor, esperado):
     texto = f"---\nstatus: {valor}\n---\n" if valor else "---\nlast_verified: x\n---\n"

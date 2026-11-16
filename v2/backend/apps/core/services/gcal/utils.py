@@ -26,7 +26,7 @@ T = TypeVar("T")
 
 # Repetições por chamada ao Google nas escritas e no `get` (FER-60). A única camada de repetição é a da
 # própria biblioteca do Google: `request.execute(num_retries=NUM_RETRIES_GOOGLE)` nos clientes, que repete
-# 5xx, 429, 403 de cota, timeout e queda de conexão com espera crescente e aleatória. As leituras do
+# 5xx, 429, 403 de limite de velocidade (não a cota diária), timeout e queda de conexão com espera crescente e aleatória. As leituras do
 # caminho da tela usam `settings.GCAL_REQUEST_MAX_RETRIES`. Nada aqui repete de novo por cima.
 NUM_RETRIES_GOOGLE = 3
 

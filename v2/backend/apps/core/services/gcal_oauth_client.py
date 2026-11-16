@@ -437,7 +437,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
         Lê o que mudou no calendário desde `sync_token` (None = leitura completa), com cancelados.
 
         Sem `singleEvents`, `orderBy`, `timeMin` ou `updatedMin`: o Google não os aceita junto do
-        `syncToken`. Cada página passa pela repetição da biblioteca do Google (5xx, 429, cota, rede); o 410 não repete.
+        `syncToken`. Cada página passa pela repetição da biblioteca do Google (5xx, 429, limite de velocidade, rede); o 410 não repete.
 
         Returns:
             (itens crus de todas as páginas, nextSyncToken da última página)

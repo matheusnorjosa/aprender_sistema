@@ -856,7 +856,7 @@ GCAL_HTTP_TIMEOUT = int(os.getenv("GCAL_HTTP_TIMEOUT", "10"))
 
 # Retries no request-path do GCal (list_calendars/list_events/calendar_accessible/health_check).
 # A repeticao e a da propria biblioteca do Google (`execute(num_retries=N)`, FER-60): 5xx, 429,
-# 403 de cota, timeout e queda de conexao, com espera aleatoria de ate 2^n s. Ela empilha sobre
+# 403 de limite de velocidade (nao a cota diaria), timeout e queda de conexao, com espera aleatoria de ate 2^n s. Ela empilha sobre
 # GCAL_HTTP_TIMEOUT e segura o worker do gunicorn; 1 retry (<=2s de espera) cobre blip
 # transitorio. O timeout de socket tambem repete: no pior caso, 2 x GCAL_HTTP_TIMEOUT + 2s.
 # get/insert/update/delete usam NUM_RETRIES_GOOGLE=3 (services/gcal/utils.py), numa camada so:

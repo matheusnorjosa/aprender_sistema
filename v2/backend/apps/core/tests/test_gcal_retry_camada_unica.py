@@ -3,7 +3,7 @@ Repetição das chamadas ao Google numa camada só (FER-60).
 
 Antes: o helper de `gcal/utils.py` (4 tentativas) envolvia o laço de cada cliente (mais 4), e uma
 escrita com o Google fora do ar chegava a 16 chamadas e ~30 s parados. Agora a única camada é a
-repetição embutida da biblioteca do Google (`request.execute(num_retries=N)`): 5xx, 429, 403 de cota,
+repetição embutida da biblioteca do Google (`request.execute(num_retries=N)`): 5xx, 429, 403 de limite de velocidade (rateLimitExceeded; a cota diária esgotada não repete),
 timeout e queda de conexão; 4 chamadas no máximo por escrita.
 
 Os testes usam o `HttpMockSequence` do googleapiclient: respostas HTTP de verdade, sem rede, contando

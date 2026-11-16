@@ -1,5 +1,10 @@
 import { Page } from '@playwright/test';
 
+// ⚠️ Com o service worker do app (/sw.js) ligado, as chamadas a /api/ feitas depois que ele assume a
+// página (o /api/me inclusive) passam por ele e não pelo page.route: o mock é ignorado. Quem precisa
+// que o mock vença usa `test.use({ serviceWorkers: 'block' })`; sem o bloqueio, a tela anônima vem do
+// 403 real do backend (FER-57).
+
 export interface ChecklistAuthBootstrapOptions {
   mockCsrf?: boolean;
   mockMeUnauthorized?: boolean;

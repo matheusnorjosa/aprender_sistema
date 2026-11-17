@@ -37,6 +37,7 @@ import {
   Empty,
   Spin,
   Select,
+  theme,
 } from 'antd';
 import type { TableRowSelection } from 'antd/es/table/interface';
 import dayjs, { type Dayjs } from 'dayjs';
@@ -209,6 +210,8 @@ interface PreviewDataType {
 }
 
 export default function PreAgendaPage(): JSX.Element {
+  // DEF-33: o número de erros usa o vermelho do tema (AA), não um hexadecimal fixo.
+  const { token } = theme.useToken();
   const [loading, setLoading] = useState<boolean>(false);
   const [rows, setRows] = useState<Solicitacao[]>([]);
   const [total, setTotal] = useState<number>(0);
@@ -976,7 +979,7 @@ export default function PreAgendaPage(): JSX.Element {
                   <Statistic
                     title="Erros"
                     value={summary.counts?.ERROR || 0}
-                    valueStyle={{ color: '#ff4d4f' }}
+                    valueStyle={{ color: token.colorErrorText }}
                   />
                 </Col>
               </Row>

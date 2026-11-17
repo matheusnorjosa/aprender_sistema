@@ -14,6 +14,7 @@ import { ConfigProvider, Layout, message, Result, Button } from 'antd';
 import logger from './utils/logger';
 import { getErrorStatus, isAuthError } from './utils/errors';
 import { ThemeProvider, useTheme, useBrandColors } from './contexts/ThemeContext';
+import { aplicarTemaNosDialogos } from './contexts/temaNosDialogos';
 import ptBR from 'antd/locale/pt_BR';
 import { getMe } from './api/availability';
 import { getMyPolicies } from './api/me';
@@ -74,6 +75,12 @@ function MonitorDeSessao({ onExpirada, onSair }: {
 function AppContent(): JSX.Element {
   const { antThemeConfig } = useTheme();
   const colors = useBrandColors();
+
+  // DEF-33: Modal.confirm, message e notification estáticos abrem fora do ConfigProvider abaixo;
+  // recebem o mesmo tema (o vermelho AA, o verde da marca e o modo escuro).
+  useEffect(() => {
+    aplicarTemaNosDialogos(antThemeConfig);
+  }, [antThemeConfig]);
 
   // ── User state ──
   const [user, setUser] = useState<CurrentUser | null>(null);

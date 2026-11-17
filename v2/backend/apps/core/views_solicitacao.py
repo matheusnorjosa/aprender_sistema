@@ -583,6 +583,15 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 | Q(usuario__last_name__icontains=q)
             )
 
+        # DEF-30 (ART-20): a edição relê a linha travada e espera a task do Google que a trava (publicação,
+        # nova tentativa, cancelamento); a regra "não editar o que está publicado ou pendente" do serializer
+        # vê o que a task gravou, e o save da linha inteira não desfaz o PUBLISHED. Só editar: aprovar e
+        # recusar são PATCH fora de transação, e o apagar tira do Google fora dela (e relê com trava no
+        # `perform_destroy`). `of=self`: o select_related de FK opcional vira OUTER JOIN, e o FOR UPDATE
+        # no lado nulo dá erro.
+        if self.action in ("update", "partial_update"):
+            qs = qs.select_for_update(of=("self",))
+
         return qs
 
     def perform_create(self, serializer):
@@ -916,6 +925,14 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         "Este evento pode estar no Google Agenda: sem compra neste município, ele voltaria para aprovação "
         "e seguiria confirmado lá. Tire o evento do Google antes de mudar o município ou o projeto."
     )
+
+    def update(self, request, *args, **kwargs):
+        """DEF-30 (ART-20): a edição inteira numa transação, para o `select_for_update` do `get_queryset`
+        segurar a linha da leitura ao save (o `partial_update` passa por aqui)."""
+        from django.db import transaction
+
+        with transaction.atomic():
+            return super().update(request, *args, **kwargs)
 
     def perform_update(self, serializer):
         """

@@ -137,6 +137,20 @@ class TestUmaCamadaSo:
 
         assert http.chamadas == 1
 
+    def test_delete_410_e_engolido_e_nao_abre_o_disjuntor(self, tipo):
+        """DEF-31 (ART-21): 410 é o evento já apagado direto no Google, igual ao 404. Antes, cada 410 contava
+        uma falha, e o 5º virava CircuitBreakerError: o cancel terminava em erro com o evento já fora."""
+        from apps.core.services.gcal.circuit_breaker import gcal_breaker, get_circuit_state
+
+        cliente, http = _cliente(tipo, [_erro(410)] * gcal_breaker.fail_max)
+
+        for _ in range(gcal_breaker.fail_max):
+            _retry_with_circuit_breaker(lambda: cliente.delete(CAL, "asv2-1"), operation_name="t")
+
+        assert http.chamadas == gcal_breaker.fail_max
+        assert get_circuit_state() == "closed"
+        assert gcal_breaker.fail_counter == 0
+
     def test_get_404_vira_none_sem_repetir(self, tipo):
         cliente, http = _cliente(tipo, [_erro(404)] * 5)
 

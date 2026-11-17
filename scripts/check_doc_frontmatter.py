@@ -3,20 +3,27 @@
 
 Todo doc vivo em `v2/docs/specs/` (specs + INDEX + READMEs de area) deve comecar
 com frontmatter YAML contendo, no minimo, `status` e `last_verified` (YYYY-MM-DD).
-Falha (exit 1) se faltar campo obrigatorio ou a data estiver mal formada.
-`last_verified` com mais de 180 dias gera AVISO (nao falha).
+Falha (exit 1) se faltar campo obrigatorio, a data estiver mal formada ou o
+cabecalho nao for YAML valido. `last_verified` com mais de 180 dias gera AVISO
+(nao falha).
+
+O cabecalho e lido por `v2/backend/scripts/doc_frontmatter.py`, o leitor unico dos
+gates de doc (FER-64); precisa do PyYAML instalado.
 
 Uso: `python scripts/check_doc_frontmatter.py [raiz]` (default v2/docs/specs).
 """
+
 import datetime
 import os
+import pathlib
 import re
 import sys
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "v2" / "backend" / "scripts"))
+import doc_frontmatter  # noqa: E402
+
 ROOT = sys.argv[1] if len(sys.argv) > 1 else "v2/docs/specs"
 REQUIRED = ["status", "last_verified"]
-FM = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.S)
-FIELD = re.compile(r"^([A-Za-z_]+):\s*(.*)$")
 DATE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
 
 errors = []
@@ -32,15 +39,14 @@ for dirpath, dirnames, filenames in os.walk(ROOT):
         fp = os.path.join(dirpath, fn)
         rel = fp.replace(os.sep, "/")
         txt = open(fp, encoding="utf-8").read()
-        m = FM.match(txt)
-        if not m:
+        try:
+            fields, _ = doc_frontmatter.frontmatter(txt, rel)
+        except ValueError as e:
+            errors.append(" ".join(str(e).split()))
+            continue
+        if not fields:
             errors.append(rel + ": sem frontmatter YAML (--- ... ---)")
             continue
-        fields = {}
-        for line in m.group(1).splitlines():
-            fm = FIELD.match(line)
-            if fm:
-                fields[fm.group(1)] = fm.group(2).strip()
         for req in REQUIRED:
             if not fields.get(req):
                 errors.append(rel + ": falta '" + req + "' no frontmatter")

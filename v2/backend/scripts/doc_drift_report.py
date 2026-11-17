@@ -59,6 +59,11 @@ import pathlib
 import subprocess
 import sys
 
+# Roda como script solto no runner, entao o proprio diretorio entra no sys.path.
+# `doc_frontmatter` e o leitor unico de cabecalho de spec (FER-64).
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import doc_frontmatter  # noqa: E402
+
 # O console do Windows abre em cp1252 e este repo tem commit com `→`, acento e
 # emoji no assunto — imprimir um deles derruba o script com UnicodeEncodeError.
 # Um relatorio que so roda no CI nao serve para quem precisa dele antes do PR.
@@ -74,7 +79,7 @@ IGNORA_DOC = ("_archive", "worktrees", "node_modules")
 
 # Mesma regra do check_doc_impact: status que declara o doc como registro, nao
 # como contrato vigente. Medir drift neles produz ruido por construcao.
-STATUS_FORA = {"historical", "stale", "superseded", "deprecated"}
+STATUS_FORA = doc_frontmatter.STATUS_FORA
 
 
 def _git(args: list[str], cwd: pathlib.Path) -> tuple[int, str]:
@@ -92,43 +97,6 @@ def _git(args: list[str], cwd: pathlib.Path) -> tuple[int, str]:
         return r.returncode, r.stdout
     except (OSError, subprocess.SubprocessError):
         return 1, ""
-
-
-def _frontmatter(texto: str) -> tuple[dict[str, str], list[str]]:
-    """Le campos escalares e a lista `sources_of_truth`.
-
-    Escrito a mao de proposito: o parser do `check_doc_frontmatter.py` usa
-    `^([A-Za-z_]+):\\s*(.*)$`, que casa `sources_of_truth:` com valor VAZIO e
-    descarta os itens `  - caminho` abaixo. Quem confiasse nele leria toda spec
-    como se nao declarasse fonte nenhuma — e toda spec ficaria "verde".
-    """
-    linhas = texto.split("\n")
-    if not linhas or linhas[0].strip() != "---":
-        return {}, []
-
-    campos: dict[str, str] = {}
-    fontes: list[str] = []
-    dentro_lista = False
-    for ln in linhas[1:]:
-        if ln.strip() == "---":
-            break
-        if ln.startswith((" ", "\t")) and ln.strip().startswith("- "):
-            if dentro_lista:
-                fontes.append(ln.strip()[2:].strip().strip("`\"'"))
-            continue
-        dentro_lista = False
-        if ":" not in ln:
-            continue
-        chave, _, valor = ln.partition(":")
-        chave = chave.strip()
-        if not chave or not chave.replace("_", "").isalnum():
-            continue
-        valor = valor.strip()
-        if chave == "sources_of_truth":
-            dentro_lista = True
-            continue
-        campos[chave] = valor
-    return campos, fontes
 
 
 def _docs_vivos(raiz: pathlib.Path):
@@ -181,7 +149,10 @@ def main(argv: list[str]) -> int:
 
     rc, _ = _git(["rev-parse", "--git-dir"], raiz)
     if rc != 0:
-        print(f"ERRO: {raiz} nao e um repositorio git — sem historico nao ha o que medir.", file=sys.stderr)
+        print(
+            f"ERRO: {raiz} nao e um repositorio git — sem historico nao ha o que medir.",
+            file=sys.stderr,
+        )
         return 1
 
     if _e_raso(raiz):
@@ -203,7 +174,12 @@ def main(argv: list[str]) -> int:
             texto = caminho.read_text(encoding="utf-8")
         except OSError:
             continue
-        campos, fontes = _frontmatter(texto)
+        try:
+            campos, fontes = doc_frontmatter.frontmatter(texto, rel)
+        except ValueError as e:
+            # Cabecalho quebrado e "nao poder medir": sai != 0 nomeando o arquivo,
+            # em vez de contar a spec como "sem fonte".
+            raise SystemExit(str(e)) from e
         if not campos:
             continue  # nao e doc SDD; fora de escopo
         if campos.get("status", "").lower() in STATUS_FORA:
@@ -237,7 +213,12 @@ def main(argv: list[str]) -> int:
             else:
                 nao_resolvem.append((rel, f))
         if not vivas:
-            nao_medivel.append((rel, f"nenhuma das {len(fontes)} entradas de `sources_of_truth` resolve"))
+            nao_medivel.append(
+                (
+                    rel,
+                    f"nenhuma das {len(fontes)} entradas de `sources_of_truth` resolve",
+                )
+            )
             continue
         fontes = vivas
 

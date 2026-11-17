@@ -99,35 +99,6 @@ for name, payload, expected in GUARDRAILS_CASES:
 
 
 # --------------------------------------------------------------------------
-# context-injector.py -- output-substring based
-# --------------------------------------------------------------------------
-CONTEXT_CASES = [
-    ("models guidance", edit("v2/backend/apps/core/models/solicitacao.py", "x"), "Model Guidelines", True),
-    ("api guidance", edit("v2/frontend/src/api/foo.ts", "x"), "API Client", True),
-    ("W5 rbac in view", edit("v2/backend/apps/core/views_x.py", 'user.groups.filter(name="DAT")'), "RBAC V001", True),
-    ("W5 rbac in test (whitelisted)", edit("v2/backend/apps/core/tests/test_x.py", 'user.groups.filter(name="DAT")'), "RBAC V001", False),
-    ("W6 pr missing markers", bash('gh pr create --body "## Summary"'), "marcadores do staging", True),
-    ("W6 pr with exact markers", bash('gh pr create --body "(8/8 PASS) Evidencia anexada no PR ALL 8 CHECKS PASSED"'), "marcadores do staging", False),
-    # W7 mudou de sentido no ADR-018 (#1516): o merge NAO deploya mais. O aviso
-    # existe para nao deixar o agente acreditar que a versao ja esta em prod.
-    ("W7 gh pr merge -> release", bash("gh pr merge 1 --squash"), "NAO deploya", True),
-    ("W7 git merge local", bash("git merge main"), "NAO deploya", False),
-    ("secret real value", write("x.py", 'password = "S3cretValue99"'), "segredo hardcoded", True),
-    ("secret placeholder", write("x.py", 'password = "changeme1"'), "segredo hardcoded", False),
-    ("N+1 in view", edit("apps/core/views_y.py", "Foo.objects.filter(a=1)"), "Possivel N+1", True),
-    ("CP-06 bad commit msg", bash('git commit -m "bad message"'), "CP-06", True),
-    # FER-55: o piso do vitest muda; o hook aponta para a SSOT em vez de copiar numeros.
-    ("vitest coverage aponta a SSOT", bash("cd v2/frontend && npx vitest run --coverage"), "thresholds de v2/frontend/vitest.config.ts", True),
-    ("vitest coverage sem piso copiado", bash("cd v2/frontend && npx vitest run --coverage"), "statements 44", False),
-    # O defeito do FER-55 foi o piso parado: o lembrete tem que dizer que se sobe, nao so que nao se baixa.
-    ("vitest coverage manda subir o piso", bash("cd v2/frontend && npx vitest run --coverage"), "sobe o piso", True),
-]
-for name, payload, sub, want in CONTEXT_CASES:
-    _, out = run_py("context-injector.py", payload)
-    check(f"context-injector: {name}", (sub in out) == want, f"'{sub}' found={sub in out} want={want}")
-
-
-# --------------------------------------------------------------------------
 # intent-detector.py
 # --------------------------------------------------------------------------
 INTENT_CASES = [
@@ -204,7 +175,7 @@ NONROOT = tempfile.gettempdir()             # garantidamente != raiz do repo
 
 # Hooks NOSSOS (exclui plugins externos thedotmack/song) que precisam de path ABSOLUTO.
 HOOK_SCRIPTS = (
-    "guardrails.py", "context-injector.py", "intent-detector.py", "post-compact-reminder.sh",
+    "guardrails.py", "intent-detector.py", "post-compact-reminder.sh",
     "tools-reminder.ps1", "graphify-reminder.ps1", "auto-format-python.ps1", "graphify-sync.ps1",
 )
 
@@ -279,10 +250,11 @@ else:
 # report
 # --------------------------------------------------------------------------
 # Piso anti-vacuidade: um harness que roda pouco passa por nao testar sem ninguem
-# perceber. 57 casos com PowerShell presente (Windows e o runner do CI, que tem
-# `pwsh`), 50 sem. Abaixo de 45, algo sumiu — e sumir em silencio e o defeito que
-# este arquivo existe para pegar.
-MINIMO = 45
+# perceber. 41 casos com PowerShell presente (Windows e o runner do CI, que tem
+# `pwsh`), 34 sem. Abaixo de 30, algo sumiu — e sumir em silencio e o defeito que
+# este arquivo existe para pegar. Era 45 (57/50 casos) ate o FER-74, que tirou o
+# context-injector.py e os 16 casos dele: o hook nunca chegava ao modelo.
+MINIMO = 30
 
 fails = [r for r in results if not r[1]]
 for name, ok, detail in results:

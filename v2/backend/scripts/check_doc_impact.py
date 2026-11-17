@@ -83,6 +83,8 @@ IGNORA_DOC = ("_archive", "worktrees", "node_modules")
 # O detector 1 historicamente so olhava {historical, stale}; alinhar com o SSOT
 # tambem fecha `superseded` e `deprecated`.
 STATUS_ESCONDE = doc_frontmatter.STATUS_FORA
+# Status da base cujo cabecalho nao se le (ver _status_na_base).
+STATUS_ILEGIVEL = "cabecalho ilegivel na base"
 
 WAIVER = re.compile(r"(?im)^\s*doc[- ]nao[- ]afetada\s*:\s*(?P<caminho>\S+)\s*(?:[—–-]{1,2}\s*(?P<motivo>.+))?$")
 
@@ -147,12 +149,23 @@ def _docs_vivos(raiz: pathlib.Path):
             yield p, rel
 
 
-def _status(texto: str) -> str:
-    return doc_frontmatter.status(texto)
+def _status(texto: str, rel: str) -> str:
+    return doc_frontmatter.status(texto, rel)
 
 
-def _sources_of_truth(texto: str) -> list[str]:
-    return doc_frontmatter.frontmatter(texto)[1]
+def _status_na_base(raiz: pathlib.Path, base: str, rel: str) -> str:
+    """`status` da versao da base. So serve de comparacao: se o cabecalho de la nao
+    se le, o PR que o conserta nao pode travar, mas tambem nao pode esconder a spec
+    de graca. Por isso devolve STATUS_ILEGIVEL: conta como vigente, e passar agora
+    para um status que esconde exige justificativa, como qualquer rebaixamento."""
+    try:
+        return doc_frontmatter.status(_git(["show", f"{base}:{rel}"], raiz))
+    except ValueError:
+        return STATUS_ILEGIVEL
+
+
+def _sources_of_truth(texto: str, rel: str) -> list[str]:
+    return doc_frontmatter.frontmatter(texto, rel)[1]
 
 
 def _sot_encolheu(raiz: pathlib.Path, base: str, rel: str, texto_atual: str) -> list[str]:
@@ -167,8 +180,11 @@ def _sot_encolheu(raiz: pathlib.Path, base: str, rel: str, texto_atual: str) -> 
     antes = _git(["show", f"{base}:{rel}"], raiz)
     if not antes:
         return []  # spec nova neste PR: nao ha do que encolher
-    _, fontes_antes = doc_frontmatter.frontmatter(antes)
-    _, fontes_agora = doc_frontmatter.frontmatter(texto_atual)
+    try:
+        _, fontes_antes = doc_frontmatter.frontmatter(antes)
+    except ValueError:
+        return []  # a base nao se le: nao ha lista confiavel para comparar
+    _, fontes_agora = doc_frontmatter.frontmatter(texto_atual, rel)
     return sorted(set(fontes_antes) - set(fontes_agora))
 
 
@@ -263,9 +279,9 @@ def main(argv: list[str]) -> int:
         # Zero rebaixamentos nos ultimos 60 commits da main: raro, preciso, e
         # conserta-se dentro do PR. Bloqueia sobre baseline limpo, sem allowlist.
         # Rebaixar pode ser legitimo — exige justificativa, nao proibicao.
-        st_agora = _status(texto)
+        st_agora = _status(texto, rel)
         if base and rel in tocados and st_agora in STATUS_ESCONDE:
-            st_antes = _status(_git(["show", f"{base}:{rel}"], raiz))
+            st_antes = _status_na_base(raiz, base, rel)
             if st_antes and st_antes not in STATUS_ESCONDE:
                 if rel in waivers:
                     pass
@@ -305,7 +321,7 @@ def main(argv: list[str]) -> int:
             avisos.append((rel, f"cita {_rotula(brandas)}, mencionado no PR sem verbo de resolucao"))
 
         # detector 2 — indice reverso: so avisa
-        sot = _sources_of_truth(texto)
+        sot = _sources_of_truth(texto, rel)
         atingidos = [s for s in sot if s.replace("\\", "/") in tocados]
         if atingidos and rel not in tocados:
             amostra = ", ".join(atingidos[:3]) + ("…" if len(atingidos) > 3 else "")

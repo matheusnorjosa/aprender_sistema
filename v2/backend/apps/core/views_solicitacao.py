@@ -583,6 +583,15 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 | Q(usuario__last_name__icontains=q)
             )
 
+        # DEF-30 (ART-20): a edição relê a linha travada e espera a task do Google que a trava (publicação,
+        # nova tentativa, cancelamento); a regra "não editar o que está publicado ou pendente" do serializer
+        # vê o que a task gravou, e o save da linha inteira não desfaz o PUBLISHED. Só editar: aprovar e
+        # recusar são PATCH fora de transação, e o apagar tira do Google fora dela (e relê com trava no
+        # `perform_destroy`). `of=self`: o select_related de FK opcional vira OUTER JOIN, e o FOR UPDATE
+        # no lado nulo dá erro.
+        if self.action in ("update", "partial_update"):
+            qs = qs.select_for_update(of=("self",))
+
         return qs
 
     def perform_create(self, serializer):
@@ -916,6 +925,47 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         "Este evento pode estar no Google Agenda: sem compra neste município, ele voltaria para aprovação "
         "e seguiria confirmado lá. Tire o evento do Google antes de mudar o município ou o projeto."
     )
+
+    # DEF-30: teto da espera pela trava da linha (task do Google ou aprovação). Abaixo do statement_timeout
+    # de produção (30 s), para a edição desistir com 400 "tente de novo", e não com o 500 do statement
+    # cancelado, sem prender a thread do gunicorn enquanto o Google está lento.
+    _EDICAO_LOCK_TIMEOUT = "10s"
+    _MSG_EDICAO_LINHA_OCUPADA = (
+        "Este evento está sendo alterado por outra operação agora (como a publicação no Google Agenda ou "
+        "uma aprovação). Tente de novo em instantes."
+    )
+
+    def get_object(self):
+        """DEF-30: na edição, o teto `_EDICAO_LOCK_TIMEOUT` vale só para a leitura travada da linha. Depois
+        dela o `lock_timeout` volta ao de antes: a trava dos participantes (`lock_participants`, no
+        `perform_update`) espera como sempre esperou, e um lote de aprovação longo não vira recusa."""
+        if self.action not in ("update", "partial_update"):
+            return super().get_object()
+        from django.db import connection
+
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT current_setting('lock_timeout')")
+            linha = cursor.fetchone()
+            cursor.execute("SELECT set_config('lock_timeout', %s, true)", [self._EDICAO_LOCK_TIMEOUT])
+        obj = super().get_object()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT set_config('lock_timeout', %s, true)", [linha[0] if linha else "0"])
+        return obj
+
+    def update(self, request, *args, **kwargs):
+        """DEF-30 (ART-20): a edição inteira numa transação, para o `select_for_update` do `get_queryset`
+        segurar a linha da leitura ao save (o `partial_update` passa por aqui)."""
+        from django.db import OperationalError, transaction
+
+        try:
+            with transaction.atomic():
+                return super().update(request, *args, **kwargs)
+        except OperationalError as exc:
+            # lock_not_available; `sqlstate` no psycopg 3 (dev), `pgcode` no psycopg2 (produção)
+            causa = exc.__cause__
+            if (getattr(causa, "sqlstate", None) or getattr(causa, "pgcode", None)) != "55P03":
+                raise
+            raise serializers.ValidationError({"non_field_errors": [self._MSG_EDICAO_LINHA_OCUPADA]}) from exc
 
     def perform_update(self, serializer):
         """

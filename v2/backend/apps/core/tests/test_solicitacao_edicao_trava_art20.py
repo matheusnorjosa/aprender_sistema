@@ -206,6 +206,79 @@ def test_edicao_durante_publicacao_espera_e_nao_desfaz_o_publicado(monkeypatch, 
     assert sol.observacoes == "original"
 
 
+class _GoogleQueFalhaNoInsert(_GoogleQueTravaNoInsert):
+    """Como o de cima, mas o insert, depois de liberado, falha como um 500 do Google."""
+
+    def insert(self, calendar_id, event_id, payload):
+        super().insert(calendar_id, event_id, payload)
+        raise RuntimeError("HttpError 500: backendError")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_edicao_durante_publicacao_que_falha_recebe_400_e_a_linha_fica_em_erro(monkeypatch, settings):
+    """A publicação normal (linha em PENDING, como `publish_to_gcal` deixa) falha enquanto a edição espera.
+
+    O ERROR que o `apply_one_solicitacao` marca dentro da trava é desfeito pelo rollback da task; a edição
+    pega a trava, relê PENDING e recebe o 400 do PENDING. O ERROR só é gravado depois, por
+    `_mark_gcal_error`, fora da trava (ART-22). A edição não muda a linha; a próxima, já sobre ERROR, segue.
+    """
+    from apps.core.services import gcal_client_factory
+    from apps.core.services.gcal import sync as sync_mod
+    from apps.core.tasks import task_publish_solicitacao_to_gcal
+
+    settings.GCAL_AUTH_MODE = "service_account"
+    settings.GCAL_CLIENT = "fake"
+    google = _GoogleQueFalhaNoInsert()
+    monkeypatch.setattr(gcal_client_factory, "get_gcal_client_and_calendar_id", lambda: (google, "primary"))
+    monkeypatch.setattr(sync_mod, "_retry_with_circuit_breaker", lambda f, **_: f())
+
+    dono = _usuario("art20_falha")
+    dono.groups.add(GroupFactory(name="Coordenador"))
+    sol = _solicitacao(dono, status="aprovado", fluxo="NAO_SUPER", gcal_status=Solicitacao.GCalStatus.PENDING)
+
+    def publicar():
+        try:
+            return task_publish_solicitacao_to_gcal(sol.id)
+        finally:
+            connection.close()
+
+    def editar():
+        try:
+            client = APIClient()
+            client.force_authenticate(dono)
+            return client.patch(f"/api/solicitacoes/{sol.id}/", {"observacoes": "novo"}, format="json")
+        finally:
+            connection.close()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futuro_publicar = executor.submit(publicar)
+        futuro_editar = None
+        try:
+            assert google.travou.wait(timeout=15), "a publicação não chegou ao insert do Google"
+            futuro_editar = executor.submit(editar)
+            _esperar_alguem_esperando_trava()
+        finally:
+            google.liberar.set()
+        resultado = futuro_publicar.result(timeout=30)
+        assert futuro_editar is not None
+        resposta = futuro_editar.result(timeout=30)
+
+    assert resultado["action"] == "ERROR", resultado
+    assert resposta.status_code == 400, f"esperado 400, obteve {resposta.status_code}: {resposta.data}"
+    assert "Aguarde a conclusão" in str(resposta.data)
+    sol.refresh_from_db()
+    assert sol.gcal_status == Solicitacao.GCalStatus.ERROR
+    assert not sol.external_event_id
+    assert sol.observacoes == "original"
+
+    client = APIClient()
+    client.force_authenticate(dono)
+    segunda = client.patch(f"/api/solicitacoes/{sol.id}/", {"observacoes": "novo"}, format="json")
+    assert segunda.status_code == 200, segunda.data
+    sol.refresh_from_db()
+    assert sol.observacoes == "novo"
+
+
 @pytest.mark.django_db(transaction=True)
 def test_edicao_que_espera_demais_recebe_400_e_nao_500(monkeypatch):
     """A espera pela trava tem teto (`lock_timeout`) abaixo do `statement_timeout` de produção (30 s).

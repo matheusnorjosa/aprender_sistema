@@ -39,7 +39,7 @@ def run_py(hook: str, payload: dict) -> tuple[int, str]:
 
 # `powershell` e o nome do binario so no Windows. O ubuntu-latest do GitHub tem
 # PowerShell Core como `pwsh`, entao os 4 casos .ps1 rodam la tambem: medido,
-# 51/51 no runner. O fallback serve para runner sem nenhum dos dois — ai eles sao
+# 51/51 no runner (41 desde o FER-74). O fallback serve para runner sem nenhum dos dois — ai eles sao
 # pulados COM AVISO, e o piso MINIMO no fim do arquivo impede que a ausencia
 # passe por aprovacao. Chamar `powershell` direto foi o que quebrou o CI do #1853.
 POWERSHELL = shutil.which("powershell") or shutil.which("pwsh")

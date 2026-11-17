@@ -23,7 +23,7 @@ concurrency:
 jobs:
   strict-security-headers:
     name: "[ops] strict security headers (staging/prod)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 25
     env:
       # Producao, escrita aqui de proposito (e nao em vars/secrets): a variavel de repo

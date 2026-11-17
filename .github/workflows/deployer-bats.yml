@@ -28,7 +28,7 @@ concurrency:
 jobs:
   bats:
     name: deployer bats (guards + units + gate de backup)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - name: Checkout

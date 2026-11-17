@@ -26,7 +26,7 @@ jobs:
   # eles rodam normalmente; o gating só afeta os [info] (não-bloqueantes).
   changes:
     name: detect frontend changes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 3
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
@@ -55,7 +55,7 @@ jobs:
 
   react-doctor:
     name: "[required] react doctor quality gate"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 12
 
     steps:
@@ -74,7 +74,7 @@ jobs:
   # é o agregador `build-lint-frontend` (o nome do ruleset), que exige este job verde.
   frontend-build:
     name: "[required] frontend lint e build"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
 
     defaults:
@@ -146,7 +146,7 @@ jobs:
   # reprovaria); o piso de vitest.config.ts vale uma vez só, na junção feita pelo agregador.
   frontend-unit:
     name: "[required] frontend unit (parte ${{ matrix.shard }}/${{ strategy.job-total }})"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -190,7 +190,7 @@ jobs:
   # check exigido nunca chegaria).
   build-lint-frontend:
     name: "[required] build/lint do frontend"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     needs: [frontend-build, frontend-unit]
     if: ${{ always() }}
@@ -244,7 +244,7 @@ jobs:
   # seed e roda um terço dos testes; o check do ruleset é o agregador `checklist-tests`.
   checklist-shard:
     name: "[required] checklist (parte ${{ matrix.shard }}/${{ strategy.job-total }})"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     # 20: a parte mais lenta levou 9m50s num runner lento (12/11), com 2m48s só de subir o backend.
     timeout-minutes: 20
     strategy:
@@ -371,7 +371,7 @@ jobs:
   # passa com as 3 partes verdes.
   checklist-tests:
     name: "[required] checklist tests (meta, a11y, security)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 3
     needs: [checklist-shard]
     if: ${{ always() }}
@@ -393,7 +393,7 @@ jobs:
     # testes residuais com variância entre runs. Após 10+ execuções estáveis
     # em main, promover para [required] removendo `continue-on-error` e
     # renomeando para `[required] e2e journeys`.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     continue-on-error: true
     needs: changes
@@ -523,7 +523,7 @@ jobs:
 
   lighthouse-ci:
     name: "[info] lighthouse CI"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs: [frontend-build, changes]
     if: github.event_name == 'pull_request' && needs.changes.outputs.frontend == 'true'
     timeout-minutes: 12
@@ -539,7 +539,7 @@ jobs:
 
     - name: Setup Chrome
       id: setup-chrome
-      uses: browser-actions/setup-chrome@c785b87e244131f27c9f19c1a33e2ead956ab7ce # v1
+      uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2.2.0
       with:
         chrome-version: stable
 
@@ -574,7 +574,7 @@ jobs:
   # "Indisponível" no relatório. Dados do evento só via `env:`.
   pr-report:
     name: "[info] frontend PR report"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     needs: [changes, frontend-build, lighthouse-ci]
     if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.changes.outputs.frontend == 'true' }}

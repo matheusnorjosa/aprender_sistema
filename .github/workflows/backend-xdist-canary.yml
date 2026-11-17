@@ -68,7 +68,7 @@ jobs:
 
   canary-report:
     name: "[ops] backend xdist canary summary"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       # Unico job que mexe na issue do canary — issues:write vive aqui. #1397.
       contents: read

@@ -20,7 +20,7 @@ concurrency:
 jobs:
   dependency-review:
     name: "[required] dependency review"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     # Só em PR — no schedule/dispatch roda só o scorecard.
     if: github.event_name == 'pull_request'
@@ -65,7 +65,7 @@ jobs:
 
       - name: Dependency Review (public repos, block HIGH/CRITICAL)
         if: github.event.repository.private == false && steps.deps-changes.outputs.any_changed == 'true'
-        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
           # ATENCAO: este step NAO roda hoje — o repositorio e' privado, entao
@@ -130,7 +130,7 @@ jobs:
 
   scorecard:
     name: "[info] openssf scorecard"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     continue-on-error: true
     permissions:

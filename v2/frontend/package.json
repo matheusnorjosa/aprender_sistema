@@ -29,8 +29,7 @@
     "lighthouse": "node scripts/lighthouse-ci.mjs",
     "lighthouse:ci": "node scripts/lighthouse-ci.mjs",
     "size": "size-limit",
-    "size:check": "npm run build && size-limit",
-    "notices": "node scripts/gen-third-party-notices.mjs"
+    "size:check": "npm run build && size-limit"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
@@ -84,6 +83,7 @@
     "msw": "^2.13.4",
     "postcss": "^8.5.25",
     "react-doctor": "0.0.42",
+    "rollup-plugin-license": "^3.7.2",
     "rollup-plugin-visualizer": "^5.14.0",
     "size-limit": "^11.2.0",
     "tailwindcss": "^3.4.18",

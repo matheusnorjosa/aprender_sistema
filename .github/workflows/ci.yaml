@@ -87,7 +87,9 @@ jobs:
         # the reusable backend-test workflow and the setup-python-deps composite action that the
         # backend jobs consume (a change there — e.g. bump de actions/setup-python, pip install ou
         # cache — precisa exercitar a suite backend, senao o PR fica verde-falso; ver #1459).
-        BACKEND_IMPACT_REGEX='^(v2/backend/|v2/infra/|v2/tests/|v2/.dockerignore$|\.github/workflows/ci\.yaml$|\.github/workflows/_backend-test\.yml$|\.github/actions/setup-python-deps/)'
+        # scripts/check_doc_frontmatter.py fica fora de v2/backend, mas a guarda que o mantem
+        # usando o leitor unico (test_doc_frontmatter::test_um_leitor_so) e teste do backend (FER-64).
+        BACKEND_IMPACT_REGEX='^(v2/backend/|v2/infra/|v2/tests/|v2/.dockerignore$|\.github/workflows/ci\.yaml$|\.github/workflows/_backend-test\.yml$|\.github/actions/setup-python-deps/|scripts/check_doc_frontmatter\.py$)'
         BACKEND_MATCHED_FILES="$(printf '%s\n' "$CHANGED_FILES" | grep -E "$BACKEND_IMPACT_REGEX" || true)"
         BACKEND_MATCHED_COUNT="$(printf '%s\n' "$BACKEND_MATCHED_FILES" | sed '/^$/d' | wc -l | tr -d ' ')"
 

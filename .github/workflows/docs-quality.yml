@@ -43,6 +43,18 @@ jobs:
         with:
           python-version: '3.12'
 
+      # Unica dependencia do job. Os portoes de doc leem o cabecalho das specs com
+      # o PyYAML (`v2/backend/scripts/doc_frontmatter.py`, FER-64) e o check dos
+      # [required] le os workflows com ele. Sem este step eles falham alto no
+      # import, nunca passam em silencio. A versao vem do requirements.txt (um pin
+      # so, o que o Dependabot atualiza); sem a linha la, o step falha.
+      - name: PyYAML para os portoes de doc
+        run: |
+          set -euo pipefail
+          # Sem o comentario do fim da linha, se houver: o pip recusa "PyYAML==x  # ...".
+          pin="$(grep -iE '^PyYAML==' v2/backend/requirements.txt | sed 's/[[:space:]]*#.*//')"
+          python -m pip install --quiet "$pin"
+
       - name: Links relativos quebrados (docs vivos)
         run: python scripts/check_doc_links.py
 
@@ -60,10 +72,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Unico step deste job com dependencia. Ler workflow com YAML de verdade
+          # Ler workflow com YAML de verdade (PyYAML instalado no inicio do job)
           # nao e luxo: a medicao que originou este gate errou duas vezes por
           # regex/glob (`*.yml*` nao casa `ci.yaml`, o arquivo com mais jobs).
-          python -m pip install --quiet pyyaml
           python v2/backend/scripts/check_required_checks.py --branch main
 
       # F.1 pela raiz. As duas arvores de ADR compartilham UM espaco de

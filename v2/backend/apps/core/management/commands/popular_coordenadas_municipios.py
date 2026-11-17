@@ -102,7 +102,7 @@ class Command(BaseCommand):
             preencher: list[Municipio] = []
             fora_da_base = igual = diferente = 0
             for m in candidatos:
-                coord = base.get(m.ibge_code.strip())
+                coord = base.get((m.ibge_code or "").strip())
                 if coord is None:
                     fora_da_base += 1
                 elif m.latitude is None or m.longitude is None:

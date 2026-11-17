@@ -714,6 +714,9 @@ except Exception as e:
 > rápido** enquanto o circuito está aberto (após uma sequência de falhas), evitando martelar a API.
 > A repetição (5xx, 429, limite de velocidade, rede) é a da biblioteca do Google, dentro do cliente
 > (`execute(num_retries=...)`); o breaker conta 1 falha por operação, depois dessas repetições (FER-60).
+> Só conta falha do Google (5xx, 429, rede, 403 de cota); o 403 sem acesso e os erros do pedido (400, 404,
+> 409, 410, 412) não contam e zeram a contagem. Vencida a pausa, uma chamada de teste fecha o circuito se
+> der certo (DEF-31). Regra completa: [gcal.spec.md](specs/backend/gcal.spec.md), "Disjuntor do Google".
 
 ## 5. Comandos Úteis
 

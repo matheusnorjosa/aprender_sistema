@@ -317,8 +317,66 @@ def test_edicao_que_espera_demais_recebe_400_e_nao_500(monkeypatch):
 
     assert resposta.status_code == 400, f"esperado 400, obteve {resposta.status_code}: {resposta.data}"
     assert "Tente de novo" in str(resposta.data)
+    # Quem segura a linha pode ser a task do Google ou a aprovação (o lote trava as linhas até o commit):
+    # a mensagem não afirma que é o Google.
+    assert "sincronizado com o Google" not in str(resposta.data)
     sol.refresh_from_db()
     assert sol.observacoes == "original"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_teto_vale_so_para_a_trava_da_linha_e_nao_para_a_dos_participantes(monkeypatch):
+    """O teto cobre só a leitura da linha; a trava dos participantes (`lock_participants`) espera como antes.
+
+    Uma aprovação em lote segura a trava de uma formadora até o commit. A edição de outro evento, nunca
+    publicado, com essa formadora pega a linha na hora e espera a trava dela. Com o teto valendo para a
+    transação inteira, passava dos 10 s e recebia 400 "sincronizado com o Google", motivo falso.
+    """
+    from django.db import transaction
+
+    from apps.core.models import Participation
+    from apps.core.services.solicitacao_availability import lock_participants
+
+    monkeypatch.setattr(SolicitacaoViewSet, "_EDICAO_LOCK_TIMEOUT", "200ms", raising=False)
+    dono = _usuario("art20_lote")
+    dono.groups.add(GroupFactory(name="Coordenador"))
+    formadora = _usuario("art20_formadora")
+    sol = _solicitacao(dono, status="aprovado", fluxo="NAO_SUPER")
+    Participation.objects.create(solicitacao=sol, usuario=formadora, role="FORMADOR")
+    travou, liberar = threading.Event(), threading.Event()
+
+    def lote_segurando_a_formadora():
+        try:
+            with transaction.atomic():
+                lock_participants([formadora.id])
+                travou.set()
+                liberar.wait(timeout=15)
+        finally:
+            connection.close()
+
+    def editar():
+        try:
+            client = APIClient()
+            client.force_authenticate(dono)
+            return client.patch(f"/api/solicitacoes/{sol.id}/", {"observacoes": "novo"}, format="json")
+        finally:
+            connection.close()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futuro_lote = executor.submit(lote_segurando_a_formadora)
+        try:
+            assert travou.wait(timeout=15), "o lote não chegou a travar a formadora"
+            futuro_editar = executor.submit(editar)
+            _esperar_alguem_esperando_trava()
+            time.sleep(0.6)  # passa do teto de 200 ms com a edição parada na trava da formadora
+        finally:
+            liberar.set()
+        futuro_lote.result(timeout=30)
+        resposta = futuro_editar.result(timeout=30)
+
+    assert resposta.status_code == 200, f"esperado 200, obteve {resposta.status_code}: {resposta.data}"
+    sol.refresh_from_db()
+    assert sol.observacoes == "novo"
 
 
 # =============================================================================

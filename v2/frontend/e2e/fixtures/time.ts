@@ -3,12 +3,13 @@
  *
  * Combina duas estratégias para determinismo temporal completo:
  *
- * 1. **Frontend**: `page.addInitScript` sobrescreve `Date.now()` e o construtor
- *    `Date` para retornar um instante fixo. Afeta `new Date()` no JS do bundle,
- *    bibliotecas de formatação (date-fns, dayjs, AntD DatePicker), timers.
+ * 1. **Frontend**: `page.clock.setFixedTime` (relógio nativo do Playwright) faz
+ *    `Date.now()` e `new Date()` devolverem o instante fixo, inclusive no bundle e
+ *    nas bibliotecas de data (dayjs, AntD DatePicker). Os timers seguem rodando.
+ *    Até o FER-65 isto era um `Date` falso injetado à mão por `addInitScript`.
  *
  * 2. **Backend**: header `X-E2E-Frozen-Time` enviado em TODAS as requests via
- *    `page.setExtraHTTPHeaders`. Lido pelo `FreezeTimeMiddleware` (Fase 2a)
+ *    `context.setExtraHTTPHeaders`. Lido pelo `FreezeTimeMiddleware` (Fase 2a)
  *    quando `DEBUG_E2E=true + INCLUDE_DEV_TOOLS=true` no Django settings.
  *
  * Sem os dois, as RD-01..RD-08 podem falhar por divergência entre "agora" do
@@ -43,39 +44,12 @@ export async function freezeTime(page: Page, isoDatetime: string): Promise<void>
 
   const fixedMs = parsed.valueOf();
 
-  // Frontend: sobrescreve Date antes do bundle carregar
-  await page.addInitScript(
-    ({ fixedMs: ms }: { fixedMs: number }) => {
-      const RealDate = Date;
-      const fixedIso = new RealDate(ms).toISOString();
+  // Frontend: relógio nativo. Vale para o CONTEXTO inteiro (esta página, popups e
+  // páginas novas do mesmo contexto), então o header abaixo tem o mesmo alcance.
+  await page.clock.setFixedTime(fixedMs);
 
-      // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-      class FrozenDate extends RealDate {
-        constructor(...args: unknown[]) {
-          if (args.length === 0) {
-            super(ms);
-          } else {
-            // @ts-expect-error — passthrough para construtor real
-            super(...args);
-          }
-        }
-        static now() {
-          return ms;
-        }
-        static parse = RealDate.parse;
-        static UTC = RealDate.UTC;
-      }
-
-      // @ts-expect-error — substituição global deliberada
-      globalThis.Date = FrozenDate;
-      // Marcador para debug
-      (globalThis as unknown as { __FROZEN_TIME__?: string }).__FROZEN_TIME__ = fixedIso;
-    },
-    { fixedMs }
-  );
-
-  // Backend: header em cada request
-  await page.setExtraHTTPHeaders({
+  // Backend: header em cada request do contexto
+  await page.context().setExtraHTTPHeaders({
     'X-E2E-Frozen-Time': isoDatetime,
   });
 }
@@ -85,7 +59,7 @@ export async function freezeTime(page: Page, isoDatetime: string): Promise<void>
  * Raramente necessário — normalmente um teste congela uma vez e não volta.
  */
 export async function unfreezeTime(page: Page): Promise<void> {
-  await page.setExtraHTTPHeaders({});
-  // Frontend: não há como remover `addInitScript` em runtime; recarregar página
-  // restauraria `Date`, mas quase sempre é mais simples criar uma nova página.
+  await page.context().setExtraHTTPHeaders({});
+  // Frontend: o `page.clock` não tem "desinstalar" e vale para o contexto inteiro;
+  // para voltar ao tempo real no navegador, use um contexto novo.
 }

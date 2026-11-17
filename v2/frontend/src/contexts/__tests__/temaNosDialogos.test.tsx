@@ -10,6 +10,9 @@
  */
 // Como no main.tsx: sem o patch, os métodos estáticos do antd 5 não renderizam no React 19.
 import '@ant-design/v5-patch-for-react-19';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, test } from 'vitest';
 import { Button, ConfigProvider, Modal, theme, type ThemeConfig } from 'antd';
@@ -90,5 +93,11 @@ describe('diálogos estáticos herdam o tema do sistema (DEF-33)', () => {
     const { colorError } = theme.getDesignToken(configDoSistema());
     const razao = (luminancia('#ffffff') + 0.05) / (luminancia(colorError) + 0.05);
     expect(razao).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('o App registra o tema ativo nos diálogos, de novo a cada troca de tema', () => {
+    // Guarda da ligação: sem ela, apagar o useEffect do App deixaria toda a suíte verde e o DEF-33 voltaria.
+    const app = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../App.tsx'), 'utf-8');
+    expect(app).toMatch(/useEffect\(\(\) => \{\s*aplicarTemaNosDialogos\(antThemeConfig\);\s*\}, \[antThemeConfig\]\);/);
   });
 });

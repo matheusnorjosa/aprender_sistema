@@ -86,17 +86,6 @@
         ]
       },
       {
-        "matcher": "Edit|Write|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "py -3 $CLAUDE_PROJECT_DIR/.claude/hooks/context-injector.py 2>/dev/null || true",
-            "timeout": 5,
-            "statusMessage": "Injecting project context..."
-          }
-        ]
-      },
-      {
         "matcher": "Bash",
         "hooks": [
           {

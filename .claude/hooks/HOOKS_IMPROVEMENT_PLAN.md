@@ -20,6 +20,12 @@
 >   produção muda por `promote.yml` gated. O item fica escrito como estava porque registra a decisão
 >   de 2026-06-25 — corrigi-lo aqui apagaria o motivo de o aviso existir.
 >
+> - **17/11/2026 (FER-74): o `context-injector.py` saiu.** Ele imprimia texto puro no PreToolUse, que o
+>   Claude Code não repassa ao modelo (só o JSON `additionalContext` chega); com o `2>/dev/null || true`
+>   ninguém via. Ou seja, nunca injetou nada. Os avisos úteis dele já têm guarda que funciona (rbac-lint,
+>   staging gate evidence, Gitleaks/TruffleHog e o `guardrails.py`). Prova e decisão no FER-67
+>   (`liberacao/relatorios/reinvencoes_vs_open_source_2026-11-16.md`, "Revisão do FER-67").
+>
 > Princípio-guia (esse continua valendo): um hook só ganha o sustento se fizer o que o CLAUDE.md
 > **não** pode — **bloqueio duro**, **automação**, ou **injeção genuinamente contextual**. Onde
 > repete o CLAUDE.md, é ruído.

@@ -32,7 +32,7 @@ Você audita a configuração `.claude/` (skills, commands, agents, hooks, cheat
 ## Não-bugs (NÃO reportar)
 
 - `.claude/_archive/**` — histórico imutável (snapshots; o gate de docs ignora de propósito).
-- Banners *deprecated-ok*: skill `etl-guidelines`, commands `etl-dry`/`etl-apply`, `context-injector.etl_context()`.
+- Banners *deprecated-ok*: skill `etl-guidelines`, commands `etl-dry`/`etl-apply`.
 - `groups.filter(name=...)` quando aparece como **anotação de "BANIDO/WRONG"** (exemplo negativo), não como recomendação.
 - Menções a `dat_ingest`/ETL no formato "foi REMOVIDO" (factual/histórico correto).
 - Tabelas de "arquivado → substituto" e branch-names tipo `feat/new-feature`.

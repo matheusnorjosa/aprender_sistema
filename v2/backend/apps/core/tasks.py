@@ -177,10 +177,18 @@ _MSG_SEM_ACESSO_CALENDARIO = (
     "O Google recusou o acesso ao calendário da organização (sem permissão de edição ou calendário "
     "não compartilhado com sua conta). Peça ao Controle o compartilhamento com «Fazer alterações nos eventos»."
 )
+_MSG_DISJUNTOR_ABERTO = (
+    "O Google Agenda falhou várias vezes seguidas; o sistema pausou as chamadas por alguns minutos. "
+    "Tente de novo daqui a pouco."
+)
 
 
 def _friendly_gcal_error(error: BaseException) -> str:
     """Texto acionável para `gcal_last_error`; o erro cru vai para o AuditLog."""
+    from apps.core.services.gcal.circuit_breaker import CircuitBreakerError
+
+    if isinstance(error, CircuitBreakerError):
+        return _MSG_DISJUNTOR_ABERTO
     status = getattr(getattr(error, "resp", None), "status", None)
     if str(status) in ("403", "404"):
         return _MSG_SEM_ACESSO_CALENDARIO
@@ -1052,11 +1060,11 @@ def queue_gcal_sync_retry(
         dict: Result with action, status, and any errors
     """
     from apps.core.models import AuditLog, Solicitacao
-    from apps.core.services.gcal.circuit_breaker import gcal_breaker
+    from apps.core.services.gcal.circuit_breaker import bloqueado_agora
 
-    # Check circuit breaker state
-    if str(gcal_breaker.current_state) == "open":
-        # Circuit still open, retry later
+    # ART-21: só espera enquanto a pausa do disjuntor não venceu. Vencida, segue: o `gcal_breaker.call` deixa
+    # esta chamada passar como teste (half-open). Ler só `current_state` deixava a tentativa presa para sempre.
+    if bloqueado_agora():
         logger.info(
             f"Circuit breaker still open for Solicitacao #{solicitation_id}, "
             f"retrying in 60s (attempt {self.request.retries + 1}/{self.max_retries})"

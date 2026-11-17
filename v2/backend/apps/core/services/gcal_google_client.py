@@ -218,9 +218,9 @@ class GoogleCalendarClient(CalendarClientAdapter):
         try:
             _delete()
         except HttpError as e:
-            if e.resp.status == 404:
-                # Evento já não existe → idempotente
-                logger.debug(f"Event {event_id} already deleted (404)")
+            if e.resp.status in (404, 410):
+                # Evento já não existe (404) ou foi apagado direto no Google (410) → idempotente
+                logger.debug(f"Event {event_id} already deleted ({e.resp.status})")
                 return
             raise
 

@@ -104,19 +104,15 @@ def _retry_with_circuit_breaker(
 
     O nome ficou do tempo em que havia um laço de repetição aqui. Desde o FER-60 a repetição é só a da
     biblioteca do Google, dentro do cliente (`execute(num_retries=...)`); esta função não repete de novo.
-    Se o disjuntor está aberto, levanta CircuitBreakerError na hora; cada operação lógica que falha
-    conta 1 falha para o disjuntor.
+    Quem decide é o `gcal_breaker.call`: aberto, levanta CircuitBreakerError sem chamar o Google até vencer o
+    `reset_timeout`; depois deixa uma chamada de teste passar (half-open) e fecha se ela der certo (ART-21).
+    Cada operação lógica que falha conta 1 falha, salvo o que `_nao_conta_como_falha` tira da conta.
 
     Raises:
         CircuitBreakerError: Se o disjuntor está aberto
         Exception: O erro da chamada (depois das repetições do cliente)
     """
     from .circuit_breaker import CircuitBreakerError, gcal_breaker
-
-    # Check circuit state first
-    if str(gcal_breaker.current_state) == "open":
-        logger.warning(f"{operation_name}: Circuit breaker is OPEN, failing fast")
-        raise CircuitBreakerError(gcal_breaker)
 
     try:
         # Use circuit breaker to track success/failure

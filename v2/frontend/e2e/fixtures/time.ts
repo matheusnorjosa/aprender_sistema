@@ -9,7 +9,7 @@
  *    Até o FER-65 isto era um `Date` falso injetado à mão por `addInitScript`.
  *
  * 2. **Backend**: header `X-E2E-Frozen-Time` enviado em TODAS as requests via
- *    `page.setExtraHTTPHeaders`. Lido pelo `FreezeTimeMiddleware` (Fase 2a)
+ *    `context.setExtraHTTPHeaders`. Lido pelo `FreezeTimeMiddleware` (Fase 2a)
  *    quando `DEBUG_E2E=true + INCLUDE_DEV_TOOLS=true` no Django settings.
  *
  * Sem os dois, as RD-01..RD-08 podem falhar por divergência entre "agora" do
@@ -44,11 +44,12 @@ export async function freezeTime(page: Page, isoDatetime: string): Promise<void>
 
   const fixedMs = parsed.valueOf();
 
-  // Frontend: relógio nativo; vale para a página atual e as próximas navegações.
+  // Frontend: relógio nativo. Vale para o CONTEXTO inteiro (esta página, popups e
+  // páginas novas do mesmo contexto), então o header abaixo tem o mesmo alcance.
   await page.clock.setFixedTime(fixedMs);
 
-  // Backend: header em cada request
-  await page.setExtraHTTPHeaders({
+  // Backend: header em cada request do contexto
+  await page.context().setExtraHTTPHeaders({
     'X-E2E-Frozen-Time': isoDatetime,
   });
 }
@@ -58,7 +59,7 @@ export async function freezeTime(page: Page, isoDatetime: string): Promise<void>
  * Raramente necessário — normalmente um teste congela uma vez e não volta.
  */
 export async function unfreezeTime(page: Page): Promise<void> {
-  await page.setExtraHTTPHeaders({});
-  // Frontend: o `page.clock` não tem "desinstalar"; para voltar ao tempo real no
-  // navegador, use uma página nova.
+  await page.context().setExtraHTTPHeaders({});
+  // Frontend: o `page.clock` não tem "desinstalar" e vale para o contexto inteiro;
+  // para voltar ao tempo real no navegador, use um contexto novo.
 }

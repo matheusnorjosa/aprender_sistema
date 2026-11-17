@@ -423,6 +423,20 @@ def test_pr_que_conserta_cabecalho_quebrado_da_base_passa(tmp_path):
     assert r.returncode == 0, f"consertar o cabecalho reprovou:\n{r.stdout}\n{r.stderr}"
 
 
+def test_consertar_cabecalho_da_base_nao_esconde_a_spec_de_graca(tmp_path):
+    """Base ilegivel nao vira 'sem status': rebaixar para historical no mesmo PR exige justificativa."""
+    raiz = cria_repo(tmp_path)
+    for f in FONTES:
+        escreve(raiz, f, "x = 1\n")
+    escreve(raiz, SPEC_REL, "---\nstatus: canonical\nstatus: canonical\n---\n\n# Pagamento\n")
+    base = commita(raiz, "chore: base com chave repetida")
+    escreve(raiz, SPEC_REL, monta_spec(None, FONTES, status="historical"))
+    commita(raiz, "docs(pagamento): conserta e rebaixa")
+
+    r = _run_range(raiz, base)
+    assert r.returncode != 0, f"rebaixamento com base ilegivel passou sem justificativa:\n{r.stdout}"
+
+
 def test_sot_crescendo_nao_reprova(tmp_path):
     """Declarar mais fontes e o comportamento que se quer premiar."""
     raiz, base = _repo_com_spec(tmp_path, fontes=FONTES[:1])

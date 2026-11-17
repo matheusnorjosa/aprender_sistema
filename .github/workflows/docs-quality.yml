@@ -51,7 +51,8 @@ jobs:
       - name: PyYAML para os portoes de doc
         run: |
           set -euo pipefail
-          pin="$(grep -iE '^PyYAML==' v2/backend/requirements.txt)"
+          # Sem o comentario do fim da linha, se houver: o pip recusa "PyYAML==x  # ...".
+          pin="$(grep -iE '^PyYAML==' v2/backend/requirements.txt | sed 's/[[:space:]]*#.*//')"
           python -m pip install --quiet "$pin"
 
       - name: Links relativos quebrados (docs vivos)

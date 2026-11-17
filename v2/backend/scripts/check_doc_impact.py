@@ -83,6 +83,8 @@ IGNORA_DOC = ("_archive", "worktrees", "node_modules")
 # O detector 1 historicamente so olhava {historical, stale}; alinhar com o SSOT
 # tambem fecha `superseded` e `deprecated`.
 STATUS_ESCONDE = doc_frontmatter.STATUS_FORA
+# Status da base cujo cabecalho nao se le (ver _status_na_base).
+STATUS_ILEGIVEL = "cabecalho ilegivel na base"
 
 WAIVER = re.compile(r"(?im)^\s*doc[- ]nao[- ]afetada\s*:\s*(?P<caminho>\S+)\s*(?:[—–-]{1,2}\s*(?P<motivo>.+))?$")
 
@@ -153,11 +155,13 @@ def _status(texto: str, rel: str) -> str:
 
 def _status_na_base(raiz: pathlib.Path, base: str, rel: str) -> str:
     """`status` da versao da base. So serve de comparacao: se o cabecalho de la nao
-    se le, vale como vazio, senao o PR que o conserta ficaria travado."""
+    se le, o PR que o conserta nao pode travar, mas tambem nao pode esconder a spec
+    de graca. Por isso devolve STATUS_ILEGIVEL: conta como vigente, e passar agora
+    para um status que esconde exige justificativa, como qualquer rebaixamento."""
     try:
         return doc_frontmatter.status(_git(["show", f"{base}:{rel}"], raiz))
     except ValueError:
-        return ""
+        return STATUS_ILEGIVEL
 
 
 def _sources_of_truth(texto: str, rel: str) -> list[str]:

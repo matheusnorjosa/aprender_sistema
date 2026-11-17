@@ -233,6 +233,17 @@ utilitário? Adicione o token lá lendo uma CSS var nova; não invente hex no co
 Precisa da paleta em JS/TS (ex.: cor de série de gráfico)? Use o hook `useBrandColors()`
 (retorna `BRAND_COLORS` com overrides de fundo por tema) em vez de importar hex.
 
+**Diálogos estáticos herdam o tema (DEF-33, 17/11/2026).** `Modal.confirm/error/warning/info/success`,
+`message` e `notification` chamados como função abrem **fora** da árvore do `ConfigProvider`. Sem
+cuidado, saem no tema padrão do AntD: o "Sim, excluir" ficava com texto branco a 3,27:1 no vermelho
+antigo, o botão primário no azul padrão e o modo escuro não chegava. O `App.tsx` registra o tema ativo
+com `aplicarTemaNosDialogos` (`contexts/temaNosDialogos.tsx`, que usa o `ConfigProvider.config({
+holderRender })` do AntD) e repete o registro a cada troca de tema. Não é preciso trocar as chamadas por
+`App.useApp()`. Teste: `contexts/__tests__/temaNosDialogos.test.tsx`.
+
+Número ou texto de erro em tela usa o token (`token.colorErrorText` via `theme.useToken()`, ou
+`<Text type="danger">`), nunca `#ff4d4f`/`#f5222d` à mão: esses reprovam como texto no branco.
+
 ---
 
 ## 6. Como alterar uma cor (checklist)

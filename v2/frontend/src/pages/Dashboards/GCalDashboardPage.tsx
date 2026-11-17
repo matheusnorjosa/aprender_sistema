@@ -691,7 +691,7 @@ export default function GCalDashboardPage(): JSX.Element {
                 <br />
                 <Space size="small">
                   <Text type="secondary">Erros:</Text>
-                  <Text strong style={{ color: '#f5222d' }}>{successRate?.error || 0}</Text>
+                  <Text strong type="danger">{successRate?.error || 0}</Text>
                 </Space>
               </Card>
             </Col>

@@ -35,6 +35,7 @@ from typing import TYPE_CHECKING, Any, Callable, TypeVar
 from django.conf import settings
 
 import pybreaker
+from google.auth.exceptions import RefreshError
 
 if TYPE_CHECKING:
     from typing import ParamSpec
@@ -91,8 +92,8 @@ class GCalCircuitBreakerListener(pybreaker.CircuitBreakerListener):
             )
 
 
-# DEF-31 (ART-21): o disjuntor mede a saúde do Google. Erro do próprio pedido e falta de acesso ao calendário
-# não são o Google fora do ar e não contam. O 403 de cota conta: é o Google pedindo para parar. A lista é a dos
+# DEF-31 (ART-21): o disjuntor mede a saúde do Google. Erro do próprio pedido, falta de acesso ao calendário e
+# credencial recusada (401, refresh recusado) não são o Google fora do ar e não contam. O 403 de cota conta: é o Google pedindo para parar. A lista é a dos
 # motivos de acesso conhecidos, não a de cota: motivo de cota novo ou fora da lista (ex.: dailyLimitExceeded) conta.
 _MOTIVOS_SEM_ACESSO = frozenset(
     {"forbidden", "requiredAccessLevel", "insufficientPermissions", "forbiddenForNonOrganizer"}
@@ -114,12 +115,17 @@ def _motivo_do_403(exc: BaseException) -> str | None:
 def _nao_conta_como_falha(exc: BaseException) -> bool:
     """`exclude` do pybreaker: True tira o erro da contagem. Na dúvida (sem status, motivo ilegível ou
     desconhecido), conta."""
+    if isinstance(exc, RefreshError):
+        # Credencial de uma pessoa (ex.: acesso revogado, invalid_grant) não conta; `retryable` é o google-auth
+        # dizendo que o token endpoint falhou (5xx, 429): isso é o Google e conta.
+        retryable: Any = getattr(exc, "retryable", False)
+        return not retryable
     try:
         status_bruto: Any = getattr(getattr(exc, "resp", None), "status", None)
         status = int(status_bruto)
     except (TypeError, ValueError):
         return False  # timeout, queda de conexão, erro sem resposta HTTP
-    if status in _ERROS_DO_PEDIDO:
+    if status in _ERROS_DO_PEDIDO or status == 401:  # 401: o Google recusou a credencial de uma pessoa
         return True
     if status == 403:
         return _motivo_do_403(exc) in _MOTIVOS_SEM_ACESSO

@@ -23,6 +23,7 @@ from rest_framework.test import APIClient
 import httplib2
 import pybreaker
 import pytest
+from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import HttpMockSequence
@@ -275,6 +276,24 @@ class TestOQueContaComoFalha:
     def test_cinco_403_sem_acesso_nao_abrem_o_disjuntor(self):
         for _ in range(gcal_breaker.fail_max):
             _contagem_depois_de(_erro_http(403, "forbidden"))
+
+        assert get_circuit_state() == "closed"
+
+    def test_401_nao_conta(self):
+        """Credencial recusada de uma pessoa (o AuthorizedHttp já renovou e o Google seguiu recusando)."""
+        assert _contagem_depois_de(_erro_http(401)) == 0
+
+    def test_refresh_recusado_nao_conta(self):
+        """Acesso revogado na conta Google: o AuthorizedHttp tenta renovar no 401 e o token endpoint recusa."""
+        assert _contagem_depois_de(RefreshError("invalid_grant: Token has been expired or revoked.")) == 0
+
+    def test_refresh_com_falha_temporaria_do_google_conta(self):
+        """5xx/429 no token endpoint: o google-auth marca `retryable`; é o Google, não a credencial."""
+        assert _contagem_depois_de(RefreshError("temporarily_unavailable", retryable=True)) == 1
+
+    def test_cinco_acessos_revogados_nao_abrem_o_disjuntor(self):
+        for _ in range(gcal_breaker.fail_max):
+            _contagem_depois_de(RefreshError("invalid_grant"))
 
         assert get_circuit_state() == "closed"
 

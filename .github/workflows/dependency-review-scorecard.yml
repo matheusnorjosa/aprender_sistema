@@ -4,7 +4,7 @@ on:
   pull_request:
     branches:
       - main
-  # Scorecard movido p/ schedule semanal — é [info], sinal baixo em repo privado, não paga
+  # Scorecard movido p/ schedule semanal — é [info] e não paga
   # por PR. O dependency-review segue no PR (é [required]). Corte de custo de Actions (2026-09).
   schedule:
     - cron: "30 6 * * 1"

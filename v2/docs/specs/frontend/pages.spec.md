@@ -1,7 +1,7 @@
 ---
 title: Páginas (React)
 status: canonical
-last_verified: 2026-11-12
+last_verified: 2026-11-17
 verified_at_commit: a63674ec98b181115a979a8c7d958f338e54209e
 sources_of_truth:
   - v2/frontend/src/App.tsx
@@ -66,7 +66,7 @@ Esta spec é o **índice canônico do inventário de páginas**: domínio, rota 
 - [`v2/frontend/src/components/AppSidebar.tsx`](../../../frontend/src/components/AppSidebar.tsx) — menu lateral; cada item lê a mesma policy da rota (`useAcesso().caps`) e, em DAT > Importações, `ehSuperusuario`. É UX, não é o gate autoritativo.
 - Diretório [`v2/frontend/src/pages/`](../../../frontend/src/pages) — **16 diretórios de domínio** (AdminDAT, Aprovacoes, Auth, Controle, DAT, DATModule, Dashboards, Deslocamentos, Disponibilidade, Home, MapaBrasil, MeusEventos, Perfil, Politica, PreAgenda, Solicitacoes) + `__tests__`.
 
-> **Contagem real:** **43 páginas lazy-loaded** (41 em `AppRoutes` + `LoginPage` e `TrocaSenhaObrigatoriaPage` em `App.tsx`), não "45+".
+> **Contagem real:** **44 páginas lazy-loaded** (42 em `AppRoutes` + `LoginPage` e `TrocaSenhaObrigatoriaPage` em `App.tsx`), não "45+".
 >
 > **Correção de mito (o inverso do que esta spec dizia até 2026-07-20):** `pages/Disponibilidade/` (diretório) **não tem `index`**; quem está roteado em `/solicitacoes/bloqueios` é o arquivo solto [`pages/Disponibilidade.tsx`](../../../frontend/src/pages/Disponibilidade.tsx) (`AppRoutes.tsx`, const `DisponibilidadeBlocks` → `import('../pages/Disponibilidade')` resolve o arquivo antes do diretório). Do diretório homônimo, só `MonthlyPage` é roteada (`AppRoutes.tsx`, const `MonthlyPage`).
 

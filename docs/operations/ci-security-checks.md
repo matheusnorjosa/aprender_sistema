@@ -29,7 +29,7 @@ Objetivo:
 - Medir postura de segurança do repositório sem bloquear merge nesta fase inicial.
 
 Comportamento:
-- O check roda automaticamente em PRs internos.
+- O check roda só no agendamento semanal (segunda, 06:30 UTC) e por `workflow_dispatch`. Não roda em PR desde 2026-09 (corte de custo).
 - Está em modo **informativo** (`continue-on-error`), então não bloqueia merge.
 - O resultado é publicado como artifact: `openssf-scorecard-results`.
 

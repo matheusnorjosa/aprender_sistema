@@ -1,7 +1,7 @@
 ---
 title: Design System — Cores, Tema e Tokens (Frontend)
 status: active
-last_verified: 2026-11-06
+last_verified: 2026-11-17
 owner: frontend
 related:
   - ./INDEX_DOCUMENTACAO.md
@@ -129,8 +129,8 @@ e **4,66:1**. O vermelho de mesmo matiz mais perto do `#ff4d4f` que passa nos tr
 login e o hover que o AntD tira dele dá 4,38:1 no branco. O red-7 já era o vermelho AA da caixa
 de feedback e da tela Compras. O `colorError` é token **seed**: o AntD tira dele o hover, o
 active e os fundos, então o vermelho escurece em tudo o que desenha dentro do `ConfigProvider`
-do `App.tsx` (borda do campo com erro, botão `danger`, contador do `Badge`; exceção logo abaixo,
-nos diálogos estáticos), e o `Alert` de erro fica com fundo `#ffe8e6` e borda `#f58d8c`
+do `App.tsx` (borda do campo com erro, botão `danger`, contador do `Badge`; desde o DEF-33,
+também nos diálogos estáticos), e o `Alert` de erro fica com fundo `#ffe8e6` e borda `#f58d8c`
 (eram `#fff2f0` e `#ffccc7`). O texto branco do botão `danger` primário e do contador vai de
 3,27:1 para 5,57:1. O hover que o AntD deriva do red-7, `#db373f`, reprovava no botão `danger`:
 **3,87:1** no hover do botão de texto, que pinta o próprio fundo rosado `#ffe8e6` em qualquer lugar
@@ -142,20 +142,11 @@ branco do botão primário), e o fundo do pressionado vai para o red-2 `#ffccc7`
 pressionado segue no red-8 `#a8071a`, então o hover fica mais escuro que o normal e mais claro que
 o pressionado. O botão `variant="filled"`, sem uso hoje, ainda reprova no hover (3,42:1).
 
-**Fora do alcance: os diálogos estáticos (`Modal.confirm`, `Modal.info`, `Modal.error`,
-`Modal.warning`).** Eles abrem fora da árvore do `ConfigProvider`, com o tema global do AntD
-(`ConfigProvider.config`), que o projeto não configura. Por isso nada do tema claro chega a eles:
-nem o red-7, nem o hover `#b80c1e`, nem o fundo `#ffccc7` do pressionado. Neles o botão `danger`
-segue no `#ff4d4f`, com o texto branco em **3,27:1**, e no hover `#ff7875` em **2,56:1**; o
-`Text type="danger"` dentro do conteúdo também segue no `#ff4d4f`. São 22 diálogos estáticos com
-botão `danger`, em 19 arquivos (por exemplo o "Sim, excluir" das telas do DAT, de Usuários, de
-Grupos, de Deslocamentos, de Aprovações e da Pré-agenda). O "Excluir" de texto citado acima é
-outro botão: fica no `Modal` em JSX, dentro da árvore, e melhorou; o "Sim, excluir" que ele abre
-não melhorou. Os diálogos de `Modal.useModal` (`CartaoEvento`, `HorarioDoEvento` e `PublicacaoSetorPage`) herdam o tema e
-estão certos. O conserto do código é o item DEF-33 do quadro da liberação: `ConfigProvider.config({ holderRender })` com
-o tema ativo, ou migrar para `Modal.useModal`, também troca o azul `#1677ff` do botão primário
-desses diálogos pelo verde da marca. Contagem: buscar `Modal.(confirm|info|error|warning)({` em
-`src` e olhar quais têm `okType: 'danger'` ou `danger: true`.
+**Diálogos estáticos (`Modal.confirm/info/error/warning`, `message`, `notification`):** até
+17/11/2026 abriam no tema padrão do AntD (o "Sim, excluir" com o texto branco a **3,27:1**).
+Desde o DEF-33 (#2245) o `App.tsx` registra o tema ativo com `aplicarTemaNosDialogos`
+(`contexts/temaNosDialogos.tsx`, `holderRender`), e eles herdam o red-7, o hover e o modo escuro.
+Ver a seção 5.
 
 **Fix de a11y no texto de exemplo (DEF-28):** o `colorTextPlaceholder` era o quaternário
 `rgba(0,0,0,.25)` ≈ `#bfbfbf`, **1,83:1** no campo. Agora é o cinza do terciário,
@@ -301,3 +292,5 @@ inclua o `#262626` (fundo elevado) no escuro.
   PR #1846) e a cadeia SSOT de três consumidores.
 - **2026-11-06** — Link do tema `#1677ff` (4,10:1) → cor da marca (decisão 6 do piloto C1,
   lote D): `colorLink`/`colorLinkHover` no claro e seed `#34BC8F` no escuro (seção 3).
+- **2026-11-17** — Diálogos estáticos herdam o tema (DEF-33, #2245): o parágrafo da seção 3 que
+  os dava como fora do alcance passou a apontar para a seção 5.

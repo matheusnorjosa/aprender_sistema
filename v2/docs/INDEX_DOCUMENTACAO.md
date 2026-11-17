@@ -22,14 +22,14 @@ investigação não valem.
 
 | Métrica | Valor | Critério de contagem |
 |---------|-------|----------------------|
-| **Models Django** | **39** (app `core`) | 38 `class X(models.Model)` em `v2/backend/apps/core/models/` + `Usuario(AbstractUser)`. Nenhum abstrato, nenhum proxy. Excluídos 27 `models.TextChoices` (enums). `dev_tools` não define models. |
+| **Models Django** | **40** (app `core`) | 39 `class X(models.Model)` em `v2/backend/apps/core/models/` + `Usuario(AbstractUser)`. Nenhum abstrato, nenhum proxy. Excluídos 27 `models.TextChoices` (enums). `dev_tools` não define models. |
 | **API Endpoints** | ver [API_REFERENCE.md](./API_REFERENCE.md) | Referência **curada**. O inventário exaustivo é o schema OpenAPI em `/api/schema/` (drf-spectacular). Número não duplicado aqui — ADR-017. |
 | **Testes backend** (pytest) | **4.385** funções em **394** arquivos | `def test_` em arquivos `test_*.py` sob `v2/backend/apps/` (recontado em 2026-10-19) |
 | **Testes frontend** (vitest) | **1.095** blocos em **156** arquivos | `it()` / `test()` em `*.test.ts(x)` sob `v2/frontend/src/` |
 | **Testes E2E** (Playwright) | **168** blocos em **29** arquivos | `test()` em `v2/frontend/e2e/**/*.spec.ts` (recontado em 2026-10-19; não conta os `test()` gerados por laço) |
-| **Rotas do frontend** | **52** | atributos `path="…"` em `v2/frontend/src/components/AppRoutes.tsx` |
-| **Componentes de página** | 41 `*Page.tsx` | de 55 `.tsx` não-teste em `v2/frontend/src/pages/`; os outros 14 são subcomponentes e helpers (`columns`/`constants`/`helpers`) |
-| **Management commands** | **35** | `core` 20 + `dev_tools` 15 |
+| **Rotas do frontend** | **54** | atributos `path="…"` em `v2/frontend/src/components/AppRoutes.tsx` |
+| **Componentes de página** | 42 `*Page.tsx` | de 58 `.tsx` não-teste em `v2/frontend/src/pages/`; os outros 16 são subcomponentes e helpers (`columns`/`constants`/`helpers`) |
+| **Management commands** | **37** | `core` 23 + `dev_tools` 14 |
 | **Type Hints** | Pyright `strict` | `v2/backend/pyproject.toml` |
 | **Gate de cobertura** | 85% | `v2/backend/pytest.ini` (`fail_under = 85`) e `codecov.yml` |
 | **Documentos** | 107 vivos em `v2/docs/` · 88 em `_archive/` · 48 em `docs/` (MkDocs) | `.md`, `_archive/` contado à parte |
@@ -350,11 +350,11 @@ Cada módulo em produção tem uma spec versionada, datada e rastreável ao cód
 
 ## 📋 Referência de Arquitetura
 
-### Backend — 39 models no app `core`
+### Backend — 40 models no app `core`
 
 | App | Models | Arquivos de definição |
 |-----|--------|-----------------------|
-| **core** | 39 | `apps/core/models/`: `usuario.py`, `organizacao.py`, `solicitacao.py`, `agenda.py`, `compra.py`, `workflow.py`, `config.py`, `auditoria.py`, `integracao.py`, `import_job.py`, `permissao_funcional.py`, `group_classificacao.py`, `formacao.py`, `acompanhamento.py`, `prova.py`, `plano_formacoes.py`, `dat_registro.py`, `dat_coordenador.py`, `dat_acao.py`, `dat_compra.py`, `dat_cadastro.py`, `acoes_notificacao.py` |
+| **core** | 40 | `apps/core/models/`: `usuario.py`, `organizacao.py`, `solicitacao.py`, `agenda.py`, `workflow.py`, `config.py`, `auditoria.py`, `integracao.py`, `import_job.py`, `permissao_funcional.py`, `group_classificacao.py`, `formacao.py`, `acompanhamento.py`, `prova.py`, `plano_formacoes.py`, `dat_registro.py`, `dat_coordenador.py`, `dat_acao.py`, `dat_compra.py`, `dat_cadastro.py`, `acoes_notificacao.py`, `feedback.py`, `gcal_copia.py` |
 | **dev_tools** | 0 | — |
 
 A lista nominal e a estrutura do pacote estão em `apps/core/models/__init__.py` (`__all__`),
@@ -369,12 +369,12 @@ o schema OpenAPI servido em `/api/schema/`. Não há número de endpoints mantid
 
 ---
 
-### Management Commands — 35
+### Management Commands — 37
 
 | App | Commands | Exemplos |
 |-----|----------|----------|
-| **core** | 20 | `import_export_contract`, `preagenda_to_gcal`, `compliance_audit`, `lgpd_export`, `rbac_matrix_doc`, `rotate_gcal_encryption_key`, `sync_municipios_ibge` |
-| **dev_tools** | 15 | `seed_rbac`, `seed_gerencias`, `seed_e2e_users`, `backfill_is_online`, `cleanup_e2e_data` |
+| **core** | 23 | `import_export_contract`, `preagenda_to_gcal`, `gcal_copia`, `conferir_gcal_adocao`, `compliance_audit`, `lgpd_export`, `rbac_matrix_doc`, `rotate_gcal_encryption_key`, `sync_municipios_ibge`, `popular_coordenadas_municipios` |
+| **dev_tools** | 14 | `seed_rbac`, `seed_gerencias`, `seed_e2e_users`, `backfill_is_online`, `cleanup_e2e_data` |
 
 `dev_tools` é desabilitado em produção (CP-08) — ver [specs/backend/dev-tools.spec.md](./specs/backend/dev-tools.spec.md).
 
@@ -425,13 +425,13 @@ aprender_sistema/
 ├── v2/
 │   ├── backend/
 │   │   ├── apps/
-│   │   │   ├── core/          # App principal (39 models)
+│   │   │   ├── core/          # App principal (40 models)
 │   │   │   └── dev_tools/     # Seeds (desabilitado em prod, CP-08)
 │   │   └── config/            # Django settings
 │   ├── frontend/
 │   │   ├── src/
-│   │   │   ├── pages/         # Componentes de página (53 rotas em AppRoutes.tsx)
-│   │   │   ├── components/    # 22 componentes de nível raiz
+│   │   │   ├── pages/         # Componentes de página (54 rotas em AppRoutes.tsx)
+│   │   │   ├── components/    # 25 componentes de nível raiz
 │   │   │   └── api/           # 16 módulos de cliente HTTP
 │   │   └── e2e/               # Testes Playwright
 │   ├── infra/                 # Docker + configs

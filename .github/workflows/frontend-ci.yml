@@ -274,7 +274,7 @@ jobs:
       # flake NÃO era o download do browser; era o `apt-get` do --with-deps
       # pendurando num mirror lento do Ubuntu (azure.archive.ubuntu.com, ~59kB/s:
       # 3min só de update, depois hang instalando uma fonte → timeout de 10min).
-      # A imagem ubuntu-latest do GitHub já traz as libs de sistema dos browsers
+      # A imagem ubuntu-26.04 do GitHub já traz as libs de sistema dos browsers
       # (actions/runner-images), então --with-deps era redundante E a fonte do
       # flake. O browser é cacheado (cache-hit = segundos); retry leve cobre um
       # hang raro do CDN do Playwright.
@@ -425,7 +425,7 @@ jobs:
       # flake NÃO era o download do browser; era o `apt-get` do --with-deps
       # pendurando num mirror lento do Ubuntu (azure.archive.ubuntu.com, ~59kB/s:
       # 3min só de update, depois hang instalando uma fonte → timeout de 10min).
-      # A imagem ubuntu-latest do GitHub já traz as libs de sistema dos browsers
+      # A imagem ubuntu-26.04 do GitHub já traz as libs de sistema dos browsers
       # (actions/runner-images), então --with-deps era redundante E a fonte do
       # flake. O browser é cacheado (cache-hit = segundos); retry leve cobre um
       # hang raro do CDN do Playwright.

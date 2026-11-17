@@ -926,13 +926,33 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         "e seguiria confirmado lá. Tire o evento do Google antes de mudar o município ou o projeto."
     )
 
+    # DEF-30: teto da espera pela trava da task do Google. Abaixo do statement_timeout de produção (30 s),
+    # para a edição desistir com 400 "tente de novo", e não com o 500 do statement cancelado, sem prender a
+    # thread do gunicorn enquanto o Google está lento.
+    _EDICAO_LOCK_TIMEOUT = "10s"
+
     def update(self, request, *args, **kwargs):
         """DEF-30 (ART-20): a edição inteira numa transação, para o `select_for_update` do `get_queryset`
         segurar a linha da leitura ao save (o `partial_update` passa por aqui)."""
-        from django.db import transaction
+        from django.db import OperationalError, connection, transaction
 
-        with transaction.atomic():
-            return super().update(request, *args, **kwargs)
+        try:
+            with transaction.atomic():
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT set_config('lock_timeout', %s, true)", [self._EDICAO_LOCK_TIMEOUT])
+                return super().update(request, *args, **kwargs)
+        except OperationalError as exc:
+            # lock_not_available; `sqlstate` no psycopg 3 (dev), `pgcode` no psycopg2 (produção)
+            causa = exc.__cause__
+            if (getattr(causa, "sqlstate", None) or getattr(causa, "pgcode", None)) != "55P03":
+                raise
+            raise serializers.ValidationError(
+                {
+                    "non_field_errors": [
+                        "Este evento está sendo sincronizado com o Google Agenda agora. Tente de novo em instantes."
+                    ]
+                }
+            ) from exc
 
     def perform_update(self, serializer):
         """

@@ -13,7 +13,8 @@ Contrato: `update`/`partial_update` leem a linha com `select_for_update(of=("sel
 recusar não travam (aprovar e recusar são PATCH chamados fora de transação: travar ali dá erro).
 
 (i) estrutural; (ii) corrida real com duas threads e banco de verdade, sem sleep fixo: a espera pela
-trava é observada em `pg_stat_activity`; (iii) aprovar, recusar e editar seguem 200 com transação real.
+trava é observada em `pg_stat_activity`, e a espera tem teto (`lock_timeout`) que devolve 400, não 500;
+(iii) aprovar, recusar e editar seguem 200 com transação real.
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
@@ -202,6 +203,48 @@ def test_edicao_durante_publicacao_espera_e_nao_desfaz_o_publicado(monkeypatch, 
     assert sol.gcal_status == Solicitacao.GCalStatus.PUBLISHED
     assert sol.external_event_id == resultado["external_event_id"]
     assert sol.external_event_id
+    assert sol.observacoes == "original"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_edicao_que_espera_demais_recebe_400_e_nao_500(monkeypatch):
+    """A espera pela trava tem teto (`lock_timeout`) abaixo do `statement_timeout` de produção (30 s).
+
+    Com o Google lento, a task segura a trava por mais de 30 s; sem teto, o SELECT FOR UPDATE da edição era
+    cancelado pelo statement_timeout (500 genérico) e prendia a thread do gunicorn. Com o teto, a edição
+    desiste e recebe 400 "tente de novo", sem mudar a linha. O teto é encurtado aqui para o teste ser rápido.
+    """
+    from django.db import transaction
+
+    monkeypatch.setattr(SolicitacaoViewSet, "_EDICAO_LOCK_TIMEOUT", "200ms", raising=False)
+    dono = _usuario("art20_teto")
+    dono.groups.add(GroupFactory(name="Coordenador"))
+    sol = _solicitacao(dono, status="aprovado", fluxo="NAO_SUPER", gcal_status=Solicitacao.GCalStatus.ERROR)
+    travou, liberar = threading.Event(), threading.Event()
+
+    def task_presa_no_google():
+        try:
+            with transaction.atomic():
+                Solicitacao.objects.select_for_update().get(pk=sol.pk)
+                travou.set()
+                liberar.wait(timeout=5)
+        finally:
+            connection.close()
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        futuro = executor.submit(task_presa_no_google)
+        try:
+            assert travou.wait(timeout=15), "a task não chegou a travar a linha"
+            client = APIClient()
+            client.force_authenticate(dono)
+            resposta = client.patch(f"/api/solicitacoes/{sol.id}/", {"observacoes": "novo"}, format="json")
+        finally:
+            liberar.set()
+        futuro.result(timeout=30)
+
+    assert resposta.status_code == 400, f"esperado 400, obteve {resposta.status_code}: {resposta.data}"
+    assert "Tente de novo" in str(resposta.data)
+    sol.refresh_from_db()
     assert sol.observacoes == "original"
 
 

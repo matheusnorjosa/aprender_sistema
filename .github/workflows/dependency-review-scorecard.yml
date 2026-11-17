@@ -68,11 +68,11 @@ jobs:
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
-          # ATENCAO: este step NAO roda hoje — o repositorio e' privado, entao
-          # quem avalia o frontend e' o step de fallback mais abaixo (que usa
-          # .github/scripts/npm-audit-gate.mjs). Mantido correto para o caso de
-          # a visibilidade mudar; se voltar a rodar e alguma excecao vier a ser
-          # necessaria, a allowlist daqui precisa espelhar a do script.
+          # O repositorio e' PUBLICO (conferido em 17/11/2026, FER-58), entao e' ESTE
+          # step que avalia os PRs que mudam manifesto; o fallback mais abaixo
+          # (.github/scripts/npm-audit-gate.mjs) so roda se ele voltar a ser privado.
+          # Se alguma excecao vier a ser necessaria, a allowlist daqui precisa
+          # espelhar a do script.
           #
           # Sem allow-ghsas: a excecao GHSA-qwww-vcr4-c8h2 (react-router) foi
           # removida em #1675 (upgrade React 19 + react-router 8.3.0, que

@@ -19,7 +19,6 @@ sources_of_truth:
   - v2/backend/apps/dev_tools/management/commands/fix_projetos_gerencia.py
   - v2/backend/apps/dev_tools/management/commands/migrate_rbac_groups.py
   - v2/backend/apps/dev_tools/management/commands/backfill_is_online.py
-  - v2/backend/apps/dev_tools/management/commands/populate_municipio_coords.py
   - v2/backend/apps/dev_tools/management/commands/cleanup_e2e_data.py
   - v2/backend/apps/dev_tools/middleware/freeze_time.py
   - v2/backend/apps/dev_tools/tests/test_optional_dev_tools.py
@@ -48,7 +47,7 @@ O app é **condicional**: só entra em `INSTALLED_APPS` quando `INCLUDE_DEV_TOOL
 - Gate de inclusão (CP-08): [`v2/backend/config/settings.py`](../../../backend/config/settings.py) — `INCLUDE_DEV_TOOLS = os.getenv("INCLUDE_DEV_TOOLS", "true").lower() == "true"`; **guard rígido de produção** (`if ENVIRONMENT == "production": ... INCLUDE_DEV_TOOLS = False`, com warning no stderr quando alguém pede `true` explicitamente); o app só é anexado via `if INCLUDE_DEV_TOOLS: INSTALLED_APPS.append("apps.dev_tools")`.
 - AppConfig: [`v2/backend/apps/dev_tools/apps.py`](../../../backend/apps/dev_tools/apps.py) (`DevToolsConfig`, sem lógica de gate — o gate vive em `settings.py`).
 - Pacote: [`v2/backend/apps/dev_tools/__init__.py`](../../../backend/apps/dev_tools/__init__.py).
-- Management commands: `v2/backend/apps/dev_tools/management/commands/*.py` — **15 comandos** (16 arquivos `.py` no total, incluindo `__init__.py`). Os 15 estão na tabela abaixo, 1:1 com os arquivos.
+- Management commands: `v2/backend/apps/dev_tools/management/commands/*.py` — **14 comandos** (15 arquivos `.py` no total, incluindo `__init__.py`). Os 14 estão na tabela abaixo, 1:1 com os arquivos. O `populate_municipio_coords` saiu em 17/11/2026 (FER-66): as coordenadas dos municípios agora vêm do `popular_coordenadas_municipios`, em `apps/core`, que existe em produção.
 - Middleware auxiliar E2E: [`v2/backend/apps/dev_tools/middleware/freeze_time.py`](../../../backend/apps/dev_tools/middleware/freeze_time.py) (`FreezeTimeMiddleware`, gate duplo `DEBUG_E2E` + `INCLUDE_DEV_TOOLS`).
 
 ### Catálogo: comando → o que semeia
@@ -68,7 +67,6 @@ O app é **condicional**: só entra em `INSTALLED_APPS` quando `INCLUDE_DEV_TOOL
 | `fix_projetos_gerencia` | Corrige vinculação de projetos a gerências. Idempotente (fixup). |
 | `migrate_rbac_groups` | **OBSOLETO desde o PR 12**: só põe o grupo `Gerente`, que não dá poder no modo `lotacao` (só somaria no modo de emergência `uniao`); o papel é o vínculo `EquipeGerencia` GERENTE vigente. |
 | `backfill_is_online` | Backfill a partir da coluna G da planilha original; grava **três** campos de `Solicitacao` num só `update`: `tipo`, `is_online` e `tipo_evento` (`backfill_is_online.py`). |
-| `populate_municipio_coords` | Popula latitude/longitude de `Municipio` a partir de CSV. |
 | `cleanup_e2e_data` | Limpeza **parcial** do que `seed_e2e_users` cria (Playwright): apaga só as **4 personas legadas** (`coord_e2e`, `super_e2e`, `controle_e2e`, `formador_e2e`), com as solicitações, participações e vínculos `EquipeGerencia` delas (FK PROTECT), o município Salvador e o projeto `TESTE E2E` quando não têm dependência. Ficam no banco as outras 9 personas com os vínculos, inclusive contas com poder: `dat_e2e` (EQUIPE na `GERENCIA DAT`, ADMIN_OPERACIONAL) e as aprovadoras `super_geral` e `approver_03` (GERENTE na `Super`); ficam também as gerências `GERENCIA E2E`, `GERENCIA DAT` e `CONTROLE` e as `DATCompra` do seed. ⚠️ O passo do município falha quando há compra no município (FK PROTECT; desde 14/10/2026 as `DATCompra` do seed) — defeito anterior ao PR B1, não corrigido. Como os passos rodam num só `transaction.atomic`, essa falha desfaz também a remoção das personas: logo depois de `seed_e2e_users`, o comando (fora do `--dry-run`) não apaga nada. |
 
 ## Contratos e invariantes
@@ -98,7 +96,7 @@ Em CI o E2E roda com `INCLUDE_DEV_TOOLS=true` + `DEBUG_E2E=true` (ver `.github/w
 
 1. **Bootstrap de dev** (caminho feliz): `make up` → aplica migrações → roda a sequência canônica de seeds (`seed_rbac` antes de tudo, depois masters como `seed_gerencias`/`seed_produtos`/`seed_tipos_evento`, vínculos `seed_gerentes --arquivo <json fora do git>`/`link_projetos_gerencias`, e fixos como `fix_projetos_gerencia`). Idempotente: re-rodar não duplica.
 2. **E2E (Playwright)**: `seed_rbac` → `seed_e2e_users` (ou `seed_frontend_contract_data` para a matriz de contrato) → suíte roda → `cleanup_e2e_data` remove só as 4 personas legadas e os dados delas; as demais personas (entre elas `dat_e2e`, que administra, e `super_geral`/`approver_03`, que aprovam o SUPER) seguem no banco com o poder dos vínculos; e, com as `DATCompra` do seed em Salvador, o comando falha e não apaga nada (ver o catálogo).
-3. **Backfill pontual**: `backfill_is_online` / `populate_municipio_coords` rodam uma vez para corrigir/preencher dados existentes.
+3. **Backfill pontual**: `backfill_is_online` roda uma vez para corrigir/preencher dados existentes.
 4. **Erro esperado em prod**: com `INCLUDE_DEV_TOOLS=false`, `manage.py seed_rbac` falha com "Unknown command" — o app não está em `INSTALLED_APPS`. Esse é o comportamento desejado (CP-08).
 
 ## Decisões relacionadas (ADRs)
@@ -120,5 +118,5 @@ Em CI o E2E roda com `INCLUDE_DEV_TOOLS=true` + `DEBUG_E2E=true` (ver `.github/w
 - **Risco residual do default `true`**: o failsafe por `ENVIRONMENT=production` **já existe** (#1466, `settings.py`, `INCLUDE_DEV_TOOLS`) — a versão anterior desta spec dizia que faltava. O que sobra é o default `true` para qualquer outro rótulo de ambiente: um staging com dados reais e `ENVIRONMENT=staging` carrega `apps.dev_tools`. Auditar via [deploy.spec.md](../infra/deploy.spec.md).
 - **Docstrings de comando**: os de `seed_rbac.py` e `seed_e2e_users.py` foram conferidos em 19/10/2026 e batem com o código. Ao mudar um seed, atualizar o docstring **e** esta tabela.
 - **Gate fora do app**: o gate vive em `config/settings.py`, não em `apps/dev_tools/apps.py` — quem audita o app precisa olhar settings. (Esta spec corrige a expectativa de que o gate estaria em `apps.py`.)
-- **Comandos não-seed na mesma pasta**: `backfill_*`, `fix_*`, `migrate_rbac_groups` e `populate_municipio_coords` são one-shot/legados; alguns dependem de planilhas/CSV externos (ex.: `backfill_is_online` lê coluna G da planilha original) e podem estar obsoletos após os data-fixes manuais do golden dataset. Confirmar relevância antes de rodar.
+- **Comandos não-seed na mesma pasta**: `backfill_*`, `fix_*` e `migrate_rbac_groups` são one-shot/legados; alguns dependem de planilhas/CSV externos (ex.: `backfill_is_online` lê coluna G da planilha original) e podem estar obsoletos após os data-fixes manuais do golden dataset. Confirmar relevância antes de rodar.
 - **`seed_rbac` é pré-requisito**: várias suítes e seeds assumem grupos/permissões já criados; rodar seeds dependentes antes de `seed_rbac` falha. A sequência canônica está documentada na memória de seed order do projeto.

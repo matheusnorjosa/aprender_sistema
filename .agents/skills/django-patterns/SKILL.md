@@ -13,7 +13,7 @@ AS v2 diverges.
 ## Backend layout (modular)
 
 The only real apps are `apps/core` (39 models, `serializers/`, `services/`) and
-`apps/dev_tools` (15 seed commands, disabled in prod). `apps/core` is split into Python
+`apps/dev_tools` (14 seed commands, disabled in prod). `apps/core` is split into Python
 packages, each with an `__init__.py` that re-exports its public names:
 
 ```

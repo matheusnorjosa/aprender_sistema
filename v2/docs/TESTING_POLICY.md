@@ -77,7 +77,7 @@ def _decrypt_token_for_tests(encrypted: bytes) -> str:
 from pathlib import Path
 from django.conf import settings
 
-csv_path = Path(settings.BASE_DIR) / "data/municipios_coordenadas.csv"
+csv_path = Path(settings.BASE_DIR) / "data/municipios_coordenadas_ibge.csv"
 ```
 
 *(Corrigido em 2026-07-24: o exemplo anterior apontava para `apps/core/data/projetos_fluxo.csv`,

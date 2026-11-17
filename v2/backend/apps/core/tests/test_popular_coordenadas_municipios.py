@@ -47,7 +47,7 @@ def test_ensaio_nao_grava(tmp_path):
     saida = _roda(_csv(tmp_path, [f"{FORTALEZA},-3.7172,-38.5431"]))
     m.refresh_from_db()
     assert m.latitude is None and m.longitude is None
-    assert "preencheria: 1" in saida
+    assert "preencheria: 1 " in saida
     assert "ENSAIO" in saida
 
 
@@ -118,3 +118,12 @@ def test_arquivo_real_da_base_e_valido():
     assert caminho.exists(), "o arquivo da base nao esta onde o comando procura"
     saida = _roda(str(caminho), minimo="5000")
     assert "linhas na base: 5571" in saida
+
+
+def test_meia_coordenada_recebe_o_par_da_base_e_e_contada(tmp_path):
+    """So latitude, sem longitude, nao aparece no mapa; vira o par inteiro da base, contado a parte."""
+    m = MunicipioFactory(ibge_code=FORTALEZA, latitude=Decimal("-3.0"), longitude=None)
+    saida = _roda(_csv(tmp_path, [f"{FORTALEZA},-3.7172,-38.5431"]), "--apply")
+    m.refresh_from_db()
+    assert (m.latitude, m.longitude) == (Decimal("-3.717200"), Decimal("-38.543100"))
+    assert "com meia coordenada trocada pelo par da base: 1" in saida

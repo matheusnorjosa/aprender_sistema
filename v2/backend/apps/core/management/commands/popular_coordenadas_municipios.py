@@ -7,7 +7,8 @@ longitude) da base publica kelvins/municipios-brasileiros, licenca MIT (ver
 
 Regras:
 - Casa SO pelo `ibge_code`; o nome nao entra (grafia varia, codigo nao).
-- So preenche quem esta sem latitude ou longitude; quem ja tem fica como esta.
+- So preenche quem esta sem coordenada. Quem tem as duas fica como esta. Quem tem so uma
+  (meia coordenada, que o mapa ignora) recebe o par inteiro da base, contado a parte.
 - Ensaio por padrao. `--apply` grava tudo numa transacao.
 - O arquivo e validado inteiro antes de qualquer gravacao: codigo de 7 digitos sem
   repeticao, coordenada numerica dentro da faixa e um numero minimo de linhas (um
@@ -35,7 +36,8 @@ if TYPE_CHECKING:
     from argparse import ArgumentParser
 
 ARQUIVO_PADRAO = Path(settings.BASE_DIR) / "data" / "municipios_coordenadas_ibge.csv"
-# O Brasil tem 5.570 municipios (+ Brasilia na base); bem abaixo disso, o arquivo veio cortado.
+# A base de 17/11/2026 tem 5.571 municipios (os 5.570 do Censo 2022 mais Boa Esperanca do Norte-MT,
+# instalado depois); bem abaixo disso, o arquivo veio cortado.
 MINIMO_PADRAO = 5000
 _CODIGO = re.compile(r"^\d{7}$")
 _SEIS_CASAS = Decimal("0.000001")
@@ -100,12 +102,14 @@ class Command(BaseCommand):
                 # Trava as linhas lidas: ninguem preenche no meio e e sobrescrito aqui.
                 candidatos = candidatos.select_for_update()
             preencher: list[Municipio] = []
-            fora_da_base = igual = diferente = 0
+            fora_da_base = igual = diferente = meia = 0
             for m in candidatos:
                 coord = base.get((m.ibge_code or "").strip())
                 if coord is None:
                     fora_da_base += 1
                 elif m.latitude is None or m.longitude is None:
+                    if m.latitude is not None or m.longitude is not None:
+                        meia += 1
                     m.latitude, m.longitude = coord
                     preencher.append(m)
                 elif (m.latitude, m.longitude) == coord:
@@ -118,7 +122,7 @@ class Command(BaseCommand):
         verbo = "preenchidos" if aplicar else "preencheria"
         self.stdout.write("GRAVADO" if aplicar else "ENSAIO (nada gravado; use --apply)")
         self.stdout.write(f"linhas na base: {len(base)}")
-        self.stdout.write(f"{verbo}: {len(preencher)}")
+        self.stdout.write(f"{verbo}: {len(preencher)} (desses, com meia coordenada trocada pelo par da base: {meia})")
         self.stdout.write(f"ja tinha, igual a base: {igual}")
         self.stdout.write(f"ja tinha, diferente da base: {diferente}")
         self.stdout.write(f"sem codigo IBGE: {sem_codigo}")

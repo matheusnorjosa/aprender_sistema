@@ -64,7 +64,7 @@ só lê server-defs de `.mcp.json`, arquivo local e não versionado — `.gitign
 ```text
 v2/backend/apps/
   core/           39 models, serializers/, services/
-  dev_tools/      15 seed commands (prod disabled)
+  dev_tools/      14 seed commands (prod disabled)
 
 v2/frontend/src/
   pages/          41 lazy-loaded (AppRoutes.tsx)

@@ -20,7 +20,7 @@ concurrency:
 jobs:
   dependency-review:
     name: "[required] dependency review"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     # Só em PR — no schedule/dispatch roda só o scorecard.
     if: github.event_name == 'pull_request'
@@ -65,14 +65,14 @@ jobs:
 
       - name: Dependency Review (public repos, block HIGH/CRITICAL)
         if: github.event.repository.private == false && steps.deps-changes.outputs.any_changed == 'true'
-        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
-          # ATENCAO: este step NAO roda hoje — o repositorio e' privado, entao
-          # quem avalia o frontend e' o step de fallback mais abaixo (que usa
-          # .github/scripts/npm-audit-gate.mjs). Mantido correto para o caso de
-          # a visibilidade mudar; se voltar a rodar e alguma excecao vier a ser
-          # necessaria, a allowlist daqui precisa espelhar a do script.
+          # O repositorio e' PUBLICO (conferido em 17/11/2026, FER-58), entao e' ESTE
+          # step que avalia os PRs que mudam manifesto; o fallback mais abaixo
+          # (.github/scripts/npm-audit-gate.mjs) so roda se ele voltar a ser privado.
+          # Se alguma excecao vier a ser necessaria, a allowlist daqui precisa
+          # espelhar a do script.
           #
           # Sem allow-ghsas: a excecao GHSA-qwww-vcr4-c8h2 (react-router) foi
           # removida em #1675 (upgrade React 19 + react-router 8.3.0, que
@@ -130,7 +130,7 @@ jobs:
 
   scorecard:
     name: "[info] openssf scorecard"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     continue-on-error: true
     permissions:

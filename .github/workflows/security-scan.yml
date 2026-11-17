@@ -30,7 +30,7 @@ jobs:
   # ================================================================
   python-security:
     name: "[required] Python Dependencies"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 18
     steps:
       - name: Checkout code
@@ -120,17 +120,19 @@ jobs:
   # ================================================================
   container-security:
     name: "[required] Container Scan"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 25
     steps:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Build backend image
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false  # v6+ anexaria um artifact por build (FER-58)
         with:
           context: ./v2
           file: ./v2/infra/Dockerfile.prod
@@ -143,7 +145,9 @@ jobs:
             GIT_SHA=${{ github.sha }}
 
       - name: Build frontend image
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false  # v6+ anexaria um artifact por build (FER-58)
         with:
           context: ./v2/frontend
           file: ./v2/frontend/Dockerfile.prod
@@ -242,7 +246,7 @@ jobs:
   frontend-security:
     name: "[required] Frontend Dependencies"
     # npm ci is CPU-intensive; ubuntu-slim (1 vCPU) caused 81% slowdown.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 12
     steps:
       - name: Checkout code
@@ -325,7 +329,7 @@ jobs:
   # ================================================================
   secrets-scan:
     name: "[required] Secret Detection"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 12
     steps:
       - name: Checkout code

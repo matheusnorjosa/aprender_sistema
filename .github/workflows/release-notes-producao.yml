@@ -23,7 +23,7 @@ jobs:
   notas:
     name: "[ops] notas de producao na Release"
     if: github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       contents: write   # gh release edit + releases/generate-notes

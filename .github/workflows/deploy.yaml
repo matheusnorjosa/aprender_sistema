@@ -36,7 +36,7 @@ concurrency:
 jobs:
   prepare:
     name: Prepare release context
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions: {}
     outputs:
@@ -76,7 +76,7 @@ jobs:
 
   build_and_push:
     name: Build, scan, and push images
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     needs: prepare
     permissions:
@@ -95,10 +95,12 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Build backend image for pre-publish scan
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false  # v6+ anexaria um artifact por build (FER-58)
         with:
           context: ./v2
           file: ./v2/infra/Dockerfile.prod
@@ -113,7 +115,9 @@ jobs:
             BUILD_DATE=${{ needs.prepare.outputs.build_date }}
 
       - name: Build frontend image for pre-publish scan
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false  # v6+ anexaria um artifact por build (FER-58)
         with:
           context: ./v2/frontend
           file: ./v2/frontend/Dockerfile.prod
@@ -170,14 +174,16 @@ jobs:
           PY
 
       - name: Login to Docker Hub
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
       - name: Build and push backend image
         id: push_backend
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false  # v6+ anexaria um artifact por build (FER-58)
         with:
           context: ./v2
           file: ./v2/infra/Dockerfile.prod
@@ -193,7 +199,9 @@ jobs:
 
       - name: Build and push frontend image
         id: push_frontend
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false  # v6+ anexaria um artifact por build (FER-58)
         with:
           context: ./v2/frontend
           file: ./v2/frontend/Dockerfile.prod
@@ -232,7 +240,7 @@ jobs:
 
   tag_and_release:
     name: Tag and GitHub Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     needs: [prepare, build_and_push]
     if: needs.build_and_push.result == 'success'

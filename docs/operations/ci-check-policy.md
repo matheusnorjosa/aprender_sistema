@@ -120,7 +120,11 @@ Executados por `schedule` ou `workflow_dispatch`:
 - Checks `info` podem usar `continue-on-error`, com artifact/log para análise posterior.
 - Não usar runners `self-hosted` nos gates de PR.
 - Preferir `ubuntu-slim` para jobs leves (lint/quality gates sem Docker) com timeout <= 15 min.
-- Manter `ubuntu-latest` para jobs com Docker, Playwright/Lighthouse, build pesado ou timeout > 15 min.
+- Jobs com Docker, Playwright/Lighthouse, build pesado ou timeout > 15 min rodam na versão **fixa** do runner,
+  `ubuntu-26.04` desde 17/11/2026 (FER-58), e não em `ubuntu-latest`: a troca de Ubuntu passa a ser decisão
+  nossa, num PR, em vez de chegar em silêncio (o `ubuntu-latest` virou 26.04 em 19/10 sem aviso no repo).
+- Ações de terceiros fixadas por SHA, com a versão no comentário; ação que ainda roda no Node 20 é trocada pela
+  versão no Node 24 (FER-58).
 
 ## Monitoramento de custo (GitHub Actions)
 

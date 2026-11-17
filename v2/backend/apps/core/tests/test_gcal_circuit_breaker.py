@@ -222,13 +222,33 @@ def _contagem_depois_de(erro: BaseException) -> int:
 class TestOQueContaComoFalha:
     """DEF-31 (ART-21): o disjuntor mede a saúde do Google, não erro do pedido nem falta de acesso."""
 
-    @pytest.mark.parametrize("motivo", ["forbidden", "requiredAccessLevel", "insufficientPermissions"])
+    @pytest.mark.parametrize(
+        "motivo", ["forbidden", "requiredAccessLevel", "insufficientPermissions", "forbiddenForNonOrganizer"]
+    )
     def test_403_sem_acesso_nao_conta(self, motivo):
         assert _contagem_depois_de(_erro_http(403, motivo)) == 0
 
-    @pytest.mark.parametrize("motivo", ["rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded"])
+    @pytest.mark.parametrize(
+        "motivo", ["rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded", "dailyLimitExceeded"]
+    )
     def test_403_de_cota_conta(self, motivo):
         assert _contagem_depois_de(_erro_http(403, motivo)) == 1
+
+    def test_403_de_motivo_desconhecido_conta(self):
+        """Falha segura: só o 403 de acesso conhecido sai da conta; um motivo novo do Google conta."""
+        assert _contagem_depois_de(_erro_http(403, "motivoQueOGoogleAindaNaoTem")) == 1
+
+    def test_403_de_cota_diaria_nao_zera_a_contagem(self):
+        """Erro excluído passa pelo `_handle_success` do pybreaker e zera o contador: cota não pode cair nele."""
+        for _ in range(gcal_breaker.fail_max - 1):
+            _contagem_depois_de(_erro_http(503))
+
+        def cota_diaria():
+            raise _erro_http(403, "dailyLimitExceeded")
+
+        with pytest.raises(CircuitBreakerError):  # a 5ª falha abre o disjuntor
+            _retry_with_circuit_breaker(cota_diaria, operation_name="t")
+        assert get_circuit_state() == "open"
 
     @pytest.mark.parametrize(
         "corpo", [b"<html>nada de json</html>", b'{"error": "texto"}', b"[]", b'{"error": {"code": 403}}']

@@ -92,8 +92,11 @@ class GCalCircuitBreakerListener(pybreaker.CircuitBreakerListener):
 
 
 # DEF-31 (ART-21): o disjuntor mede a saúde do Google. Erro do próprio pedido e falta de acesso ao calendário
-# não são o Google fora do ar e não contam. O 403 de cota conta: é o Google pedindo para parar.
-_MOTIVOS_DE_COTA = frozenset({"rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded"})
+# não são o Google fora do ar e não contam. O 403 de cota conta: é o Google pedindo para parar. A lista é a dos
+# motivos de acesso conhecidos, não a de cota: motivo de cota novo ou fora da lista (ex.: dailyLimitExceeded) conta.
+_MOTIVOS_SEM_ACESSO = frozenset(
+    {"forbidden", "requiredAccessLevel", "insufficientPermissions", "forbiddenForNonOrganizer"}
+)
 _ERROS_DO_PEDIDO = frozenset({400, 404, 409, 410, 412})
 
 
@@ -109,7 +112,8 @@ def _motivo_do_403(exc: BaseException) -> str | None:
 
 
 def _nao_conta_como_falha(exc: BaseException) -> bool:
-    """`exclude` do pybreaker: True tira o erro da contagem. Na dúvida (sem status, motivo ilegível), conta."""
+    """`exclude` do pybreaker: True tira o erro da contagem. Na dúvida (sem status, motivo ilegível ou
+    desconhecido), conta."""
     try:
         status_bruto: Any = getattr(getattr(exc, "resp", None), "status", None)
         status = int(status_bruto)
@@ -118,8 +122,7 @@ def _nao_conta_como_falha(exc: BaseException) -> bool:
     if status in _ERROS_DO_PEDIDO:
         return True
     if status == 403:
-        motivo = _motivo_do_403(exc)
-        return motivo is not None and motivo not in _MOTIVOS_DE_COTA
+        return _motivo_do_403(exc) in _MOTIVOS_SEM_ACESSO
     return False  # 429, 5xx e o resto
 
 

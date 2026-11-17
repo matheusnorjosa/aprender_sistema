@@ -111,8 +111,9 @@ Phase 2 (#866) closed the following:
 
 Still open, deliberately out of scope:
 
-- **"Count only transient errors" filter** on the GCal circuit breaker (tracked in #779 notes).
 - **Distributed tracing span** for each retry attempt — today we have structured logs but no trace context.
+
+Closed later, outside Phase 2: the **"count only transient errors" filter** on the GCal circuit breaker (DEF-31, `ART-21`; was tracked in #779 notes). `exclude=[_nao_conta_como_falha]` in `services/gcal/circuit_breaker.py`; the rules live in [`gcal.spec.md`](specs/backend/gcal.spec.md) ("Disjuntor do Google").
 
 ## Related
 

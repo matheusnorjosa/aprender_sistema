@@ -68,7 +68,7 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    # Sem --with-deps, como no frontend-ci: o ubuntu-latest ja tem as libs, e o apt do
+    # Sem --with-deps, como no frontend-ci: o ubuntu-26.04 ja tem as libs, e o apt do
     # mirror era fonte de flake.
     - name: Install Playwright browsers
       run: npx playwright install chromium

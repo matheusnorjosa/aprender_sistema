@@ -732,8 +732,10 @@ docker compose exec web python manage.py shell
 ### Publish via Management Command
 
 > 🔴 **Corrigido em 2026-07-24: o command `sync_calendar` NÃO EXISTE.** Nunca existiu neste
-> repositório. O único management command relacionado a GCal é
-> `apps/core/management/commands/preagenda_to_gcal.py`:
+> repositório. Os management commands do Google são `preagenda_to_gcal` (publicação em lote,
+> abaixo), `gcal_copia` (cópia Google → sistema, dry-run por padrão), `conferir_gcal_adocao`
+> (conferência da adoção do Event ID na virada) e `rotate_gcal_encryption_key` (troca da chave,
+> seção 8), todos em `apps/core/management/commands/`:
 
 ```bash
 # Consultar as opções reais antes de usar

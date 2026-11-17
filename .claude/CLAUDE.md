@@ -63,14 +63,14 @@ só lê server-defs de `.mcp.json`, arquivo local e não versionado — `.gitign
 
 ```text
 v2/backend/apps/
-  core/           39 models, serializers/, services/
+  core/           40 models, serializers/, services/
   dev_tools/      14 seed commands (prod disabled)
 
 v2/frontend/src/
-  pages/          41 lazy-loaded (AppRoutes.tsx)
-  components/     24 reutilizáveis (+ access/, google/, lgpd/)
+  pages/          42 lazy-loaded (AppRoutes.tsx)
+  components/     25 reutilizáveis (+ access/, google/, lgpd/)
   hooks/          13 custom hooks
-  api/            15 clientes API (fetch) + config.ts + unwrapList.ts
+  api/            16 clientes API (fetch) + config.ts + unwrapList.ts
   types/          TypeScript definitions
 ```
 

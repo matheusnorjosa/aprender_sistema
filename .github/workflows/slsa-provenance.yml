@@ -143,7 +143,8 @@ jobs:
       # A attestation SLSA do GitHub NAO esta disponivel em repositorio privado de
       # conta pessoal — o proprio action falha com "Failed to persist attestation:
       # Feature not available for user-owned private repositories". Este repo era
-      # publico ate 2026-07-20 (quando o job passava inteiro) e virou privado depois.
+      # publico ate 2026-07-20 (quando o job passava inteiro), virou privado depois e
+      # voltou a ser publico.
       #
       # `continue-on-error` em vez de `if:` por VISIBILIDADE de proposito: nada aqui
       # afirma "o repo e privado". A attestation simplesmente TENTA. Se o repo voltar

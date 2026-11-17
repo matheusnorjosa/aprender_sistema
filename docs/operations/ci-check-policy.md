@@ -56,18 +56,16 @@ sozinho **não** diz como o check bloqueia o merge — há três mecanismos (col
 | `[required] architecture dependency guardrails` | `architecture-guardrails.yml` | ruleset (direto) |
 | `[required] rbac matrix doc drift` | `rbac-doc-drift.yml` | path-filtered — exceção (não no ruleset) |
 
-Os **14** marcados **ruleset (direto)** devem compor os `required_status_checks` de
-`Protect main`. Em 2026-08-26 o ruleset tinha os 13 primeiros; o `architecture dependency
-guardrails` teve o path filter do `pull_request` removido (passa a sempre reportar) e é
-**adicionado ao ruleset logo após o merge deste PR** — fechando o único `[required]` de
-backend/frontend que ainda não travava o merge.
+Os **14** marcados **ruleset (direto)** estão nos `required_status_checks` do ruleset
+`Protect main` (conferido em 17/11/2026 com `gh api .../rulesets`). O `architecture dependency
+guardrails` entrou depois de perder o path filter do `pull_request`.
 
 > **A composição efetiva do ruleset é uma configuração do GitHub, não um arquivo do
 > repositório.** A coluna **Enforcement** é o inventário do que *deveria* valer; conferir com
 > `gh api /repos/<owner>/<repo>/rulesets` antes de assumir que os diretos continuam ligados.
 
 > **Exceção conhecida (path-filtered) — `[required] rbac matrix doc drift`.** Usa `paths` no
-> gatilho de `pull_request` (`rbac-doc-drift.yml:32-37`), então **não reporta** em PR fora dos
+> gatilho de `pull_request` (`rbac-doc-drift.yml:29-32`), então **não reporta** em PR fora dos
 > paths e **não está no ruleset**. Ligá-lo sem antes remover o `paths` travaria todo PR que não
 > toque `matrix.py`/`rbac_authorization_matrix.md` (check eternamente *pending*/"Expected").
 > Para promovê-lo ao gate: remover o `paths` do `pull_request` (como `architecture-guardrails.yml`
@@ -92,13 +90,14 @@ Estes checks não bloqueiam merge:
 
 ## Checks operacionais
 
-Executados por `schedule` ou `workflow_dispatch`:
+Executados por `schedule`, `workflow_dispatch` ou `workflow_run`:
 
 - `[ops] strict security headers (staging/prod)`
 - `[ops] backend xdist canary summary`
 - `[ops] frontend monthly metrics (medir)` e `(publicar)` (`frontend-metrics-monthly.yml`) — dia 1º, ~09:17 de Fortaleza: mede a `main` (size-limit + Lighthouse, sem bloquear nada) e deixa um comentário novo por execução na issue #2066, com a variação contra a medição anterior
 - `[ops] slsa provenance + cosign`
 - `[ops] promote (assina ponteiro)` (`promote.yml`, gated no Environment `production`)
+- `[ops] notas de producao na Release` (`release-notes-producao.yml`), disparado por `workflow_run` quando o promote termina
 
 ## Trilha Canary Backend xdist
 
@@ -119,10 +118,11 @@ Executados por `schedule` ou `workflow_dispatch`:
   (senão o check não reporta em PR fora dos paths e o ruleset fica *pending* eterno).
 - Checks `info` podem usar `continue-on-error`, com artifact/log para análise posterior.
 - Não usar runners `self-hosted` nos gates de PR.
-- Preferir `ubuntu-slim` para jobs leves (lint/quality gates sem Docker) com timeout <= 15 min.
-- Jobs com Docker, Playwright/Lighthouse, build pesado ou timeout > 15 min rodam na versão **fixa** do runner,
-  `ubuntu-26.04` desde 17/11/2026 (FER-58), e não em `ubuntu-latest`: a troca de Ubuntu passa a ser decisão
-  nossa, num PR, em vez de chegar em silêncio (o `ubuntu-latest` virou 26.04 em 19/10 sem aviso no repo).
+- Todos os jobs rodam na versão **fixa** do runner, `ubuntu-26.04`, desde 17/11/2026 (FER-58), e não em
+  `ubuntu-latest`: a troca de Ubuntu passa a ser decisão nossa, num PR, em vez de chegar em silêncio (o
+  `ubuntu-latest` virou 26.04 em 19/10 sem aviso no repo). Nenhum job usa `ubuntu-slim` hoje
+  (`security-scan.yml:248` registra que ele deixou o `npm ci` 81% mais lento); levar um job leve para ele é
+  decisão de PR.
 - Ações de terceiros fixadas por SHA, com a versão no comentário; ação que ainda roda no Node 20 é trocada pela
   versão no Node 24 (FER-58).
 

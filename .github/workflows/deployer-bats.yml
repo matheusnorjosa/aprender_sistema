@@ -34,7 +34,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
 
-      # jq/curl/flock/sha256sum ja vem no ubuntu-latest; cosign/gh sao MOCKADOS pelo
+      # jq/curl/flock/sha256sum ja vem no ubuntu-26.04; cosign/gh sao MOCKADOS pelo
       # helper (nao precisam existir). So o bats precisa ser instalado.
       - name: Instala bats
         run: sudo apt-get update -qq && sudo apt-get install -y -qq bats

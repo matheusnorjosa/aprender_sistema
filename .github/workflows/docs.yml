@@ -21,7 +21,7 @@ concurrency:
 # ================================================================
 # MkDocs Documentation Build (validation only)
 # Issue #269: Automatic documentation generation
-# Note: Deploy disabled - GitHub Pages requires paid plan for private repos
+# Nota: deploy desligado por decisão. O repo voltou a ser público, e o Pages não exige mais plano pago.
 # ================================================================
 
 jobs:

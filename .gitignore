@@ -506,7 +506,7 @@ creds/
 !.secrets.baseline
 
 # Keep required tracked runtime/support files
-!v2/backend/data/municipios_coordenadas.csv
+!v2/backend/data/municipios_coordenadas_ibge.csv
 !v2/backend/media/
 !v2/backend/media/.gitkeep
 

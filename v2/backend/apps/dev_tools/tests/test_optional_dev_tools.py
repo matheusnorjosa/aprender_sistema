@@ -69,7 +69,6 @@ class TestDevToolsCommands:
             "fix_projetos_gerencia",
             "migrate_rbac_groups",
             "link_projetos_gerencias",
-            "populate_municipio_coords",
             "cleanup_e2e_data",
         ]
 
@@ -83,6 +82,7 @@ class TestDevToolsCommands:
         # These should always exist (in core)
         assert "preagenda_to_gcal" in commands
         assert "rotate_gcal_encryption_key" in commands
+        assert "popular_coordenadas_municipios" in commands  # FER-66: precisa rodar em producao
 
 
 class TestDevToolsExclusionDocumentation:

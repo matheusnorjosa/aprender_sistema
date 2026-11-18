@@ -70,6 +70,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Django admin: o service worker não toca (SEG-54). O cache-first abaixo guardaria para sempre o JSON
+  // do autocomplete do admin (nomes de pessoas) no cache estático, que o logout não apaga.
+  if (url.pathname.startsWith('/admin/')) {
+    return;
+  }
+
   // API requests: network only, never cached (SEG-54)
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(networkOnly(request, { usarCache: false }));

@@ -22,6 +22,8 @@ interface Ambiente {
   /** nome do cache → URLs gravadas */
   gravados: Map<string, string[]>;
   rede: { online: boolean };
+  /** nomes dos caches que existem agora */
+  nomes: () => string[];
 }
 
 function carregarSw(cachesIniciais: Record<string, Record<string, string>> = {}): Ambiente {
@@ -71,7 +73,7 @@ function carregarSw(cachesIniciais: Record<string, Record<string, string>> = {})
     console: { log: () => undefined, error: () => undefined },
   };
   runInNewContext(readFileSync(resolve(__dirname, '../../public/sw.js'), 'utf-8'), contexto);
-  return { handlers, gravados, rede };
+  return { handlers, gravados, rede, nomes: () => [...conteudo.keys()] };
 }
 
 async function pedir(amb: Ambiente, caminho: string, mode = 'cors'): Promise<Response> {
@@ -134,10 +136,22 @@ describe('service worker não guarda resposta de API (SEG-54)', () => {
     });
 
     await ativar(amb);
-    amb.rede.online = false;
 
-    expect((await pedir(amb, '/api/config/')).status).toBe(503);
-    expect((await pedir(amb, '/logo.svg', 'no-cors')).status).toBe(503); // estático de versão antiga também sai
+    expect(amb.nomes()).toEqual([]); // os de API de qualquer versão e o estático de versão antiga
+  });
+
+  test('o Django admin fica fora do service worker: nada é respondido nem guardado', async () => {
+    const amb = carregarSw();
+    let respondeu = false;
+
+    amb.handlers.fetch!({
+      request: { url: `${ORIGEM}/admin/autocomplete/?term=a&model_name=usuario`, mode: 'cors', method: 'GET' },
+      respondWith: () => (respondeu = true),
+    });
+    await new Promise((ok) => setTimeout(ok, 0));
+
+    expect(respondeu).toBe(false);
+    expect([...amb.gravados.values()].flat()).toEqual([]);
   });
 
   test('arquivo estático continua guardado e servido sem rede', async () => {

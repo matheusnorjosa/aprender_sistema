@@ -1,13 +1,19 @@
 /**
  * AS v2 - Service Worker (Issue #416)
  *
- * Provides offline support with cache-first for static assets
- * and network-first with cache fallback for API requests.
+ * Provides offline support with cache-first for static assets.
+ *
+ * SEG-54: resposta de API NUNCA é guardada nem servida do cache. As listas de /api/options/ e
+ * /api/config/ mudam conforme quem está logado, e o cache não é separado por pessoa: em computador
+ * compartilhado, quem entrava depois recebia, sem rede, as listas da pessoa anterior. Chamada de API
+ * vai sempre à rede; sem rede, devolve o JSON OFFLINE (503).
  */
 
-const CACHE_VERSION = 'v4';
+const CACHE_VERSION = 'v5';
 const STATIC_CACHE_NAME = `aprender-v2-static-${CACHE_VERSION}`;
-const API_CACHE_NAME = `aprender-v2-api-${CACHE_VERSION}`;
+// Prefixo dos caches de API de versões antigas (até a v4); apagados ao ativar. Espelhado em
+// src/services/swCache.ts, que os apaga também no logout.
+const API_CACHE_PREFIX = 'aprender-v2-api-';
 
 // Static assets to cache on install
 const STATIC_ASSETS = [
@@ -16,15 +22,6 @@ const STATIC_ASSETS = [
   '/offline.html',
   '/logo.svg',
   '/manifest.json',
-];
-
-// API routes that can be cached for offline use.
-// NB: /api/me/* é intencionalmente EXCLUÍDO — identidade e policies nunca são
-// cacheadas (Issue #1461), para não servir dados de um usuário anterior offline
-// em dispositivo compartilhado. Ver isCacheableApiRoute().
-const CACHEABLE_API_ROUTES = [
-  '/api/options/',
-  '/api/config/',
 ];
 
 // Install: cache static assets
@@ -46,10 +43,10 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames
           .filter((name) => {
-            // Delete old versions of our caches
+            // Delete old versions of the static cache and every API cache (SEG-54)
             return (
               (name.startsWith('aprender-v2-static-') && name !== STATIC_CACHE_NAME) ||
-              (name.startsWith('aprender-v2-api-') && name !== API_CACHE_NAME)
+              name.startsWith(API_CACHE_PREFIX)
             );
           })
           .map((name) => {
@@ -73,15 +70,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // API requests: network-first with cache fallback
+  // API requests: network only, never cached (SEG-54)
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirstWithCache(request));
+    event.respondWith(networkOnly(request, { usarCache: false }));
     return;
   }
 
   // Navigation requests (HTML pages): network-first to always get latest index.html
   if (request.mode === 'navigate') {
-    event.respondWith(networkFirstWithCache(request));
+    event.respondWith(networkOnly(request, { usarCache: true }));
     return;
   }
 
@@ -90,26 +87,21 @@ self.addEventListener('fetch', (event) => {
 });
 
 /**
- * Network-first strategy with cache fallback for API requests.
+ * Network strategy for API and navigation requests: nothing is written to the cache here.
+ * `usarCache` (navigation only): on network failure, serve the precached page if there is one.
+ * API requests never read the cache (SEG-54).
  */
-async function networkFirstWithCache(request) {
+async function networkOnly(request, { usarCache }) {
   try {
-    const response = await fetch(request);
-
-    // Cache successful GET requests for cacheable routes
-    if (request.method === 'GET' && response.ok && isCacheableApiRoute(request.url)) {
-      const cache = await caches.open(API_CACHE_NAME);
-      cache.put(request, response.clone());
-    }
-
-    return response;
+    return await fetch(request);
   } catch {
-    console.log('[SW] Network failed, trying cache:', request.url);
+    console.log('[SW] Network failed:', request.url);
 
-    // Try cache
-    const cached = await caches.match(request);
-    if (cached) {
-      return cached;
+    if (usarCache) {
+      const cached = await caches.match(request);
+      if (cached) {
+        return cached;
+      }
     }
 
     // DEF-27: abrir uma página sem conexão mostra a página amigável, não o JSON da API.
@@ -166,18 +158,6 @@ async function cacheFirstWithNetwork(request) {
     // Return empty response for other requests
     return new Response('', { status: 503 });
   }
-}
-
-/**
- * Check if URL is a cacheable API route.
- */
-function isCacheableApiRoute(url) {
-  const { pathname } = new URL(url);
-  // Identidade/policies NUNCA são cacheadas (Issue #1461): exclusão explícita,
-  // não por substring — impede vazamento cross-user offline. Mesmo que /api/me/
-  // volte a CACHEABLE_API_ROUTES por engano, este guard mantém a exclusão.
-  if (pathname.startsWith('/api/me/')) return false;
-  return CACHEABLE_API_ROUTES.some((route) => pathname.startsWith(route));
 }
 
 // Handle messages from clients

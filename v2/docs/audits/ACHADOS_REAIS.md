@@ -964,7 +964,7 @@ contra `HEAD` antes de virar fila de trabalho.
 |---|---|---|
 | `M05-01` | corrigido em prod | v2/backend/apps/core/views/admin.py:494-500 — `GroupViewSet.get_permissions()`: list/retrieve → `HasPerm("manage_purchases_and_materials")`, TODO o resto (creat… |
 | `M05-02` | corrigido em prod | C:\tmp\aprender_verify_main\v2\backend\apps\core\views\admin.py:492-499 — GroupViewSet.get_permissions() devolve [SuperuserOnly()] para toda action que nao seja… |
-| `M02-10` | corrigido em prod | v2/frontend/public/sw.js:161 — `if (pathname.startsWith('/api/me/')) return false;` dentro de `isCacheableApiRoute()`. Não é um guard HTTP (não devolve status):… |
+| `M02-10` | corrigido em prod | `v2/frontend/public/sw.js` — era `if (pathname.startsWith('/api/me/')) return false;` dentro de `isCacheableApiRoute()`. Desde o SEG-54 (2026-11-18) a função não existe mais: o service worker não guarda nem serve resposta de API nenhuma (`networkOnly`, `usarCache: false`), o que cobre o `/api/me/` e as listas de `/api/options/` e `/api/config/`. Teste: `src/test/sw.semCacheDeApi.test.ts` |
 | `M06-03` | corrigido so na main | C:\tmp\aprender_verify_main\v2\frontend\eslint.config.js:38 — bloco com files: ['src/**/*.{ts,tsx}'] + tseslint.configs.recommended. Nao e guard HTTP (achado de… |
 
 `M22-01` foi removido da lista acionável por ser **duplicata de `M03-01`** — mesmo defeito,

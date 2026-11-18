@@ -5,6 +5,7 @@ import './index.css'
 import App from './App'
 import logger from './utils/logger'
 import { recarregarSeVersaoAntiga } from './utils/recargaVersaoNova'
+import { clearApiCaches } from './services/swCache'
 
 // Falha do Vite ao pré-carregar um pedaço de tela da versão que saiu do ar: recarrega uma vez antes
 // de a tela quebrar. Se não recarregar (2ª vez em 30 s), o erro segue para o ErrorBoundary.
@@ -17,6 +18,8 @@ window.addEventListener('vite:preloadError', (event) => {
 // Issue #416: Register Service Worker for offline support
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
+    // SEG-54: apaga sobras de cache de API de versões antigas do SW a cada carregamento.
+    void clearApiCaches();
     navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
         logger.log('[SW] Registered:', registration.scope);

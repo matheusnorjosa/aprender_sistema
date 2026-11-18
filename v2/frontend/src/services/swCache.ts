@@ -1,19 +1,20 @@
 /**
  * Limpeza do Cache Storage do Service Worker (Issue #1461).
  *
- * O SW (`public/sw.js`) mantém caches de API nomeados `aprender-v2-api-*`. Como
- * eles podem conter respostas de `/api/me/*` de um usuário anterior, precisam ser
- * removidos no logout — senão, offline e em dispositivo compartilhado, a identidade
- * antiga pode ser servida do cache. Os caches de assets estáticos podem permanecer.
+ * Até a v4, o SW (`public/sw.js`) mantinha caches de API nomeados `aprender-v2-api-*`, com
+ * respostas que dependem de quem está logado. Desde o SEG-54 ele não guarda nem serve
+ * resposta de API, e apaga esses caches ao ativar. Esta limpeza fica para as sobras: um SW
+ * antigo ainda em execução pode regravar o cache depois da ativação do novo. Roda no logout
+ * e a cada carregamento da página (`main.tsx`). Os caches de assets estáticos permanecem.
  */
 
-/** Prefixo dos caches de API do SW (espelha `API_CACHE_NAME` em public/sw.js). */
+/** Prefixo dos caches de API do SW (espelha `API_CACHE_PREFIX` em public/sw.js). */
 const API_CACHE_PREFIX = 'aprender-v2-api-';
 
 /**
  * Remove todos os caches de API do SW. No-op seguro quando o Cache Storage não
  * está disponível (SSR, navegador sem suporte, jsdom) ou quando a API falha —
- * o logout nunca deve travar por causa disso.
+ * nem o logout nem o carregamento devem travar por causa disso.
  */
 export async function clearApiCaches(): Promise<void> {
   if (typeof caches === 'undefined') return;

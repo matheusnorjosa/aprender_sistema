@@ -1,7 +1,7 @@
 ---
 title: Deploy & Produção (spec)
 status: canonical
-last_verified: 2026-10-19
+last_verified: 2026-11-19
 verified_at_commit: 247b74c4cee914c9085019e84780acf2d4905503
 sources_of_truth:
   - v2/infra/docker-compose.prod.yml

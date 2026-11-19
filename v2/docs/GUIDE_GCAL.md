@@ -822,7 +822,7 @@ Para achar: linha em `PENDING` há mais de 15 min por `gcal_last_sync_at`, e nad
 **Solução:** primeiro achar o último pedido, o `AuditLog` com `details.pedido` igual a `Solicitacao.gcal_pedido`.
 
 - **É `CANCEL_GCAL_REQUESTED`** (um "Tirar do Google" parado): **nunca** reenviar nem reaplicar. Isso desfaz a remoção e pode trazer de volta o evento já apagado: o delete do Google é soft-delete, e o UPDATE manda `status: confirmed`. Esperar a mensagem voltar (até cerca de 1 hora) ou refazer o cancelamento por `POST /api/solicitacoes/{id}/cancel-gcal/`, que aceita linha `PENDING` com `external_event_id`. A tela não tem esse botão para linha em `PENDING`.
-- **Nenhum `*_REQUESTED` tem aquele pedido:** ele veio de lote (publicar, reaplicar ou reenviar). O lote não grava `*_REQUESTED`; o pedido fica em `Solicitacao.gcal_pedido` e em `TaskResult.task_kwargs`, guardado por 1 dia. O reenvio em lote pela Pré-agenda é seguro: ele aceita linha em `PENDING`, o pedido novo substitui o antigo, e a mensagem antiga, quando voltar, devolve `SKIP`.
+- **É `PUBLISH_GCAL_REQUESTED` ou `RESYNC_GCAL_REQUESTED`** (publicar ou reenviar de uma linha), **ou nenhum `*_REQUESTED` tem aquele pedido** (ele veio de lote: publicar, reaplicar ou reenviar; o lote não grava `*_REQUESTED`; o pedido fica em `Solicitacao.gcal_pedido` e em `TaskResult.task_kwargs`, guardado por 1 dia): o reenvio em lote pela Pré-agenda é seguro. Ele aceita linha em `PENDING`, o pedido novo substitui o antigo, e a mensagem antiga, quando voltar, devolve `SKIP`. O reaplicar não serve aqui: ele recusa linha em `PENDING` (`operacao_em_andamento`).
 
 ### Erro: "Não foi possível enviar o pedido para a fila de publicação"
 

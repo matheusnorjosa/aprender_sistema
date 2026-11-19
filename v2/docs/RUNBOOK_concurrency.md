@@ -94,8 +94,10 @@ death between the Google write and the commit finds the row still `PENDING` with
      Google already deleted (the Google delete is a soft delete, and the UPDATE sends `status: confirmed`). Wait
      for the message (up to about 1 h) or redo the cancel with `POST /api/solicitacoes/{id}/cancel-gcal/`, which
      accepts a `PENDING` row with `external_event_id` (the screen has no button for a `PENDING` row);
-   - no `*_REQUESTED` row with that id (a batch request): batch resend from the Pré-agenda is safe. It accepts
-     `PENDING` rows, the new request supersedes the old one, and the old message returns `SKIP` when it arrives.
+   - `PUBLISH_GCAL_REQUESTED` or `RESYNC_GCAL_REQUESTED` (a single-row publish or resend), or no `*_REQUESTED`
+     row with that id (a batch request): batch resend from the Pré-agenda is safe. It accepts `PENDING` rows, the
+     new request supersedes the old one, and the old message returns `SKIP` when it arrives. Reapply does not
+     help here: it refuses a `PENDING` row (`operacao_em_andamento`).
 
 ## Triage — "import took 30 min and then only some rows were saved"
 

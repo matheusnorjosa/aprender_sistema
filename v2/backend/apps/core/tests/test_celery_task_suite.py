@@ -900,6 +900,26 @@ class TestMarcaDeErroSobTrava:
 
         assert _travou_a_solicitacao(consultas.captured_queries)
 
+    def test_marca_confere_o_pedido_na_linha_travada(self, task_solicitacao):
+        """Outro pedido (por exemplo, "Tirar do Google") commita enquanto a marca espera a trava: logo antes do
+        FOR UPDATE da própria marca, a mesma conexão troca o identificador. Quem conferisse o pedido antes da trava
+        gravaria ERROR por cima do pedido mais novo, e a tarefa dele, achando ERROR, não faria nada."""
+        sol = task_solicitacao
+        pedido = _com_pedido(sol)
+        mais_novo = uuid4().hex
+
+        def outro_pedido_antes_da_trava(execute, sql, params, many, context):
+            if _travou_a_solicitacao([{"sql": sql}]):
+                Solicitacao.objects.filter(pk=sol.pk).update(gcal_pedido=mais_novo)
+            return execute(sql, params, many, context)
+
+        with connection.execute_wrapper(outro_pedido_antes_da_trava):
+            self._marcar(sol, pedido=pedido)
+
+        linha = _linha_do_google(sol)
+        assert (linha["gcal_status"], linha["gcal_pedido"]) == (_PENDING, mais_novo)
+        assert not _erros_auditados(sol).exists()
+
     def test_previa_segue_sem_gravar(self, task_solicitacao):
         from apps.core.tasks import _mark_gcal_error  # pyright: ignore[reportPrivateUsage]
 

@@ -288,7 +288,16 @@ def _mark_gcal_error(
 _FALHAS_DE_BANCO_QUE_REPETEM = (OperationalError, InterfaceError)
 
 
-@shared_task(name="apps.core.tasks.task_publish_solicitacao_to_gcal", autoretry_for=_FALHAS_DE_BANCO_QUE_REPETEM)
+# ISS-1970: publicar e cancelar só confirmam a mensagem depois de terminar (`acks_late`), e o processo do
+# worker que morre no meio a devolve à fila na hora (`reject_on_worker_lost`). Se o servidor inteiro cai, a
+# mensagem volta quando vence o prazo do Redis (`visibility_timeout`, 1 h). Só nestas duas, que têm a guarda
+# do pedido: a segunda entrega acha a linha fora de PENDING e não repete nada. Global segue desligado.
+@shared_task(
+    name="apps.core.tasks.task_publish_solicitacao_to_gcal",
+    autoretry_for=_FALHAS_DE_BANCO_QUE_REPETEM,
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
 def task_publish_solicitacao_to_gcal(
     solicitation_id: int,
     dry_run: bool = False,
@@ -530,7 +539,12 @@ def task_publish_solicitacao_to_gcal(
         }
 
 
-@shared_task(name="apps.core.tasks.task_cancel_solicitacao_from_gcal", autoretry_for=_FALHAS_DE_BANCO_QUE_REPETEM)
+@shared_task(
+    name="apps.core.tasks.task_cancel_solicitacao_from_gcal",
+    autoretry_for=_FALHAS_DE_BANCO_QUE_REPETEM,
+    acks_late=True,  # ISS-1970: ver o comentário do publicar
+    reject_on_worker_lost=True,
+)
 def task_cancel_solicitacao_from_gcal(
     solicitation_id: int,
     operator_user_id: int | None = None,

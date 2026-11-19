@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 from functools import partial
+from typing import Any
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -637,7 +638,7 @@ def _estado_em_que_age(tarefa: str) -> str:
     return _ERROR if tarefa == "nova_tentativa" else _PENDING
 
 
-def _tarefa(nome: str):
+def _tarefa(nome: str) -> Any:
     from apps.core.tasks import (
         queue_gcal_sync_retry,
         task_cancel_solicitacao_from_gcal,
@@ -1315,3 +1316,37 @@ def test_limite_brando_global_abaixo_do_duro():
     assert brando is not None
     assert brando < settings.CELERY_TASK_TIME_LIMIT
     assert app.conf.task_soft_time_limit == brando
+
+
+@_PUBLICAR_E_CANCELAR
+def test_publicar_e_cancelar_voltam_a_fila_se_o_processo_morre(tarefa):
+    """DEF-32 (ISS-1970): a mensagem só é confirmada depois que a tarefa termina (`acks_late`), e o processo do
+    worker que morre no meio a devolve à fila na hora (`reject_on_worker_lost`). A segunda entrega passa pela
+    guarda do pedido, então repetir não duplica nada."""
+    task = _tarefa(tarefa)
+
+    assert task.acks_late is True
+    assert task.reject_on_worker_lost is True
+
+
+def test_entrega_de_novo_vale_so_para_publicar_e_cancelar():
+    """Ligado para todas, qualquer tarefa repetiria ao ser entregue de novo; só as duas com a guarda do pedido
+    estão preparadas. A nova tentativa agenda a si mesma (`self.retry`) e fica de fora."""
+    from config.celery import app
+
+    assert not app.conf.task_acks_late
+    assert not app.conf.task_reject_on_worker_lost
+    nova_tentativa = _tarefa("nova_tentativa")
+    assert not nova_tentativa.acks_late
+    assert not nova_tentativa.reject_on_worker_lost
+
+
+def test_prazo_de_reentrega_do_redis_passa_do_limite_de_tempo_da_tarefa():
+    """Se o servidor inteiro cai, o Redis devolve a mensagem não confirmada depois do `visibility_timeout`
+    (1 h quando não configurado). Menor que o limite duro da tarefa, ele entregaria de novo uma tarefa que
+    ainda está rodando."""
+    from config.celery import app
+
+    prazo = app.conf.broker_transport_options.get("visibility_timeout", 3600)
+
+    assert prazo > app.conf.task_time_limit

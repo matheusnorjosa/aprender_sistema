@@ -637,7 +637,7 @@ def _estado_em_que_age(tarefa: str) -> str:
     return _ERROR if tarefa == "nova_tentativa" else _PENDING
 
 
-def _rodar(tarefa: str, sol_id: int, **kwargs):
+def _tarefa(nome: str):
     from apps.core.tasks import (
         queue_gcal_sync_retry,
         task_cancel_solicitacao_from_gcal,
@@ -649,7 +649,11 @@ def _rodar(tarefa: str, sol_id: int, **kwargs):
         "cancelar": task_cancel_solicitacao_from_gcal,
         "nova_tentativa": queue_gcal_sync_retry,
     }
-    return tarefas[tarefa](sol_id, **kwargs)
+    return tarefas[nome]
+
+
+def _rodar(tarefa: str, sol_id: int, **kwargs):
+    return _tarefa(tarefa)(sol_id, **kwargs)
 
 
 def _apagou(sol):
@@ -1120,6 +1124,43 @@ class TestErroDoPublicarENovaTentativa:
 
         assert resultado["action"] == "SKIP"
         assert _linha_do_google(sol) == antes
+
+
+_PUBLICAR_E_CANCELAR = pytest.mark.parametrize("tarefa", ["publicar", "cancelar"])
+
+
+class TestFalhaDeBancoPedeNovaExecucao:
+    """DEF-32: a conexão com o banco que cai no meio da tarefa (inclusive ao gravar o erro) faz o Celery rodar a
+    tarefa de novo, em vez de deixar a linha em PENDING. A nova execução passa pela guarda do pedido."""
+
+    @_PUBLICAR_E_CANCELAR
+    def test_tarefa_repete_em_falha_de_conexao_com_o_banco(self, tarefa):
+        from django.db import InterfaceError, OperationalError
+
+        assert {OperationalError, InterfaceError} <= set(getattr(_tarefa(tarefa), "autoretry_for", ()))
+
+    @_PUBLICAR_E_CANCELAR
+    def test_conexao_que_cai_ao_gravar_o_erro_pede_nova_execucao(self, task_solicitacao, tarefa):
+        """O Google falha e, na hora de marcar ERROR, o banco está fora: a tarefa pede nova execução ao Celery
+        com o erro do banco (aqui o `retry` é trocado para o pedido aparecer sem um worker de verdade)."""
+        from django.db import OperationalError
+
+        from celery.exceptions import Retry
+
+        sol = task_solicitacao
+        pedido = _com_pedido(sol)
+
+        with (
+            patch(_APPLY, side_effect=RuntimeError("Google fora do ar")),
+            patch(_CANCEL, side_effect=RuntimeError("Google fora do ar")),
+            patch.object(Solicitacao, "mark_gcal", side_effect=OperationalError("conexão com o banco caiu")),
+            patch.object(_tarefa(tarefa), "retry", side_effect=Retry()) as nova_execucao,
+            pytest.raises(Retry),
+        ):
+            _rodar(tarefa, sol.id, pedido=pedido)
+
+        nova_execucao.assert_called_once()
+        assert isinstance(nova_execucao.call_args.kwargs["exc"], OperationalError)
 
 
 class TestNotificacoesTask:

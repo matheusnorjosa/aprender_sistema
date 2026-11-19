@@ -22,6 +22,7 @@ from io import StringIO
 from typing import Any
 
 from django.core.management import call_command
+from django.db import InterfaceError, OperationalError
 
 from celery import shared_task  # type: ignore[attr-defined]
 
@@ -278,7 +279,12 @@ def _mark_gcal_error(
         )
 
 
-@shared_task(name="apps.core.tasks.task_publish_solicitacao_to_gcal")
+# DEF-32: a conexão com o banco que cai no meio da tarefa (inclusive ao marcar ERROR) não deixa a linha em
+# PENDING: o Celery roda a tarefa de novo, e a nova execução passa pela guarda do pedido.
+_FALHAS_DE_BANCO_QUE_REPETEM = (OperationalError, InterfaceError)
+
+
+@shared_task(name="apps.core.tasks.task_publish_solicitacao_to_gcal", autoretry_for=_FALHAS_DE_BANCO_QUE_REPETEM)
 def task_publish_solicitacao_to_gcal(
     solicitation_id: int,
     dry_run: bool = False,
@@ -501,7 +507,7 @@ def task_publish_solicitacao_to_gcal(
         }
 
 
-@shared_task(name="apps.core.tasks.task_cancel_solicitacao_from_gcal")
+@shared_task(name="apps.core.tasks.task_cancel_solicitacao_from_gcal", autoretry_for=_FALHAS_DE_BANCO_QUE_REPETEM)
 def task_cancel_solicitacao_from_gcal(
     solicitation_id: int,
     operator_user_id: int | None = None,

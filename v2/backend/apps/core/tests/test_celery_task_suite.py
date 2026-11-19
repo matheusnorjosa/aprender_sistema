@@ -826,6 +826,154 @@ class TestGuardaDoPedido:
         assert linha == {"gcal_status": "PUBLISHED", "external_event_id": eid}
 
 
+def _erros_auditados(sol):
+    return AuditLog.objects.filter(action=AuditLog.Action.PUBLISH_GCAL_ERROR, details__solicitacao_id=sol.id)
+
+
+class TestMarcaDeErroSobTrava:
+    """DEF-32: a marca de ERROR (`_mark_gcal_error`) trava a linha e só grava, na linha e no AuditLog, se o
+    pedido da tarefa ainda é o da linha e ela segue PENDING. Antes era um save cego, fora de trava: a falha de
+    um pedido antigo apagava o resultado de outro mais novo (ERROR por cima de PUBLISHED, ou de NONE)."""
+
+    def _marcar(self, sol, **kwargs):
+        from apps.core.tasks import _mark_gcal_error
+
+        _mark_gcal_error(sol.id, "O Google recusou.", raw_error="HttpError 500", dry_run=False, **kwargs)
+
+    def test_pedido_superado_nao_marca_nem_audita(self, task_solicitacao):
+        sol = task_solicitacao
+        _com_pedido(sol)  # o pedido mais novo, ainda por fazer
+        antes = _linha_do_google(sol)
+
+        self._marcar(sol, pedido=uuid4().hex)
+
+        assert _linha_do_google(sol) == antes
+        assert not _erros_auditados(sol).exists()
+
+    @pytest.mark.parametrize("gcal_status", ["PUBLISHED", "NONE", "ERROR"])
+    def test_mesmo_pedido_com_a_linha_fora_de_pending_nao_marca(self, task_solicitacao, gcal_status):
+        """A mesma mensagem, entregue de novo, falha depois que a primeira entrega concluiu: não regrava."""
+        sol = task_solicitacao
+        pedido = _com_pedido(sol, gcal_status=gcal_status, gcal_payload_hash="hash-publicado")
+        antes = _linha_do_google(sol)
+
+        self._marcar(sol, pedido=pedido)
+
+        assert _linha_do_google(sol) == antes
+        assert not _erros_auditados(sol).exists()
+
+    def test_mesmo_pedido_em_pending_marca_e_audita(self, task_solicitacao):
+        sol = task_solicitacao
+        pedido = _com_pedido(sol, gcal_payload_hash="hash-publicado")
+
+        self._marcar(sol, pedido=pedido, operation="cancel")
+
+        linha = _linha_do_google(sol)
+        assert linha["gcal_status"] == _ERROR
+        assert linha["gcal_last_error"] == "O Google recusou."
+        assert linha["gcal_payload_hash"] is None
+        assert linha["gcal_pedido"] == pedido
+        assert linha["external_event_id"] == sol.external_event_id  # a linha segue re-tentável
+        registro = _erros_auditados(sol).get()
+        assert registro.details["operation"] == "cancel"
+        assert registro.details["error"] == "HttpError 500"
+
+    def test_sem_identificador_em_linha_sem_pedido_marca_como_antes(self, task_solicitacao):
+        """Mensagem antiga ou chamada direta: marca em qualquer estado, como sempre fez."""
+        sol = task_solicitacao  # PUBLISHED, sem pedido
+
+        self._marcar(sol)
+
+        assert _linha_do_google(sol)["gcal_status"] == _ERROR
+        assert _erros_auditados(sol).count() == 1
+
+    def test_marca_trava_a_linha(self, task_solicitacao):
+        with CaptureQueriesContext(connection) as consultas:
+            self._marcar(task_solicitacao)
+
+        assert _travou_a_solicitacao(consultas.captured_queries)
+
+    def test_previa_segue_sem_gravar(self, task_solicitacao):
+        from apps.core.tasks import _mark_gcal_error
+
+        antes = _linha_do_google(task_solicitacao)
+
+        _mark_gcal_error(task_solicitacao.id, "O Google recusou.", raw_error="HttpError 500", dry_run=True)
+
+        assert _linha_do_google(task_solicitacao) == antes
+        assert not _erros_auditados(task_solicitacao).exists()
+
+    @pytest.mark.parametrize("tarefa", ["publicar", "cancelar"])
+    def test_falha_da_tarefa_nao_marca_por_cima_de_pedido_que_chegou_depois(self, task_solicitacao, tarefa):
+        """A tarefa passa pela guarda, o Google falha e o rollback solta a linha. Antes da marca de erro, outro
+        pedido commita (aqui, na hora em que a tarefa monta o texto do erro). A marca relê sob a trava e não
+        grava por cima do pedido mais novo."""
+        sol = task_solicitacao
+        pedido = _com_pedido(sol)
+        mais_novo = uuid4().hex
+
+        def outro_pedido_commita(_erro):
+            Solicitacao.objects.filter(pk=sol.pk).update(gcal_pedido=mais_novo)
+            return "O Google recusou."
+
+        with (
+            patch(_APPLY, side_effect=RuntimeError("Google fora do ar")),
+            patch(_CANCEL, side_effect=RuntimeError("Google fora do ar")),
+            patch("apps.core.tasks._friendly_gcal_error", side_effect=outro_pedido_commita),
+        ):
+            resultado = _rodar(tarefa, sol.id, pedido=pedido)
+
+        assert resultado["action"] == "ERROR"
+        linha = _linha_do_google(sol)
+        assert linha["gcal_status"] == _PENDING
+        assert linha["gcal_pedido"] == mais_novo
+        assert not _erros_auditados(sol).exists()
+
+    @pytest.mark.parametrize(
+        "tarefa, operador",
+        [
+            ("publicar", "sem_credencial"),
+            ("publicar", "ausente"),
+            ("publicar", "inexistente"),
+            ("cancelar", "sem_credencial"),
+        ],
+    )
+    def test_saida_cedo_do_oauth_com_pedido_superado_nao_muda_a_linha(
+        self, task_solicitacao, settings, tarefa, operador
+    ):
+        """As saídas cedo do modo OAuth (sem operador, operador que não existe, sem credencial Google) marcam
+        ERROR antes da trava da tarefa. Com o pedido superado, não mudam a linha."""
+        settings.GCAL_AUTH_MODE = "oauth"
+        sol = task_solicitacao
+        _com_pedido(sol)  # o pedido mais novo
+        antes = _linha_do_google(sol)
+        operadores = {"sem_credencial": UsuarioFactory().pk, "ausente": None, "inexistente": 999_999_999}
+        operator_user_id = operadores[operador]
+
+        resultado = _rodar(tarefa, sol.id, operator_user_id=operator_user_id, pedido=uuid4().hex)
+
+        assert resultado["action"] == "ERROR"
+        assert _linha_do_google(sol) == antes
+        assert not _erros_auditados(sol).exists()
+
+    @pytest.mark.parametrize("tarefa", ["publicar", "cancelar"])
+    def test_falha_ao_gravar_o_erro_faz_a_tarefa_levantar(self, task_solicitacao, tarefa):
+        """RED: o `mark_gcal` que falhava era engolido e a tarefa devolvia ERROR com a linha ainda em PENDING,
+        para sempre. Agora a falha sobe e a tarefa termina em falha (ou roda de novo, se for de conexão)."""
+        from django.db import DatabaseError
+
+        sol = task_solicitacao
+        pedido = _com_pedido(sol)
+
+        with (
+            patch(_APPLY, side_effect=RuntimeError("Google fora do ar")),
+            patch(_CANCEL, side_effect=RuntimeError("Google fora do ar")),
+            patch.object(Solicitacao, "mark_gcal", side_effect=DatabaseError("banco fora do ar")),
+            pytest.raises(DatabaseError),
+        ):
+            _rodar(tarefa, sol.id, pedido=pedido)
+
+
 class TestNotificacoesTask:
     """Tests for processar_notificacoes_acoes_diarias."""
 

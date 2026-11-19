@@ -233,6 +233,7 @@ def _mark_gcal_error(
     operation: str = "publish",
     dry_run: bool,
     apply_blocked: bool = False,
+    pedido: str | None = None,
 ) -> None:
     """Tira a linha de PENDING: marca ERROR com `message` e audita o erro cru.
 
@@ -240,34 +241,41 @@ def _mark_gcal_error(
     fica PENDING para sempre (publicar some da tela e a edição fica bloqueada). `mark_gcal` não
     toca em `external_event_id`, então a linha segue re-tentável.
 
+    DEF-32: a marca relê a linha sob trava, em transação própria, e só grava (a linha e o AuditLog) se o
+    `pedido` da tarefa ainda vale em PENDING (`_pedido_ainda_vale`). A falha de um pedido superado, ou de
+    uma mensagem entregue de novo depois de concluída, não escreve por cima do resultado de outra operação.
+    Se a gravação falha, o erro sobe: engolido, deixava a linha em PENDING sem ninguém para tirá-la de lá.
+
     No dry-run não grava nada: a prévia não marca PENDING, e ERROR (ou AuditLog) numa linha que
     pode estar publicada seria efeito colateral de uma simulação. O erro volta só no resultado.
     `dry_run` é obrigatório: esquecê-lo numa saída nova vira TypeError, não uma escrita silenciosa.
     """
+    from django.db import transaction
+
     from apps.core.models import AuditLog, Solicitacao
 
     if dry_run:
         return
-    try:
-        s = Solicitacao.objects.get(id=solicitation_id)
-    except Solicitacao.DoesNotExist:
-        return
-    try:
+    with transaction.atomic():
+        try:
+            s = Solicitacao.objects.select_for_update().get(id=solicitation_id)
+        except Solicitacao.DoesNotExist:
+            return
+        if not _pedido_ainda_vale(s, pedido, Solicitacao.GCalStatus.PENDING):
+            return
         s.mark_gcal(status=Solicitacao.GCalStatus.ERROR, payload_hash=None, error=message)
-    except Exception:
-        logger.exception("Falha ao marcar ERROR na Solicitacao #%s", solicitation_id)
-    AuditLog.objects.create(
-        usuario=operator,
-        action=AuditLog.Action.PUBLISH_GCAL_ERROR,
-        model_name="Solicitacao",
-        details={
-            "solicitacao_id": s.id,
-            "operation": operation,
-            "error": raw_error[:500],
-            "dry_run": dry_run,
-            "apply_blocked": apply_blocked,
-        },
-    )
+        AuditLog.objects.create(
+            usuario=operator,
+            action=AuditLog.Action.PUBLISH_GCAL_ERROR,
+            model_name="Solicitacao",
+            details={
+                "solicitacao_id": s.id,
+                "operation": operation,
+                "error": raw_error[:500],
+                "dry_run": dry_run,
+                "apply_blocked": apply_blocked,
+            },
+        )
 
 
 @shared_task(name="apps.core.tasks.task_publish_solicitacao_to_gcal")
@@ -322,6 +330,7 @@ def task_publish_solicitacao_to_gcal(
                 raw_error="missing_operator_user_id",
                 dry_run=dry_run,
                 apply_blocked=apply_blocked,
+                pedido=pedido,
             )
             return {
                 "action": "ERROR",
@@ -348,6 +357,7 @@ def task_publish_solicitacao_to_gcal(
                 raw_error="operator_not_found",
                 dry_run=dry_run,
                 apply_blocked=apply_blocked,
+                pedido=pedido,
             )
             return {
                 "action": "ERROR",
@@ -365,6 +375,7 @@ def task_publish_solicitacao_to_gcal(
                 operator=operator,
                 dry_run=dry_run,
                 apply_blocked=apply_blocked,
+                pedido=pedido,
             )
             return {
                 "action": "ERROR",
@@ -382,6 +393,7 @@ def task_publish_solicitacao_to_gcal(
                 operator=operator,
                 dry_run=dry_run,
                 apply_blocked=apply_blocked,
+                pedido=pedido,
             )
             return {
                 "action": "ERROR",
@@ -472,6 +484,7 @@ def task_publish_solicitacao_to_gcal(
             operator=operator,
             dry_run=dry_run,
             apply_blocked=apply_blocked,
+            pedido=pedido,
         )
 
         return {
@@ -535,7 +548,13 @@ def task_cancel_solicitacao_from_gcal(
             else:
                 mensagem = _friendly_gcal_error(e)
             _mark_gcal_error(
-                solicitation_id, mensagem, raw_error=str(e), operator=operator, operation="cancel", dry_run=False
+                solicitation_id,
+                mensagem,
+                raw_error=str(e),
+                operator=operator,
+                operation="cancel",
+                dry_run=False,
+                pedido=pedido,
             )
             return {
                 "action": "ERROR",
@@ -598,6 +617,7 @@ def task_cancel_solicitacao_from_gcal(
             operator=operator,
             operation="cancel",
             dry_run=False,
+            pedido=pedido,
         )
         return {
             "action": "ERROR",

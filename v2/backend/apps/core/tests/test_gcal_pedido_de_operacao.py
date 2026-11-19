@@ -14,12 +14,38 @@ O Google é sempre simulado; nada sai da máquina.
 
 from __future__ import annotations
 
-from django.db import connection
+from unittest.mock import patch
+
+from django.db import OperationalError, connection, transaction
+from django.test.utils import CaptureQueriesContext
 
 import pytest
 
+from apps.core.exceptions import ConflictError, ValidationAPIError
 from apps.core.models import Solicitacao
 from apps.core.tests.factories import SolicitacaoFactory
+
+_CAMPOS = ("gcal_pedido", "gcal_status", "gcal_payload_hash", "gcal_last_error", "gcal_last_sync_at")
+_HASH = "a" * 40
+
+
+def _evento(**extra) -> Solicitacao:
+    """Aprovado e futuro; nunca publicado, salvo o que `extra` trocar."""
+    return SolicitacaoFactory(**{"status": "aprovado", **extra})
+
+
+def _linha(sol) -> dict:
+    return Solicitacao.objects.filter(pk=sol.pk).values(*_CAMPOS).get()
+
+
+def _erro_do_banco(sqlstate: str) -> OperationalError:
+    """OperationalError como o Django levanta: a causa (do psycopg) traz o SQLSTATE."""
+    causa = Exception("erro do banco")
+    causa.sqlstate = sqlstate
+    erro = OperationalError("erro do banco")
+    erro.__cause__ = causa
+    return erro
+
 
 # =============================================================================
 # O campo
@@ -56,3 +82,172 @@ def test_insert_sem_a_coluna_gcal_pedido_nasce_vazio_pelo_default_do_banco():
         linha = cursor.fetchone()
     assert linha is not None
     assert Solicitacao.objects.get(pk=linha[0]).gcal_pedido == ""
+
+
+# =============================================================================
+# A função de pedido
+# =============================================================================
+
+
+@pytest.mark.django_db
+class TestPedirOperacaoGcal:
+    """`pedir_operacao_gcal` trava a linha, confere de novo sobre ela, grava o identificador e marca PENDING."""
+
+    def test_cada_pedido_grava_um_identificador_novo_e_marca_pending(self):
+        from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+
+        sol = _evento(gcal_status="ERROR", gcal_last_error="falhou antes")
+
+        primeiro = pedir_operacao_gcal(sol.pk, "publicar")
+
+        linha = _linha(sol)
+        assert len(primeiro) == 32
+        assert linha["gcal_pedido"] == primeiro
+        assert linha["gcal_status"] == Solicitacao.GCalStatus.PENDING
+        assert linha["gcal_last_error"] == ""
+        # A cópia Google → Sistema usa este carimbo como guarda: o pedido tem de atualizá-lo.
+        assert linha["gcal_last_sync_at"] is not None
+
+        segundo = pedir_operacao_gcal(sol.pk, "reenviar")
+
+        assert segundo != primeiro
+        assert _linha(sol)["gcal_pedido"] == segundo
+
+    @pytest.mark.parametrize(
+        "operacao, gcal_status, esperado",
+        [
+            ("publicar", "ERROR", None),
+            ("reenviar", "PUBLISHED", None),
+            ("cancelar", "PUBLISHED", _HASH),
+            ("reaplicar", "PUBLISHED", _HASH),
+            ("reaplicar", "ERROR", None),
+            ("reaplicar", "PENDING", None),
+        ],
+    )
+    def test_o_que_cada_operacao_faz_com_o_hash(self, operacao, gcal_status, esperado):
+        """Publicar e reenviar zeram (o envio é forçado); cancelar mantém; reaplicar mantém só o de linha
+        PUBLISHED, que é o que deixa o envio sem mudança virar SKIP."""
+        from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+
+        sol = _evento(gcal_status=gcal_status, external_event_id="evt-hash", gcal_payload_hash=_HASH)
+
+        pedir_operacao_gcal(sol.pk, operacao)
+
+        linha = _linha(sol)
+        assert linha["gcal_payload_hash"] == esperado
+        assert linha["gcal_status"] == Solicitacao.GCalStatus.PENDING
+
+    def test_pedido_trava_a_linha_com_teto_de_espera(self):
+        from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+
+        sol = _evento()
+
+        with CaptureQueriesContext(connection) as consultas:
+            pedir_operacao_gcal(sol.pk, "publicar")
+
+        sqls = [q["sql"] for q in consultas.captured_queries]
+        travas = [i for i, sql in enumerate(sqls) if "FOR UPDATE" in sql and 'FROM "core_solicitacao"' in sql]
+        tetos = [i for i, sql in enumerate(sqls) if "set_config('lock_timeout'" in sql]
+        assert travas, "o pedido não travou a linha"
+        assert tetos and tetos[0] < travas[0], "o teto da espera tem de valer antes da trava"
+        assert "'10s'" in sqls[tetos[0]]
+
+    def test_a_conferencia_e_feita_na_linha_travada(self):
+        """A aprovação é desfeita entre a leitura sem trava de quem chama e o FOR UPDATE: logo antes dele, a
+        mesma conexão rebaixa a linha. Quem conferisse antes da trava marcaria PENDING num evento pendente."""
+        from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+
+        sol = _evento()
+        antes = _linha(sol)
+
+        def rebaixa_antes_da_trava(execute, sql, params, many, context):
+            if "FOR UPDATE" in sql and 'FROM "core_solicitacao"' in sql:
+                Solicitacao.objects.filter(pk=sol.pk).update(status="pendente")
+            return execute(sql, params, many, context)
+
+        with connection.execute_wrapper(rebaixa_antes_da_trava), pytest.raises(ValidationAPIError) as erro:
+            pedir_operacao_gcal(sol.pk, "publicar")
+
+        assert erro.value.code == "not_approved"
+        assert _linha(sol) == antes
+
+    @pytest.mark.parametrize(
+        "operacao, estado, code",
+        [
+            ("publicar", {"status": "pendente"}, "not_approved"),
+            ("reenviar", {"status": "pendente", "gcal_status": "PUBLISHED"}, "not_approved"),
+            ("reaplicar", {"status": "pendente", "gcal_status": "PUBLISHED"}, "not_approved"),
+            ("publicar", {"gcal_status": "PUBLISHED"}, "ja_publicado"),
+            ("publicar", {"gcal_status": "PENDING"}, "ja_publicado"),
+            ("reenviar", {"gcal_status": "NONE"}, "nao_publicado"),
+            ("reaplicar", {"gcal_status": "NONE"}, "nao_publicado"),
+        ],
+    )
+    def test_recusa_relida_sob_a_trava_nao_muda_a_linha(self, operacao, estado, code):
+        from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+
+        sol = _evento(**estado)
+        antes = _linha(sol)
+
+        with pytest.raises(ValidationAPIError) as erro:
+            pedir_operacao_gcal(sol.pk, operacao)
+
+        assert erro.value.code == code
+        assert _linha(sol) == antes
+
+    def test_cancelar_sem_evento_no_google_e_recusado_e_nao_muda_a_linha(self):
+        from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+
+        sol = _evento()
+        antes = _linha(sol)
+
+        with pytest.raises(ConflictError) as erro:
+            pedir_operacao_gcal(sol.pk, "cancelar")
+
+        assert erro.value.details["code"] == "not_published"
+        assert _linha(sol) == antes
+
+    def test_trava_ocupada_alem_do_teto_vira_conflito_com_o_texto_da_edicao(self):
+        """55P03 (lock_not_available): o pedido desiste com o mesmo texto da edição (DEF-30), sem tocar a linha."""
+        from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+        from apps.core.views_solicitacao import SolicitacaoViewSet
+
+        sol = _evento()
+        antes = _linha(sol)
+
+        with (
+            patch.object(Solicitacao.objects, "select_for_update", side_effect=_erro_do_banco("55P03")),
+            pytest.raises(ConflictError) as erro,
+        ):
+            pedir_operacao_gcal(sol.pk, "publicar")
+
+        assert erro.value.details["code"] == "linha_ocupada"
+        assert erro.value.message == SolicitacaoViewSet._MSG_EDICAO_LINHA_OCUPADA
+        assert _linha(sol) == antes
+
+    def test_outro_erro_do_banco_na_trava_sobe_como_veio(self):
+        """Só a espera vencida vira "linha ocupada"; o statement cancelado (57014), por exemplo, não."""
+        from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+
+        sol = _evento()
+
+        with (
+            patch.object(Solicitacao.objects, "select_for_update", side_effect=_erro_do_banco("57014")),
+            pytest.raises(OperationalError),
+        ):
+            pedir_operacao_gcal(sol.pk, "publicar")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_pedido_exige_a_transacao_de_quem_chama():
+    """A função não abre transação: quem chama abre, e o enfileiramento entra nela. Fora de transação o
+    `select_for_update` levanta, em vez de gravar PENDING sem a tarefa."""
+    from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+
+    sol = _evento()
+    antes = _linha(sol)
+
+    with pytest.raises(transaction.TransactionManagementError):
+        pedir_operacao_gcal(sol.pk, "publicar")
+
+    assert _linha(sol) == antes

@@ -11,16 +11,29 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
+from uuid import uuid4
 
 from django.conf import settings
+from django.db import OperationalError, connection
 from django.utils import timezone
 
 from apps.core.exceptions import APIError, ConflictError, ValidationAPIError
 from apps.core.models import AuditLog, GoogleOAuthCredential, Solicitacao, Usuario
+from apps.core.services.db_retry import _extract_pgcode  # pyright: ignore[reportPrivateUsage]
 from apps.core.utils.net import get_client_ip
 
 logger = logging.getLogger(__name__)
+
+# Quem desiste de esperar a trava da linha diz isto: a edição (DEF-30) e o pedido de operação no Google (DEF-32).
+MSG_LINHA_OCUPADA = (
+    "Este evento está sendo alterado por outra operação agora (como a publicação no Google Agenda ou "
+    "uma aprovação). Tente de novo em instantes."
+)
+
+# Teto da espera do pedido pela trava da linha, o mesmo da edição: abaixo do statement_timeout de produção
+# (30 s), para desistir com "tente de novo" e não com o 500 do statement cancelado.
+_PEDIDO_LOCK_TIMEOUT = "10s"
 
 # Por que o evento não pode ir ao Google agora (virada, 16/10/2026). Mensagem para a tela e o lote.
 MENSAGENS_NAO_PUBLICAVEL: dict[str, str] = {
@@ -51,6 +64,69 @@ def motivo_nao_publicavel(s: Solicitacao, *, reenvio: bool = False) -> str | Non
     elif s.gcal_status in (Solicitacao.GCalStatus.PUBLISHED, Solicitacao.GCalStatus.PENDING):
         return "ja_publicado"
     return None
+
+
+def pedir_operacao_gcal(solicitacao_id: int, operacao: Literal["publicar", "reenviar", "reaplicar", "cancelar"]) -> str:
+    """Registra o pedido de uma operação no Google e devolve o identificador dele (DEF-32).
+
+    Trava a linha, confere sobre ela o que a entrada conferiu sem trava, grava um identificador novo em
+    `gcal_pedido` e marca PENDING. A tarefa recebe o identificador e só age se ele ainda for o da linha.
+
+    Exige transação aberta por quem chama e não abre outra: o `.delay` da tarefa entra na mesma transação,
+    e a fila fora do ar desfaz o PENDING. Fora de transação o `select_for_update` levanta.
+
+    Hash do payload: publicar e reenviar zeram (o envio é forçado); cancelar mantém; reaplicar mantém só o
+    de linha PUBLISHED, para o envio sem mudança virar SKIP.
+
+    Raises:
+        ConflictError `linha_ocupada`: outra operação segurou a linha além de `_PEDIDO_LOCK_TIMEOUT`.
+        ValidationAPIError, ConflictError: as recusas das entradas, agora sobre a linha travada.
+        Solicitacao.DoesNotExist: a linha foi apagada depois da leitura de quem chama.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT set_config('lock_timeout', %s, true)", [_PEDIDO_LOCK_TIMEOUT])
+    try:
+        s = Solicitacao.objects.select_for_update().get(pk=solicitacao_id)
+    except OperationalError as exc:
+        if _extract_pgcode(exc) != "55P03":  # lock_not_available
+            raise
+        raise ConflictError(message=MSG_LINHA_OCUPADA, details={"code": "linha_ocupada"}) from exc
+
+    if operacao == "cancelar":
+        if not s.external_event_id and s.gcal_status != Solicitacao.GCalStatus.PUBLISHED:
+            raise ConflictError(
+                message="Solicitação não possui evento publicado no Google Calendar.",
+                details={
+                    "code": "not_published",
+                    "hint": "Apenas eventos publicados podem ser cancelados.",
+                },
+            )
+    else:
+        reenvio = operacao != "publicar"
+        if s.status != "aprovado":
+            raise ValidationAPIError(
+                message=(
+                    "Apenas solicitações aprovadas podem ser resincronizadas."
+                    if reenvio
+                    else "Apenas solicitações aprovadas podem ser publicadas no Google Calendar."
+                ),
+                code="not_approved",
+            )
+        motivo = motivo_nao_publicavel(s, reenvio=reenvio)
+        if motivo is not None:
+            raise ValidationAPIError(message=MENSAGENS_NAO_PUBLICAVEL[motivo], code=motivo)
+
+    mantem_hash = operacao == "cancelar" or (
+        operacao == "reaplicar" and s.gcal_status == Solicitacao.GCalStatus.PUBLISHED
+    )
+    s.gcal_pedido = uuid4().hex
+    s.save(update_fields=["gcal_pedido"])
+    s.mark_gcal(
+        status=Solicitacao.GCalStatus.PENDING,
+        payload_hash=s.gcal_payload_hash if mantem_hash else None,
+        error="",
+    )
+    return s.gcal_pedido
 
 
 @dataclass

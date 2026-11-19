@@ -195,6 +195,35 @@ def _friendly_gcal_error(error: BaseException) -> str:
     return str(error)[:500]
 
 
+def _pedido_ainda_vale(s: Any, pedido: str | None, estado: str) -> bool:
+    """A tarefa pode agir sobre a linha `s`, lida sob a trava? (DEF-32)
+
+    Só se o identificador da mensagem é o que a entrada gravou na linha (`pedir_operacao_gcal`) e a linha está
+    no `estado` em que o pedido a deixou. Outro identificador = pedido superado por um mais novo, ou desfeito
+    pelo rollback da entrada. Mesmo identificador em outro estado = a mensagem foi entregue de novo depois de
+    concluída.
+    """
+    if pedido is None:  # mensagem antiga ou chamada direta: só linha que nunca teve pedido
+        return not s.gcal_pedido
+    return s.gcal_pedido == pedido and s.gcal_status == estado
+
+
+def _pedido_sem_efeito(s: Any) -> dict[str, Any]:
+    """Resultado da tarefa que não agiu: sem Google, sem AuditLog e sem gravar."""
+    logger.info(
+        "gcal: pedido superado ou já concluído para a Solicitacao #%s (gcal_status=%s); nada a fazer",
+        s.id,
+        s.gcal_status,
+    )
+    return {
+        "action": "SKIP",
+        "solicitation_id": s.id,
+        "external_event_id": s.external_event_id,
+        "summary": f"Solicitação #{s.id}: pedido superado ou já concluído ({s.gcal_status}), nada a fazer",
+        "error": None,
+    }
+
+
 def _mark_gcal_error(
     solicitation_id: int,
     message: str,
@@ -247,6 +276,7 @@ def task_publish_solicitacao_to_gcal(
     dry_run: bool = False,
     apply_blocked: bool = False,
     operator_user_id: int | None = None,
+    pedido: str | None = None,
 ) -> dict[str, Any]:
     """
     Publica uma Solicitacao no Google Calendar (via Celery).
@@ -258,6 +288,8 @@ def task_publish_solicitacao_to_gcal(
         dry_run: Se True, não persiste mudanças no DB/Calendar
         apply_blocked: Se True, aplica mesmo sem GCAL_CLIENT configurado
         operator_user_id: ID do usuário operador (OAuth mode)
+        pedido: identificador gravado pela entrada (`pedir_operacao_gcal`); a tarefa só age se ele ainda
+            for o da linha e ela estiver PENDING (`_pedido_ainda_vale`). Sem ele, só linha que nunca teve pedido.
 
     Returns:
         dict: {
@@ -371,6 +403,10 @@ def task_publish_solicitacao_to_gcal(
             qs = Solicitacao.objects.all() if dry_run else Solicitacao.objects.select_for_update()
             s = qs.get(id=solicitation_id)
 
+            # DEF-32: a prévia não grava e não passa pela guarda.
+            if not dry_run and not _pedido_ainda_vale(s, pedido, Solicitacao.GCalStatus.PENDING):
+                return _pedido_sem_efeito(s)
+
             # Aplicar publicação (com cliente OAuth se disponível)
             outcome = apply_one_solicitacao(s, dry_run=dry_run, apply_blocked=apply_blocked, client=client)
 
@@ -451,6 +487,7 @@ def task_publish_solicitacao_to_gcal(
 def task_cancel_solicitacao_from_gcal(
     solicitation_id: int,
     operator_user_id: int | None = None,
+    pedido: str | None = None,
 ) -> dict[str, Any]:
     """
     Cancela evento de uma Solicitacao no Google Calendar (via Celery) - Fase 4.
@@ -461,10 +498,11 @@ def task_cancel_solicitacao_from_gcal(
     Args:
         solicitation_id: ID da Solicitacao a cancelar
         operator_user_id: ID do usuário operador (OAuth mode, fix #572)
+        pedido: identificador gravado pela entrada; mesma regra do publish (`_pedido_ainda_vale`)
 
     Returns:
         dict: {
-            "action": "DELETE" | "ERROR",
+            "action": "DELETE" | "SKIP" | "ERROR",
             "solicitation_id": int,
             "external_event_id": str | None,
             "summary": str,
@@ -515,6 +553,9 @@ def task_cancel_solicitacao_from_gcal(
         with transaction.atomic():
             # Buscar solicitação (com lock de linha)
             s = Solicitacao.objects.select_for_update().get(id=solicitation_id)
+
+            if not _pedido_ainda_vale(s, pedido, Solicitacao.GCalStatus.PENDING):
+                return _pedido_sem_efeito(s)
 
             # Cancelar evento no Calendar e limpar campos
             outcome = cancel_solicitacao(s, client=client)
@@ -1044,6 +1085,7 @@ def queue_gcal_sync_retry(
     *,
     dry_run: bool = False,
     apply_blocked: bool = False,
+    pedido: str | None = None,
 ) -> dict[str, Any]:
     """
     Retry GCal sync when circuit breaker closes (Gap 6 - PLAN_maturity_gaps.md).
@@ -1055,6 +1097,8 @@ def queue_gcal_sync_retry(
         solicitation_id: ID of the Solicitacao to sync
         dry_run: If True, don't persist changes
         apply_blocked: If True, apply even without GCAL_CLIENT configured
+        pedido: identificador do pedido que falhou no publish; a tentativa só age se ele ainda for o da linha
+            e ela estiver em ERROR (`_pedido_ainda_vale`)
 
     Returns:
         dict: Result with action, status, and any errors
@@ -1087,8 +1131,11 @@ def queue_gcal_sync_retry(
             # O publish que caiu no breaker enfileirou esta tentativa e deixou a linha em ERROR. Outro
             # estado, lido sob a trava, quer dizer que alguém agiu depois: NONE = tiraram do Google (seguir
             # traria o evento de volta), PUBLISHED = outro publish já fez, PENDING = há publish ou cancel
-            # mais novo na fila. A tentativa então não chama o Google.
-            if s.gcal_status != Solicitacao.GCalStatus.ERROR:
+            # mais novo na fila. A tentativa então não chama o Google. DEF-32: nem quando o ERROR é de outro
+            # pedido, mais novo que o que enfileirou esta tentativa (a prévia não passa por esta guarda).
+            if s.gcal_status != Solicitacao.GCalStatus.ERROR or (
+                not dry_run and not _pedido_ainda_vale(s, pedido, Solicitacao.GCalStatus.ERROR)
+            ):
                 logger.info(
                     "queue_gcal_sync_retry: Solicitacao #%s mudou desde a falha (gcal_status=%s); nada a fazer",
                     s.id,

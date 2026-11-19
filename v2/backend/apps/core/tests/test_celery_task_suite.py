@@ -607,6 +607,225 @@ class TestTravaDuraAChamadaAoGoogle:
         ), "a chamada ao Google rodou num outro bloco aberto pelo mesmo Atomic"
 
 
+_PENDING = Solicitacao.GCalStatus.PENDING
+_ERROR = Solicitacao.GCalStatus.ERROR
+_CAMPOS_DO_GOOGLE = (
+    *_CAMPOS_GCAL,
+    "gcal_pedido",
+    "external_event_id",
+    "meet_link",
+    "last_synced_at",
+    "last_sync_action",
+    "last_sync_error",
+)
+_TRES_TAREFAS = pytest.mark.parametrize("tarefa", ["publicar", "cancelar", "nova_tentativa"])
+
+
+def _linha_do_google(sol):
+    return Solicitacao.objects.filter(pk=sol.pk).values(*_CAMPOS_DO_GOOGLE).get()
+
+
+def _com_pedido(sol, *, gcal_status=_PENDING, **campos) -> str:
+    """Deixa a linha como a entrada deixa: identificador novo gravado e PENDING (ou o `gcal_status` dado)."""
+    pedido = uuid4().hex
+    Solicitacao.objects.filter(pk=sol.pk).update(gcal_pedido=pedido, gcal_status=gcal_status, **campos)
+    return pedido
+
+
+def _estado_em_que_age(tarefa: str) -> str:
+    """A nova tentativa age sobre ERROR (o publish que falhou deixou assim); publicar e cancelar, sobre PENDING."""
+    return _ERROR if tarefa == "nova_tentativa" else _PENDING
+
+
+def _rodar(tarefa: str, sol_id: int, **kwargs):
+    from apps.core.tasks import (
+        queue_gcal_sync_retry,
+        task_cancel_solicitacao_from_gcal,
+        task_publish_solicitacao_to_gcal,
+    )
+
+    tarefas = {
+        "publicar": task_publish_solicitacao_to_gcal,
+        "cancelar": task_cancel_solicitacao_from_gcal,
+        "nova_tentativa": queue_gcal_sync_retry,
+    }
+    return tarefas[tarefa](sol_id, **kwargs)
+
+
+def _apagou(sol):
+    from apps.core.services.gcal.sync import SyncOutcome
+
+    return SyncOutcome(action="DELETE", solicitation_id=sol.id, external_event_id=None, summary="")
+
+
+class TestGuardaDoPedido:
+    """DEF-32: a tarefa só chama o Google e só grava se, sob a trava, o identificador da mensagem é o da linha e
+    a linha está no estado em que o pedido a deixou (PENDING; ERROR para a nova tentativa). Fora disso devolve
+    SKIP sem Google, sem AuditLog e sem tocar a linha: pedido superado por outro mais novo, pedido desfeito
+    (rollback da entrada), mensagem entregue de novo depois de concluída, mensagem sem identificador."""
+
+    @_TRES_TAREFAS
+    def test_pedido_superado_nao_chama_o_google_nem_grava(self, task_solicitacao, tarefa):
+        sol = task_solicitacao
+        _com_pedido(sol, gcal_status=_estado_em_que_age(tarefa))  # o pedido mais novo
+        antes = _linha_do_google(sol)
+
+        with patch(_APPLY) as aplicar, patch(_CANCEL) as cancelar:
+            resultado = _rodar(tarefa, sol.id, pedido=uuid4().hex)  # a mensagem do pedido antigo
+
+        aplicar.assert_not_called()
+        cancelar.assert_not_called()
+        assert resultado["action"] == "SKIP"
+        assert resultado["error"] is None
+        assert _linha_do_google(sol) == antes
+        assert not AuditLog.objects.filter(details__solicitacao_id=sol.id).exists()
+
+    @pytest.mark.parametrize(
+        "tarefa, gcal_status",
+        [
+            ("publicar", "PUBLISHED"),
+            ("publicar", "ERROR"),
+            ("publicar", "NONE"),
+            ("cancelar", "PUBLISHED"),
+            ("cancelar", "ERROR"),
+            ("nova_tentativa", "PUBLISHED"),
+            ("nova_tentativa", "PENDING"),
+        ],
+    )
+    def test_mesmo_pedido_com_a_linha_fora_do_estado_em_que_age_nao_faz_nada(
+        self, task_solicitacao, tarefa, gcal_status
+    ):
+        """A mensagem entregue de novo depois que o pedido terminou (ou falhou e foi marcado) não repete nada."""
+        sol = task_solicitacao
+        pedido = _com_pedido(sol, gcal_status=gcal_status)
+        antes = _linha_do_google(sol)
+
+        with patch(_APPLY) as aplicar, patch(_CANCEL) as cancelar:
+            resultado = _rodar(tarefa, sol.id, pedido=pedido)
+
+        aplicar.assert_not_called()
+        cancelar.assert_not_called()
+        assert resultado["action"] == "SKIP"
+        assert _linha_do_google(sol) == antes
+        assert not AuditLog.objects.filter(details__solicitacao_id=sol.id).exists()
+
+    def test_cancelamento_entregue_de_novo_sobre_linha_ja_desvinculada_nao_vira_erro(self, task_solicitacao):
+        """O cancelamento terminou (NONE, sem id) e a mensagem volta. Sem a guarda, o `cancel_solicitacao` de
+        verdade levantava "não possui evento publicado" e a linha ia para ERROR."""
+        sol = task_solicitacao
+        pedido = _com_pedido(sol, gcal_status="NONE", external_event_id=None)
+        antes = _linha_do_google(sol)
+
+        resultado = _rodar("cancelar", sol.id, pedido=pedido)
+
+        assert resultado["action"] == "SKIP"
+        assert _linha_do_google(sol) == antes
+        assert not AuditLog.objects.filter(details__solicitacao_id=sol.id).exists()
+
+    @_TRES_TAREFAS
+    def test_mesmo_pedido_no_estado_em_que_age_segue(self, task_solicitacao, tarefa):
+        sol = task_solicitacao
+        pedido = _com_pedido(sol, gcal_status=_estado_em_que_age(tarefa))
+
+        with (
+            patch(_APPLY, return_value=_sincronizou(sol)) as aplicar,
+            patch(_CANCEL, return_value=_apagou(sol)) as cancelar,
+        ):
+            resultado = _rodar(tarefa, sol.id, pedido=pedido)
+
+        assert resultado["error"] is None
+        if tarefa == "cancelar":
+            cancelar.assert_called_once()
+            assert resultado["action"] == "DELETE"
+        else:
+            aplicar.assert_called_once()
+            assert resultado["action"] == "UPDATE"
+
+    @_TRES_TAREFAS
+    def test_guarda_confere_o_identificador_na_linha_travada(self, task_solicitacao, tarefa):
+        """Outro pedido commita entre a entrega da mensagem e o FOR UPDATE: logo antes dele, a mesma conexão
+        troca o identificador. Quem conferisse antes da trava seguiria com o pedido antigo."""
+        sol = task_solicitacao
+        pedido = _com_pedido(sol, gcal_status=_estado_em_que_age(tarefa))
+
+        def outro_pedido_antes_da_trava(execute, sql, params, many, context):
+            if _travou_a_solicitacao([{"sql": sql}]):
+                Solicitacao.objects.filter(pk=sol.pk).update(gcal_pedido=uuid4().hex)
+            return execute(sql, params, many, context)
+
+        with (
+            connection.execute_wrapper(outro_pedido_antes_da_trava),
+            patch(_APPLY) as aplicar,
+            patch(_CANCEL) as cancelar,
+        ):
+            resultado = _rodar(tarefa, sol.id, pedido=pedido)
+
+        aplicar.assert_not_called()
+        cancelar.assert_not_called()
+        assert resultado["action"] == "SKIP"
+
+    @_TRES_TAREFAS
+    def test_mensagem_sem_identificador_nao_age_em_linha_que_ja_teve_pedido(self, task_solicitacao, tarefa):
+        """Mensagem antiga (enfileirada antes do campo existir) ou chamada direta: só vale para linha que nunca
+        teve pedido, que é como as chamadas diretas dos outros testes deste arquivo seguem funcionando."""
+        sol = task_solicitacao
+        _com_pedido(sol, gcal_status=_estado_em_que_age(tarefa))
+        antes = _linha_do_google(sol)
+
+        with patch(_APPLY) as aplicar, patch(_CANCEL) as cancelar:
+            resultado = _rodar(tarefa, sol.id)
+
+        aplicar.assert_not_called()
+        cancelar.assert_not_called()
+        assert resultado["action"] == "SKIP"
+        assert _linha_do_google(sol) == antes
+
+    def test_previa_nao_passa_pela_guarda(self, task_solicitacao):
+        """A prévia não grava e não leva identificador: roda mesmo em linha que tem pedido."""
+        sol = task_solicitacao
+        _com_pedido(sol)
+
+        with patch(_APPLY, return_value=_sincronizou(sol)) as aplicar:
+            resultado = _rodar("publicar", sol.id, dry_run=True)
+
+        aplicar.assert_called_once()
+        assert resultado["action"] == "UPDATE"
+
+    def test_cancelamento_atrasado_nao_apaga_a_publicacao_mais_nova(self, settings):
+        """De ponta a ponta, com o cliente fake: publicado → "Tirar do Google" (a tarefa fica na fila) →
+        "Reenviar" (pedido mais novo) publica → a tarefa do cancelamento antigo roda.
+
+        RED: o cancelamento atrasado apagava o evento no Google e desvinculava a linha, por cima do reenvio."""
+        from django.db import transaction
+
+        from apps.core.services.gcal_fake_client import FakeCalendarClient
+        from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+
+        settings.GCAL_AUTH_MODE = "service_account"
+        fabrica = "apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id"
+        fake = FakeCalendarClient()
+        agora = timezone.now()
+        sol = SolicitacaoFactory(
+            status="aprovado", inicio=agora + timedelta(days=2), fim=agora + timedelta(days=2, hours=2)
+        )
+        eid = f"asv2{sol.id}"
+
+        with patch(fabrica, return_value=(fake, "primary")):
+            assert _rodar("publicar", sol.id)["action"] == "CREATE"
+            with transaction.atomic():
+                cancelamento = pedir_operacao_gcal(sol.id, "cancelar")
+            with transaction.atomic():
+                reenvio = pedir_operacao_gcal(sol.id, "reenviar")
+            assert _rodar("publicar", sol.id, pedido=reenvio)["action"] == "UPDATE"
+
+            resultado = _rodar("cancelar", sol.id, pedido=cancelamento)
+
+        assert resultado["action"] == "SKIP"
+        assert fake.get("primary", eid)["status"] == "confirmed"
+        linha = Solicitacao.objects.filter(pk=sol.pk).values("gcal_status", "external_event_id").get()
+        assert linha == {"gcal_status": "PUBLISHED", "external_event_id": eid}
+
+
 class TestNotificacoesTask:
     """Tests for processar_notificacoes_acoes_diarias."""
 

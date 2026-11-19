@@ -390,6 +390,23 @@ def test_fila_fora_do_ar_responde_503_e_nao_deixa_a_linha_em_pending(entrada, se
     assert not _pediu(sol, dados["acao"])
 
 
+@pytest.mark.django_db(transaction=True)
+def test_erro_do_delay_que_nao_e_da_fila_sobe_e_desfaz_o_pedido(settings):
+    """Só erro do broker vira 503 "fila indisponível". Um erro de código no `.delay` (aqui, a assinatura da
+    tarefa trocada) sobe e a resposta é 500: o atomic da entrada desfaz o pedido, e a linha fica como estava.
+    Antes, ele também virava 503, e o guia mandava esperar o Redis voltar com o Redis de pé."""
+    settings.GCAL_CLIENT = "google"
+    sol = _evento()
+    antes = _linha(sol)
+
+    with patch(_DELAY_PUBLICAR, side_effect=TypeError("unexpected keyword argument 'pedido'")):
+        resposta = _api(raise_request_exception=False).post(f"/api/solicitacoes/{sol.pk}/publish/", {}, format="json")
+
+    assert resposta.status_code == 500
+    assert _linha(sol) == antes
+    assert not _pediu(sol, "PUBLISH_GCAL_REQUESTED")
+
+
 @pytest.mark.django_db
 @_TRES_ENTRADAS
 def test_tarefa_e_auditoria_levam_o_pedido_gravado_na_linha(entrada, settings):

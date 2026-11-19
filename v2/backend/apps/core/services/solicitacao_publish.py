@@ -18,6 +18,8 @@ from django.conf import settings
 from django.db import OperationalError, connection, transaction
 from django.utils import timezone
 
+from kombu.exceptions import OperationalError as FilaForaDoAr
+
 from apps.core.exceptions import APIError, ConflictError, ValidationAPIError
 from apps.core.models import AuditLog, GoogleOAuthCredential, Solicitacao, Usuario
 from apps.core.services.db_retry import _extract_pgcode  # pyright: ignore[reportPrivateUsage]
@@ -42,6 +44,10 @@ _MSG_FILA_INDISPONIVEL = (
 _MSG_OPERACAO_EM_ANDAMENTO = (
     "Este evento já tem uma operação no Google em andamento. Espere ela terminar e tente de novo."
 )
+
+# Erros do broker no `.delay`: o Celery embrulha os erros de conexão do Redis no OperationalError do kombu; os
+# outros três são de socket. Qualquer outra exceção é defeito de código e sobe (500), sem virar "fila fora".
+_ERROS_DA_FILA = (FilaForaDoAr, ConnectionError, TimeoutError, OSError)
 
 # Por que o evento não pode ir ao Google agora (virada, 16/10/2026). Mensagem para a tela e o lote.
 MENSAGENS_NAO_PUBLICAVEL: dict[str, str] = {
@@ -147,12 +153,13 @@ def pedir_operacao_gcal(solicitacao_id: int, operacao: Literal["publicar", "reen
 def enfileirar_tarefa_gcal(tarefa: Any, solicitacao_id: int, **kwargs: Any) -> Any:
     """`.delay` da tarefa, de dentro da transação do pedido.
 
-    Fila fora do ar vira 503 `fila_indisponivel`; ao sair do `atomic` de quem chama, o erro desfaz o
-    PENDING e o identificador. Não fica pedido gravado sem tarefa na fila.
+    Fila fora do ar (`_ERROS_DA_FILA`) vira 503 `fila_indisponivel`; ao sair do `atomic` de quem chama, o erro
+    desfaz o PENDING e o identificador. Não fica pedido gravado sem tarefa na fila. Outro erro sobe como veio
+    (500) e desfaz do mesmo jeito.
     """
     try:
         return tarefa.delay(solicitacao_id, **kwargs)
-    except Exception as exc:
+    except _ERROS_DA_FILA as exc:
         logger.exception(
             "gcal_fila_indisponivel",
             extra={"event": "gcal_fila_indisponivel", "solicitacao_id": solicitacao_id},

@@ -18,15 +18,19 @@ from unittest.mock import patch
 
 from django.db import OperationalError, connection, transaction
 from django.test.utils import CaptureQueriesContext
+from rest_framework.test import APIClient
 
 import pytest
 
 from apps.core.exceptions import ConflictError, ValidationAPIError
-from apps.core.models import Solicitacao
-from apps.core.tests.factories import SolicitacaoFactory
+from apps.core.models import AuditLog, Solicitacao
+from apps.core.tests.factories import SolicitacaoFactory, UsuarioFactory
 
 _CAMPOS = ("gcal_pedido", "gcal_status", "gcal_payload_hash", "gcal_last_error", "gcal_last_sync_at")
 _HASH = "a" * 40
+_PENDING = Solicitacao.GCalStatus.PENDING
+_DELAY_PUBLICAR = "apps.core.tasks.task_publish_solicitacao_to_gcal.delay"
+_DELAY_CANCELAR = "apps.core.tasks.task_cancel_solicitacao_from_gcal.delay"
 
 
 def _evento(**extra) -> Solicitacao:
@@ -222,7 +226,7 @@ class TestPedirOperacaoGcal:
             pedir_operacao_gcal(sol.pk, "publicar")
 
         assert erro.value.details["code"] == "linha_ocupada"
-        assert erro.value.message == SolicitacaoViewSet._MSG_EDICAO_LINHA_OCUPADA
+        assert erro.value.message == SolicitacaoViewSet._MSG_EDICAO_LINHA_OCUPADA  # pyright: ignore[reportPrivateUsage]
         assert _linha(sol) == antes
 
     def test_outro_erro_do_banco_na_trava_sobe_como_veio(self):
@@ -250,4 +254,146 @@ def test_pedido_exige_a_transacao_de_quem_chama():
     with pytest.raises(transaction.TransactionManagementError):
         pedir_operacao_gcal(sol.pk, "publicar")
 
+    assert _linha(sol) == antes
+
+
+# =============================================================================
+# As entradas de uma linha: publicar, reenviar e tirar do Google
+# =============================================================================
+
+_NO_GOOGLE = {"gcal_status": "PUBLISHED", "external_event_id": "evt-entrada", "gcal_payload_hash": _HASH}
+# `mudanca`: o que outra operação grava entre a leitura sem trava da entrada e o pedido.
+_ENTRADAS = {
+    "publicar": {
+        "rota": "publish",
+        "estado": {},
+        "delay": _DELAY_PUBLICAR,
+        "acao": "PUBLISH_GCAL_REQUESTED",
+        "mudanca": {"status": "pendente"},
+        "recusa": 400,
+    },
+    "reenviar": {
+        "rota": "resync-gcal",
+        "estado": _NO_GOOGLE,
+        "delay": _DELAY_PUBLICAR,
+        "acao": "RESYNC_GCAL_REQUESTED",
+        "mudanca": {"status": "pendente"},
+        "recusa": 400,
+    },
+    "cancelar": {
+        "rota": "cancel-gcal",
+        "estado": _NO_GOOGLE,
+        "delay": _DELAY_CANCELAR,
+        "acao": "CANCEL_GCAL_REQUESTED",
+        "mudanca": {"gcal_status": "NONE", "external_event_id": None},
+        "recusa": 409,
+    },
+}
+_TRES_ENTRADAS = pytest.mark.parametrize("entrada", list(_ENTRADAS))
+
+
+def _api(**opcoes) -> APIClient:
+    api = APIClient(**opcoes)
+    api.force_authenticate(UsuarioFactory(superuser=True))
+    return api
+
+
+def _pediu(sol, acao: str) -> bool:
+    return AuditLog.objects.filter(action=acao, details__solicitacao_id=sol.pk).exists()
+
+
+@pytest.mark.django_db
+@_TRES_ENTRADAS
+def test_entrada_confere_de_novo_sob_a_trava(entrada, settings):
+    """A linha muda no banco depois da leitura sem trava da entrada (a aprovação foi desfeita; o evento saiu do
+    Google). O pedido relê sob a trava e recusa: nada vai para a fila e a linha não fica PENDING. A recusa é a
+    mesma que a entrada dá quando já lê a linha nesse estado."""
+    settings.GCAL_CLIENT = "google"
+    dados = _ENTRADAS[entrada]
+    sol = _evento(**dados["estado"])
+    api = _api()
+    url = f"/api/solicitacoes/{sol.pk}/{dados['rota']}/"
+
+    def outra_operacao_muda_a_linha(_user):
+        Solicitacao.objects.filter(pk=sol.pk).update(**dados["mudanca"])
+
+    with (
+        patch("apps.core.services.solicitacao_publish._check_google_oauth", side_effect=outra_operacao_muda_a_linha),
+        patch(dados["delay"]) as delay,
+    ):
+        delay.return_value.id = "tarefa-indevida"
+        sob_trava = api.post(url, {}, format="json")
+
+    delay.assert_not_called()
+    assert sob_trava.status_code == dados["recusa"], sob_trava.data
+    linha = _linha(sol)
+    assert linha["gcal_status"] != _PENDING
+    assert linha["gcal_pedido"] == ""
+    assert not _pediu(sol, dados["acao"])
+
+    with patch(dados["delay"]):
+        sem_trava = api.post(url, {}, format="json")
+
+    assert (sob_trava.status_code, sob_trava.data) == (sem_trava.status_code, sem_trava.data)
+
+
+@pytest.mark.django_db(transaction=True)
+@_TRES_ENTRADAS
+def test_fila_fora_do_ar_responde_503_e_nao_deixa_a_linha_em_pending(entrada, settings):
+    """O `.delay` falha (Redis fora): a transação do pedido desfaz e a linha fica como estava, com o mesmo
+    identificador. Antes, o PENDING já estava gravado e não havia tarefa para tirá-lo de lá."""
+    from kombu.exceptions import OperationalError as FilaForaDoAr
+
+    settings.GCAL_CLIENT = "google"
+    dados = _ENTRADAS[entrada]
+    sol = _evento(**dados["estado"])
+    antes = _linha(sol)
+
+    with patch(dados["delay"], side_effect=FilaForaDoAr("redis fora do ar")):
+        resposta = _api(raise_request_exception=False).post(
+            f"/api/solicitacoes/{sol.pk}/{dados['rota']}/", {}, format="json"
+        )
+
+    assert resposta.status_code == 503
+    assert resposta.data["code"] == "fila_indisponivel"
+    assert "Nada foi alterado" in resposta.data["detail"]
+    assert _linha(sol) == antes
+    assert not _pediu(sol, dados["acao"])
+
+
+@pytest.mark.django_db
+@_TRES_ENTRADAS
+def test_tarefa_e_auditoria_levam_o_pedido_gravado_na_linha(entrada, settings):
+    settings.GCAL_CLIENT = "google"
+    dados = _ENTRADAS[entrada]
+    sol = _evento(**dados["estado"])
+
+    with patch(dados["delay"]) as delay:
+        delay.return_value.id = "tarefa-1"
+        resposta = _api().post(f"/api/solicitacoes/{sol.pk}/{dados['rota']}/", {}, format="json")
+
+    assert resposta.status_code == 202, resposta.data
+    linha = _linha(sol)
+    assert linha["gcal_status"] == _PENDING
+    assert len(linha["gcal_pedido"]) == 32
+    delay.assert_called_once()
+    assert delay.call_args.args == (sol.pk,)
+    assert delay.call_args.kwargs["pedido"] == linha["gcal_pedido"]
+    registro = AuditLog.objects.get(action=dados["acao"], details__solicitacao_id=sol.pk)
+    assert registro.details["pedido"] == linha["gcal_pedido"]
+    assert registro.details["task_id"] == "tarefa-1"
+
+
+@pytest.mark.django_db
+def test_previa_do_publicar_nao_faz_pedido():
+    """A prévia não grava nada: a tarefa vai sem identificador e a linha fica como estava."""
+    sol = _evento()
+    antes = _linha(sol)
+
+    with patch(_DELAY_PUBLICAR) as delay:
+        delay.return_value.id = "previa-1"
+        resposta = _api().post(f"/api/solicitacoes/{sol.pk}/publish/", {"dry_run": True}, format="json")
+
+    assert resposta.status_code == 202, resposta.data
+    delay.assert_called_once_with(sol.pk, dry_run=True, apply_blocked=False)
     assert _linha(sol) == antes

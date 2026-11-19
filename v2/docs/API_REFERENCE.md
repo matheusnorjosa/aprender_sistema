@@ -347,6 +347,7 @@ sob `/api/gcal/`. Exigem `CanUseGcal` (policy `use_gcal` =
 `operate_preagenda` OU `approve_solicitation`) **ou** `CanPublishSetorSolicitacao` — actions `preview_gcal`/`publish`/`resync_gcal`/`cancel_gcal` do `SolicitacaoViewSet` (`views_solicitacao.py`).
 Com `CanPublishSetorSolicitacao` (Apoio de Coordenação) só vale evento **aprovado do próprio setor**: `Projeto.setor` do evento ∈ setores do vínculo vigente da pessoa (`can_publish_solicitacao`); fora disso, 404.
 Em modo OAuth, publish/resync/cancel recusam **antes** de marcar PENDING: 403 `google_not_connected` (sem credencial Google) e 409 `google_calendar_not_configured` (sem calendário de publicação — nem o pino `GCAL_OAUTH_CALENDAR_ID`, nem escolha na credencial; ver `GUIDE_GCAL.md`).
+Fora da prévia (`dry_run`), os três fazem o pedido com a linha travada e enfileiram a task na mesma transação (DEF-32): respondem **409** com `errors.code = linha_ocupada` quando outra operação segura a linha há mais de 10 s, e **503** `fila_indisponivel` quando a fila recusa a task. Nos dois casos nada muda e a ação pode ser repetida. Regra em [gcal.spec.md](specs/backend/gcal.spec.md) («Pedido de operação no Google»).
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
@@ -361,6 +362,10 @@ opcionais `dry_run` e `apply_blocked` (`GCalPublishBatchView.post`, `views_gcal/
 Resposta 202: `{"queued": N, "errors": [...], "dry_run": bool, "apply_blocked": bool}`.
 Em modo OAuth (`GCAL_AUTH_MODE=oauth`), igual a reapply/resync: exige a credencial Google de quem chama
 (senão 403 `{"code": "google_not_connected"}`, sem alterar nenhuma linha) e passa `operator_user_id` à task.
+Fora do `dry_run`, cada id válido é pedido e enfileirado na própria transação, com a linha travada (DEF-32).
+A recusa relida sob a trava vira item em `errors` com `detail` e `code` (`not_approved`, `ja_publicado`,
+`evento_passado`, `publicado_fora_do_sistema` ou `linha_ocupada`). Se a fila recusa uma task, o lote para: o id
+da vez e os restantes voltam em `errors` com `code = fila_indisponivel` e nenhum deles fica `PENDING`.
 
 Não existem `/api/gcal/preview/`, `/api/gcal/publish/`, `/api/gcal/resync/{id}/`
 nem `/api/gcal/cancel/{id}/`.
@@ -385,6 +390,11 @@ Todas com `permission_classes = [IsAuthenticated, CanUseGcal]`.
 | POST | `/api/gcal/dashboard/batch/resync/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Resincronizar em lote | `CanUseGcal` |
 
 Não existem `/api/gcal/dashboard/summary/`, `/pending/`, `/errors/` nem `/insights/`.
+
+`batch/reapply/` e `batch/resync/` seguem a regra do `publish-batch` (transação por id, `errors[].code`, parada
+quando a fila recusa a task; nos dois o `code` da linha que nunca foi ao Google é `nao_publicado`). O reapply
+marca `PENDING` e mantém o hash da linha `PUBLISHED`: o evento sem mudança vira `SKIP` na task e volta a
+`PUBLISHED`, sem chamar o Google. O resync zera o hash e sempre reenvia.
 
 `alerts/summary` (#2039) traz, além das contagens por `gcal_status` (que respeitam `start`/`end`),
 quem precisa reconectar a conta Google, sem depender da janela:

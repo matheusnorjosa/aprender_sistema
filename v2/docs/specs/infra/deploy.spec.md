@@ -150,6 +150,12 @@ cache (`/0`), Celery broker (`/1`) e sessões (`SESSION_ENGINE=cache`) usam esse
 **Decisão: manter na VM01.** Latência localhost (<1ms — sessão bate no Redis a cada request autenticado), seguro
 (senha + `backend-internal` sem porta no host), cabe nos recursos (2g de 16g). O downside (restart da VM01 =
 re-login + perda de tasks Celery em voo) é irrelevante pré-go-live e aceitável no volume previsto.
+Desde o DEF-32 (19/11/2026) a perda não vale mais para publicar e cancelar no Google
+(`task_publish_solicitacao_to_gcal` e `task_cancel_solicitacao_from_gcal`, com `acks_late` e
+`reject_on_worker_lost`): a tarefa interrompida volta sozinha à fila, na hora se só o processo do worker morre e
+em até 1 hora (o `visibility_timeout` do Redis) se o servidor inteiro é derrubado, e a segunda entrega não
+repete o que já foi feito. Vale também para a troca de versão. A regra está em
+[`gcal.spec.md`](../backend/gcal.spec.md) («Pedido de operação no Google»); as outras tarefas seguem como antes.
 **Rejeitado:** Redis grátis externo (latência por-request + rate-limit de free tier para sessão/cache/broker).
 VM03 dedicada só se **HA** virar requisito.
 

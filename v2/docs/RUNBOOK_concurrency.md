@@ -50,15 +50,29 @@ Rare under `READ COMMITTED`. If you see it:
 
 ## Triage — "concurrent GCal publish left external_event_id in weird state"
 
-Symptoms: `Solicitacao.gcal_status = PUBLISHED` but `external_event_id = NULL`, or two different `last_sync_action` values flipping.
+Symptoms: `Solicitacao.gcal_status = PUBLISHED` but `external_event_id = NULL`, two different `last_sync_action` values flipping, or a row that stays in `PENDING`.
 
-1. Check for duplicate Celery task enqueues for the same `solicitacao_id`:
+Since DEF-32 (2026-11-19) every publish, resend, reapply and cancel request writes a request id on the row
+(`Solicitacao.gcal_pedido`) under the row lock, in the same transaction that enqueues the task
+(`pedir_operacao_gcal`). The task only acts if the id it carries is still the one on the row and the row is
+still `PENDING` (`ERROR` for the circuit-breaker retry). A superseded request, a request whose transaction was
+rolled back and a message delivered twice all return `SKIP`: no Google call, no AuditLog, no write. Duplicate
+deliveries are expected: the publish and cancel tasks run with `acks_late` + `reject_on_worker_lost`, so the
+message comes back when the worker process dies mid-task (at once) or when the whole host goes down (after the
+Redis `visibility_timeout`, 1 h).
+
+1. Find the request: `Solicitacao.gcal_pedido` holds the latest id, and each `*_REQUESTED` AuditLog row carries
+   it in `details.pedido`.
+2. Check the executions for that `solicitacao_id`:
    ```bash
    docker compose logs --tail=5000 worker | grep task_publish_solicitacao_to_gcal | grep "<ID>"
    ```
-2. If count > 1 in < 30 s, the upstream dispatcher is double-queuing — fix the dispatcher, not the task.
-3. As a safety net, `apply_one_solicitacao` is decorated with `@retry_on_deadlock`. A torn state should not be possible from a single dispatch — it requires two parallel dispatches.
-4. Recover: either wait for the circuit-breaker retry task to re-sync, or manually re-apply via the Django admin action.
+   More than one execution is fine as long as only one acted; the others log `pedido superado ou já concluído`.
+3. A row stuck in `PENDING` means the message has not come back yet (host crash: up to 1 h). The request never
+   commits `PENDING` without a queued task: if the queue refuses the task, the transaction rolls back and the
+   API answers 503 `fila_indisponivel`.
+4. Recover: batch resend from the Pré-agenda (it accepts `PENDING` rows; the new request supersedes the old
+   one, and the old message returns `SKIP` when it arrives), or wait for the redelivery.
 
 ## Triage — "import took 30 min and then only some rows were saved"
 

@@ -499,13 +499,18 @@ entrada `use_gcal` de `ACCESS_POLICIES` em `apps/core/rbac/policies.py`) **ou** 
 não existe no codebase.)*
 
 **Fluxo**:
-1. Valida `status == 'aprovado'`
-2. Reseta `gcal_payload_hash = None` (força UPDATE mesmo se já publicado)
-3. Marca `gcal_status = PENDING`
-4. Enfileira `task_publish_solicitacao_to_gcal.delay(id)`
-5. Retorna **202 Accepted** com `task_id`
+1. Valida `status == 'aprovado'` e `motivo_nao_publicavel(reenvio=True)` (leitura sem trava, para a resposta rápida)
+2. Numa transação só (DEF-32):
+   - faz o pedido (`pedir_operacao_gcal`): trava a linha, confere de novo as duas regras, grava o identificador do pedido (`gcal_pedido`), reseta `gcal_payload_hash = None` (força UPDATE mesmo se já publicado) e marca `gcal_status = PENDING`
+   - enfileira `task_publish_solicitacao_to_gcal` com o identificador
+   - grava o `AuditLog`
+3. Retorna **202 Accepted** com `task_id`
 
-**AuditLog**: Action `RESYNC_GCAL_REQUESTED`
+**AuditLog**: Action `RESYNC_GCAL_REQUESTED` (com `details.pedido`)
+
+**Retornos** (valem também para `/publish/` e `/cancel-gcal/`):
+- **409 Conflict** com `errors.code = linha_ocupada`: outra operação (edição, aprovação, tarefa do Google) segura a linha há mais de 10 s. Nada muda; tentar de novo.
+- **503** com `code = fila_indisponivel`: a fila (Redis) recusou a tarefa. A transação é desfeita, a linha não fica `PENDING` e a pessoa pode repetir a ação.
 
 **Exemplo**:
 ```bash
@@ -534,8 +539,8 @@ não existe no codebase.)*
 
 **Fluxo**:
 1. Valida que evento foi publicado (`external_event_id` existe ou `gcal_status == PUBLISHED`)
-2. Marca `gcal_status = PENDING` temporariamente
-3. Enfileira `task_cancel_solicitacao_from_gcal.delay(id)`
+2. Numa transação só (DEF-32): faz o pedido (`pedir_operacao_gcal`: trava a linha, confere de novo, grava o identificador e marca `gcal_status = PENDING`, mantendo o hash), enfileira `task_cancel_solicitacao_from_gcal` com o identificador e grava o `AuditLog`
+3. A task só age se o identificador dela ainda é o da linha e a linha segue `PENDING`; senão devolve `SKIP` sem chamar o Google (pedido superado por outro mais novo, ou mensagem entregue de novo)
 4. Task deleta evento do Calendar (trata 404 como sucesso - idempotência)
 5. Limpa campos: `external_event_id`, `meet_link`, `gcal_payload_hash`
 6. Marca `gcal_status = NONE`, `last_sync_action = DELETE`
@@ -801,6 +806,22 @@ export GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
 **Causa:** o "Cancelar" apaga o evento no Google, e o Google faz soft-delete: o evento fica `cancelled` com o mesmo id. A publicação seguinte encontra esse id, adota o evento e faz `patch`. Até a correção de 2026-09-28 o payload não mandava `status`, e o `patch` deixava o evento cancelado.
 
 **Solução:** hoje o payload sempre manda `"status": "confirmed"`, e publicar de novo volta a mostrar o evento. Isso vale também quando a consulta ao Google falha na republicação (cota, 5xx, rede): o `insert` recebe 409, porque o id já existe, e a publicação faz `patch` em seguida. Para um evento que ficou oculto antes da correção, use "Reenviar" (resync): o resync zera o hash do payload e força um `UPDATE`, que manda o `status` e traz o evento de volta a `confirmed`.
+
+### Evento parado em *Publicando…* (`PENDING`)
+
+**Sintoma:** a linha fica em *Publicando…* por mais de alguns minutos.
+
+**Causa:** desde o DEF-32 o `PENDING` só é gravado junto com a tarefa na fila, e a tarefa sempre fecha o pedido (publicado, removido ou erro). Sobra um caso: o servidor inteiro caiu com a tarefa no meio. A mensagem não confirmada volta à fila sozinha quando vence o prazo do Redis (`visibility_timeout`, 1 hora); se só o processo do worker morreu, volta na hora. A segunda entrega não repete o que já foi feito.
+
+**Solução:** esperar até 1 hora, ou reenviar em lote pela Pré-agenda (o reenvio em lote aceita linha em `PENDING`): o pedido novo substitui o antigo, e a mensagem antiga, quando voltar, devolve `SKIP`. Para investigar, o identificador do pedido está em `Solicitacao.gcal_pedido` e no `AuditLog` `*_REQUESTED` (`details.pedido`).
+
+### Erro: "Não foi possível enviar o pedido para a fila de publicação"
+
+**Sintoma:** publicar, reenviar ou tirar do Google responde **503** (`fila_indisponivel`); no lote, o item da vez e os seguintes voltam em `errors` com esse código.
+
+**Causa:** a fila (Redis) recusou a tarefa.
+
+**Solução:** nada foi alterado (a linha não fica `PENDING`); repetir a ação quando o Redis voltar. O erro cru fica no log do `web`, evento `gcal_fila_indisponivel`.
 
 ### Erro: "Sua conexão com o Google expirou ou foi removida"
 

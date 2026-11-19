@@ -14,6 +14,10 @@ O Google é sempre simulado; nada sai da máquina.
 
 from __future__ import annotations
 
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from unittest.mock import patch
 
 from django.db import OperationalError, connection, transaction
@@ -397,3 +401,298 @@ def test_previa_do_publicar_nao_faz_pedido():
     assert resposta.status_code == 202, resposta.data
     delay.assert_called_once_with(sol.pk, dry_run=True, apply_blocked=False)
     assert _linha(sol) == antes
+
+
+# =============================================================================
+# Só as entradas enfileiram publicar e cancelar
+# =============================================================================
+
+_APPS = Path(__file__).resolve().parents[2]
+_TAREFAS_COM_PEDIDO = ("task_publish_solicitacao_to_gcal", "task_cancel_solicitacao_from_gcal")
+_QUEM_ENFILEIRA = {"core/services/solicitacao_publish.py", "core/views_gcal/batch.py", "core/tasks.py"}
+
+
+def _mencoes_fora_da_lista(apps: Path) -> list[str]:
+    """Arquivos de `apps/` (fora de `tests/` e de `_QUEM_ENFILEIRA`) que citam uma das duas tarefas."""
+    achados: list[str] = []
+    for arquivo in sorted(apps.rglob("*.py")):
+        relativo = arquivo.relative_to(apps).as_posix()
+        if "tests" in relativo.split("/") or relativo in _QUEM_ENFILEIRA:
+            continue
+        texto = arquivo.read_text(encoding="utf-8")
+        achados += [f"{relativo}: {tarefa}" for tarefa in _TAREFAS_COM_PEDIDO if tarefa in texto]
+    return achados
+
+
+def test_a_varredura_acha_quem_enfileira_por_fora(tmp_path):
+    """Prova de que a sentinela de baixo dispara: um módulo que enfileira por conta própria é achado; os
+    testes e os arquivos da lista não."""
+    (tmp_path / "core" / "services").mkdir(parents=True)
+    (tmp_path / "core" / "tests").mkdir()
+    (tmp_path / "core" / "services" / "atalho.py").write_text(
+        "from apps.core.tasks import task_publish_solicitacao_to_gcal\n\ntask_publish_solicitacao_to_gcal.delay(1)\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "core" / "tests" / "test_x.py").write_text("task_cancel_solicitacao_from_gcal.delay(1)\n")
+    (tmp_path / "core" / "tasks.py").write_text("def task_cancel_solicitacao_from_gcal(): ...\n")
+
+    assert _mencoes_fora_da_lista(tmp_path) == ["core/services/atalho.py: task_publish_solicitacao_to_gcal"]
+
+
+def test_so_as_entradas_enfileiram_publicar_e_cancelar():
+    """Quem enfileira uma das duas tarefas por fora pula o pedido: a linha fica sem identificador novo, a
+    tarefa não age (ou age sobre o pedido de outro) e o PENDING não fica preso à transação da fila. Por isso
+    nenhum outro arquivo de `apps/` sequer cita as duas tarefas: quem precisa publicar ou tirar do Google chama
+    `publish_to_gcal`, `resync_to_gcal`, `cancel_from_gcal` ou os lotes."""
+    assert _mencoes_fora_da_lista(_APPS) == []
+
+
+# =============================================================================
+# Corridas reais: duas conexões, banco de verdade, sem sleep fixo
+# =============================================================================
+
+
+def _esperar_alguem_esperando_trava(quem: str, timeout: float = 15.0) -> None:
+    """Polling em `pg_stat_activity` até outra conexão deste banco estar parada esperando uma trava."""
+    limite = time.monotonic() + timeout
+    with connection.cursor() as cursor:
+        while time.monotonic() < limite:
+            cursor.execute("""
+                SELECT count(*) FROM pg_stat_activity
+                WHERE datname = current_database() AND wait_event_type = 'Lock' AND pid <> pg_backend_pid()
+                """)
+            if cursor.fetchone()[0]:
+                return
+            time.sleep(0.02)
+    pytest.fail(f"{quem} não chegou a esperar a trava da linha")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_publicar_espera_a_edicao_que_segura_a_linha_e_rele_o_evento_rebaixado(settings):
+    """A edição segura a linha e, ao salvar, devolve o evento para aprovação. O "Publicar" que chega nesse
+    meio lê `aprovado` sem trava, espera a edição no pedido, relê `pendente` e é recusado.
+
+    Antes: o PENDING era gravado por cima do evento rebaixado e a tarefa ia para a fila."""
+    settings.GCAL_CLIENT = "google"
+    sol = _evento()
+    api = _api()
+    travou, liberar = threading.Event(), threading.Event()
+
+    def edicao_que_rebaixa():
+        try:
+            with transaction.atomic():
+                linha = Solicitacao.objects.select_for_update().get(pk=sol.pk)
+                travou.set()
+                if not liberar.wait(timeout=30):
+                    raise TimeoutError("o teste não liberou a edição")
+                linha.status = "pendente"
+                linha.save(update_fields=["status"])
+        finally:
+            connection.close()
+
+    def publicar():
+        try:
+            return api.post(f"/api/solicitacoes/{sol.pk}/publish/", {}, format="json")
+        finally:
+            connection.close()
+
+    with patch(_DELAY_PUBLICAR) as delay, ThreadPoolExecutor(max_workers=2) as executor:
+        delay.return_value.id = "tarefa-indevida"
+        futuro_edicao = executor.submit(edicao_que_rebaixa)
+        futuro_publicar = None
+        try:
+            assert travou.wait(timeout=15), "a edição não chegou a travar a linha"
+            futuro_publicar = executor.submit(publicar)
+            _esperar_alguem_esperando_trava("o pedido de publicar")
+        finally:
+            liberar.set()
+        futuro_edicao.result(timeout=30)
+        assert futuro_publicar is not None
+        resposta = futuro_publicar.result(timeout=30)
+
+    assert resposta.status_code == 400, f"esperado 400, obteve {resposta.status_code}: {resposta.data}"
+    assert resposta.data["code"] == "not_approved"
+    delay.assert_not_called()
+    linha = Solicitacao.objects.filter(pk=sol.pk).values("status", "gcal_status", "gcal_pedido").get()
+    assert linha == {"status": "pendente", "gcal_status": "NONE", "gcal_pedido": ""}
+
+
+@pytest.mark.django_db(transaction=True)
+@_TRES_ENTRADAS
+def test_pedido_que_espera_alem_do_teto_desiste_sem_tocar_a_linha(entrada, settings, monkeypatch):
+    """Outra operação segura a linha por mais que o teto (encurtado aqui): o pedido desiste com 409
+    `linha_ocupada` e "tente de novo", em vez de prender a thread do gunicorn até o statement_timeout."""
+    from apps.core.services import solicitacao_publish
+
+    monkeypatch.setattr(solicitacao_publish, "_PEDIDO_LOCK_TIMEOUT", "200ms")
+    settings.GCAL_CLIENT = "google"
+    dados = _ENTRADAS[entrada]
+    sol = _evento(**dados["estado"])
+    antes = _linha(sol)
+    api = _api()
+    travou, liberar = threading.Event(), threading.Event()
+
+    def outra_operacao_segura_a_linha():
+        try:
+            with transaction.atomic():
+                Solicitacao.objects.select_for_update().get(pk=sol.pk)
+                travou.set()
+                liberar.wait(timeout=5)
+        finally:
+            connection.close()
+
+    with patch(dados["delay"]) as delay, ThreadPoolExecutor(max_workers=1) as executor:
+        delay.return_value.id = "tarefa-indevida"
+        futuro = executor.submit(outra_operacao_segura_a_linha)
+        try:
+            assert travou.wait(timeout=15), "a outra operação não chegou a travar a linha"
+            resposta = api.post(f"/api/solicitacoes/{sol.pk}/{dados['rota']}/", {}, format="json")
+        finally:
+            liberar.set()
+        futuro.result(timeout=30)
+
+    assert resposta.status_code == 409, f"esperado 409, obteve {resposta.status_code}: {resposta.data}"
+    assert resposta.data["errors"]["code"] == "linha_ocupada"
+    assert "Tente de novo" in resposta.data["detail"]
+    delay.assert_not_called()
+    assert _linha(sol) == antes
+    assert not _pediu(sol, dados["acao"])
+
+
+class _EntradaDesfeita(Exception):
+    """Faz a transação da entrada desfazer (como a fila fora do ar faz)."""
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("desfecho, acao", [("commit", "CREATE"), ("rollback", "SKIP")])
+def test_tarefa_que_chega_antes_do_fim_do_pedido_espera_a_trava(desfecho, acao, settings, monkeypatch):
+    """O worker pode pegar a mensagem antes de a entrada commitar (o `.delay` roda dentro da transação). A
+    tarefa espera no FOR UPDATE: se a entrada commita, acha o pedido dela e publica; se a entrada desfaz, a
+    linha volta a ser a de antes, o identificador não confere e a tarefa não faz nada."""
+    from apps.core.services import gcal_client_factory
+    from apps.core.services.gcal import sync as sync_mod
+    from apps.core.services.gcal_fake_client import FakeCalendarClient
+    from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+    from apps.core.tasks import task_publish_solicitacao_to_gcal
+
+    settings.GCAL_AUTH_MODE = "service_account"
+    settings.GCAL_CLIENT = "fake"
+    fake = FakeCalendarClient()
+    monkeypatch.setattr(gcal_client_factory, "get_gcal_client_and_calendar_id", lambda: (fake, "primary"))
+    monkeypatch.setattr(sync_mod, "_retry_with_circuit_breaker", lambda f, **_: f())
+    sol = _evento()
+    antes = _linha(sol)
+    pedido = {}
+    pediu, liberar = threading.Event(), threading.Event()
+
+    def entrada():
+        try:
+            with transaction.atomic():
+                pedido["id"] = pedir_operacao_gcal(sol.pk, "publicar")
+                pediu.set()
+                if not liberar.wait(timeout=30):
+                    raise TimeoutError("o teste não liberou a entrada")
+                if desfecho == "rollback":
+                    raise _EntradaDesfeita
+        except _EntradaDesfeita:
+            pass
+        finally:
+            connection.close()
+
+    def tarefa():
+        try:
+            return task_publish_solicitacao_to_gcal(sol.pk, pedido=pedido["id"])
+        finally:
+            connection.close()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futuro_entrada = executor.submit(entrada)
+        futuro_tarefa = None
+        try:
+            assert pediu.wait(timeout=15), "a entrada não chegou a fazer o pedido"
+            futuro_tarefa = executor.submit(tarefa)
+            _esperar_alguem_esperando_trava("a tarefa")
+        finally:
+            liberar.set()
+        futuro_entrada.result(timeout=30)
+        assert futuro_tarefa is not None
+        resultado = futuro_tarefa.result(timeout=30)
+
+    assert resultado["action"] == acao, resultado
+    if desfecho == "commit":
+        assert fake.get("primary", f"asv2{sol.pk}")["status"] == "confirmed"
+        linha = _linha(sol)
+        assert (linha["gcal_status"], linha["gcal_pedido"]) == ("PUBLISHED", pedido["id"])
+    else:
+        assert fake.list_events("primary") == []
+        assert _linha(sol) == antes
+
+
+@pytest.mark.django_db(transaction=True)
+def test_duas_entregas_do_mesmo_pedido_chamam_o_google_uma_vez(settings, monkeypatch):
+    """A mesma mensagem é entregue duas vezes (o worker morreu e o Redis a devolveu enquanto a primeira ainda
+    rodava). A segunda espera a trava da primeira, acha a linha fora de PENDING e devolve SKIP: sem Google, sem
+    AuditLog, sem gravar."""
+    from apps.core.services import gcal_client_factory
+    from apps.core.services.gcal import sync as sync_mod
+    from apps.core.services.gcal_fake_client import FakeCalendarClient
+    from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+    from apps.core.tasks import task_publish_solicitacao_to_gcal
+
+    class GoogleQuePrendeNoInsert(FakeCalendarClient):
+        """Registra cada chamada; o insert avisa que chegou (`travou`) e só responde após `liberar`."""
+
+        def __init__(self):
+            super().__init__()
+            self.chamadas = []
+            self.travou = threading.Event()
+            self.liberar = threading.Event()
+
+        def get(self, calendar_id, event_id):
+            self.chamadas.append("get")
+            return super().get(calendar_id, event_id)
+
+        def insert(self, calendar_id, event_id, payload):
+            self.chamadas.append("insert")
+            self.travou.set()
+            if not self.liberar.wait(timeout=30):
+                raise TimeoutError("o teste não liberou o insert")
+            return super().insert(calendar_id, event_id, payload)
+
+        def update(self, calendar_id, event_id, payload):
+            self.chamadas.append("update")
+            return super().update(calendar_id, event_id, payload)
+
+    settings.GCAL_AUTH_MODE = "service_account"
+    settings.GCAL_CLIENT = "fake"
+    google = GoogleQuePrendeNoInsert()
+    monkeypatch.setattr(gcal_client_factory, "get_gcal_client_and_calendar_id", lambda: (google, "primary"))
+    monkeypatch.setattr(sync_mod, "_retry_with_circuit_breaker", lambda f, **_: f())
+    sol = _evento()
+    with transaction.atomic():
+        pedido = pedir_operacao_gcal(sol.pk, "publicar")
+
+    def entregar():
+        try:
+            return task_publish_solicitacao_to_gcal(sol.pk, pedido=pedido)
+        finally:
+            connection.close()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        primeira = executor.submit(entregar)
+        segunda = None
+        try:
+            assert google.travou.wait(timeout=15), "a primeira entrega não chegou ao insert do Google"
+            segunda = executor.submit(entregar)
+            _esperar_alguem_esperando_trava("a segunda entrega")
+        finally:
+            google.liberar.set()
+        resultados = [primeira.result(timeout=30)]
+        assert segunda is not None
+        resultados.append(segunda.result(timeout=30))
+
+    assert [r["action"] for r in resultados] == ["CREATE", "SKIP"], resultados
+    assert google.chamadas == ["get", "insert"]
+    assert AuditLog.objects.filter(action="PUBLISH_GCAL", details__solicitacao_id=sol.pk).count() == 1
+    linha = _linha(sol)
+    assert (linha["gcal_status"], linha["gcal_pedido"]) == ("PUBLISHED", pedido)

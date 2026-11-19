@@ -424,6 +424,7 @@ class TestGcalSyncRetryTask:
             "action": "UPDATE",
             "external_event_id": retry_solicitacao.external_event_id,
             "retry_attempt": 1,
+            "pedido": None,  # chamada direta, sem identificador (DEF-32)
         }
 
     def test_retry_de_solicitacao_que_sumiu_devolve_does_not_exist(self):
@@ -470,6 +471,7 @@ class TestGcalSyncRetryTask:
             "error": "Google fora do ar",
             "dry_run": False,
             "apply_blocked": False,
+            "pedido": None,  # chamada direta, sem identificador (DEF-32)
         }
 
     def test_retry_que_falha_sem_conseguir_registrar_devolve_o_erro(self, retry_solicitacao, caplog):
@@ -1292,6 +1294,36 @@ class TestPublicarNaoTerminaEmPending:
 
         assert resultado["action"] == "SKIP"
         assert _linha_do_google(sol) == antes
+
+
+class TestDesfechoRegistraOPedido:
+    """DEF-32: o AuditLog do desfecho leva o identificador do pedido (`details.pedido`), como o `*_REQUESTED`. O
+    lote não grava `*_REQUESTED`: é pelo desfecho que se casa o pedido com o que aconteceu com ele."""
+
+    @pytest.mark.parametrize(
+        "tarefa, google_falha, acao",
+        [
+            ("publicar", False, "PUBLISH_GCAL"),
+            ("cancelar", False, "CANCEL_GCAL"),
+            ("nova_tentativa", False, "GCAL_RETRY_SUCCESS"),
+            ("publicar", True, "PUBLISH_GCAL_ERROR"),
+            ("cancelar", True, "PUBLISH_GCAL_ERROR"),
+            ("nova_tentativa", True, "PUBLISH_GCAL_ERROR"),
+        ],
+    )
+    def test_desfecho_leva_o_pedido(self, task_solicitacao, tarefa, google_falha, acao):
+        sol = task_solicitacao
+        pedido = _com_pedido(sol, gcal_status=_estado_em_que_age(tarefa))
+        if google_falha:
+            aplicar = cancelar = {"side_effect": RuntimeError("Google fora do ar")}
+        else:
+            aplicar, cancelar = {"return_value": _sincronizou(sol)}, {"return_value": _apagou(sol)}
+
+        with patch(_APPLY, **aplicar), patch(_CANCEL, **cancelar):
+            _rodar(tarefa, sol.id, pedido=pedido)
+
+        registro = AuditLog.objects.get(action=acao, details__solicitacao_id=sol.id)
+        assert registro.details["pedido"] == pedido
 
 
 class TestNotificacoesTask:

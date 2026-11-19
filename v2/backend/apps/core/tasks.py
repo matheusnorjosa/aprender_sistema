@@ -279,6 +279,7 @@ def _mark_gcal_error(
                 "error": raw_error[:500],
                 "dry_run": dry_run,
                 "apply_blocked": apply_blocked,
+                "pedido": pedido,
             },
         )
 
@@ -469,6 +470,7 @@ def task_publish_solicitacao_to_gcal(
                     "summary": outcome.summary,
                     "dry_run": dry_run,
                     "apply_blocked": apply_blocked,
+                    "pedido": pedido,
                 }
 
                 # OAuth Phase 3: Incluir google_email no AuditLog se disponível
@@ -637,6 +639,7 @@ def task_cancel_solicitacao_from_gcal(
                     "action": outcome.action,
                     "external_event_id": outcome.external_event_id,
                     "summary": outcome.summary,
+                    "pedido": pedido,
                 },
             )
 
@@ -1233,6 +1236,7 @@ def queue_gcal_sync_retry(
                         "action": outcome.action,
                         "external_event_id": outcome.external_event_id,
                         "retry_attempt": self.request.retries + 1,
+                        "pedido": pedido,
                     },
                 )
 
@@ -1280,6 +1284,7 @@ def queue_gcal_sync_retry(
                         "error": str(e)[:500],
                         "dry_run": dry_run,
                         "apply_blocked": apply_blocked,
+                        "pedido": pedido,
                     },
                 )
             except Exception:

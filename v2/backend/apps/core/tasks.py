@@ -182,6 +182,10 @@ _MSG_DISJUNTOR_ABERTO = (
     "O Google Agenda falhou várias vezes seguidas; o sistema pausou as chamadas por alguns minutos. "
     "Tente de novo daqui a pouco."
 )
+_MSG_PUBLICACAO_SEM_APROVACAO = (
+    "A publicação não foi feita porque o evento deixou de estar aprovado. Aprove de novo e publique."
+)
+_MSG_PUBLICACAO_NAO_CONFIRMADA = "O Google não confirmou a publicação. Publique de novo."
 
 
 def _friendly_gcal_error(error: BaseException) -> str:
@@ -427,6 +431,25 @@ def task_publish_solicitacao_to_gcal(
 
             # Aplicar publicação (com cliente OAuth se disponível)
             outcome = apply_one_solicitacao(s, dry_run=dry_run, apply_blocked=apply_blocked, client=client)
+
+            # DEF-32: a tarefa que agiu sobre um pedido não deixa a linha em PENDING. O SKIP do sync não grava
+            # nada: o reaplicar sem mudança (hash igual) volta a PUBLISHED com o mesmo hash; o evento que
+            # deixou de estar aprovado e não tem id, ou que o Google não confirmou, vira ERROR com o motivo.
+            if (
+                pedido is not None
+                and not dry_run
+                and outcome.action == "SKIP"
+                and s.gcal_status == Solicitacao.GCalStatus.PENDING
+            ):
+                if s.status == "aprovado" and s.external_event_id:
+                    s.mark_gcal(status=Solicitacao.GCalStatus.PUBLISHED, payload_hash=s.gcal_payload_hash, error="")
+                else:
+                    s.mark_gcal(
+                        status=Solicitacao.GCalStatus.ERROR,
+                        error=(
+                            _MSG_PUBLICACAO_NAO_CONFIRMADA if s.status == "aprovado" else _MSG_PUBLICACAO_SEM_APROVACAO
+                        ),
+                    )
 
             # Criar AuditLog (apenas se não for dry_run)
             if not dry_run:

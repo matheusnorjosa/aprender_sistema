@@ -1163,6 +1163,136 @@ class TestFalhaDeBancoPedeNovaExecucao:
         assert isinstance(nova_execucao.call_args.kwargs["exc"], OperationalError)
 
 
+def _pulou(sol):
+    from apps.core.services.gcal.sync import SyncOutcome
+
+    return SyncOutcome(action="SKIP", solicitation_id=sol.id, external_event_id=sol.external_event_id, summary="")
+
+
+class TestPublicarNaoTerminaEmPending:
+    """DEF-32: a tarefa de publicar que agiu sobre um pedido não deixa a linha em PENDING. O `apply` não grava
+    nada quando devolve SKIP (evento que deixou de estar aprovado e não tem id; reaplicar sem mudança): a tarefa
+    fecha o pedido, com PUBLISHED se o evento segue aprovado e no Google, com ERROR e o motivo se não."""
+
+    def test_evento_que_deixou_de_estar_aprovado_termina_em_erro_com_o_motivo(self, settings):
+        """Com o cliente fake: "Publicar" é pedido, a aprovação é desfeita e só então a tarefa roda.
+
+        RED: o sync devolvia SKIP sem gravar e a linha ficava em PENDING para sempre."""
+        from apps.core.services.gcal_fake_client import FakeCalendarClient
+
+        settings.GCAL_AUTH_MODE = "service_account"
+        fake = FakeCalendarClient()
+        sol = _evento_futuro()
+        pedido = _pedir(sol, "publicar")
+        Solicitacao.objects.filter(pk=sol.pk).update(status="pendente")
+
+        with patch(_FABRICA_DO_CLIENTE, return_value=(fake, "primary")):
+            resultado = _rodar("publicar", sol.id, pedido=pedido)
+
+        assert resultado["action"] == "SKIP"
+        assert fake.list_events("primary") == []
+        linha = _linha_do_google(sol)
+        assert linha["gcal_status"] == _ERROR
+        assert linha["gcal_last_error"] == (
+            "A publicação não foi feita porque o evento deixou de estar aprovado. Aprove de novo e publique."
+        )
+        assert linha["external_event_id"] is None
+
+    def test_reaplicar_sem_mudanca_termina_publicado_com_o_mesmo_hash(self, settings):
+        """Com o cliente fake: publicado → "Reaplicar" sem nada ter mudado. O hash é o mesmo, o sync devolve
+        SKIP sem chamar o Google e a linha volta a PUBLISHED com o hash que tinha.
+
+        RED: o lote de reaplicar não marcava nada; marcando PENDING, o SKIP deixaria a linha presa."""
+        from apps.core.services.gcal_fake_client import FakeCalendarClient
+
+        settings.GCAL_AUTH_MODE = "service_account"
+        fake = FakeCalendarClient()
+        sol = _evento_futuro()
+
+        with patch(_FABRICA_DO_CLIENTE, return_value=(fake, "primary")):
+            assert _rodar("publicar", sol.id)["action"] == "CREATE"
+            publicado = _linha_do_google(sol)
+            pedido = _pedir(sol, "reaplicar")
+            with patch.object(fake, "update", wraps=fake.update) as atualizou:
+                resultado = _rodar("publicar", sol.id, pedido=pedido)
+
+        assert resultado["action"] == "SKIP"
+        atualizou.assert_not_called()
+        linha = _linha_do_google(sol)
+        assert linha["gcal_status"] == "PUBLISHED"
+        assert linha["gcal_payload_hash"] == publicado["gcal_payload_hash"]
+        assert linha["gcal_payload_hash"]
+        assert linha["gcal_last_error"] == ""
+        assert linha["external_event_id"] == publicado["external_event_id"]
+
+    def test_pedido_nao_muda_updated_at_e_por_isso_o_reaplicar_sem_mudanca_da_skip(self, settings):
+        """O hash do payload inclui `updated_at` (`extendedProperties.private.last_updated`). Se o pedido
+        gravasse `updated_at`, todo reaplicar viraria UPDATE e, com `GCAL_SEND_UPDATES=all`, mandaria o convite
+        de novo a todos sem mudança nenhuma. É por isso que `pedir_operacao_gcal` não grava `updated_at`, e que
+        os lotes de publicar e de reenviar, que gravavam, deixaram de gravar."""
+        from apps.core.services.gcal_fake_client import FakeCalendarClient
+
+        settings.GCAL_AUTH_MODE = "service_account"
+        fake = FakeCalendarClient()
+        sol = _evento_futuro()
+
+        def updated_at():
+            return Solicitacao.objects.values_list("updated_at", flat=True).get(pk=sol.pk)
+
+        with patch(_FABRICA_DO_CLIENTE, return_value=(fake, "primary")):
+            assert _rodar("publicar", sol.id)["action"] == "CREATE"
+            antes = updated_at()
+            pedido = _pedir(sol, "reaplicar")
+            assert updated_at() == antes
+            with patch.object(fake, "update", wraps=fake.update) as atualizou:
+                resultado = _rodar("publicar", sol.id, pedido=pedido)
+
+        assert resultado["action"] == "SKIP"
+        atualizou.assert_not_called()
+
+    def test_skip_de_evento_aprovado_sem_id_termina_em_erro(self, task_solicitacao):
+        """Aprovado, sem id do evento e o sync não fez nada: o Google não confirmou; a linha não fica em PENDING."""
+        sol = task_solicitacao
+        pedido = _com_pedido(sol, external_event_id=None)
+
+        with patch(_APPLY, return_value=_pulou(sol)):
+            resultado = _rodar("publicar", sol.id, pedido=pedido)
+
+        assert resultado["action"] == "SKIP"
+        linha = _linha_do_google(sol)
+        assert linha["gcal_status"] == _ERROR
+        assert linha["gcal_last_error"] == "O Google não confirmou a publicação. Publique de novo."
+
+    def test_skip_em_que_o_sync_ja_marcou_erro_fica_com_o_erro_do_sync(self, task_solicitacao):
+        """Sem `GCAL_CLIENT`, o sync marca ERROR e devolve SKIP: a linha já saiu de PENDING e a tarefa não regrava."""
+        sol = task_solicitacao
+        pedido = _com_pedido(sol)
+
+        def marca_erro_e_pula(s, **_kwargs):
+            s.mark_gcal(status=_ERROR, error="GCAL_CLIENT não configurado")
+            return _pulou(s)
+
+        with patch(_APPLY, side_effect=marca_erro_e_pula):
+            _rodar("publicar", sol.id, pedido=pedido)
+
+        linha = _linha_do_google(sol)
+        assert (linha["gcal_status"], linha["gcal_last_error"]) == (_ERROR, "GCAL_CLIENT não configurado")
+
+    @pytest.mark.parametrize("chamada", ["sem_pedido", "previa"])
+    def test_skip_sem_pedido_ou_na_previa_nao_grava(self, task_solicitacao, chamada):
+        """Mensagem antiga, chamada direta e prévia seguem como antes: o SKIP não toca a linha."""
+        sol = task_solicitacao
+        Solicitacao.objects.filter(pk=sol.pk).update(gcal_status=_PENDING)
+        antes = _linha_do_google(sol)
+        kwargs = {"dry_run": True} if chamada == "previa" else {}
+
+        with patch(_APPLY, return_value=_pulou(sol)):
+            resultado = _rodar("publicar", sol.id, **kwargs)
+
+        assert resultado["action"] == "SKIP"
+        assert _linha_do_google(sol) == antes
+
+
 class TestNotificacoesTask:
     """Tests for processar_notificacoes_acoes_diarias."""
 

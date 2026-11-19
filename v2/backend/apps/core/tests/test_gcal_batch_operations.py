@@ -893,3 +893,36 @@ def test_reaplicar_em_lote_mantem_o_hash_so_de_linha_publicada(api_client, usuar
     assert linhas[publicada.id]["gcal_payload_hash"] == "hash-publicada"
     assert linhas[com_erro.id]["gcal_status"] == _PENDING
     assert linhas[com_erro.id]["gcal_payload_hash"] is None
+
+
+@pytest.mark.django_db
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
+def test_reaplicar_em_lote_com_o_mesmo_id_duas_vezes_enfileira_uma(api_client, usuario_controle, setup_publicadas):
+    """O mesmo id duas vezes no POST, como um 2º Reaplicar antes de a tarefa do 1º rodar. A pré-validação lê a
+    linha PUBLISHED, mas o 2º pedido a relê sob a trava em PENDING e vira item com `code=operacao_em_andamento`;
+    a linha fica com o 1º pedido e o hash. Antes, o 2º zerava o hash e a tarefa dele mandava o UPDATE ao Google
+    sem mudança nenhuma."""
+    sol = setup_publicadas[0]
+    Solicitacao.objects.filter(pk=sol.pk).update(gcal_payload_hash="hash-publicada")
+    api_client.force_authenticate(user=usuario_controle)
+
+    with patch(_DELAY) as delay:
+        response = api_client.post(
+            "/api/gcal/dashboard/batch/reapply/",
+            {"ids": [sol.id, sol.id], "dry_run": False, "apply_blocked": False},
+            format="json",
+        )
+
+    assert response.status_code == http_status.HTTP_202_ACCEPTED
+    assert response.data["queued"] == 1
+    assert response.data["errors"] == [
+        {
+            "id": sol.id,
+            "detail": "Este evento já tem uma operação no Google em andamento. Espere ela terminar e tente de novo.",
+            "code": "operacao_em_andamento",
+        }
+    ]
+    delay.assert_called_once()
+    linha = _linhas([sol.id])[sol.id]
+    assert (linha["gcal_status"], linha["gcal_payload_hash"]) == (_PENDING, "hash-publicada")
+    assert delay.call_args.kwargs["pedido"] == linha["gcal_pedido"]

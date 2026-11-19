@@ -39,6 +39,10 @@ _MSG_FILA_INDISPONIVEL = (
     "Não foi possível enviar o pedido para a fila de publicação. Nada foi alterado. Tente de novo em instantes."
 )
 
+_MSG_OPERACAO_EM_ANDAMENTO = (
+    "Este evento já tem uma operação no Google em andamento. Espere ela terminar e tente de novo."
+)
+
 # Por que o evento não pode ir ao Google agora (virada, 16/10/2026). Mensagem para a tela e o lote.
 MENSAGENS_NAO_PUBLICAVEL: dict[str, str] = {
     "publicado_fora_do_sistema": (
@@ -82,8 +86,12 @@ def pedir_operacao_gcal(solicitacao_id: int, operacao: Literal["publicar", "reen
     Hash do payload: publicar e reenviar zeram (o envio é forçado); cancelar mantém; reaplicar mantém só o
     de linha PUBLISHED, para o envio sem mudança virar SKIP.
 
+    Reaplicar sobre linha em PENDING é recusado: outra operação está em andamento, e o pedido novo zeraria o
+    hash (UPDATE sem mudança no Google, com e-mail aos convidados) ou desfaria um "Tirar do Google".
+
     Raises:
         ConflictError `linha_ocupada`: outra operação segurou a linha além de `_PEDIDO_LOCK_TIMEOUT`.
+        ConflictError `operacao_em_andamento`: reaplicar sobre linha em PENDING.
         ValidationAPIError, ConflictError: as recusas das entradas, agora sobre a linha travada.
         Solicitacao.DoesNotExist: a linha foi apagada depois da leitura de quem chama.
     """
@@ -95,6 +103,9 @@ def pedir_operacao_gcal(solicitacao_id: int, operacao: Literal["publicar", "reen
         if _extract_pgcode(exc) != "55P03":  # lock_not_available
             raise
         raise ConflictError(message=MSG_LINHA_OCUPADA, details={"code": "linha_ocupada"}) from exc
+
+    if operacao == "reaplicar" and s.gcal_status == Solicitacao.GCalStatus.PENDING:
+        raise ConflictError(message=_MSG_OPERACAO_EM_ANDAMENTO, details={"code": "operacao_em_andamento"})
 
     if operacao == "cancelar":
         if not s.external_event_id and s.gcal_status != Solicitacao.GCalStatus.PUBLISHED:

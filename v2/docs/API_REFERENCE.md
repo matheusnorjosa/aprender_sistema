@@ -394,7 +394,9 @@ Não existem `/api/gcal/dashboard/summary/`, `/pending/`, `/errors/` nem `/insig
 `batch/reapply/` e `batch/resync/` seguem a regra do `publish-batch` (transação por id, `errors[].code`, parada
 quando a fila recusa a task; nos dois o `code` da linha que nunca foi ao Google é `nao_publicado`). O reapply
 marca `PENDING` e mantém o hash da linha `PUBLISHED`: o evento sem mudança vira `SKIP` na task e volta a
-`PUBLISHED`, sem chamar o Google. O resync zera o hash e sempre reenvia.
+`PUBLISHED`, sem chamar o Google. Linha em `ERROR` perde o hash, e o envio acontece. Linha que, relida sob a
+trava, já está em `PENDING` (outra operação em andamento, ou o mesmo id repetido no corpo) vai para `errors` com
+`code = operacao_em_andamento` e fica como estava. O resync zera o hash e sempre reenvia.
 
 `alerts/summary` (#2039) traz, além das contagens por `gcal_status` (que respeitam `start`/`end`),
 quem precisa reconectar a conta Google, sem depender da janela:

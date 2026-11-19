@@ -240,7 +240,9 @@ class GCalBatchReapplyView(APIView):
     POST /api/gcal/dashboard/batch/reapply/
 
     Reaplica eventos já publicados: marca PENDING e mantém o hash da linha PUBLISHED, então o evento sem
-    mudança vira SKIP na tarefa e volta a PUBLISHED. Linha em ERROR ou PENDING perde o hash (o envio acontece).
+    mudança vira SKIP na tarefa e volta a PUBLISHED. Linha em ERROR perde o hash (o envio acontece). Linha em
+    PENDING (outra operação em andamento, ou o mesmo id repetido no lote) vai para 'errors' com
+    code='operacao_em_andamento', sem mudar nada.
     Fila fora do ar: como no publish-batch (o lote para; code='fila_indisponivel').
 
     Request Body:
@@ -347,7 +349,8 @@ class GCalBatchReapplyView(APIView):
                 )
                 continue
 
-            # Válida: pedido (PENDING sob trava; o hash fica só em linha PUBLISHED) e tarefa, numa transação por id
+            # Válida: pedido (PENDING sob trava; o hash fica só em linha PUBLISHED; linha já em PENDING é recusada)
+            # e tarefa, numa transação por id
             if not dry_run:
                 erro = _pedir_e_enfileirar(
                     sol.id, "reaplicar", apply_blocked=apply_blocked, operator_user_id=operator_user_id

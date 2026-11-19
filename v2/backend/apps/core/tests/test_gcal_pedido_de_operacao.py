@@ -130,12 +130,12 @@ class TestPedirOperacaoGcal:
             ("cancelar", "PUBLISHED", _HASH),
             ("reaplicar", "PUBLISHED", _HASH),
             ("reaplicar", "ERROR", None),
-            ("reaplicar", "PENDING", None),
         ],
     )
     def test_o_que_cada_operacao_faz_com_o_hash(self, operacao, gcal_status, esperado):
         """Publicar e reenviar zeram (o envio é forçado); cancelar mantém; reaplicar mantém só o de linha
-        PUBLISHED, que é o que deixa o envio sem mudança virar SKIP."""
+        PUBLISHED, que é o que deixa o envio sem mudança virar SKIP. Reaplicar sobre linha em PENDING é recusado
+        (teste de baixo)."""
         from apps.core.services.solicitacao_publish import pedir_operacao_gcal
 
         sol = _evento(gcal_status=gcal_status, external_event_id="evt-hash", gcal_payload_hash=_HASH)
@@ -145,6 +145,28 @@ class TestPedirOperacaoGcal:
         linha = _linha(sol)
         assert linha["gcal_payload_hash"] == esperado
         assert linha["gcal_status"] == Solicitacao.GCalStatus.PENDING
+
+    @pytest.mark.parametrize("em_andamento", ["reaplicar", "cancelar"])
+    def test_reaplicar_sobre_operacao_em_andamento_e_recusado_sem_gravar(self, em_andamento):
+        """Um 2º Reaplicar antes de a tarefa do 1º rodar (duplo clique, linha "Publicando…" marcada de novo, id
+        repetido no lote) ou um Reaplicar por cima de um "Tirar do Google" que ainda não rodou. Relida sob a
+        trava, a linha está em PENDING: o pedido é recusado antes de gravar. Antes, ele zerava o hash, e a tarefa
+        mandava o UPDATE ao Google (com e-mail aos convidados) sem mudança nenhuma, ou desfazia o cancelamento."""
+        from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+
+        sol = _evento(gcal_status="PUBLISHED", external_event_id="evt-andamento", gcal_payload_hash=_HASH)
+        primeiro = pedir_operacao_gcal(sol.pk, em_andamento)
+        antes = _linha(sol)
+
+        with pytest.raises(ConflictError) as erro:
+            pedir_operacao_gcal(sol.pk, "reaplicar")
+
+        assert erro.value.details == {"code": "operacao_em_andamento"}
+        assert erro.value.message == (
+            "Este evento já tem uma operação no Google em andamento. Espere ela terminar e tente de novo."
+        )
+        assert _linha(sol) == antes
+        assert (antes["gcal_pedido"], antes["gcal_payload_hash"]) == (primeiro, _HASH)
 
     def test_pedido_trava_a_linha_com_teto_de_espera(self):
         from apps.core.services.solicitacao_publish import pedir_operacao_gcal

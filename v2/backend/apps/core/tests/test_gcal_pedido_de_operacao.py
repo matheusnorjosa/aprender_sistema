@@ -286,6 +286,29 @@ def test_pedido_exige_a_transacao_de_quem_chama():
     assert _linha(sol) == antes
 
 
+@pytest.mark.django_db(transaction=True)
+def test_teto_de_espera_do_pedido_vale_so_na_transacao_dele():
+    """O teto de 10 s é local à transação do pedido (`set_config(..., true)`). Em produção a conexão é
+    reaproveitada (CONN_MAX_AGE): um teto de sessão sobraria para as próximas esperas de trava daquela thread do
+    gunicorn, que desistiriam em 10 s com um 55P03 que ninguém trata."""
+    from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+
+    def teto_da_conexao() -> str:
+        with connection.cursor() as cursor:
+            cursor.execute("SHOW lock_timeout")
+            return cursor.fetchone()[0]
+
+    sol = _evento()
+    antes = teto_da_conexao()
+    assert antes != "10s", "o teste só prova algo se a conexão não começar com o teto do pedido"
+
+    with transaction.atomic():
+        pedir_operacao_gcal(sol.pk, "publicar")
+
+    assert _linha(sol)["gcal_status"] == _PENDING
+    assert teto_da_conexao() == antes
+
+
 # =============================================================================
 # As entradas de uma linha: publicar, reenviar e tirar do Google
 # =============================================================================

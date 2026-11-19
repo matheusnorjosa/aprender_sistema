@@ -462,21 +462,11 @@ def task_publish_solicitacao_to_gcal(
             "error": "DoesNotExist",
         }
     except Exception as e:
-        # #1541: se o publish caiu porque o circuit breaker do GCal está ABERTO,
-        # enfileira o auto-retry que espera o breaker fechar. A task
-        # queue_gcal_sync_retry existia (Gap 6) mas NUNCA era enfileirada — a sync
-        # derrubada pelo breaker ficava perdida até re-disparo MANUAL, em silêncio.
         from apps.core.services.gcal.circuit_breaker import CircuitBreakerError
 
-        if isinstance(e, CircuitBreakerError) and not dry_run:
-            queue_gcal_sync_retry.apply_async(
-                (solicitation_id,),
-                kwargs={"dry_run": dry_run, "apply_blocked": apply_blocked},
-                countdown=60,
-            )
-
         # Marca ERROR com texto acionável (403/404 do Google = sem acesso ao calendário);
-        # o erro cru vai para o AuditLog. No dry-run, nenhum dos dois.
+        # o erro cru vai para o AuditLog. No dry-run, nenhum dos dois. Vem ANTES de enfileirar a nova
+        # tentativa (DEF-32): ela só age sobre linha em ERROR, e a fila fora do ar não pode impedir a marca.
         _mark_gcal_error(
             solicitation_id,
             _friendly_gcal_error(e),
@@ -486,6 +476,21 @@ def task_publish_solicitacao_to_gcal(
             apply_blocked=apply_blocked,
             pedido=pedido,
         )
+
+        # #1541: se o publish caiu porque o circuit breaker do GCal está ABERTO,
+        # enfileira o auto-retry que espera o breaker fechar. A task
+        # queue_gcal_sync_retry existia (Gap 6) mas NUNCA era enfileirada — a sync
+        # derrubada pelo breaker ficava perdida até re-disparo MANUAL, em silêncio.
+        # A tentativa leva o identificador do pedido: só age se ele ainda for o da linha.
+        if isinstance(e, CircuitBreakerError) and not dry_run:
+            try:
+                queue_gcal_sync_retry.apply_async(
+                    (solicitation_id,),
+                    kwargs={"dry_run": dry_run, "apply_blocked": apply_blocked, "pedido": pedido},
+                    countdown=60,
+                )
+            except Exception:
+                logger.exception("Falha ao enfileirar a nova tentativa da Solicitacao #%s", solicitation_id)
 
         return {
             "action": "ERROR",

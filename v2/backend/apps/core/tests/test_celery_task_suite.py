@@ -836,7 +836,7 @@ class TestMarcaDeErroSobTrava:
     um pedido antigo apagava o resultado de outro mais novo (ERROR por cima de PUBLISHED, ou de NONE)."""
 
     def _marcar(self, sol, **kwargs):
-        from apps.core.tasks import _mark_gcal_error
+        from apps.core.tasks import _mark_gcal_error  # pyright: ignore[reportPrivateUsage]
 
         _mark_gcal_error(sol.id, "O Google recusou.", raw_error="HttpError 500", dry_run=False, **kwargs)
 
@@ -894,7 +894,7 @@ class TestMarcaDeErroSobTrava:
         assert _travou_a_solicitacao(consultas.captured_queries)
 
     def test_previa_segue_sem_gravar(self, task_solicitacao):
-        from apps.core.tasks import _mark_gcal_error
+        from apps.core.tasks import _mark_gcal_error  # pyright: ignore[reportPrivateUsage]
 
         antes = _linha_do_google(task_solicitacao)
 
@@ -972,6 +972,154 @@ class TestMarcaDeErroSobTrava:
             pytest.raises(DatabaseError),
         ):
             _rodar(tarefa, sol.id, pedido=pedido)
+
+
+_FABRICA_DO_CLIENTE = "apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id"
+
+
+def _evento_futuro():
+    agora = timezone.now()
+    return SolicitacaoFactory(
+        status="aprovado", inicio=agora + timedelta(days=2), fim=agora + timedelta(days=2, hours=2)
+    )
+
+
+def _pedir(sol, operacao: str) -> str:
+    from django.db import transaction
+
+    from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+
+    with transaction.atomic():
+        return pedir_operacao_gcal(sol.id, operacao)
+
+
+def _publicar_com_o_disjuntor_aberto(sol, pedido: str):
+    """Roda o publicar com o disjuntor aberto. Devolve (resultado, mock do `apply_async` da nova tentativa)."""
+    from apps.core.services.gcal.circuit_breaker import gcal_breaker
+    from apps.core.tasks import queue_gcal_sync_retry
+
+    gcal_breaker.open()
+    try:
+        with patch.object(queue_gcal_sync_retry, "apply_async") as enfileirou:
+            resultado = _rodar("publicar", sol.id, pedido=pedido)
+    finally:
+        gcal_breaker.close()
+    return resultado, enfileirou
+
+
+def _rodar_a_nova_tentativa(enfileirou):
+    """Roda a nova tentativa com os argumentos que o publicar mandou para a fila."""
+    from apps.core.tasks import queue_gcal_sync_retry
+
+    args, opcoes = enfileirou.call_args
+    return queue_gcal_sync_retry(*args[0], **opcoes["kwargs"])
+
+
+class TestErroDoPublicarENovaTentativa:
+    """DEF-32: no erro do publicar, a marca de ERROR vem antes de enfileirar a nova tentativa (que só age sobre
+    linha em ERROR), a fila fora do ar não impede a marca, e a nova tentativa leva o identificador do pedido."""
+
+    def test_linha_ja_esta_em_erro_quando_a_nova_tentativa_vai_para_a_fila(self, task_solicitacao):
+        """RED: a tentativa era enfileirada com a linha ainda em PENDING; com a fila fora, a exceção saía do
+        `except` e a marca de ERROR nem rodava."""
+        from apps.core.services.gcal.circuit_breaker import CircuitBreakerError, gcal_breaker
+        from apps.core.tasks import queue_gcal_sync_retry
+
+        sol = task_solicitacao
+        pedido = _com_pedido(sol)
+        visto = {}
+
+        def enfileirar(*_args, **_kwargs):
+            visto["gcal_status"] = _linha_do_google(sol)["gcal_status"]
+
+        with (
+            patch(_APPLY, side_effect=CircuitBreakerError(gcal_breaker)),
+            patch.object(queue_gcal_sync_retry, "apply_async", side_effect=enfileirar) as enfileirou,
+        ):
+            resultado = _rodar("publicar", sol.id, pedido=pedido)
+
+        assert resultado["action"] == "ERROR"
+        assert visto == {"gcal_status": _ERROR}
+        enfileirou.assert_called_once_with(
+            (sol.id,), kwargs={"dry_run": False, "apply_blocked": False, "pedido": pedido}, countdown=60
+        )
+
+    def test_fila_fora_ao_enfileirar_a_nova_tentativa_nao_impede_a_marca_de_erro(self, task_solicitacao, caplog):
+        from kombu.exceptions import OperationalError as FilaForaDoAr
+
+        from apps.core.services.gcal.circuit_breaker import CircuitBreakerError, gcal_breaker
+        from apps.core.tasks import queue_gcal_sync_retry
+
+        sol = task_solicitacao
+        pedido = _com_pedido(sol)
+
+        with (
+            caplog.at_level(logging.ERROR, logger="apps.core.tasks"),
+            patch(_APPLY, side_effect=CircuitBreakerError(gcal_breaker)),
+            patch.object(queue_gcal_sync_retry, "apply_async", side_effect=FilaForaDoAr("redis fora do ar")),
+        ):
+            resultado = _rodar("publicar", sol.id, pedido=pedido)
+
+        assert resultado["action"] == "ERROR"
+        assert _linha_do_google(sol)["gcal_status"] == _ERROR
+        assert any(
+            r.name == "apps.core.tasks" and r.exc_info and isinstance(r.exc_info[1], FilaForaDoAr)
+            for r in caplog.records
+        ), "a falha ao enfileirar a nova tentativa não foi para o log"
+
+    def test_nova_tentativa_enfileirada_pelo_publicar_publica_quando_o_disjuntor_fecha(self, settings):
+        """De ponta a ponta, com o cliente fake: "Publicar" cai no disjuntor aberto (linha em ERROR, tentativa
+        na fila com o identificador) → o disjuntor fecha → a tentativa publica.
+
+        RED: a tentativa ia para a fila sem o identificador e, numa linha que tem pedido, não agia nunca."""
+        from apps.core.services.gcal_fake_client import FakeCalendarClient
+
+        settings.GCAL_AUTH_MODE = "service_account"
+        fake = FakeCalendarClient()
+        sol = _evento_futuro()
+        eid = f"asv2{sol.id}"
+
+        with patch(_FABRICA_DO_CLIENTE, return_value=(fake, "primary")):
+            resultado, enfileirou = _publicar_com_o_disjuntor_aberto(sol, _pedir(sol, "publicar"))
+            assert resultado["action"] == "ERROR"
+            assert _linha_do_google(sol)["gcal_status"] == _ERROR
+
+            resultado = _rodar_a_nova_tentativa(enfileirou)
+
+        assert resultado["action"] == "CREATE"
+        assert fake.get("primary", eid)["status"] == "confirmed"
+        linha = _linha_do_google(sol)
+        assert (linha["gcal_status"], linha["external_event_id"]) == ("PUBLISHED", eid)
+
+    def test_nova_tentativa_nao_age_depois_de_um_cancelamento_que_falhou(self, settings):
+        """De ponta a ponta: publicado → "Reenviar" cai no disjuntor aberto (ERROR, tentativa na fila) → "Tirar
+        do Google" também cai (ERROR de novo, agora com o identificador do cancelamento) → o disjuntor fecha e a
+        tentativa do reenvio roda. A linha está em ERROR, mas por outro pedido: a tentativa não reenvia o evento
+        que a pessoa mandou tirar."""
+        from apps.core.services.gcal.circuit_breaker import gcal_breaker
+        from apps.core.services.gcal_fake_client import FakeCalendarClient
+
+        settings.GCAL_AUTH_MODE = "service_account"
+        fake = FakeCalendarClient()
+        sol = _evento_futuro()
+
+        with patch(_FABRICA_DO_CLIENTE, return_value=(fake, "primary")):
+            assert _rodar("publicar", sol.id)["action"] == "CREATE"
+            resultado, enfileirou = _publicar_com_o_disjuntor_aberto(sol, _pedir(sol, "reenviar"))
+            assert resultado["action"] == "ERROR"
+            cancelamento = _pedir(sol, "cancelar")
+            gcal_breaker.open()
+            try:
+                assert _rodar("cancelar", sol.id, pedido=cancelamento)["action"] == "ERROR"
+            finally:
+                gcal_breaker.close()
+            antes = _linha_do_google(sol)
+            assert (antes["gcal_status"], antes["gcal_pedido"]) == (_ERROR, cancelamento)
+
+            resultado = _rodar_a_nova_tentativa(enfileirou)
+
+        assert resultado["action"] == "SKIP"
+        assert _linha_do_google(sol) == antes
 
 
 class TestNotificacoesTask:

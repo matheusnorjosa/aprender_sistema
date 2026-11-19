@@ -165,11 +165,15 @@ class TestPublishEndpoint:
         # Response doesn't include dry_run field
         assert response.data.get("task_id") == "fake-task-id"
 
-        # Verificar que task foi chamada (usando ANY para args posicionais)
-        mock_task.assert_called_once_with(ANY, dry_run=False, apply_blocked=True)
+        # Verificar que task foi chamada (usando ANY para args posicionais), com o identificador do pedido
+        # gravado na linha (DEF-32)
+        solicitacao_aprovada.refresh_from_db()
+        assert solicitacao_aprovada.gcal_pedido
+        mock_task.assert_called_once_with(
+            ANY, dry_run=False, apply_blocked=True, pedido=solicitacao_aprovada.gcal_pedido
+        )
 
         # Status deve ser PENDING
-        solicitacao_aprovada.refresh_from_db()
         assert solicitacao_aprovada.gcal_status == Solicitacao.GCalStatus.PENDING
 
     @patch("django.conf.settings.GCAL_CLIENT", "fake")
@@ -218,7 +222,11 @@ class TestPublishEndpoint:
         )
 
         assert response.status_code == status.HTTP_202_ACCEPTED
-        mock_task.assert_called_once_with(ANY, dry_run=False, apply_blocked=True)
+        solicitacao_aprovada.refresh_from_db()
+        assert solicitacao_aprovada.gcal_pedido
+        mock_task.assert_called_once_with(
+            ANY, dry_run=False, apply_blocked=True, pedido=solicitacao_aprovada.gcal_pedido
+        )
 
     @patch("django.conf.settings.GCAL_CLIENT", "fake")
     @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
@@ -286,8 +294,12 @@ class TestResyncEndpoint:
         solicitacao_published.refresh_from_db()
         assert solicitacao_published.gcal_status == Solicitacao.GCalStatus.PENDING
 
-        # Verificar que task foi enfileirada (endpoint hardcodes apply_blocked=False)
-        mock_task.assert_called_once_with(ANY, dry_run=False, apply_blocked=False)
+        # Verificar que task foi enfileirada (endpoint hardcodes apply_blocked=False), com o identificador
+        # do pedido gravado na linha (DEF-32)
+        assert solicitacao_published.gcal_pedido
+        mock_task.assert_called_once_with(
+            ANY, dry_run=False, apply_blocked=False, pedido=solicitacao_published.gcal_pedido
+        )
 
     @patch("django.conf.settings.GCAL_CLIENT", "fake")
     @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)

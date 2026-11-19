@@ -220,7 +220,8 @@ def test_edicao_durante_publicacao_que_falha_recebe_400_e_a_linha_fica_em_erro(m
 
     O ERROR que o `apply_one_solicitacao` marca dentro da trava é desfeito pelo rollback da task; a edição
     pega a trava, relê PENDING e recebe o 400 do PENDING. O ERROR só é gravado depois, por
-    `_mark_gcal_error`, fora da trava (ART-22). A edição não muda a linha; a próxima, já sobre ERROR, segue.
+    `_mark_gcal_error`, que trava a linha por conta própria e espera a edição soltá-la (DEF-32). A edição
+    não muda a linha; a próxima, já sobre ERROR, segue.
     """
     from apps.core.services import gcal_client_factory
     from apps.core.services.gcal import sync as sync_mod

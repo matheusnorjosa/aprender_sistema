@@ -634,8 +634,12 @@ def test_batch_publish_oauth_mode_com_credencial_passa_operator_user_id(
     assert response.status_code == http_status.HTTP_202_ACCEPTED
     assert response.data["queued"] == 3
     assert response.data["errors"] == []
+    # Cada task leva o identificador do pedido gravado na linha dela (DEF-32)
+    pedidos = dict(Solicitacao.objects.filter(id__in=ids).values_list("id", "gcal_pedido"))
+    assert all(pedidos.values())
     assert mock_task.call_args_list == [
-        call(sid, dry_run=False, apply_blocked=False, operator_user_id=usuario_controle.pk) for sid in ids
+        call(sid, dry_run=False, apply_blocked=False, operator_user_id=usuario_controle.pk, pedido=pedidos[sid])
+        for sid in ids
     ]
 
 

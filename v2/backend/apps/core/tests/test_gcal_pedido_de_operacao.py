@@ -46,10 +46,11 @@ def _linha(sol) -> dict:
     return Solicitacao.objects.filter(pk=sol.pk).values(*_CAMPOS).get()
 
 
-def _erro_do_banco(sqlstate: str) -> OperationalError:
-    """OperationalError como o Django levanta: a causa (do psycopg) traz o SQLSTATE."""
+def _erro_do_banco(sqlstate: str, atributo: str = "sqlstate") -> OperationalError:
+    """OperationalError como o Django levanta: a causa (do driver) traz o SQLSTATE, em `sqlstate` no psycopg 3
+    (desenvolvimento e testes) e em `pgcode` no psycopg2 (produção)."""
     causa = Exception("erro do banco")
-    causa.sqlstate = sqlstate
+    setattr(causa, atributo, sqlstate)
     erro = OperationalError("erro do banco")
     erro.__cause__ = causa
     return erro
@@ -215,8 +216,10 @@ class TestPedirOperacaoGcal:
         assert erro.value.details["code"] == "not_published"
         assert _linha(sol) == antes
 
-    def test_trava_ocupada_alem_do_teto_vira_conflito_com_o_texto_da_edicao(self):
-        """55P03 (lock_not_available): o pedido desiste com o mesmo texto da edição (DEF-30), sem tocar a linha."""
+    @pytest.mark.parametrize("atributo", ["sqlstate", "pgcode"], ids=["psycopg3", "psycopg2"])
+    def test_trava_ocupada_alem_do_teto_vira_conflito_com_o_texto_da_edicao(self, atributo):
+        """55P03 (lock_not_available): o pedido desiste com o mesmo texto da edição (DEF-30), sem tocar a linha.
+        Vale para os dois drivers: a corrida real deste arquivo roda no psycopg 3, e a produção usa o psycopg2."""
         from apps.core.services.solicitacao_publish import pedir_operacao_gcal
         from apps.core.views_solicitacao import SolicitacaoViewSet
 
@@ -224,7 +227,7 @@ class TestPedirOperacaoGcal:
         antes = _linha(sol)
 
         with (
-            patch.object(Solicitacao.objects, "select_for_update", side_effect=_erro_do_banco("55P03")),
+            patch.object(Solicitacao.objects, "select_for_update", side_effect=_erro_do_banco("55P03", atributo)),
             pytest.raises(ConflictError) as erro,
         ):
             pedir_operacao_gcal(sol.pk, "publicar")

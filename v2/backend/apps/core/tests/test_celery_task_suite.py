@@ -668,8 +668,9 @@ def _apagou(sol):
 class TestGuardaDoPedido:
     """DEF-32: a tarefa só chama o Google e só grava se, sob a trava, o identificador da mensagem é o da linha e
     a linha está no estado em que o pedido a deixou (PENDING; ERROR para a nova tentativa). Fora disso devolve
-    SKIP sem Google, sem AuditLog e sem tocar a linha: pedido superado por outro mais novo, pedido desfeito
-    (rollback da entrada), mensagem entregue de novo depois de concluída, mensagem sem identificador."""
+    SKIP sem chamar a Agenda do Google, sem AuditLog e sem tocar a linha: pedido superado por outro mais novo,
+    pedido desfeito (rollback da entrada), mensagem entregue de novo depois de concluída, mensagem sem
+    identificador."""
 
     @_TRES_TAREFAS
     def test_pedido_superado_nao_chama_o_google_nem_grava(self, task_solicitacao, tarefa):
@@ -1154,7 +1155,9 @@ _PUBLICAR_E_CANCELAR = pytest.mark.parametrize("tarefa", ["publicar", "cancelar"
 
 class TestFalhaDeBancoPedeNovaExecucao:
     """DEF-32: a conexão com o banco que cai no meio da tarefa (inclusive ao gravar o erro) faz o Celery rodar a
-    tarefa de novo, em vez de deixar a linha em PENDING. A nova execução passa pela guarda do pedido."""
+    tarefa de novo (180 s depois, até 3 vezes), e a nova execução passa pela guarda do pedido. Os testes trocam o
+    `retry` e chamam a tarefa direto: não cobrem a entrega com o banco fora, que o Celery confirma sem rodar (a
+    gravação de STARTED falha antes do corpo da tarefa) e deixa a linha em PENDING (limite em gcal.spec.md)."""
 
     @_PUBLICAR_E_CANCELAR
     def test_tarefa_repete_em_falha_de_conexao_com_o_banco(self, tarefa):
@@ -1223,7 +1226,7 @@ class TestPublicarNaoTerminaEmPending:
 
     def test_reaplicar_sem_mudanca_termina_publicado_com_o_mesmo_hash(self, settings):
         """Com o cliente fake: publicado → "Reaplicar" sem nada ter mudado. O hash é o mesmo, o sync devolve
-        SKIP sem chamar o Google e a linha volta a PUBLISHED com o hash que tinha.
+        SKIP sem gravar no Google (uma leitura do evento) e a linha volta a PUBLISHED com o hash que tinha.
 
         RED: o lote de reaplicar não marcava nada; marcando PENDING, o SKIP deixaria a linha presa."""
         from apps.core.services.gcal_fake_client import FakeCalendarClient
@@ -1374,7 +1377,8 @@ def test_limite_brando_global_abaixo_do_duro():
 def test_publicar_e_cancelar_voltam_a_fila_se_o_processo_morre(tarefa):
     """DEF-32 (ISS-1970): a mensagem só é confirmada depois que a tarefa termina (`acks_late`), e o processo do
     worker que morre no meio a devolve à fila na hora (`reject_on_worker_lost`). A segunda entrega passa pela
-    guarda do pedido, então repetir não duplica nada."""
+    guarda do pedido: não regrava o que já foi gravado e, se o processo morreu entre o Google e o commit, escreve
+    de novo no mesmo evento, sem duplicar."""
     task = _tarefa(tarefa)
 
     assert task.acks_late is True

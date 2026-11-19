@@ -52,6 +52,11 @@ gh workflow run promote.yml -f release=vYYYY.MM.DD-<sha7>
 - [ ] O agente `aprender-deployer` (VM01) lê o ponteiro, verifica com cosign contra o trusted-root pinado, aplica **por digest** em `127.0.0.1:9443` e confirma de dentro da VM (`confirm_localhost` em `deployer/apply.sh` = `/api/readyz/` + `/api/version/`)
 - [ ] **Gate de backup fresco**: o applier roda `deployer/hooks/check_backup.sh` e **recusa aplicar** se não houver dump com idade ≤ `BACKUP_MAX_AGE` (28h) e tamanho ≥ `BACKUP_MIN_SIZE` (1024B) em `/var/backups/aprender`. Ele só faz `stat` — **não** valida que o backup é restaurável (ver [BACKUP_OPERATIONS.md](BACKUP_OPERATIONS.md))
 - [ ] **Rollback** = promover a tag anterior pelo mesmo caminho gated: `gh workflow run promote.yml -f release=<tag-anterior>`
+- [ ] **Promoção que cruza o DEF-32 (pedido de operação no Google), nos dois sentidos** (volta para tag anterior a
+      ele, ou reavanço depois da volta): antes, no Redis do broker (DB 1), `LLEN celery` e `ZCARD unacked_index` em
+      zero (só as contagens) e nenhuma `Solicitacao` com `gcal_status=PENDING`; depois, listar as linhas em `PENDING`
+      por idade (`gcal_last_sync_at`) e resolver pela receita de [`gcal.spec.md`](specs/backend/gcal.spec.md)
+      («Pedido de operação no Google»). Regra em [`deploy.spec.md`](specs/infra/deploy.spec.md) (topologia do Redis)
 
 > Rollback de **imagem** não desfaz **migration**. Se a release promovida aplicou migration
 > destrutiva, o caminho de volta é restore de banco, com `restore_db.sh` — operante para

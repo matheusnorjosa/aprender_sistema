@@ -56,23 +56,46 @@ Since DEF-32 (2026-11-19) every publish, resend, reapply and cancel request writ
 (`Solicitacao.gcal_pedido`) under the row lock, in the same transaction that enqueues the task
 (`pedir_operacao_gcal`). The task only acts if the id it carries is still the one on the row and the row is
 still `PENDING` (`ERROR` for the circuit-breaker retry). A superseded request, a request whose transaction was
-rolled back and a message delivered twice all return `SKIP`: no Google call, no AuditLog, no write. Duplicate
-deliveries are expected: the publish and cancel tasks run with `acks_late` + `reject_on_worker_lost`, so the
-message comes back when the worker process dies mid-task (at once) or when the whole host goes down (after the
-Redis `visibility_timeout`, 1 h).
+rolled back and a message delivered again after the task finished all return `SKIP`: no Calendar call and no
+write on the row. In OAuth mode the task builds the operator's client before the guard, and that may refresh
+the token (a `GOOGLE_REFRESH_TOKEN` AuditLog). Duplicate deliveries are expected: the publish and cancel tasks
+run with `acks_late` + `reject_on_worker_lost`, so the message comes back when the worker process dies mid-task
+(at once) or when the whole host goes down (after the Redis `visibility_timeout`, 1 h). A redelivery after a
+death between the Google write and the commit finds the row still `PENDING` with the same id and writes again
+(UPDATE or ADOPT of the same event, or a DELETE that gets 404/410): the event is not duplicated, but with
+`GCAL_SEND_UPDATES` other than `none` the e-mail may go out again.
 
-1. Find the request: `Solicitacao.gcal_pedido` holds the latest id, and each `*_REQUESTED` AuditLog row carries
-   it in `details.pedido`.
-2. Check the executions for that `solicitacao_id`:
+1. Find the latest request: `Solicitacao.gcal_pedido` holds it; look for the AuditLog rows whose `details.pedido`
+   equals it. The three `*_REQUESTED` rows carry it, and so do the outcomes (`PUBLISH_GCAL`, `CANCEL_GCAL`,
+   `PUBLISH_GCAL_ERROR`, `GCAL_RETRY_SUCCESS`). Batches write no `*_REQUESTED`: an id with no `*_REQUESTED` row
+   came from a batch (publish, reapply or resend), and it is also in `TaskResult.task_kwargs` (kept 1 day).
+2. Check the executions for that `solicitacao_id`, for both tasks (publish and cancel):
    ```bash
-   docker compose logs --tail=5000 worker | grep task_publish_solicitacao_to_gcal | grep "<ID>"
+   docker compose logs --tail=5000 worker | grep -E "task_publish_solicitacao_to_gcal|task_cancel_solicitacao_from_gcal" | grep "<ID>"
    ```
    More than one execution is fine as long as only one acted; the others log `pedido superado ou já concluído`.
-3. A row stuck in `PENDING` means the message has not come back yet (host crash: up to 1 h). The request never
-   commits `PENDING` without a queued task: if the queue refuses the task, the transaction rolls back and the
-   API answers 503 `fila_indisponivel`.
-4. Recover: batch resend from the Pré-agenda (it accepts `PENDING` rows; the new request supersedes the old
-   one, and the old message returns `SKIP` when it arrives), or wait for the redelivery.
+3. A row stuck in `PENDING`. The request never commits `PENDING` without a queued task (if the queue refuses
+   the task, the transaction rolls back and the API answers 503 `fila_indisponivel`), but the task may never
+   reach an outcome:
+   - host crash with the task in flight: the message comes back after the Redis `visibility_timeout` (up to 1 h);
+   - database down when a delivery starts (first delivery, redelivery after 1 h, requeue after the worker
+     process died): the `STARTED` write fails before the task body, Celery acks the message without running it,
+     and the row stays `PENDING`. The same happens when the `autoretry_for` attempts run out (3, 180 s apart) or
+     the database error is not a connection error: the retry only covers a connection drop mid-task with the
+     database back before the next run;
+   - hard crash of VM01 with the task inside the row lock: PostgreSQL keeps the lock until it notices the dead
+     client (about 2 h with Linux defaults). Meanwhile a resend answers 409 `linha_ocupada`, and the returned
+     message may run out of `autoretry_for` attempts.
+
+   To find them: `PENDING` for more than 15 min by `gcal_last_sync_at`, and nothing in `unacked` on the broker
+   Redis (DB 1, `ZCARD unacked_index`; counts only, never print the content).
+4. Recover, by the latest request found in step 1:
+   - `CANCEL_GCAL_REQUESTED`: **never** resend or reapply. That undoes the removal and may bring back an event
+     Google already deleted (the Google delete is a soft delete, and the UPDATE sends `status: confirmed`). Wait
+     for the message (up to about 1 h) or redo the cancel with `POST /api/solicitacoes/{id}/cancel-gcal/`, which
+     accepts a `PENDING` row with `external_event_id` (the screen has no button for a `PENDING` row);
+   - no `*_REQUESTED` row with that id (a batch request): batch resend from the Pré-agenda is safe. It accepts
+     `PENDING` rows, the new request supersedes the old one, and the old message returns `SKIP` when it arrives.
 
 ## Triage — "import took 30 min and then only some rows were saved"
 

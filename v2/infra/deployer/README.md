@@ -56,7 +56,7 @@ config.env.example  portainer.curlrc.example
 
 ## Operação
 
-- **Rollback:** promover a **tag imutável anterior** pelo mesmo gate (nova `sequence`, `rollback:true` assinado). **Não há auto-rollback** (migrate é forward-only). Ref do Env anterior fica em `/var/lib/aprender-applier/rollback_ref.json`.
+- **Rollback:** promover a **tag imutável anterior** pelo mesmo gate (nova `sequence`, `rollback:true` assinado). **Não há auto-rollback** (migrate é forward-only). Ref do Env anterior fica em `/var/lib/aprender-applier/rollback_ref.json`. Volta ou reavanço que cruze o DEF-32 (pedido de operação no Google): antes, fila e `unacked` do broker vazios e nenhuma linha em `PENDING`; depois, resolver as linhas em `PENDING`. Ver [`deploy.spec.md`](../../docs/specs/infra/deploy.spec.md) (topologia do Redis).
 - **Rotação do token:** substituir `portainer.curlrc` (0400) — nenhum outro lugar tem o token.
 - **Confirmação:** `journalctl -u aprender-applier` (logs JSON, token redigido). Verdade do que subiu = digest verificado no PUT, não a cor de nenhum job.
 - **Dead-man switch:** o deployer toca `heartbeat` a cada tick; um observador **externo** alerta na **ausência** de heartbeat (>15min). "Quem observa o observador" = decisão aberta #9.

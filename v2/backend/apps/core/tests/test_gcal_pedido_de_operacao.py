@@ -392,8 +392,8 @@ def test_entrada_confere_de_novo_sob_a_trava(entrada, settings):
 @pytest.mark.django_db(transaction=True)
 @_TRES_ENTRADAS
 def test_fila_fora_do_ar_responde_503_e_nao_deixa_a_linha_em_pending(entrada, settings):
-    """O `.delay` falha (Redis fora): a transação do pedido desfaz e a linha fica como estava, com o mesmo
-    identificador. Antes, o PENDING já estava gravado e não havia tarefa para tirá-lo de lá."""
+    """O `.delay` falha porque a fila recusou a tarefa: a transação do pedido desfaz e a linha fica como estava,
+    com o mesmo identificador. Antes, o PENDING já estava gravado e não havia tarefa para tirá-lo de lá."""
     from kombu.exceptions import OperationalError as FilaForaDoAr
 
     settings.GCAL_CLIENT = "google"
@@ -695,9 +695,11 @@ def test_tarefa_que_chega_antes_do_fim_do_pedido_espera_a_trava(desfecho, acao, 
 
 @pytest.mark.django_db(transaction=True)
 def test_duas_entregas_do_mesmo_pedido_chamam_o_google_uma_vez(settings, monkeypatch):
-    """A mesma mensagem é entregue duas vezes (o worker morreu e o Redis a devolveu enquanto a primeira ainda
-    rodava). A segunda espera a trava da primeira, acha a linha fora de PENDING e devolve SKIP: sem Google, sem
-    AuditLog, sem gravar."""
+    """A mesma mensagem é entregue duas vezes ao mesmo tempo (por exemplo, a conexão do worker com o Redis caiu e
+    a mensagem voltou enquanto a primeira entrega rodava). A segunda espera a trava da primeira, acha a linha fora
+    de PENDING e devolve SKIP: sem chamar a Agenda do Google, sem AuditLog e sem gravar. Este teste cobre a primeira
+    entrega que commita; se o processo dela morresse entre o Google e o commit, a segunda escreveria de novo no
+    mesmo evento."""
     from apps.core.services import gcal_client_factory
     from apps.core.services.gcal import sync as sync_mod
     from apps.core.services.gcal_fake_client import FakeCalendarClient

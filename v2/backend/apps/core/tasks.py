@@ -214,7 +214,10 @@ def _pedido_ainda_vale(s: Any, pedido: str | None, estado: str) -> bool:
 
 
 def _pedido_sem_efeito(s: Any) -> dict[str, Any]:
-    """Resultado da tarefa que não agiu: sem Google, sem AuditLog e sem gravar."""
+    """Resultado da tarefa que não agiu: sem chamar a Agenda do Google e sem gravar na linha.
+
+    No modo OAuth a tarefa monta o cliente antes da guarda, e isso pode ter renovado o token do operador.
+    """
     logger.info(
         "gcal: pedido superado ou já concluído para a Solicitacao #%s (gcal_status=%s); nada a fazer",
         s.id,
@@ -284,15 +287,18 @@ def _mark_gcal_error(
         )
 
 
-# DEF-32: a conexão com o banco que cai no meio da tarefa (inclusive ao marcar ERROR) não deixa a linha em
-# PENDING: o Celery roda a tarefa de novo, e a nova execução passa pela guarda do pedido.
+# DEF-32: a conexão com o banco que cai no meio da tarefa (inclusive ao marcar ERROR) faz o Celery rodar a tarefa
+# de novo (180 s depois, até 3 vezes), e a nova execução passa pela guarda do pedido. Só cobre o banco que volta
+# antes da nova execução: a entrega com o banco fora é confirmada sem rodar (a gravação de STARTED falha antes do
+# corpo da tarefa) e a linha fica PENDING, como quando as tentativas se esgotam. Limites em gcal.spec.md.
 _FALHAS_DE_BANCO_QUE_REPETEM = (OperationalError, InterfaceError)
 
 
 # ISS-1970: publicar e cancelar só confirmam a mensagem depois de terminar (`acks_late`), e o processo do
 # worker que morre no meio a devolve à fila na hora (`reject_on_worker_lost`). Se o servidor inteiro cai, a
 # mensagem volta quando vence o prazo do Redis (`visibility_timeout`, 1 h). Só nestas duas, que têm a guarda
-# do pedido: a segunda entrega acha a linha fora de PENDING e não repete nada. Global segue desligado.
+# do pedido: a segunda entrega não regrava o que já foi gravado; se o processo morreu entre a escrita no Google
+# e o commit, ela escreve de novo no mesmo evento (sem duplicar; o e-mail pode se repetir). Global segue desligado.
 @shared_task(
     name="apps.core.tasks.task_publish_solicitacao_to_gcal",
     autoretry_for=_FALHAS_DE_BANCO_QUE_REPETEM,

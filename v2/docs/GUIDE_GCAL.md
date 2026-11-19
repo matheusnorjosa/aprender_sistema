@@ -540,7 +540,7 @@ não existe no codebase.)*
 **Fluxo**:
 1. Valida que evento foi publicado (`external_event_id` existe ou `gcal_status == PUBLISHED`)
 2. Numa transação só (DEF-32): faz o pedido (`pedir_operacao_gcal`: trava a linha, confere de novo, grava o identificador e marca `gcal_status = PENDING`, mantendo o hash), enfileira `task_cancel_solicitacao_from_gcal` com o identificador e grava o `AuditLog`
-3. A task só age se o identificador dela ainda é o da linha e a linha segue `PENDING`; senão devolve `SKIP` sem chamar o Google (pedido superado por outro mais novo, ou mensagem entregue de novo)
+3. A task só age se o identificador dela ainda é o da linha e a linha segue `PENDING`; senão devolve `SKIP` sem chamar a Agenda do Google e sem gravar na linha (pedido superado por outro mais novo, ou mensagem entregue de novo depois de concluída). No modo OAuth a task monta o cliente antes dessa conferência, e isso pode renovar o token do operador
 4. Task deleta evento do Calendar (trata 404 como sucesso - idempotência)
 5. Limpa campos: `external_event_id`, `meet_link`, `gcal_payload_hash`
 6. Marca `gcal_status = NONE`, `last_sync_action = DELETE`
@@ -811,15 +811,24 @@ export GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
 
 **Sintoma:** a linha fica em *Publicando…* por mais de alguns minutos.
 
-**Causa:** desde o DEF-32 o `PENDING` só é gravado junto com a tarefa na fila, e a tarefa sempre fecha o pedido (publicado, removido ou erro). Sobra um caso: o servidor inteiro caiu com a tarefa no meio. A mensagem não confirmada volta à fila sozinha quando vence o prazo do Redis (`visibility_timeout`, 1 hora); se só o processo do worker morreu, volta na hora. A segunda entrega não repete o que já foi feito.
+**Causa:** desde o DEF-32 o `PENDING` só é gravado junto com a tarefa na fila (com a fila fora do ar, nada muda e a resposta é 503). Mesmo assim, a tarefa pode não chegar ao desfecho:
 
-**Solução:** esperar até 1 hora, ou reenviar em lote pela Pré-agenda (o reenvio em lote aceita linha em `PENDING`): o pedido novo substitui o antigo, e a mensagem antiga, quando voltar, devolve `SKIP`. Para investigar, o identificador do pedido está em `Solicitacao.gcal_pedido` e no `AuditLog` `*_REQUESTED` (`details.pedido`).
+- **O servidor inteiro caiu com a tarefa no meio.** A mensagem não confirmada volta à fila quando vence o prazo do Redis (`visibility_timeout`, 1 hora); se só o processo do worker morreu, volta na hora. A segunda entrega não regrava o que já foi gravado; se o processo morreu entre a escrita no Google e o commit, ela escreve de novo (UPDATE ou ADOPT do mesmo evento, ou DELETE que volta 404/410). O evento não duplica, mas com `GCAL_SEND_UPDATES` diferente de `none` o e-mail pode se repetir.
+- **O banco estava fora quando a tarefa começou** (1ª entrega, reentrega depois de 1 hora, devolução do processo morto). A gravação de `STARTED` falha antes do corpo da tarefa, o Celery confirma a mensagem sem rodar e a linha fica `PENDING` sem nada na fila. A repetição em falha de banco (`autoretry_for`) só cobre a queda no meio da tarefa com o banco de volta antes da nova execução (180 s, até 3 vezes). O mesmo acontece quando as tentativas se esgotam ou quando o erro de banco não é de conexão.
+- **Queda dura da VM01 com a tarefa dentro da trava da linha.** A trava fica no PostgreSQL até ele notar o cliente morto (cerca de 2 horas com o padrão do Linux). Nesse intervalo o reenvio responde 409 (`linha_ocupada`; no lote, item em `errors`) e a mensagem devolvida pode se esgotar no `autoretry_for`.
+
+Para achar: linha em `PENDING` há mais de 15 min por `gcal_last_sync_at`, e nada em `unacked` no Redis da fila (DB 1, `ZCARD unacked_index`, sem imprimir o conteúdo).
+
+**Solução:** primeiro achar o último pedido, o `AuditLog` com `details.pedido` igual a `Solicitacao.gcal_pedido`.
+
+- **É `CANCEL_GCAL_REQUESTED`** (um "Tirar do Google" parado): **nunca** reenviar nem reaplicar. Isso desfaz a remoção e pode trazer de volta o evento já apagado: o delete do Google é soft-delete, e o UPDATE manda `status: confirmed`. Esperar a mensagem voltar (até cerca de 1 hora) ou refazer o cancelamento por `POST /api/solicitacoes/{id}/cancel-gcal/`, que aceita linha `PENDING` com `external_event_id`. A tela não tem esse botão para linha em `PENDING`.
+- **Nenhum `*_REQUESTED` tem aquele pedido:** ele veio de lote (publicar, reaplicar ou reenviar). O lote não grava `*_REQUESTED`; o pedido fica em `Solicitacao.gcal_pedido` e em `TaskResult.task_kwargs`, guardado por 1 dia. O reenvio em lote pela Pré-agenda é seguro: ele aceita linha em `PENDING`, o pedido novo substitui o antigo, e a mensagem antiga, quando voltar, devolve `SKIP`.
 
 ### Erro: "Não foi possível enviar o pedido para a fila de publicação"
 
 **Sintoma:** publicar, reenviar ou tirar do Google responde **503** (`fila_indisponivel`); no lote, o item da vez e os seguintes voltam em `errors` com esse código.
 
-**Causa:** a fila (Redis) recusou a tarefa.
+**Causa:** a fila (Redis) recusou a tarefa (erro do broker no envio). Outro erro no envio, de código, não cai aqui: a resposta é 500, também sem mudar a linha, e o traceback fica no log do `web`.
 
 **Solução:** nada foi alterado (a linha não fica `PENDING`); repetir a ação quando o Redis voltar. O erro cru fica no log do `web`, evento `gcal_fila_indisponivel`.
 

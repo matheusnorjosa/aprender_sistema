@@ -347,7 +347,7 @@ sob `/api/gcal/`. Exigem `CanUseGcal` (policy `use_gcal` =
 `operate_preagenda` OU `approve_solicitation`) **ou** `CanPublishSetorSolicitacao` — actions `preview_gcal`/`publish`/`resync_gcal`/`cancel_gcal` do `SolicitacaoViewSet` (`views_solicitacao.py`).
 Com `CanPublishSetorSolicitacao` (Apoio de Coordenação) só vale evento **aprovado do próprio setor**: `Projeto.setor` do evento ∈ setores do vínculo vigente da pessoa (`can_publish_solicitacao`); fora disso, 404.
 Em modo OAuth, publish/resync/cancel recusam **antes** de marcar PENDING: 403 `google_not_connected` (sem credencial Google) e 409 `google_calendar_not_configured` (sem calendário de publicação — nem o pino `GCAL_OAUTH_CALENDAR_ID`, nem escolha na credencial; ver `GUIDE_GCAL.md`).
-Fora da prévia (`dry_run`), os três fazem o pedido com a linha travada e enfileiram a task na mesma transação (DEF-32): respondem **409** com `errors.code = linha_ocupada` quando outra operação segura a linha há mais de 10 s, e **503** `fila_indisponivel` quando a fila recusa a task. Nos dois casos nada muda e a ação pode ser repetida. Regra em [gcal.spec.md](specs/backend/gcal.spec.md) («Pedido de operação no Google»).
+Fora da prévia (`dry_run`), os três fazem o pedido com a linha travada e enfileiram a task na mesma transação (DEF-32): respondem **409** com `errors.code = linha_ocupada` quando outra operação segura a linha há mais de 10 s, e **503** `fila_indisponivel` quando a fila recusa a task. Nos dois casos nada muda e a ação pode ser repetida. Outro erro ao enfileirar (defeito de código) responde 500, também sem mudar a linha. Regra em [gcal.spec.md](specs/backend/gcal.spec.md) («Pedido de operação no Google»).
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
@@ -394,7 +394,8 @@ Não existem `/api/gcal/dashboard/summary/`, `/pending/`, `/errors/` nem `/insig
 `batch/reapply/` e `batch/resync/` seguem a regra do `publish-batch` (transação por id, `errors[].code`, parada
 quando a fila recusa a task; nos dois o `code` da linha que nunca foi ao Google é `nao_publicado`). O reapply
 marca `PENDING` e mantém o hash da linha `PUBLISHED`: o evento sem mudança vira `SKIP` na task e volta a
-`PUBLISHED`, sem chamar o Google. Linha em `ERROR` perde o hash, e o envio acontece. Linha que, relida sob a
+`PUBLISHED`, sem gravar no Google (uma leitura do evento por linha). Linha em `ERROR` perde o hash, e o envio
+acontece. Linha que, relida sob a
 trava, já está em `PENDING` (outra operação em andamento, ou o mesmo id repetido no corpo) vai para `errors` com
 `code = operacao_em_andamento` e fica como estava. O resync zera o hash e sempre reenvia.
 

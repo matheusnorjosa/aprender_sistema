@@ -153,11 +153,24 @@ re-login + perda de tasks Celery em voo) é irrelevante pré-go-live e aceitáve
 Desde o DEF-32 (19/11/2026) a perda não vale mais para publicar e cancelar no Google
 (`task_publish_solicitacao_to_gcal` e `task_cancel_solicitacao_from_gcal`, com `acks_late` e
 `reject_on_worker_lost`): a tarefa interrompida volta sozinha à fila, na hora se só o processo do worker morre e
-em até 1 hora (o `visibility_timeout` do Redis) se o servidor inteiro é derrubado, e a segunda entrega não
-repete o que já foi feito. Vale também para a troca de versão. A regra está em
+em até 1 hora (o `visibility_timeout` do Redis) se o servidor inteiro é derrubado. A segunda entrega não regrava
+o que já foi gravado; se o processo morreu entre a escrita no Google e o commit, ela escreve de novo no mesmo
+evento (sem duplicar; com `GCAL_SEND_UPDATES` diferente de `none`, o e-mail pode se repetir). Na troca de versão,
+vale para a promoção para a frente. Os limites (banco fora quando a tarefa começa, tentativas esgotadas, trava
+presa numa queda dura da VM01) e a receita para linha parada em `PENDING` estão em
 [`gcal.spec.md`](../backend/gcal.spec.md) («Pedido de operação no Google»); as outras tarefas seguem como antes.
 **Rejeitado:** Redis grátis externo (latência por-request + rate-limit de free tier para sessão/cache/broker).
 VM03 dedicada só se **HA** virar requisito.
+
+**Promoção que cruza o DEF-32, nos dois sentidos** (volta para uma tag anterior a ele, ou reavanço depois da
+volta). A mensagem nova, com `pedido`, num worker antigo dá `TypeError` e a linha fica `PENDING`; a mensagem
+antiga, sem `pedido`, num worker novo dá `SKIP` sem gravar se a linha já teve pedido, e a linha também fica
+`PENDING`. Antes de promover: no Redis do broker (DB 1), `LLEN celery` e `ZCARD unacked_index` em zero (só as
+contagens, sem imprimir o conteúdo) e nenhuma `Solicitacao` com `gcal_status=PENDING`. Depois da troca: listar
+as linhas em `PENDING` por idade (`gcal_last_sync_at`) e resolver cada uma pela receita da spec (cancelamento
+parado nunca vai para o reenvio). O `stop_grace_period` do worker fica como ajuste manual pendente do dono: com
+ele, quase toda promoção vira desligamento educado, em que a tarefa termina antes de o worker parar; sem ele, a
+tarefa interrompida pela promoção só volta depois de até 1 hora.
 
 **Docs de topologia reconciliados (Fase 2 concluída):** `v2/infra/ENVIRONMENTS.md`, `v2/infra/README.md` e
 `.claude/CLAUDE.md` (tabela prod) descrevem o Redis como **container interno na VM01** (serviço `redis`),

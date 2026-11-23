@@ -68,7 +68,13 @@ death between the Google write and the commit finds the row still `PENDING` with
 1. Find the latest request: `Solicitacao.gcal_pedido` holds it; look for the AuditLog rows whose `details.pedido`
    equals it. The three `*_REQUESTED` rows carry it, and so do the outcomes (`PUBLISH_GCAL`, `CANCEL_GCAL`,
    `PUBLISH_GCAL_ERROR`, `GCAL_RETRY_SUCCESS`). Batches write no `*_REQUESTED`: an id with no `*_REQUESTED` row
-   came from a batch (publish, reapply or resend), and it is also in `TaskResult.task_kwargs` (kept 1 day).
+   came from a batch (publish, reapply or resend). `TaskResult.task_kwargs` is only a hint: it is kept 1 day and
+   does not exist if the task never started or the database was down when it started.
+   The id only exists for requests made with DEF-32 live. The row was marked by the previous version (before the
+   first promotion of DEF-32, or during a rollback) if `gcal_pedido` is empty, or if a `*_REQUESTED` row of that
+   `details.solicitacao_id` is newer than the one carrying the id. Then decide by the latest `*_REQUESTED` of the
+   row: a `CANCEL_GCAL_REQUESTED` with no `CANCEL_GCAL` after it is a stuck cancel; redo it with `cancel-gcal`
+   and never resend. When in doubt, check in Google whether the event is cancelled before any resend.
 2. Check the executions for that `solicitacao_id`, for both tasks (publish and cancel):
    ```bash
    docker compose logs --tail=5000 worker | grep -E "task_publish_solicitacao_to_gcal|task_cancel_solicitacao_from_gcal" | grep "<ID>"
@@ -80,24 +86,34 @@ death between the Google write and the commit finds the row still `PENDING` with
    - host crash with the task in flight: the message comes back after the Redis `visibility_timeout` (up to 1 h);
    - database down when a delivery starts (first delivery, redelivery after 1 h, requeue after the worker
      process died): the `STARTED` write fails before the task body, Celery acks the message without running it,
-     and the row stays `PENDING`. The same happens when the `autoretry_for` attempts run out (3, 180 s apart) or
-     the database error is not a connection error: the retry only covers a connection drop mid-task with the
-     database back before the next run;
+     and the row stays `PENDING`. Celery only runs the task again (`autoretry_for`, 180 s later, up to 3 times)
+     when the `ERROR` mark itself fails with a Django `OperationalError` or `InterfaceError`: a connection drop,
+     but also a statement timeout (30 s), lock timeout, deadlock or serialization failure. A short database drop
+     mid-task needs no retry: the mark opens a new connection and writes `ERROR`. The row also stays `PENDING`
+     when the attempts run out, or when the mark fails with another database error (`IntegrityError`,
+     `DataError`, `ProgrammingError`);
    - hard crash of VM01 with the task inside the row lock: PostgreSQL keeps the lock until it notices the dead
      client (about 2 h with Linux defaults). Meanwhile a resend answers 409 `linha_ocupada`, and the returned
      message may run out of `autoretry_for` attempts.
 
-   To find them: `PENDING` for more than 15 min by `gcal_last_sync_at`, and nothing in `unacked` on the broker
-   Redis (DB 1, `ZCARD unacked_index`; counts only, never print the content).
+   To find them: `PENDING` for more than 15 min by `gcal_last_sync_at`, and nothing in `unacked` or in the queue
+   on the broker Redis (DB 1, `ZCARD unacked_index` and `LLEN celery` at 0; counts only, never print the content).
 4. Recover, by the latest request found in step 1:
    - `CANCEL_GCAL_REQUESTED`: **never** resend or reapply. That undoes the removal and may bring back an event
-     Google already deleted (the Google delete is a soft delete, and the UPDATE sends `status: confirmed`). Wait
-     for the message (up to about 1 h) or redo the cancel with `POST /api/solicitacoes/{id}/cancel-gcal/`, which
-     accepts a `PENDING` row with `external_event_id` (the screen has no button for a `PENDING` row);
+     Google already deleted (the Google delete is a soft delete, and the UPDATE sends `status: confirmed`).
+     Waiting only helps while the message is still in `unacked` or in the queue (`LLEN celery` above 0), up to
+     about 1 h. A row found by the filter above has no message to come back: redo the cancel now with
+     `POST /api/solicitacoes/{id}/cancel-gcal/`, which accepts a `PENDING` row with `external_event_id` (the
+     screen has no button for a `PENDING` row);
    - `PUBLISH_GCAL_REQUESTED` or `RESYNC_GCAL_REQUESTED` (a single-row publish or resend), or no `*_REQUESTED`
-     row with that id (a batch request): batch resend from the Pré-agenda is safe. It accepts `PENDING` rows, the
-     new request supersedes the old one, and the old message returns `SKIP` when it arrives. Reapply does not
-     help here: it refuses a `PENDING` row (`operacao_em_andamento`).
+     row with that id (a batch request): batch resend from the Pré-agenda is safe in that it does not undo a
+     cancel; it forces the UPDATE and, with `GCAL_SEND_UPDATES` other than `none`, e-mails external guests even
+     with no change. It accepts `PENDING` rows, the new request supersedes the old one, and the old message
+     returns `SKIP` when it arrives. Reapply does not help here: it refuses a `PENDING` row
+     (`operacao_em_andamento`);
+   - Event already over: resend and reapply refuse it (`evento_passado`). A stuck cancel still goes through
+     `cancel-gcal`, which ignores the date; a stuck publish or resend only leaves `PENDING` through the admin,
+     where `gcal_status` is editable.
 
 ## Triage — "import took 30 min and then only some rows were saved"
 

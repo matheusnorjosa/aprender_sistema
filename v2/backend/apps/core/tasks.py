@@ -287,10 +287,11 @@ def _mark_gcal_error(
         )
 
 
-# DEF-32: a conexão com o banco que cai no meio da tarefa (inclusive ao marcar ERROR) faz o Celery rodar a tarefa
-# de novo (180 s depois, até 3 vezes), e a nova execução passa pela guarda do pedido. Só cobre o banco que volta
-# antes da nova execução: a entrega com o banco fora é confirmada sem rodar (a gravação de STARTED falha antes do
-# corpo da tarefa) e a linha fica PENDING, como quando as tentativas se esgotam. Limites em gcal.spec.md.
+# DEF-32: OperationalError ou InterfaceError que escapa da tarefa (na prática, a marca de ERROR que falha: queda
+# de conexão, mas também statement timeout, lock timeout, deadlock ou falha de serialização) faz o Celery rodar a
+# tarefa de novo (180 s depois, até 3 vezes), e a nova execução passa pela guarda do pedido. Outro erro de banco
+# na marca termina em falha. A entrega com o banco fora é confirmada sem rodar (a gravação de STARTED falha antes
+# do corpo da tarefa) e a linha fica PENDING, como quando as tentativas se esgotam. Limites em gcal.spec.md.
 _FALHAS_DE_BANCO_QUE_REPETEM = (OperationalError, InterfaceError)
 
 

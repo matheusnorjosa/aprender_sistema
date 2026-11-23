@@ -1,7 +1,7 @@
 ---
 title: Deploy & Produção (spec)
 status: canonical
-last_verified: 2026-11-19
+last_verified: 2026-11-23
 verified_at_commit: 247b74c4cee914c9085019e84780acf2d4905503
 sources_of_truth:
   - v2/infra/docker-compose.prod.yml
@@ -156,21 +156,23 @@ Desde o DEF-32 (19/11/2026) a perda não vale mais para publicar e cancelar no G
 em até 1 hora (o `visibility_timeout` do Redis) se o servidor inteiro é derrubado. A segunda entrega não regrava
 o que já foi gravado; se o processo morreu entre a escrita no Google e o commit, ela escreve de novo no mesmo
 evento (sem duplicar; com `GCAL_SEND_UPDATES` diferente de `none`, o e-mail pode se repetir). Na troca de versão,
-vale para a promoção para a frente. Os limites (banco fora quando a tarefa começa, tentativas esgotadas, trava
-presa numa queda dura da VM01) e a receita para linha parada em `PENDING` estão em
+vale para as promoções a partir de uma versão que já tem o DEF-32. Na primeira (a que o leva), o worker parado é
+o antigo, sem `acks_late`, e a tarefa em voo se perde como antes. Os limites (banco fora quando a tarefa começa,
+tentativas esgotadas, trava presa numa queda dura da VM01) e a receita para linha parada em `PENDING` estão em
 [`gcal.spec.md`](../backend/gcal.spec.md) («Pedido de operação no Google»); as outras tarefas seguem como antes.
 **Rejeitado:** Redis grátis externo (latência por-request + rate-limit de free tier para sessão/cache/broker).
 VM03 dedicada só se **HA** virar requisito.
 
-**Promoção que cruza o DEF-32, nos dois sentidos** (volta para uma tag anterior a ele, ou reavanço depois da
-volta). A mensagem nova, com `pedido`, num worker antigo dá `TypeError` e a linha fica `PENDING`; a mensagem
-antiga, sem `pedido`, num worker novo dá `SKIP` sem gravar se a linha já teve pedido, e a linha também fica
-`PENDING`. Antes de promover: no Redis do broker (DB 1), `LLEN celery` e `ZCARD unacked_index` em zero (só as
-contagens, sem imprimir o conteúdo) e nenhuma `Solicitacao` com `gcal_status=PENDING`. Depois da troca: listar
-as linhas em `PENDING` por idade (`gcal_last_sync_at`) e resolver cada uma pela receita da spec (cancelamento
-parado nunca vai para o reenvio). O `stop_grace_period` do worker fica como ajuste manual pendente do dono: com
-ele, quase toda promoção vira desligamento educado, em que a tarefa termina antes de o worker parar; sem ele, a
-tarefa interrompida pela promoção só volta depois de até 1 hora.
+**Promoção que cruza o DEF-32** (a primeira, que o leva; a volta para uma tag anterior a ele; o reavanço depois
+da volta). Na primeira, a tarefa em voo no worker antigo se perde e a linha fica `PENDING` com `gcal_pedido`
+vazio. Na volta e no reavanço, a mensagem nova, com `pedido`, num worker antigo dá `TypeError` e a linha fica
+`PENDING`; a mensagem antiga, sem `pedido`, num worker novo dá `SKIP` sem gravar se a linha já teve pedido, e a
+linha também fica `PENDING`. Antes de promover: no Redis do broker (DB 1), `LLEN celery` e `ZCARD unacked_index`
+em zero (só as contagens, sem imprimir o conteúdo) e nenhuma `Solicitacao` com `gcal_status=PENDING`. Depois da
+troca: listar as linhas em `PENDING` por idade (`gcal_last_sync_at`) e resolver cada uma pela receita da spec
+(cancelamento parado nunca vai para o reenvio; linha em `PENDING` com `gcal_pedido` vazio veio da versão
+antiga). O `stop_grace_period` do worker fica como ajuste manual pendente do dono: com ele, quase toda promoção
+vira desligamento educado, em que a tarefa termina antes de o worker parar; sem ele, a tarefa interrompida pela promoção só volta depois de até 1 hora (na primeira promoção do DEF-32, não volta).
 
 **Docs de topologia reconciliados (Fase 2 concluída):** `v2/infra/ENVIRONMENTS.md`, `v2/infra/README.md` e
 `.claude/CLAUDE.md` (tabela prod) descrevem o Redis como **container interno na VM01** (serviço `redis`),

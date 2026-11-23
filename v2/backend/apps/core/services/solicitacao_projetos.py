@@ -1,19 +1,21 @@
 """
-Evento de dois projetos (#2036; decisões do dono de 08/11/2026). SSOT da regra e das leituras.
+Evento de mais de um projeto (#2036, decisões do dono de 08/11/2026; VIR-17, de 23/11/2026: até três).
+SSOT da regra e das leituras.
 
-O evento tem até dois projetos, nas vagas `Solicitacao.projeto` e `Solicitacao.projeto_2`. As duas valem
-igual: não há projeto principal. O banco garante que o 2º só existe com o 1º e é diferente dele
-(constraint `solicitacao_projeto_2_valido`). A aplicação garante o resto:
+O evento tem até três projetos, nas vagas `Solicitacao.projeto`, `projeto_2` e `projeto_3`. As vagas valem igual
+para a regra; a ordem delas é a do rótulo "A / B / C". O banco garante que o 2º só existe com o 1º,
+o 3º só com o 2º, e que nenhum se repete (constraints `solicitacao_projeto_2_valido` e
+`solicitacao_projeto_3_valido`). A aplicação garante o resto:
 
-- **Regra 2:** os dois projetos são da mesma gerência e do mesmo fluxo (`par_de_projetos_invalido`).
-  Gerência vazia não conta como "a mesma" (fail-closed). Por isso o poder (escopo, aprovação, publicação)
-  pode ler só `projeto`: gerência e fluxo são iguais nas duas vagas.
+- **Regra 2:** os projetos do evento são no máximo três, diferentes, da mesma gerência e do mesmo fluxo
+  (`grupo_de_projetos_invalido`). Gerência vazia não conta como "a mesma" (fail-closed). Por isso o poder
+  (escopo, aprovação, publicação) pode ler só `projeto`: gerência e fluxo são iguais em todas as vagas.
 - **Regra 10:** mudar a gerência ou o fluxo de um projeto que está em evento com outro fica bloqueado,
   em qualquer evento, de qualquer status (`mudanca_de_grupo_bloqueada`). Quem chama: `ProjetoSerializer`
   e `ProjetoAdminForm`.
 
-Leituras de identidade (busca, contagem por projeto, rótulo) passam pelas duas vagas, sempre por estes
-helpers. A contagem por projeto conta o evento nos dois; os totais (eventos, gerência, fluxo) contam uma vez.
+Leituras de identidade (busca, contagem por projeto, rótulo) passam por todas as vagas, sempre por estes
+helpers. A contagem por projeto conta o evento em cada projeto; os totais (eventos, gerência, fluxo) contam uma vez.
 """
 
 from __future__ import annotations
@@ -25,36 +27,53 @@ from django.db.models import Count, Q, QuerySet
 
 from apps.core.models import Projeto, Solicitacao
 
-VAGAS = ("projeto", "projeto_2")
+VAGAS = ("projeto", "projeto_2", "projeto_3")
 
-MSG_MESMO_PROJETO = "Os dois projetos do evento são o mesmo: escolha outro ou deixe só um."
-MSG_SEM_GERENCIA = "Projeto sem gerência não entra em evento de dois projetos."
-MSG_GERENCIA_DIFERENTE = "Os dois projetos do evento precisam ser da mesma gerência."
-MSG_FLUXO_DIFERENTE = "Os dois projetos do evento precisam ter o mesmo fluxo de aprovação."
-MSG_SEGUNDO_SEM_PRIMEIRO = "Este evento tem dois projetos: o projeto não pode ficar vazio."
+MSG_MESMO_PROJETO = "O mesmo projeto está em duas vagas do evento: escolha outro ou deixe a vaga vazia."
+MSG_SEM_GERENCIA = "Projeto sem gerência não entra em evento de mais de um projeto."
+MSG_GERENCIA_DIFERENTE = "Os projetos do evento precisam ser da mesma gerência."
+MSG_FLUXO_DIFERENTE = "Os projetos do evento precisam ter o mesmo fluxo de aprovação."
+MSG_MAIS_DE_TRES = "O evento tem no máximo três projetos."
+MSG_SEGUNDO_SEM_PRIMEIRO = "Este evento tem mais de um projeto: o projeto não pode ficar vazio."
+MSG_TERCEIRO_SEM_SEGUNDO = "Este evento tem três projetos: o 2º projeto não pode ficar vazio enquanto houver o 3º."
 
 
 def projetos_do_evento(s: Solicitacao) -> list[Projeto]:
-    """Os projetos do evento, na ordem das vagas (0, 1 ou 2)."""
-    return [p for p in (s.projeto, s.projeto_2) if p is not None]
+    """Os projetos do evento, na ordem das vagas (0 a 3)."""
+    return [p for p in (s.projeto, s.projeto_2, s.projeto_3) if p is not None]
 
 
 def ids_dos_projetos(s: Solicitacao) -> frozenset[int]:
-    """Conjunto dos ids: inverter as vagas não muda nada. Não consulta o banco."""
-    return frozenset(pk for pk in (s.projeto_id, s.projeto_2_id) if pk is not None)  # type: ignore[attr-defined]
+    """Conjunto dos ids: trocar a ordem das vagas não muda nada. Não consulta o banco."""
+    ids = (getattr(s, f"{vaga}_id") for vaga in VAGAS)
+    return frozenset(pk for pk in ids if pk is not None)
+
+
+def grupo_de_projetos_invalido(*projetos: Projeto) -> str | None:
+    """Regra 2: a mensagem do motivo, ou None quando os projetos podem ficar no mesmo evento."""
+    if len(projetos) > len(VAGAS):
+        return MSG_MAIS_DE_TRES
+    ids: set[int] = {p.pk for p in projetos}
+    if len(ids) < len(projetos):
+        return MSG_MESMO_PROJETO
+    if len(projetos) < 2:
+        return None
+    gerencias: set[int | None] = {p.gerencia_id for p in projetos}  # type: ignore[attr-defined]
+    if None in gerencias:
+        return MSG_SEM_GERENCIA
+    if len(gerencias) > 1:
+        return MSG_GERENCIA_DIFERENTE
+    if len({p.fluxo for p in projetos}) > 1:
+        return MSG_FLUXO_DIFERENTE
+    return None
 
 
 def par_de_projetos_invalido(a: Projeto, b: Projeto) -> str | None:
-    """Regra 2: a mensagem do motivo, ou None quando o par pode ficar no mesmo evento."""
-    if a.pk == b.pk:
-        return MSG_MESMO_PROJETO
-    if a.gerencia_id is None or b.gerencia_id is None:  # type: ignore[attr-defined]
-        return MSG_SEM_GERENCIA
-    if a.gerencia_id != b.gerencia_id:  # type: ignore[attr-defined]
-        return MSG_GERENCIA_DIFERENTE
-    if a.fluxo != b.fluxo:
-        return MSG_FLUXO_DIFERENTE
-    return None
+    """Regra 2 para o par (validação da criação e carga, até as entregas B e D do VIR-17 conferirem o grupo).
+
+    A edição pela API já confere o grupo com o 3º gravado (`SolicitacaoSerializer._conferir_projetos`).
+    """
+    return grupo_de_projetos_invalido(a, b)
 
 
 def q_tem_projeto(**lookup: Any) -> Q:
@@ -84,7 +103,7 @@ def _na_vaga(qs: QuerySet[Solicitacao], vaga: str, so_projeto: int | None) -> Qu
 def contar_por_projeto(
     qs: QuerySet[Solicitacao], campo: str = "nome", *, so_projeto: int | None = None, **aggs: Any
 ) -> dict[Any, dict[str, int]]:
-    """Agrega por projeto nas duas vagas e soma: o evento de dois projetos conta nos dois.
+    """Agrega por projeto em todas as vagas e soma: o evento de mais de um projeto conta em cada um.
 
     `campo` é o campo do projeto que vira a chave (padrão `nome`). `aggs` são as anotações (padrão
     `count=Count("id")`). Vaga vazia não entra (sem balde nulo). Ordenar e cortar o top N depois da soma.
@@ -101,9 +120,9 @@ def contar_por_projeto(
 
 
 def projetos_distintos_por(qs: QuerySet[Solicitacao], chave: str, *, so_projeto: int | None = None) -> Counter[Any]:
-    """Quantos projetos distintos há em cada valor de `chave` (ex.: `municipio_id`), unindo as duas vagas.
+    """Quantos projetos distintos há em cada valor de `chave` (ex.: `municipio_id`), unindo as vagas.
 
-    O projeto que está na vaga 1 de um evento e na vaga 2 de outro conta uma vez. Duas consultas.
+    O projeto que está na vaga 1 de um evento e na vaga 2 de outro conta uma vez. Uma consulta por vaga.
     `so_projeto` (o filtro de projeto da tela) conta só esse projeto: o parceiro do combo fica de fora.
     """
     pares: set[tuple[Any, int]] = set()
@@ -113,15 +132,20 @@ def projetos_distintos_por(qs: QuerySet[Solicitacao], chave: str, *, so_projeto:
 
 
 def eventos_conjuntos_do_projeto(projeto: Projeto) -> int:
-    """Quantos eventos de dois projetos têm este projeto, em qualquer vaga e qualquer status."""
-    return Solicitacao.objects.filter(Q(projeto=projeto, projeto_2__isnull=False) | Q(projeto_2=projeto)).count()
+    """Quantos eventos de mais de um projeto têm este projeto, em qualquer vaga e qualquer status.
+
+    O 3º só existe com o 2º (constraint), então "1º com 2º" já cobre o trio pela vaga 1.
+    """
+    return Solicitacao.objects.filter(
+        Q(projeto=projeto, projeto_2__isnull=False) | Q(projeto_2=projeto) | Q(projeto_3=projeto)
+    ).count()
 
 
 def mudanca_de_grupo_bloqueada(projeto: Projeto, *, gerencia_id: int | None, fluxo: str | None) -> str | None:
     """Regra 10: a mensagem do bloqueio quando o **valor** da gerência ou do fluxo muda e o projeto está em
     evento com outro; senão None. Salvar com os mesmos valores passa.
 
-    Eventos reprovados, publicados ou antigos não se editam, e a troca só funciona nos projetos do par juntos.
+    Eventos reprovados, publicados ou antigos não se editam, e a troca só funciona nos projetos do evento juntos.
     Por isso a mensagem manda ao administrador do sistema, e não ao evento.
     """
     if projeto.pk is None or (gerencia_id == projeto.gerencia_id and fluxo == projeto.fluxo):  # type: ignore[attr-defined]
@@ -131,6 +155,6 @@ def mudanca_de_grupo_bloqueada(projeto: Projeto, *, gerencia_id: int | None, flu
         return None
     eventos = "1 evento" if n == 1 else f"{n} eventos"
     return (
-        f"Este projeto está em {eventos} junto com outro projeto, e os dois precisam ter a mesma gerência e o "
-        "mesmo fluxo. A troca tem de ser feita nos projetos juntos: peça ao administrador do sistema."
+        f"Este projeto está em {eventos} junto com outro projeto, e os projetos do evento precisam ter a mesma "
+        "gerência e o mesmo fluxo. A troca tem de ser feita nos projetos juntos: peça ao administrador do sistema."
     )

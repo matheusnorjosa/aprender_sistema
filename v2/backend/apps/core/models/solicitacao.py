@@ -68,9 +68,10 @@ class Solicitacao(models.Model):
         related_name="solicitacoes",
         null=True,
         blank=True,
-        help_text="Um dos projetos do evento (o outro, se houver, fica em projeto_2)",
+        help_text="Um dos projetos do evento (os outros, se houver, ficam em projeto_2 e projeto_3)",
     )
-    # #2036: evento de dois projetos. As duas vagas valem igual (sem principal); mesma gerência e mesmo fluxo.
+    # #2036 e VIR-17: evento de mais de um projeto. As vagas valem igual (sem principal); mesma gerência e mesmo
+    # fluxo.
     projeto_2 = models.ForeignKey(  # type: ignore[misc]
         "core.Projeto",
         on_delete=models.PROTECT,
@@ -79,7 +80,20 @@ class Solicitacao(models.Model):
         blank=True,
         verbose_name="Outro projeto",
         help_text=(
-            "Evento de dois projetos. As duas vagas valem igual; mesma gerência e mesmo fluxo "
+            "Evento de mais de um projeto. As vagas valem igual; mesma gerência e mesmo fluxo "
+            "(regra em services/solicitacao_projetos)."
+        ),
+    )
+    # VIR-17 (23/11/2026): evento de até três projetos. A 3ª vaga é igual à 2ª e só existe com ela.
+    projeto_3 = models.ForeignKey(  # type: ignore[misc]
+        "core.Projeto",
+        on_delete=models.PROTECT,
+        related_name="solicitacoes_3",
+        null=True,
+        blank=True,
+        verbose_name="Terceiro projeto",
+        help_text=(
+            "Evento de três projetos. Só com o 2º; os três diferentes, da mesma gerência e do mesmo fluxo "
             "(regra em services/solicitacao_projetos)."
         ),
     )
@@ -341,11 +355,21 @@ class Solicitacao(models.Model):
                 name="solicitacao_gcal_status_valid",
             ),
             # #2036: o 2º projeto só com o 1º, e diferente dele. Gerência e fluxo iguais é regra de aplicação
-            # (`par_de_projetos_invalido`), conferida pelo `compliance_audit`.
+            # (`grupo_de_projetos_invalido`), conferida pelo `compliance_audit`.
             models.CheckConstraint(
                 condition=models.Q(projeto_2__isnull=True)
                 | (models.Q(projeto__isnull=False) & ~models.Q(projeto_2=models.F("projeto"))),
                 name="solicitacao_projeto_2_valido",
+            ),
+            # VIR-17: o 3º só com o 2º (e, pela constraint acima, com o 1º), e diferente dos dois.
+            models.CheckConstraint(
+                condition=models.Q(projeto_3__isnull=True)
+                | (
+                    models.Q(projeto_2__isnull=False)
+                    & ~models.Q(projeto_3=models.F("projeto"))
+                    & ~models.Q(projeto_3=models.F("projeto_2"))
+                ),
+                name="solicitacao_projeto_3_valido",
             ),
         ]
 

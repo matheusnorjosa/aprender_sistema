@@ -55,10 +55,10 @@ gh workflow run promote.yml -f release=vYYYY.MM.DD-<sha7>
 - [ ] **Promoção que cruza o DEF-32 (pedido de operação no Google)** (a primeira, que o leva; a volta para tag
       anterior a ele; o reavanço depois da volta): antes, no Redis do broker (DB 1), `LLEN celery` e
       `ZCARD unacked_index` em zero (só as contagens) e nenhuma `Solicitacao` com `gcal_status=PENDING`; depois,
-      listar as linhas em `PENDING` por idade (`gcal_last_sync_at`) e resolver pela receita de
-      [`gcal.spec.md`](specs/backend/gcal.spec.md) («Pedido de operação no Google»), a mesma para qualquer
-      versão: registro de Google mais recente da linha no `AuditLog` igual a `CANCEL_GCAL_REQUESTED` é
-      cancelamento parado (refazer pelo cancel-gcal, nunca reenviar); nos outros casos, reenviar pela Pré-agenda.
+      listar as linhas em `PENDING` por idade (`gcal_last_sync_at`) e resolver cada uma pela regra «Linha parada
+      em `PENDING`» de [`gcal.spec.md`](specs/backend/gcal.spec.md) («Pedido de operação no Google»), com a
+      consulta de [`GUIDE_GCAL.md`](GUIDE_GCAL.md) («Evento parado em *Publicando…*»). A regra tem exceções e um
+      ramo para evento passado; não decidir por resumo.
       Na primeira, o worker parado é o antigo, sem `acks_late`, e a tarefa em voo se perde. Regra em
       [`deploy.spec.md`](specs/infra/deploy.spec.md) (topologia do Redis)
 

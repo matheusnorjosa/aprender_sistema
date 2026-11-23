@@ -168,10 +168,10 @@ da volta). Na primeira, a tarefa em voo no worker antigo se perde e a linha fica
 `PENDING`; a mensagem antiga, sem `pedido`, num worker novo dá `SKIP` sem gravar se a linha já teve pedido, e a
 linha também fica `PENDING`. Antes de promover: no Redis do broker (DB 1), `LLEN celery` e `ZCARD unacked_index`
 em zero (só as contagens, sem imprimir o conteúdo) e nenhuma `Solicitacao` com `gcal_status=PENDING`. Depois da
-troca: listar as linhas em `PENDING` por idade (`gcal_last_sync_at`) e resolver cada uma pela receita da spec,
-a mesma para qualquer versão: se o registro de Google mais recente da linha no `AuditLog` é
-`CANCEL_GCAL_REQUESTED`, é cancelamento parado (refazer pelo cancel-gcal, nunca reenviar); nos outros casos,
-reenviar pela Pré-agenda. O `stop_grace_period` do worker fica como ajuste manual pendente do dono: com ele, quase toda promoção
+troca: listar as linhas em `PENDING` por idade (`gcal_last_sync_at`) e resolver cada uma pela regra «Linha parada
+em `PENDING`» de [`gcal.spec.md`](../backend/gcal.spec.md) («Pedido de operação no Google»), com a consulta de
+[`GUIDE_GCAL.md`](../../GUIDE_GCAL.md) («Evento parado em *Publicando…*»). A regra tem exceções e um ramo para
+evento passado; não decidir por resumo. O `stop_grace_period` do worker fica como ajuste manual pendente do dono: com ele, quase toda promoção
 vira desligamento educado, em que a tarefa termina antes de o worker parar; sem ele, a tarefa interrompida pela promoção só volta depois de até 1 hora (na primeira promoção do DEF-32, não volta).
 
 **Docs de topologia reconciliados (Fase 2 concluída):** `v2/infra/ENVIRONMENTS.md`, `v2/infra/README.md` e

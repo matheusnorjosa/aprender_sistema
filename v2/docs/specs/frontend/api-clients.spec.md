@@ -1,7 +1,7 @@
 ---
 title: Clientes de API (Fetch)
 status: canonical
-last_verified: 2026-11-17
+last_verified: 2026-11-23
 sources_of_truth:
   - v2/frontend/src/api/config.ts
   - v2/frontend/src/api/auth.ts
@@ -84,7 +84,8 @@ Wrapper publico exportado por `config.ts`:
 3. **Login**: `auth.login()` -> `POST /auth/login/` -> sucesso -> `clearCsrfCache()` (Django rotacionou o token) de forma que a proxima mutacao busca token novo.
 4. **Bootstrap**: no carregamento do app, `initCsrfToken()` pre-aquece o token para evitar race no primeiro submit.
 5. **Regra da compra nas listas (14/10/2026)**: `lookupProjetos(q, params)` aceita `{ com_compra }` sem mudar a assinatura de `q` (o `ComboBox` chama só com `q`); `lookupMunicipiosWithFilters({ q, com_compra, projeto_id, marcar_sem_compra, municipio_id })`: `projeto_id` sozinho já filtra pelo par; com `marcar_sem_compra` + `projeto_id` (pedido do dono, 03/11/2026; Nova Solicitação e edição) a lista não é filtrada, mesmo com `com_compra`: traz também os municípios sem compra, com compra primeiro, e cada item leva `sem_compra` (o evento ali vai para aprovação) e `projeto_em_espera`; `municipio_id` devolve só esse município (a edição reconfere o par ao trocar o projeto). Combo (#2036): `projeto_2_id`, junto de `projeto_id`, pede compra para os dois; `lookupProjetos(q, { mesmo_grupo_de })` lista só os projetos que podem ir com aquele (mesma gerência e mesmo fluxo). Comportamento das telas: [`pages.spec.md`](pages.spec.md); `getProjetosOptions({ excludeKits, comCompra })` monta `/options/projetos/` com `buildUrl`. O servidor isenta quem é isento.
-6. **Download de arquivo**: `fetchBlob('/dat/registros/export/')` (`datModule.ts`; `me.ts` usa `/me/export/`) retorna `Blob`; o caller cria `URL.createObjectURL`. Falha lanca `Error('Export failed: HTTP <status>')`; sem rede, `TypeError('Sem conexão com o servidor.')`.
+6. **Tipo de evento de formação (CON-09, 23/11/2026)**: `lookupTiposEvento(q)` devolve em cada item `de_formacao`, a marca do servidor de que o tipo pede o "Nº da formação" (regra em RF02 de [requisitos-funcionais](../domain/requisitos-funcionais.spec.md)); a tela não compara nome de tipo.
+7. **Download de arquivo**: `fetchBlob('/dat/registros/export/')` (`datModule.ts`; `me.ts` usa `/me/export/`) retorna `Blob`; o caller cria `URL.createObjectURL`. Falha lanca `Error('Export failed: HTTP <status>')`; sem rede, `TypeError('Sem conexão com o servidor.')`.
 
 ## Decisoes relacionadas (ADRs)
 

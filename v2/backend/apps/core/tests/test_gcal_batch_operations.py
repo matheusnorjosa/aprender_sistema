@@ -25,8 +25,9 @@ Refs:
 from __future__ import annotations
 
 from datetime import timedelta
-from unittest.mock import call, patch
+from unittest.mock import Mock, call, patch
 
+from django.db import OperationalError, connection
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework import status as http_status
@@ -633,8 +634,12 @@ def test_batch_publish_oauth_mode_com_credencial_passa_operator_user_id(
     assert response.status_code == http_status.HTTP_202_ACCEPTED
     assert response.data["queued"] == 3
     assert response.data["errors"] == []
+    # Cada task leva o identificador do pedido gravado na linha dela (DEF-32)
+    pedidos = dict(Solicitacao.objects.filter(id__in=ids).values_list("id", "gcal_pedido"))
+    assert all(pedidos.values())
     assert mock_task.call_args_list == [
-        call(sid, dry_run=False, apply_blocked=False, operator_user_id=usuario_controle.pk) for sid in ids
+        call(sid, dry_run=False, apply_blocked=False, operator_user_id=usuario_controle.pk, pedido=pedidos[sid])
+        for sid in ids
     ]
 
 
@@ -687,3 +692,240 @@ def test_batch_publish_despacho_respeita_assinatura_da_task(
     assert response.data["errors"] == []
     assert response.data["queued"] == 3
     assert mock_send_task.call_count == 3
+
+
+# ============================================================================
+# TESTES - DEF-32: o lote pede cada linha sob trava, numa transação por id
+# ============================================================================
+
+_DELAY = "apps.core.tasks.task_publish_solicitacao_to_gcal.delay"
+_PENDING = Solicitacao.GCalStatus.PENDING
+# lote: (rota, chave dos ids no corpo, estado em que as linhas têm de estar)
+_LOTES = {
+    "publicar": ("/api/gcal/publish-batch/", "solicitacao_ids", Solicitacao.GCalStatus.NONE),
+    "reaplicar": ("/api/gcal/dashboard/batch/reapply/", "ids", Solicitacao.GCalStatus.PUBLISHED),
+    "reenviar": ("/api/gcal/dashboard/batch/resync/", "ids", Solicitacao.GCalStatus.PUBLISHED),
+}
+_TRES_LOTES = pytest.mark.parametrize("lote", list(_LOTES))
+_SQL_DA_TRAVA = ("FOR UPDATE", 'FROM "core_solicitacao"')
+
+
+def _preparar_lote(lote, solicitacoes):
+    """Deixa as 3 linhas no estado que o lote aceita. Devolve (rota, corpo, ids)."""
+    rota, chave, estado = _LOTES[lote]
+    ids = [sol.id for sol in solicitacoes]
+    Solicitacao.objects.filter(id__in=ids).update(gcal_status=estado, gcal_payload_hash="hash-do-lote")
+    return rota, {chave: ids, "dry_run": False, "apply_blocked": False}, ids
+
+
+def _linhas(ids):
+    campos = ("id", "status", "gcal_status", "gcal_pedido", "gcal_payload_hash")
+    return {linha["id"]: linha for linha in Solicitacao.objects.filter(id__in=ids).values(*campos)}
+
+
+@pytest.mark.django_db(transaction=True)
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
+@_TRES_LOTES
+def test_lote_para_na_primeira_falha_da_fila_e_nao_deixa_pending(
+    lote, api_client, usuario_controle, setup_solicitacoes
+):
+    """A fila cai no 2º id: a transação dele desfaz (a linha fica como estava), o laço para e o 3º entra em
+    `errors` sem ter sido tocado. O 1º, já enfileirado, segue PENDING com o identificador dele.
+
+    Antes: o lote de publicar e o de reenviar deixavam a linha em PENDING sem tarefa, e os três seguiam
+    tentando a fila fora do ar até o fim da lista."""
+    from kombu.exceptions import OperationalError as FilaForaDoAr
+
+    rota, corpo, ids = _preparar_lote(lote, setup_solicitacoes)
+    antes = _linhas(ids)
+    api_client.force_authenticate(user=usuario_controle)
+
+    with patch(_DELAY, side_effect=[Mock(id="tarefa-1"), FilaForaDoAr("redis fora do ar")]) as delay:
+        response = api_client.post(rota, corpo, format="json")
+
+    assert response.status_code == http_status.HTTP_202_ACCEPTED
+    assert delay.call_count == 2, "o laço tem de parar na primeira falha da fila"
+    assert response.data["queued"] == 1
+    assert [(erro["id"], erro.get("code")) for erro in response.data["errors"]] == [
+        (ids[1], "fila_indisponivel"),
+        (ids[2], "fila_indisponivel"),
+    ]
+    depois = _linhas(ids)
+    assert depois[ids[0]]["gcal_status"] == _PENDING
+    assert len(depois[ids[0]]["gcal_pedido"]) == 32
+    assert depois[ids[1]] == antes[ids[1]]
+    assert depois[ids[2]] == antes[ids[2]]
+
+
+@pytest.mark.django_db
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
+@_TRES_LOTES
+def test_lote_confere_a_linha_sob_a_trava_e_a_recusa_vira_item_com_codigo(
+    lote, api_client, usuario_controle, setup_solicitacoes
+):
+    """A aprovação do 2º evento é desfeita depois da leitura do lote (logo antes da primeira trava): a
+    conferência sob a trava recusa só ele, com `code`, e os outros dois seguem."""
+    rota, corpo, ids = _preparar_lote(lote, setup_solicitacoes)
+    alvo = ids[1]
+    api_client.force_authenticate(user=usuario_controle)
+
+    def desfaz_a_aprovacao_antes_da_trava(execute, sql, params, many, context):
+        if all(trecho in sql for trecho in _SQL_DA_TRAVA):
+            Solicitacao.objects.filter(pk=alvo, status="aprovado").update(status="pendente")
+        return execute(sql, params, many, context)
+
+    with connection.execute_wrapper(desfaz_a_aprovacao_antes_da_trava), patch(_DELAY) as delay:
+        response = api_client.post(rota, corpo, format="json")
+
+    assert response.status_code == http_status.HTTP_202_ACCEPTED
+    assert response.data["queued"] == 2
+    assert [(erro["id"], erro.get("code")) for erro in response.data["errors"]] == [(alvo, "not_approved")]
+    assert [chamada.args[0] for chamada in delay.call_args_list] == [ids[0], ids[2]]
+    linha = _linhas([alvo])[alvo]
+    assert linha["gcal_status"] != _PENDING
+    assert linha["gcal_pedido"] == ""
+
+
+@pytest.mark.django_db
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
+def test_lote_linha_ocupada_vira_item_com_codigo_e_o_lote_segue(api_client, usuario_controle, setup_solicitacoes):
+    """A 2ª linha está presa por outra operação além do teto (55P03 simulado): só ela vai para `errors`, com
+    `code=linha_ocupada`; a fila está de pé, então o laço não para."""
+    rota, corpo, ids = _preparar_lote("publicar", setup_solicitacoes)
+    api_client.force_authenticate(user=usuario_controle)
+    travar = Solicitacao.objects.select_for_update
+    travas = []
+
+    def segunda_linha_ocupada(*args, **kwargs):
+        travas.append(1)
+        if len(travas) == 2:
+            causa = Exception("lock timeout")
+            causa.sqlstate = "55P03"
+            erro = OperationalError("canceling statement due to lock timeout")
+            erro.__cause__ = causa
+            raise erro
+        return travar(*args, **kwargs)
+
+    with (
+        patch.object(Solicitacao.objects, "select_for_update", side_effect=segunda_linha_ocupada),
+        patch(_DELAY) as delay,
+    ):
+        response = api_client.post(rota, corpo, format="json")
+
+    assert response.status_code == http_status.HTTP_202_ACCEPTED
+    assert response.data["queued"] == 2
+    assert [(erro["id"], erro.get("code")) for erro in response.data["errors"]] == [(ids[1], "linha_ocupada")]
+    assert [chamada.args[0] for chamada in delay.call_args_list] == [ids[0], ids[2]]
+
+
+@pytest.mark.django_db
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
+def test_lote_linha_apagada_depois_da_leitura_vira_item_nao_encontrada(
+    api_client, usuario_controle, setup_solicitacoes
+):
+    """O 2º evento é excluído depois da leitura do lote: vira o item "não encontrada" e o lote segue."""
+    rota, corpo, ids = _preparar_lote("publicar", setup_solicitacoes)
+    alvo = ids[1]
+    api_client.force_authenticate(user=usuario_controle)
+
+    def apaga_antes_da_trava(execute, sql, params, many, context):
+        if all(trecho in sql for trecho in _SQL_DA_TRAVA):
+            Solicitacao.objects.filter(pk=alvo).delete()
+        return execute(sql, params, many, context)
+
+    with connection.execute_wrapper(apaga_antes_da_trava), patch(_DELAY) as delay:
+        response = api_client.post(rota, corpo, format="json")
+
+    assert response.status_code == http_status.HTTP_202_ACCEPTED
+    assert response.data["queued"] == 2
+    assert response.data["errors"] == [{"id": alvo, "detail": "Solicitação não encontrada"}]
+    assert [chamada.args[0] for chamada in delay.call_args_list] == [ids[0], ids[2]]
+
+
+@pytest.mark.django_db
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
+@_TRES_LOTES
+def test_lote_pede_cada_linha_e_a_tarefa_leva_o_identificador_dela(
+    lote, api_client, usuario_controle, setup_solicitacoes
+):
+    """Os três lotes marcam PENDING pelo pedido (o de reaplicar não marcava nada) e a tarefa de cada linha
+    leva o identificador gravado nela."""
+    rota, corpo, ids = _preparar_lote(lote, setup_solicitacoes)
+    api_client.force_authenticate(user=usuario_controle)
+
+    with patch(_DELAY) as delay:
+        response = api_client.post(rota, corpo, format="json")
+
+    assert response.status_code == http_status.HTTP_202_ACCEPTED
+    assert response.data["queued"] == 3
+    assert response.data["errors"] == []
+    linhas = _linhas(ids)
+    assert [chamada.args for chamada in delay.call_args_list] == [(sol_id,) for sol_id in ids]
+    for chamada in delay.call_args_list:
+        linha = linhas[chamada.args[0]]
+        assert linha["gcal_status"] == _PENDING
+        assert len(linha["gcal_pedido"]) == 32
+        assert chamada.kwargs == {"dry_run": False, "apply_blocked": False, "pedido": linha["gcal_pedido"]}
+    assert len({linha["gcal_pedido"] for linha in linhas.values()}) == 3
+
+
+@pytest.mark.django_db
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
+def test_reaplicar_em_lote_mantem_o_hash_so_de_linha_publicada(api_client, usuario_controle, setup_solicitacoes):
+    """Linha PUBLISHED mantém o hash (o reaplicar sem mudança vira SKIP na tarefa); linha em ERROR com hash
+    antigo perde o hash, para o envio acontecer."""
+    publicada, com_erro, _outra = setup_solicitacoes
+    Solicitacao.objects.filter(pk=publicada.pk).update(gcal_status="PUBLISHED", gcal_payload_hash="hash-publicada")
+    Solicitacao.objects.filter(pk=com_erro.pk).update(gcal_status="ERROR", gcal_payload_hash="hash-antigo")
+    api_client.force_authenticate(user=usuario_controle)
+
+    with patch(_DELAY):
+        response = api_client.post(
+            "/api/gcal/dashboard/batch/reapply/",
+            {"ids": [publicada.id, com_erro.id], "dry_run": False, "apply_blocked": False},
+            format="json",
+        )
+
+    assert response.status_code == http_status.HTTP_202_ACCEPTED
+    assert response.data["queued"] == 2
+    linhas = _linhas([publicada.id, com_erro.id])
+    assert linhas[publicada.id]["gcal_status"] == _PENDING
+    assert linhas[publicada.id]["gcal_payload_hash"] == "hash-publicada"
+    assert linhas[com_erro.id]["gcal_status"] == _PENDING
+    assert linhas[com_erro.id]["gcal_payload_hash"] is None
+
+
+@pytest.mark.django_db
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
+def test_reaplicar_em_lote_com_o_mesmo_id_duas_vezes_enfileira_uma(api_client, usuario_controle, setup_publicadas):
+    """O mesmo id duas vezes no POST, como um 2º Reaplicar antes de a tarefa do 1º rodar. A pré-validação lê a
+    linha PUBLISHED, mas o 2º pedido a relê sob a trava em PENDING e vira item com `code=operacao_em_andamento`;
+    a linha fica com o 1º pedido e o hash. Antes, o 2º zerava o hash e a tarefa dele mandava o UPDATE ao Google
+    sem mudança nenhuma."""
+    sol = setup_publicadas[0]
+    Solicitacao.objects.filter(pk=sol.pk).update(gcal_payload_hash="hash-publicada")
+    api_client.force_authenticate(user=usuario_controle)
+
+    with patch(_DELAY) as delay:
+        response = api_client.post(
+            "/api/gcal/dashboard/batch/reapply/",
+            {"ids": [sol.id, sol.id], "dry_run": False, "apply_blocked": False},
+            format="json",
+        )
+
+    assert response.status_code == http_status.HTTP_202_ACCEPTED
+    assert response.data["queued"] == 1
+    assert response.data["errors"] == [
+        {
+            "id": sol.id,
+            "detail": (
+                "Este evento já tem uma operação no Google em andamento. Espere alguns minutos; se não terminar, "
+                "siga «Evento parado em Publicando…» no GUIDE_GCAL (não reenvie se foi um Tirar do Google)."
+            ),
+            "code": "operacao_em_andamento",
+        }
+    ]
+    delay.assert_called_once()
+    linha = _linhas([sol.id])[sol.id]
+    assert (linha["gcal_status"], linha["gcal_payload_hash"]) == (_PENDING, "hash-publicada")
+    assert delay.call_args.kwargs["pedido"] == linha["gcal_pedido"]

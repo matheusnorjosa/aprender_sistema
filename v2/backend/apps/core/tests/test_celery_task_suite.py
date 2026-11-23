@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 from functools import partial
+from typing import Any
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -423,6 +424,7 @@ class TestGcalSyncRetryTask:
             "action": "UPDATE",
             "external_event_id": retry_solicitacao.external_event_id,
             "retry_attempt": 1,
+            "pedido": None,  # chamada direta, sem identificador (DEF-32)
         }
 
     def test_retry_de_solicitacao_que_sumiu_devolve_does_not_exist(self):
@@ -469,6 +471,7 @@ class TestGcalSyncRetryTask:
             "error": "Google fora do ar",
             "dry_run": False,
             "apply_blocked": False,
+            "pedido": None,  # chamada direta, sem identificador (DEF-32)
         }
 
     def test_retry_que_falha_sem_conseguir_registrar_devolve_o_erro(self, retry_solicitacao, caplog):
@@ -607,6 +610,746 @@ class TestTravaDuraAChamadaAoGoogle:
         ), "a chamada ao Google rodou num outro bloco aberto pelo mesmo Atomic"
 
 
+_PENDING = Solicitacao.GCalStatus.PENDING
+_ERROR = Solicitacao.GCalStatus.ERROR
+_CAMPOS_DO_GOOGLE = (
+    *_CAMPOS_GCAL,
+    "gcal_pedido",
+    "external_event_id",
+    "meet_link",
+    "last_synced_at",
+    "last_sync_action",
+    "last_sync_error",
+)
+_TRES_TAREFAS = pytest.mark.parametrize("tarefa", ["publicar", "cancelar", "nova_tentativa"])
+
+
+def _linha_do_google(sol):
+    return Solicitacao.objects.filter(pk=sol.pk).values(*_CAMPOS_DO_GOOGLE).get()
+
+
+def _com_pedido(sol, *, gcal_status=_PENDING, **campos) -> str:
+    """Deixa a linha como a entrada deixa: identificador novo gravado e PENDING (ou o `gcal_status` dado)."""
+    pedido = uuid4().hex
+    Solicitacao.objects.filter(pk=sol.pk).update(gcal_pedido=pedido, gcal_status=gcal_status, **campos)
+    return pedido
+
+
+def _estado_em_que_age(tarefa: str) -> str:
+    """A nova tentativa age sobre ERROR (o publish que falhou deixou assim); publicar e cancelar, sobre PENDING."""
+    return _ERROR if tarefa == "nova_tentativa" else _PENDING
+
+
+def _tarefa(nome: str) -> Any:
+    from apps.core.tasks import (
+        queue_gcal_sync_retry,
+        task_cancel_solicitacao_from_gcal,
+        task_publish_solicitacao_to_gcal,
+    )
+
+    tarefas = {
+        "publicar": task_publish_solicitacao_to_gcal,
+        "cancelar": task_cancel_solicitacao_from_gcal,
+        "nova_tentativa": queue_gcal_sync_retry,
+    }
+    return tarefas[nome]
+
+
+def _rodar(tarefa: str, sol_id: int, **kwargs):
+    return _tarefa(tarefa)(sol_id, **kwargs)
+
+
+def _apagou(sol):
+    from apps.core.services.gcal.sync import SyncOutcome
+
+    return SyncOutcome(action="DELETE", solicitation_id=sol.id, external_event_id=None, summary="")
+
+
+class TestGuardaDoPedido:
+    """DEF-32: a tarefa só chama o Google e só grava se, sob a trava, o identificador da mensagem é o da linha e
+    a linha está no estado em que o pedido a deixou (PENDING; ERROR para a nova tentativa). Fora disso devolve
+    SKIP sem chamar a Agenda do Google, sem AuditLog e sem tocar a linha: pedido superado por outro mais novo,
+    pedido desfeito (rollback da entrada), mensagem entregue de novo depois de concluída, mensagem sem
+    identificador."""
+
+    @_TRES_TAREFAS
+    def test_pedido_superado_nao_chama_o_google_nem_grava(self, task_solicitacao, tarefa):
+        sol = task_solicitacao
+        _com_pedido(sol, gcal_status=_estado_em_que_age(tarefa))  # o pedido mais novo
+        antes = _linha_do_google(sol)
+
+        with patch(_APPLY) as aplicar, patch(_CANCEL) as cancelar:
+            resultado = _rodar(tarefa, sol.id, pedido=uuid4().hex)  # a mensagem do pedido antigo
+
+        aplicar.assert_not_called()
+        cancelar.assert_not_called()
+        assert resultado["action"] == "SKIP"
+        assert resultado["error"] is None
+        assert _linha_do_google(sol) == antes
+        assert not AuditLog.objects.filter(details__solicitacao_id=sol.id).exists()
+
+    @pytest.mark.parametrize(
+        "tarefa, gcal_status",
+        [
+            ("publicar", "PUBLISHED"),
+            ("publicar", "ERROR"),
+            ("publicar", "NONE"),
+            ("cancelar", "PUBLISHED"),
+            ("cancelar", "ERROR"),
+            ("nova_tentativa", "PUBLISHED"),
+            ("nova_tentativa", "PENDING"),
+        ],
+    )
+    def test_mesmo_pedido_com_a_linha_fora_do_estado_em_que_age_nao_faz_nada(
+        self, task_solicitacao, tarefa, gcal_status
+    ):
+        """A mensagem entregue de novo depois que o pedido terminou (ou falhou e foi marcado) não repete nada."""
+        sol = task_solicitacao
+        pedido = _com_pedido(sol, gcal_status=gcal_status)
+        antes = _linha_do_google(sol)
+
+        with patch(_APPLY) as aplicar, patch(_CANCEL) as cancelar:
+            resultado = _rodar(tarefa, sol.id, pedido=pedido)
+
+        aplicar.assert_not_called()
+        cancelar.assert_not_called()
+        assert resultado["action"] == "SKIP"
+        assert _linha_do_google(sol) == antes
+        assert not AuditLog.objects.filter(details__solicitacao_id=sol.id).exists()
+
+    def test_cancelamento_entregue_de_novo_sobre_linha_ja_desvinculada_nao_vira_erro(self, task_solicitacao):
+        """O cancelamento terminou (NONE, sem id) e a mensagem volta. Sem a guarda, o `cancel_solicitacao` de
+        verdade levantava "não possui evento publicado" e a linha ia para ERROR."""
+        sol = task_solicitacao
+        pedido = _com_pedido(sol, gcal_status="NONE", external_event_id=None)
+        antes = _linha_do_google(sol)
+
+        resultado = _rodar("cancelar", sol.id, pedido=pedido)
+
+        assert resultado["action"] == "SKIP"
+        assert _linha_do_google(sol) == antes
+        assert not AuditLog.objects.filter(details__solicitacao_id=sol.id).exists()
+
+    @_TRES_TAREFAS
+    def test_mesmo_pedido_no_estado_em_que_age_segue(self, task_solicitacao, tarefa):
+        sol = task_solicitacao
+        pedido = _com_pedido(sol, gcal_status=_estado_em_que_age(tarefa))
+
+        with (
+            patch(_APPLY, return_value=_sincronizou(sol)) as aplicar,
+            patch(_CANCEL, return_value=_apagou(sol)) as cancelar,
+        ):
+            resultado = _rodar(tarefa, sol.id, pedido=pedido)
+
+        assert resultado["error"] is None
+        if tarefa == "cancelar":
+            cancelar.assert_called_once()
+            assert resultado["action"] == "DELETE"
+        else:
+            aplicar.assert_called_once()
+            assert resultado["action"] == "UPDATE"
+
+    @_TRES_TAREFAS
+    def test_guarda_confere_o_identificador_na_linha_travada(self, task_solicitacao, tarefa):
+        """Outro pedido commita entre a entrega da mensagem e o FOR UPDATE: logo antes dele, a mesma conexão
+        troca o identificador. Quem conferisse antes da trava seguiria com o pedido antigo."""
+        sol = task_solicitacao
+        pedido = _com_pedido(sol, gcal_status=_estado_em_que_age(tarefa))
+
+        def outro_pedido_antes_da_trava(execute, sql, params, many, context):
+            if _travou_a_solicitacao([{"sql": sql}]):
+                Solicitacao.objects.filter(pk=sol.pk).update(gcal_pedido=uuid4().hex)
+            return execute(sql, params, many, context)
+
+        with (
+            connection.execute_wrapper(outro_pedido_antes_da_trava),
+            patch(_APPLY) as aplicar,
+            patch(_CANCEL) as cancelar,
+        ):
+            resultado = _rodar(tarefa, sol.id, pedido=pedido)
+
+        aplicar.assert_not_called()
+        cancelar.assert_not_called()
+        assert resultado["action"] == "SKIP"
+
+    @_TRES_TAREFAS
+    def test_mensagem_sem_identificador_nao_age_em_linha_que_ja_teve_pedido(self, task_solicitacao, tarefa):
+        """Mensagem antiga (enfileirada antes do campo existir) ou chamada direta: só vale para linha que nunca
+        teve pedido, que é como as chamadas diretas dos outros testes deste arquivo seguem funcionando."""
+        sol = task_solicitacao
+        _com_pedido(sol, gcal_status=_estado_em_que_age(tarefa))
+        antes = _linha_do_google(sol)
+
+        with patch(_APPLY) as aplicar, patch(_CANCEL) as cancelar:
+            resultado = _rodar(tarefa, sol.id)
+
+        aplicar.assert_not_called()
+        cancelar.assert_not_called()
+        assert resultado["action"] == "SKIP"
+        assert _linha_do_google(sol) == antes
+
+    def test_previa_nao_passa_pela_guarda(self, task_solicitacao):
+        """A prévia não grava e não leva identificador: roda mesmo em linha que tem pedido."""
+        sol = task_solicitacao
+        _com_pedido(sol)
+
+        with patch(_APPLY, return_value=_sincronizou(sol)) as aplicar:
+            resultado = _rodar("publicar", sol.id, dry_run=True)
+
+        aplicar.assert_called_once()
+        assert resultado["action"] == "UPDATE"
+
+    def test_cancelamento_atrasado_nao_apaga_a_publicacao_mais_nova(self, settings):
+        """De ponta a ponta, com o cliente fake: publicado → "Tirar do Google" (a tarefa fica na fila) →
+        "Reenviar" (pedido mais novo) publica → a tarefa do cancelamento antigo roda.
+
+        RED: o cancelamento atrasado apagava o evento no Google e desvinculava a linha, por cima do reenvio."""
+        from django.db import transaction
+
+        from apps.core.services.gcal_fake_client import FakeCalendarClient
+        from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+
+        settings.GCAL_AUTH_MODE = "service_account"
+        fabrica = "apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id"
+        fake = FakeCalendarClient()
+        agora = timezone.now()
+        sol = SolicitacaoFactory(
+            status="aprovado", inicio=agora + timedelta(days=2), fim=agora + timedelta(days=2, hours=2)
+        )
+        eid = f"asv2{sol.id}"
+
+        with patch(fabrica, return_value=(fake, "primary")):
+            assert _rodar("publicar", sol.id)["action"] == "CREATE"
+            with transaction.atomic():
+                cancelamento = pedir_operacao_gcal(sol.id, "cancelar")
+            with transaction.atomic():
+                reenvio = pedir_operacao_gcal(sol.id, "reenviar")
+            assert _rodar("publicar", sol.id, pedido=reenvio)["action"] == "UPDATE"
+
+            resultado = _rodar("cancelar", sol.id, pedido=cancelamento)
+
+        assert resultado["action"] == "SKIP"
+        assert fake.get("primary", eid)["status"] == "confirmed"
+        linha = Solicitacao.objects.filter(pk=sol.pk).values("gcal_status", "external_event_id").get()
+        assert linha == {"gcal_status": "PUBLISHED", "external_event_id": eid}
+
+
+def _erros_auditados(sol):
+    return AuditLog.objects.filter(action=AuditLog.Action.PUBLISH_GCAL_ERROR, details__solicitacao_id=sol.id)
+
+
+class TestMarcaDeErroSobTrava:
+    """DEF-32: a marca de ERROR (`_mark_gcal_error`) trava a linha e só grava, na linha e no AuditLog, se o
+    pedido da tarefa ainda é o da linha e ela segue PENDING. Antes era um save cego, fora de trava: a falha de
+    um pedido antigo apagava o resultado de outro mais novo (ERROR por cima de PUBLISHED, ou de NONE)."""
+
+    def _marcar(self, sol, **kwargs):
+        from apps.core.tasks import _mark_gcal_error  # pyright: ignore[reportPrivateUsage]
+
+        _mark_gcal_error(sol.id, "O Google recusou.", raw_error="HttpError 500", dry_run=False, **kwargs)
+
+    def test_pedido_superado_nao_marca_nem_audita(self, task_solicitacao):
+        sol = task_solicitacao
+        _com_pedido(sol)  # o pedido mais novo, ainda por fazer
+        antes = _linha_do_google(sol)
+
+        self._marcar(sol, pedido=uuid4().hex)
+
+        assert _linha_do_google(sol) == antes
+        assert not _erros_auditados(sol).exists()
+
+    @pytest.mark.parametrize("gcal_status", ["PUBLISHED", "NONE", "ERROR"])
+    def test_mesmo_pedido_com_a_linha_fora_de_pending_nao_marca(self, task_solicitacao, gcal_status):
+        """A mesma mensagem, entregue de novo, falha depois que a primeira entrega concluiu: não regrava."""
+        sol = task_solicitacao
+        pedido = _com_pedido(sol, gcal_status=gcal_status, gcal_payload_hash="hash-publicado")
+        antes = _linha_do_google(sol)
+
+        self._marcar(sol, pedido=pedido)
+
+        assert _linha_do_google(sol) == antes
+        assert not _erros_auditados(sol).exists()
+
+    def test_mesmo_pedido_em_pending_marca_e_audita(self, task_solicitacao):
+        sol = task_solicitacao
+        pedido = _com_pedido(sol, gcal_payload_hash="hash-publicado")
+
+        self._marcar(sol, pedido=pedido, operation="cancel")
+
+        linha = _linha_do_google(sol)
+        assert linha["gcal_status"] == _ERROR
+        assert linha["gcal_last_error"] == "O Google recusou."
+        assert linha["gcal_payload_hash"] is None
+        assert linha["gcal_pedido"] == pedido
+        assert linha["external_event_id"] == sol.external_event_id  # a linha segue re-tentável
+        registro = _erros_auditados(sol).get()
+        assert registro.details["operation"] == "cancel"
+        assert registro.details["error"] == "HttpError 500"
+
+    def test_sem_identificador_em_linha_sem_pedido_marca_como_antes(self, task_solicitacao):
+        """Mensagem antiga ou chamada direta: marca em qualquer estado, como sempre fez."""
+        sol = task_solicitacao  # PUBLISHED, sem pedido
+
+        self._marcar(sol)
+
+        assert _linha_do_google(sol)["gcal_status"] == _ERROR
+        assert _erros_auditados(sol).count() == 1
+
+    def test_marca_trava_a_linha(self, task_solicitacao):
+        with CaptureQueriesContext(connection) as consultas:
+            self._marcar(task_solicitacao)
+
+        assert _travou_a_solicitacao(consultas.captured_queries)
+
+    def test_marca_confere_o_pedido_na_linha_travada(self, task_solicitacao):
+        """Outro pedido (por exemplo, "Tirar do Google") commita enquanto a marca espera a trava: logo antes do
+        FOR UPDATE da própria marca, a mesma conexão troca o identificador. Quem conferisse o pedido antes da trava
+        gravaria ERROR por cima do pedido mais novo, e a tarefa dele, achando ERROR, não faria nada."""
+        sol = task_solicitacao
+        pedido = _com_pedido(sol)
+        mais_novo = uuid4().hex
+
+        def outro_pedido_antes_da_trava(execute, sql, params, many, context):
+            if _travou_a_solicitacao([{"sql": sql}]):
+                Solicitacao.objects.filter(pk=sol.pk).update(gcal_pedido=mais_novo)
+            return execute(sql, params, many, context)
+
+        with connection.execute_wrapper(outro_pedido_antes_da_trava):
+            self._marcar(sol, pedido=pedido)
+
+        linha = _linha_do_google(sol)
+        assert (linha["gcal_status"], linha["gcal_pedido"]) == (_PENDING, mais_novo)
+        assert not _erros_auditados(sol).exists()
+
+    def test_previa_segue_sem_gravar(self, task_solicitacao):
+        from apps.core.tasks import _mark_gcal_error  # pyright: ignore[reportPrivateUsage]
+
+        antes = _linha_do_google(task_solicitacao)
+
+        _mark_gcal_error(task_solicitacao.id, "O Google recusou.", raw_error="HttpError 500", dry_run=True)
+
+        assert _linha_do_google(task_solicitacao) == antes
+        assert not _erros_auditados(task_solicitacao).exists()
+
+    @pytest.mark.parametrize("tarefa", ["publicar", "cancelar"])
+    def test_falha_da_tarefa_nao_marca_por_cima_de_pedido_que_chegou_depois(self, task_solicitacao, tarefa):
+        """A tarefa passa pela guarda, o Google falha e o rollback solta a linha. Antes da marca de erro, outro
+        pedido commita (aqui, na hora em que a tarefa monta o texto do erro). A marca relê sob a trava e não
+        grava por cima do pedido mais novo."""
+        sol = task_solicitacao
+        pedido = _com_pedido(sol)
+        mais_novo = uuid4().hex
+
+        def outro_pedido_commita(_erro):
+            Solicitacao.objects.filter(pk=sol.pk).update(gcal_pedido=mais_novo)
+            return "O Google recusou."
+
+        with (
+            patch(_APPLY, side_effect=RuntimeError("Google fora do ar")),
+            patch(_CANCEL, side_effect=RuntimeError("Google fora do ar")),
+            patch("apps.core.tasks._friendly_gcal_error", side_effect=outro_pedido_commita),
+        ):
+            resultado = _rodar(tarefa, sol.id, pedido=pedido)
+
+        assert resultado["action"] == "ERROR"
+        linha = _linha_do_google(sol)
+        assert linha["gcal_status"] == _PENDING
+        assert linha["gcal_pedido"] == mais_novo
+        assert not _erros_auditados(sol).exists()
+
+    @pytest.mark.parametrize(
+        "tarefa, operador",
+        [
+            ("publicar", "sem_credencial"),
+            ("publicar", "ausente"),
+            ("publicar", "inexistente"),
+            ("cancelar", "sem_credencial"),
+        ],
+    )
+    def test_saida_cedo_do_oauth_com_pedido_superado_nao_muda_a_linha(
+        self, task_solicitacao, settings, tarefa, operador
+    ):
+        """As saídas cedo do modo OAuth (sem operador, operador que não existe, sem credencial Google) marcam
+        ERROR antes da trava da tarefa. Com o pedido superado, não mudam a linha."""
+        settings.GCAL_AUTH_MODE = "oauth"
+        sol = task_solicitacao
+        _com_pedido(sol)  # o pedido mais novo
+        antes = _linha_do_google(sol)
+        operadores = {"sem_credencial": UsuarioFactory().pk, "ausente": None, "inexistente": 999_999_999}
+        operator_user_id = operadores[operador]
+
+        resultado = _rodar(tarefa, sol.id, operator_user_id=operator_user_id, pedido=uuid4().hex)
+
+        assert resultado["action"] == "ERROR"
+        assert _linha_do_google(sol) == antes
+        assert not _erros_auditados(sol).exists()
+
+    @pytest.mark.parametrize("tarefa", ["publicar", "cancelar"])
+    def test_falha_ao_gravar_o_erro_faz_a_tarefa_levantar(self, task_solicitacao, tarefa):
+        """RED: o `mark_gcal` que falhava era engolido e a tarefa devolvia ERROR com a linha ainda em PENDING,
+        para sempre. Agora a falha sobe e a tarefa termina em falha (ou roda de novo, se for de conexão)."""
+        from django.db import DatabaseError
+
+        sol = task_solicitacao
+        pedido = _com_pedido(sol)
+
+        with (
+            patch(_APPLY, side_effect=RuntimeError("Google fora do ar")),
+            patch(_CANCEL, side_effect=RuntimeError("Google fora do ar")),
+            patch.object(Solicitacao, "mark_gcal", side_effect=DatabaseError("banco fora do ar")),
+            pytest.raises(DatabaseError),
+        ):
+            _rodar(tarefa, sol.id, pedido=pedido)
+
+
+_FABRICA_DO_CLIENTE = "apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id"
+
+
+def _evento_futuro():
+    agora = timezone.now()
+    return SolicitacaoFactory(
+        status="aprovado", inicio=agora + timedelta(days=2), fim=agora + timedelta(days=2, hours=2)
+    )
+
+
+def _pedir(sol, operacao: str) -> str:
+    from django.db import transaction
+
+    from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+
+    with transaction.atomic():
+        return pedir_operacao_gcal(sol.id, operacao)
+
+
+def _publicar_com_o_disjuntor_aberto(sol, pedido: str):
+    """Roda o publicar com o disjuntor aberto. Devolve (resultado, mock do `apply_async` da nova tentativa)."""
+    from apps.core.services.gcal.circuit_breaker import gcal_breaker
+    from apps.core.tasks import queue_gcal_sync_retry
+
+    gcal_breaker.open()
+    try:
+        with patch.object(queue_gcal_sync_retry, "apply_async") as enfileirou:
+            resultado = _rodar("publicar", sol.id, pedido=pedido)
+    finally:
+        gcal_breaker.close()
+    return resultado, enfileirou
+
+
+def _rodar_a_nova_tentativa(enfileirou):
+    """Roda a nova tentativa com os argumentos que o publicar mandou para a fila."""
+    from apps.core.tasks import queue_gcal_sync_retry
+
+    args, opcoes = enfileirou.call_args
+    return queue_gcal_sync_retry(*args[0], **opcoes["kwargs"])
+
+
+class TestErroDoPublicarENovaTentativa:
+    """DEF-32: no erro do publicar, a marca de ERROR vem antes de enfileirar a nova tentativa (que só age sobre
+    linha em ERROR), a fila fora do ar não impede a marca, e a nova tentativa leva o identificador do pedido."""
+
+    def test_linha_ja_esta_em_erro_quando_a_nova_tentativa_vai_para_a_fila(self, task_solicitacao):
+        """RED: a tentativa era enfileirada com a linha ainda em PENDING; com a fila fora, a exceção saía do
+        `except` e a marca de ERROR nem rodava."""
+        from apps.core.services.gcal.circuit_breaker import CircuitBreakerError, gcal_breaker
+        from apps.core.tasks import queue_gcal_sync_retry
+
+        sol = task_solicitacao
+        pedido = _com_pedido(sol)
+        visto = {}
+
+        def enfileirar(*_args, **_kwargs):
+            visto["gcal_status"] = _linha_do_google(sol)["gcal_status"]
+
+        with (
+            patch(_APPLY, side_effect=CircuitBreakerError(gcal_breaker)),
+            patch.object(queue_gcal_sync_retry, "apply_async", side_effect=enfileirar) as enfileirou,
+        ):
+            resultado = _rodar("publicar", sol.id, pedido=pedido)
+
+        assert resultado["action"] == "ERROR"
+        assert visto == {"gcal_status": _ERROR}
+        enfileirou.assert_called_once_with(
+            (sol.id,), kwargs={"dry_run": False, "apply_blocked": False, "pedido": pedido}, countdown=60
+        )
+
+    def test_fila_fora_ao_enfileirar_a_nova_tentativa_nao_impede_a_marca_de_erro(self, task_solicitacao, caplog):
+        from kombu.exceptions import OperationalError as FilaForaDoAr
+
+        from apps.core.services.gcal.circuit_breaker import CircuitBreakerError, gcal_breaker
+        from apps.core.tasks import queue_gcal_sync_retry
+
+        sol = task_solicitacao
+        pedido = _com_pedido(sol)
+
+        with (
+            caplog.at_level(logging.ERROR, logger="apps.core.tasks"),
+            patch(_APPLY, side_effect=CircuitBreakerError(gcal_breaker)),
+            patch.object(queue_gcal_sync_retry, "apply_async", side_effect=FilaForaDoAr("redis fora do ar")),
+        ):
+            resultado = _rodar("publicar", sol.id, pedido=pedido)
+
+        assert resultado["action"] == "ERROR"
+        assert _linha_do_google(sol)["gcal_status"] == _ERROR
+        assert any(
+            r.name == "apps.core.tasks" and r.exc_info and isinstance(r.exc_info[1], FilaForaDoAr)
+            for r in caplog.records
+        ), "a falha ao enfileirar a nova tentativa não foi para o log"
+
+    def test_nova_tentativa_enfileirada_pelo_publicar_publica_quando_o_disjuntor_fecha(self, settings):
+        """De ponta a ponta, com o cliente fake: "Publicar" cai no disjuntor aberto (linha em ERROR, tentativa
+        na fila com o identificador) → o disjuntor fecha → a tentativa publica.
+
+        RED: a tentativa ia para a fila sem o identificador e, numa linha que tem pedido, não agia nunca."""
+        from apps.core.services.gcal_fake_client import FakeCalendarClient
+
+        settings.GCAL_AUTH_MODE = "service_account"
+        fake = FakeCalendarClient()
+        sol = _evento_futuro()
+        eid = f"asv2{sol.id}"
+
+        with patch(_FABRICA_DO_CLIENTE, return_value=(fake, "primary")):
+            resultado, enfileirou = _publicar_com_o_disjuntor_aberto(sol, _pedir(sol, "publicar"))
+            assert resultado["action"] == "ERROR"
+            assert _linha_do_google(sol)["gcal_status"] == _ERROR
+
+            resultado = _rodar_a_nova_tentativa(enfileirou)
+
+        assert resultado["action"] == "CREATE"
+        assert fake.get("primary", eid)["status"] == "confirmed"
+        linha = _linha_do_google(sol)
+        assert (linha["gcal_status"], linha["external_event_id"]) == ("PUBLISHED", eid)
+
+    def test_nova_tentativa_nao_age_depois_de_um_cancelamento_que_falhou(self, settings):
+        """De ponta a ponta: publicado → "Reenviar" cai no disjuntor aberto (ERROR, tentativa na fila) → "Tirar
+        do Google" também cai (ERROR de novo, agora com o identificador do cancelamento) → o disjuntor fecha e a
+        tentativa do reenvio roda. A linha está em ERROR, mas por outro pedido: a tentativa não reenvia o evento
+        que a pessoa mandou tirar."""
+        from apps.core.services.gcal.circuit_breaker import gcal_breaker
+        from apps.core.services.gcal_fake_client import FakeCalendarClient
+
+        settings.GCAL_AUTH_MODE = "service_account"
+        fake = FakeCalendarClient()
+        sol = _evento_futuro()
+
+        with patch(_FABRICA_DO_CLIENTE, return_value=(fake, "primary")):
+            assert _rodar("publicar", sol.id)["action"] == "CREATE"
+            resultado, enfileirou = _publicar_com_o_disjuntor_aberto(sol, _pedir(sol, "reenviar"))
+            assert resultado["action"] == "ERROR"
+            cancelamento = _pedir(sol, "cancelar")
+            gcal_breaker.open()
+            try:
+                assert _rodar("cancelar", sol.id, pedido=cancelamento)["action"] == "ERROR"
+            finally:
+                gcal_breaker.close()
+            antes = _linha_do_google(sol)
+            assert (antes["gcal_status"], antes["gcal_pedido"]) == (_ERROR, cancelamento)
+
+            resultado = _rodar_a_nova_tentativa(enfileirou)
+
+        assert resultado["action"] == "SKIP"
+        assert _linha_do_google(sol) == antes
+
+
+_PUBLICAR_E_CANCELAR = pytest.mark.parametrize("tarefa", ["publicar", "cancelar"])
+
+
+class TestFalhaDeBancoPedeNovaExecucao:
+    """DEF-32: OperationalError ou InterfaceError que escapa da tarefa (na prática, a marca de ERROR que falha) faz
+    o Celery rodar a tarefa de novo (180 s depois, até 3 vezes), e a nova execução passa pela guarda do pedido.
+    Os testes trocam o `retry` e chamam a tarefa direto: não cobrem a entrega com o banco fora, que o Celery
+    confirma sem rodar (a gravação de STARTED falha antes do corpo da tarefa) e deixa a linha em PENDING (limite
+    em gcal.spec.md)."""
+
+    @_PUBLICAR_E_CANCELAR
+    def test_tarefa_repete_em_falha_de_conexao_com_o_banco(self, tarefa):
+        from django.db import InterfaceError, OperationalError
+
+        assert {OperationalError, InterfaceError} <= set(getattr(_tarefa(tarefa), "autoretry_for", ()))
+
+    @_PUBLICAR_E_CANCELAR
+    def test_conexao_que_cai_ao_gravar_o_erro_pede_nova_execucao(self, task_solicitacao, tarefa):
+        """O Google falha e, na hora de marcar ERROR, o banco está fora: a tarefa pede nova execução ao Celery
+        com o erro do banco (aqui o `retry` é trocado para o pedido aparecer sem um worker de verdade)."""
+        from django.db import OperationalError
+
+        from celery.exceptions import Retry
+
+        sol = task_solicitacao
+        pedido = _com_pedido(sol)
+
+        with (
+            patch(_APPLY, side_effect=RuntimeError("Google fora do ar")),
+            patch(_CANCEL, side_effect=RuntimeError("Google fora do ar")),
+            patch.object(Solicitacao, "mark_gcal", side_effect=OperationalError("conexão com o banco caiu")),
+            patch.object(_tarefa(tarefa), "retry", side_effect=Retry()) as nova_execucao,
+            pytest.raises(Retry),
+        ):
+            _rodar(tarefa, sol.id, pedido=pedido)
+
+        nova_execucao.assert_called_once()
+        assert isinstance(nova_execucao.call_args.kwargs["exc"], OperationalError)
+
+
+def _pulou(sol):
+    from apps.core.services.gcal.sync import SyncOutcome
+
+    return SyncOutcome(action="SKIP", solicitation_id=sol.id, external_event_id=sol.external_event_id, summary="")
+
+
+class TestPublicarNaoTerminaEmPending:
+    """DEF-32: a tarefa de publicar que agiu sobre um pedido não deixa a linha em PENDING. O `apply` não grava
+    nada quando devolve SKIP (evento que deixou de estar aprovado e não tem id; reaplicar sem mudança): a tarefa
+    fecha o pedido, com PUBLISHED se o evento segue aprovado e no Google, com ERROR e o motivo se não."""
+
+    def test_evento_que_deixou_de_estar_aprovado_termina_em_erro_com_o_motivo(self, settings):
+        """Com o cliente fake: "Publicar" é pedido, a aprovação é desfeita e só então a tarefa roda.
+
+        RED: o sync devolvia SKIP sem gravar e a linha ficava em PENDING para sempre."""
+        from apps.core.services.gcal_fake_client import FakeCalendarClient
+
+        settings.GCAL_AUTH_MODE = "service_account"
+        fake = FakeCalendarClient()
+        sol = _evento_futuro()
+        pedido = _pedir(sol, "publicar")
+        Solicitacao.objects.filter(pk=sol.pk).update(status="pendente")
+
+        with patch(_FABRICA_DO_CLIENTE, return_value=(fake, "primary")):
+            resultado = _rodar("publicar", sol.id, pedido=pedido)
+
+        assert resultado["action"] == "SKIP"
+        assert fake.list_events("primary") == []
+        linha = _linha_do_google(sol)
+        assert linha["gcal_status"] == _ERROR
+        assert linha["gcal_last_error"] == (
+            "A publicação não foi feita porque o evento deixou de estar aprovado. Aprove de novo e publique."
+        )
+        assert linha["external_event_id"] is None
+
+    def test_reaplicar_sem_mudanca_termina_publicado_com_o_mesmo_hash(self, settings):
+        """Com o cliente fake: publicado → "Reaplicar" sem nada ter mudado. O hash é o mesmo, o sync devolve
+        SKIP sem gravar no Google (uma leitura do evento) e a linha volta a PUBLISHED com o hash que tinha.
+
+        RED: o lote de reaplicar não marcava nada; marcando PENDING, o SKIP deixaria a linha presa."""
+        from apps.core.services.gcal_fake_client import FakeCalendarClient
+
+        settings.GCAL_AUTH_MODE = "service_account"
+        fake = FakeCalendarClient()
+        sol = _evento_futuro()
+
+        with patch(_FABRICA_DO_CLIENTE, return_value=(fake, "primary")):
+            assert _rodar("publicar", sol.id)["action"] == "CREATE"
+            publicado = _linha_do_google(sol)
+            pedido = _pedir(sol, "reaplicar")
+            with patch.object(fake, "update", wraps=fake.update) as atualizou:
+                resultado = _rodar("publicar", sol.id, pedido=pedido)
+
+        assert resultado["action"] == "SKIP"
+        atualizou.assert_not_called()
+        linha = _linha_do_google(sol)
+        assert linha["gcal_status"] == "PUBLISHED"
+        assert linha["gcal_payload_hash"] == publicado["gcal_payload_hash"]
+        assert linha["gcal_payload_hash"]
+        assert linha["gcal_last_error"] == ""
+        assert linha["external_event_id"] == publicado["external_event_id"]
+
+    def test_pedido_nao_muda_updated_at_e_por_isso_o_reaplicar_sem_mudanca_da_skip(self, settings):
+        """O hash do payload inclui `updated_at` (`extendedProperties.private.last_updated`). Se o pedido
+        gravasse `updated_at`, todo reaplicar viraria UPDATE e, com `GCAL_SEND_UPDATES=all`, mandaria o convite
+        de novo a todos sem mudança nenhuma. É por isso que `pedir_operacao_gcal` não grava `updated_at`, e que
+        os lotes de publicar e de reenviar, que gravavam, deixaram de gravar."""
+        from apps.core.services.gcal_fake_client import FakeCalendarClient
+
+        settings.GCAL_AUTH_MODE = "service_account"
+        fake = FakeCalendarClient()
+        sol = _evento_futuro()
+
+        def updated_at():
+            return Solicitacao.objects.values_list("updated_at", flat=True).get(pk=sol.pk)
+
+        with patch(_FABRICA_DO_CLIENTE, return_value=(fake, "primary")):
+            assert _rodar("publicar", sol.id)["action"] == "CREATE"
+            antes = updated_at()
+            pedido = _pedir(sol, "reaplicar")
+            assert updated_at() == antes
+            with patch.object(fake, "update", wraps=fake.update) as atualizou:
+                resultado = _rodar("publicar", sol.id, pedido=pedido)
+
+        assert resultado["action"] == "SKIP"
+        atualizou.assert_not_called()
+
+    def test_skip_de_evento_aprovado_sem_id_termina_em_erro(self, task_solicitacao):
+        """Aprovado, sem id do evento e o sync não fez nada: o Google não confirmou; a linha não fica em PENDING."""
+        sol = task_solicitacao
+        pedido = _com_pedido(sol, external_event_id=None)
+
+        with patch(_APPLY, return_value=_pulou(sol)):
+            resultado = _rodar("publicar", sol.id, pedido=pedido)
+
+        assert resultado["action"] == "SKIP"
+        linha = _linha_do_google(sol)
+        assert linha["gcal_status"] == _ERROR
+        assert linha["gcal_last_error"] == "O Google não confirmou a publicação. Publique de novo."
+
+    def test_skip_em_que_o_sync_ja_marcou_erro_fica_com_o_erro_do_sync(self, task_solicitacao):
+        """Sem `GCAL_CLIENT`, o sync marca ERROR e devolve SKIP: a linha já saiu de PENDING e a tarefa não regrava."""
+        sol = task_solicitacao
+        pedido = _com_pedido(sol)
+
+        def marca_erro_e_pula(s, **_kwargs):
+            s.mark_gcal(status=_ERROR, error="GCAL_CLIENT não configurado")
+            return _pulou(s)
+
+        with patch(_APPLY, side_effect=marca_erro_e_pula):
+            _rodar("publicar", sol.id, pedido=pedido)
+
+        linha = _linha_do_google(sol)
+        assert (linha["gcal_status"], linha["gcal_last_error"]) == (_ERROR, "GCAL_CLIENT não configurado")
+
+    @pytest.mark.parametrize("chamada", ["sem_pedido", "previa"])
+    def test_skip_sem_pedido_ou_na_previa_nao_grava(self, task_solicitacao, chamada):
+        """Mensagem antiga, chamada direta e prévia seguem como antes: o SKIP não toca a linha."""
+        sol = task_solicitacao
+        Solicitacao.objects.filter(pk=sol.pk).update(gcal_status=_PENDING)
+        antes = _linha_do_google(sol)
+        kwargs = {"dry_run": True} if chamada == "previa" else {}
+
+        with patch(_APPLY, return_value=_pulou(sol)):
+            resultado = _rodar("publicar", sol.id, **kwargs)
+
+        assert resultado["action"] == "SKIP"
+        assert _linha_do_google(sol) == antes
+
+
+class TestDesfechoRegistraOPedido:
+    """DEF-32: o AuditLog do desfecho leva o identificador do pedido (`details.pedido`), como o `*_REQUESTED`. O
+    lote não grava `*_REQUESTED`: é pelo desfecho que se casa o pedido com o que aconteceu com ele."""
+
+    @pytest.mark.parametrize(
+        "tarefa, google_falha, acao",
+        [
+            ("publicar", False, "PUBLISH_GCAL"),
+            ("cancelar", False, "CANCEL_GCAL"),
+            ("nova_tentativa", False, "GCAL_RETRY_SUCCESS"),
+            ("publicar", True, "PUBLISH_GCAL_ERROR"),
+            ("cancelar", True, "PUBLISH_GCAL_ERROR"),
+            ("nova_tentativa", True, "PUBLISH_GCAL_ERROR"),
+        ],
+    )
+    def test_desfecho_leva_o_pedido(self, task_solicitacao, tarefa, google_falha, acao):
+        sol = task_solicitacao
+        pedido = _com_pedido(sol, gcal_status=_estado_em_que_age(tarefa))
+        if google_falha:
+            aplicar = cancelar = {"side_effect": RuntimeError("Google fora do ar")}
+        else:
+            aplicar, cancelar = {"return_value": _sincronizou(sol)}, {"return_value": _apagou(sol)}
+
+        with patch(_APPLY, **aplicar), patch(_CANCEL, **cancelar):
+            _rodar(tarefa, sol.id, pedido=pedido)
+
+        registro = AuditLog.objects.get(action=acao, details__solicitacao_id=sol.id)
+        assert registro.details["pedido"] == pedido
+
+
 class TestNotificacoesTask:
     """Tests for processar_notificacoes_acoes_diarias."""
 
@@ -629,3 +1372,38 @@ def test_limite_brando_global_abaixo_do_duro():
     assert brando is not None
     assert brando < settings.CELERY_TASK_TIME_LIMIT
     assert app.conf.task_soft_time_limit == brando
+
+
+@_PUBLICAR_E_CANCELAR
+def test_publicar_e_cancelar_voltam_a_fila_se_o_processo_morre(tarefa):
+    """DEF-32 (ISS-1970): a mensagem só é confirmada depois que a tarefa termina (`acks_late`), e o processo do
+    worker que morre no meio a devolve à fila na hora (`reject_on_worker_lost`). A segunda entrega passa pela
+    guarda do pedido: não regrava o que já foi gravado e, se o processo morreu entre o Google e o commit, escreve
+    de novo no mesmo evento, sem duplicar."""
+    task = _tarefa(tarefa)
+
+    assert task.acks_late is True
+    assert task.reject_on_worker_lost is True
+
+
+def test_entrega_de_novo_vale_so_para_publicar_e_cancelar():
+    """Ligado para todas, qualquer tarefa repetiria ao ser entregue de novo; só as duas com a guarda do pedido
+    estão preparadas. A nova tentativa agenda a si mesma (`self.retry`) e fica de fora."""
+    from config.celery import app
+
+    assert not app.conf.task_acks_late
+    assert not app.conf.task_reject_on_worker_lost
+    nova_tentativa = _tarefa("nova_tentativa")
+    assert not nova_tentativa.acks_late
+    assert not nova_tentativa.reject_on_worker_lost
+
+
+def test_prazo_de_reentrega_do_redis_passa_do_limite_de_tempo_da_tarefa():
+    """Se o servidor inteiro cai, o Redis devolve a mensagem não confirmada depois do `visibility_timeout`
+    (1 h quando não configurado). Menor que o limite duro da tarefa, ele entregaria de novo uma tarefa que
+    ainda está rodando."""
+    from config.celery import app
+
+    prazo = app.conf.broker_transport_options.get("visibility_timeout", 3600)
+
+    assert prazo > app.conf.task_time_limit

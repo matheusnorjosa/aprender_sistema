@@ -10,9 +10,10 @@ Type-checked with Pyright (strict mode).
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Literal
 
 from django.conf import settings
+from django.db import transaction
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -22,6 +23,7 @@ from rest_framework.views import APIView
 
 from drf_spectacular.utils import extend_schema
 
+from apps.core.exceptions import APIError
 from apps.core.models import Solicitacao
 from apps.core.rbac.policies import CanUseGcal
 from apps.core.serializers.gcal_dashboard_contract import (
@@ -29,9 +31,56 @@ from apps.core.serializers.gcal_dashboard_contract import (
     BatchActionResponseSerializer,
     DetailMessageSerializer,
 )
-from apps.core.services.solicitacao_publish import MENSAGENS_NAO_PUBLICAVEL, motivo_nao_publicavel
+from apps.core.services.solicitacao_publish import (
+    MENSAGENS_NAO_PUBLICAVEL,
+    enfileirar_tarefa_gcal,
+    motivo_nao_publicavel,
+    pedir_operacao_gcal,
+)
 
 logger = logging.getLogger(__name__)
+
+_FILA_INDISPONIVEL = "fila_indisponivel"
+
+
+def _pedir_e_enfileirar(
+    sol_id: int,
+    operacao: Literal["publicar", "reaplicar", "reenviar"],
+    *,
+    apply_blocked: bool,
+    operator_user_id: int | None,
+) -> dict[str, Any] | None:
+    """Pedido e tarefa de um id numa transação só (DEF-32). Devolve o item de `errors`, ou None se enfileirou.
+
+    A recusa relida sob a trava, a linha ocupada além do teto e a fila fora do ar desfazem a transação
+    deste id: a linha fica como estava. Fila fora do ar sai com `code=fila_indisponivel`, e quem chama para o laço.
+    """
+    from apps.core.tasks import task_publish_solicitacao_to_gcal
+
+    kwargs: dict[str, Any] = {"dry_run": False, "apply_blocked": apply_blocked}
+    if operator_user_id is not None:  # modo OAuth
+        kwargs["operator_user_id"] = operator_user_id
+    try:
+        with transaction.atomic():
+            pedido = pedir_operacao_gcal(sol_id, operacao)
+            enfileirar_tarefa_gcal(task_publish_solicitacao_to_gcal, sol_id, **kwargs, pedido=pedido)
+    except Solicitacao.DoesNotExist:
+        return {"id": sol_id, "detail": "Solicitação não encontrada"}
+    except APIError as e:
+        return {"id": sol_id, "detail": e.message, "code": e.details.get("code") or e.code}
+    return None
+
+
+def _nao_enfileirados(ids: list[Any]) -> list[dict[str, Any]]:
+    """Itens de `errors` dos ids que o lote nem tentou, porque a fila caiu antes deles."""
+    return [
+        {
+            "id": sol_id,
+            "detail": "Não enfileirado: a fila de publicação está indisponível. Tente de novo em instantes.",
+            "code": _FILA_INDISPONIVEL,
+        }
+        for sol_id in ids
+    ]
 
 
 class GCalPublishBatchView(APIView):
@@ -65,8 +114,10 @@ class GCalPublishBatchView(APIView):
     - Apenas solicitações com status='aprovado' são processadas
     - Recusa (com `code`) evento passado, já publicado e publicado fora do sistema (`motivo_nao_publicavel`)
     - Se GCAL_CLIENT != "google" e dry_run=false e apply_blocked=false → erro
-    - Válidas: marca gcal_status=PENDING e enfileira task Celery
+    - Válidas: marca gcal_status=PENDING e enfileira task Celery (uma transação por id, com a linha travada)
     - Inválidas: retorna em 'errors' com motivo
+    - Fila fora do ar: o id da vez não fica PENDING, o lote para e os restantes vão para 'errors'
+      (code='fila_indisponivel')
 
     OAuth Mode (#2039, igual a reapply/resync):
     - Se GCAL_AUTH_MODE=='oauth', requer GoogleOAuthCredential
@@ -87,7 +138,6 @@ class GCalPublishBatchView(APIView):
     )
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         from apps.core.models import GoogleOAuthCredential
-        from apps.core.tasks import task_publish_solicitacao_to_gcal
 
         # OAuth: verificar credencial Google ANTES de mexer em qualquer linha (#2039)
         auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
@@ -132,7 +182,7 @@ class GCalPublishBatchView(APIView):
         # PERF-SQL-01: O(1) lookup instead of O(N) linear search per iteration
         sol_map = {s.id: s for s in solicitacoes}
 
-        for sol_id in solicitacao_ids:
+        for posicao, sol_id in enumerate(solicitacao_ids):
             # Verificar se existe
             sol = sol_map.get(sol_id)
             if not sol:
@@ -160,25 +210,20 @@ class GCalPublishBatchView(APIView):
                 )
                 continue
 
-            # Válida: marcar como PENDING e enfileirar
+            # Válida: pedido (PENDING sob trava) e tarefa, numa transação por id. O id vai POSICIONAL:
+            # a task recebe `solicitation_id` (M24-01).
             if not dry_run:
-                sol.gcal_status = Solicitacao.GCalStatus.PENDING
-                sol.save(update_fields=["gcal_status", "updated_at"])
-
-                # Id POSICIONAL: a task recebe `solicitation_id`. O antigo kwarg
-                # `solicitacao_id=` estourava TypeError no despacho e nada rodava (M24-01).
-                try:
-                    if auth_mode == "oauth":
-                        task_publish_solicitacao_to_gcal.delay(
-                            sol.id, dry_run=dry_run, apply_blocked=apply_blocked, operator_user_id=operator_user_id
-                        )
-                    else:
-                        task_publish_solicitacao_to_gcal.delay(sol.id, dry_run=dry_run, apply_blocked=apply_blocked)
+                erro = _pedir_e_enfileirar(
+                    sol.id, "publicar", apply_blocked=apply_blocked, operator_user_id=operator_user_id
+                )
+                if erro is None:
                     queued.append(sol.id)
                     logger.info(f"Batch publish queued: solicitacao_id={sol.id}, dry_run={dry_run}")
-                except Exception as e:
-                    logger.error(f"Failed to queue solicitacao_id={sol.id}: {e}")
-                    errors.append({"id": sol.id, "detail": "Erro ao enfileirar operação."})
+                    continue
+                errors.append(erro)
+                if erro.get("code") == _FILA_INDISPONIVEL:
+                    errors.extend(_nao_enfileirados(solicitacao_ids[posicao + 1 :]))
+                    break
             else:
                 # Dry-run: apenas simula
                 queued.append(sol.id)
@@ -194,8 +239,11 @@ class GCalBatchReapplyView(APIView):
     """
     POST /api/gcal/dashboard/batch/reapply/
 
-    Reaplica eventos já publicados (não reseta hash).
-    Útil para forçar update no Google Calendar sem alterar o estado local.
+    Reaplica eventos já publicados: marca PENDING e mantém o hash da linha PUBLISHED, então o evento sem
+    mudança vira SKIP na tarefa e volta a PUBLISHED. Linha em ERROR perde o hash (o envio acontece). Linha em
+    PENDING (outra operação em andamento, ou o mesmo id repetido no lote) vai para 'errors' com
+    code='operacao_em_andamento', sem mudar nada.
+    Fila fora do ar: como no publish-batch (o lote para; code='fila_indisponivel').
 
     Request Body:
     {
@@ -236,7 +284,6 @@ class GCalBatchReapplyView(APIView):
     )
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         from apps.core.models import GoogleOAuthCredential
-        from apps.core.tasks import task_publish_solicitacao_to_gcal
 
         # OAuth Phase 7: Verificar credencial Google em modo OAuth
         auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
@@ -277,7 +324,7 @@ class GCalBatchReapplyView(APIView):
         queued_count = 0
         errors = []
 
-        for sol_id in ids:
+        for posicao, sol_id in enumerate(ids):
             # Verificar se existe (O(1) dict lookup)
             sol = solicitacoes_dict.get(sol_id)
             if not sol:
@@ -302,22 +349,20 @@ class GCalBatchReapplyView(APIView):
                 )
                 continue
 
-            # Válida: enfileirar (reapply não reseta hash)
+            # Válida: pedido (PENDING sob trava; o hash fica só em linha PUBLISHED; linha já em PENDING é recusada)
+            # e tarefa, numa transação por id
             if not dry_run:
-                try:
-                    # OAuth mode: passar operator_user_id
-                    if auth_mode == "oauth":
-                        task_publish_solicitacao_to_gcal.delay(
-                            sol.id, dry_run=dry_run, apply_blocked=apply_blocked, operator_user_id=operator_user_id
-                        )
-                    else:
-                        # Service account mode: sem operator_user_id
-                        task_publish_solicitacao_to_gcal.delay(sol.id, dry_run=dry_run, apply_blocked=apply_blocked)
+                erro = _pedir_e_enfileirar(
+                    sol.id, "reaplicar", apply_blocked=apply_blocked, operator_user_id=operator_user_id
+                )
+                if erro is None:
                     queued_count += 1
                     logger.info(f"Batch reapply queued: id={sol.id}, operator={operator_user_id}")
-                except Exception as e:
-                    logger.error(f"Failed to queue reapply id={sol.id}: {e}")
-                    errors.append({"id": sol.id, "detail": "Erro ao enfileirar operação."})
+                    continue
+                errors.append(erro)
+                if erro.get("code") == _FILA_INDISPONIVEL:
+                    errors.extend(_nao_enfileirados(ids[posicao + 1 :]))
+                    break
             else:
                 # Dry-run: apenas simula
                 queued_count += 1
@@ -334,6 +379,7 @@ class GCalBatchResyncView(APIView):
 
     Força resync de eventos (reseta hash + marca PENDING).
     Útil para corrigir drift ou reprocessar eventos com erros.
+    Fila fora do ar: como no publish-batch (o lote para; code='fila_indisponivel').
 
     Request Body:
     {
@@ -374,7 +420,6 @@ class GCalBatchResyncView(APIView):
     )
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         from apps.core.models import GoogleOAuthCredential
-        from apps.core.tasks import task_publish_solicitacao_to_gcal
 
         # OAuth Phase 7: Verificar credencial Google em modo OAuth
         auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
@@ -415,7 +460,7 @@ class GCalBatchResyncView(APIView):
         queued_count = 0
         errors = []
 
-        for sol_id in ids:
+        for posicao, sol_id in enumerate(ids):
             # Verificar se existe (O(1) dict lookup)
             sol = solicitacoes_dict.get(sol_id)
             if not sol:
@@ -440,27 +485,19 @@ class GCalBatchResyncView(APIView):
                 )
                 continue
 
-            # Válida: resetar hash + marcar PENDING + enfileirar
+            # Válida: pedido (PENDING sob trava, hash zerado para forçar o reenvio) e tarefa, numa transação por id
             if not dry_run:
-                try:
-                    # Resync: resetar hash para forçar reprocessamento
-                    sol.gcal_payload_hash = None
-                    sol.gcal_status = Solicitacao.GCalStatus.PENDING
-                    sol.save(update_fields=["gcal_payload_hash", "gcal_status", "updated_at"])
-
-                    # OAuth mode: passar operator_user_id
-                    if auth_mode == "oauth":
-                        task_publish_solicitacao_to_gcal.delay(
-                            sol.id, dry_run=dry_run, apply_blocked=apply_blocked, operator_user_id=operator_user_id
-                        )
-                    else:
-                        # Service account mode: sem operator_user_id
-                        task_publish_solicitacao_to_gcal.delay(sol.id, dry_run=dry_run, apply_blocked=apply_blocked)
+                erro = _pedir_e_enfileirar(
+                    sol.id, "reenviar", apply_blocked=apply_blocked, operator_user_id=operator_user_id
+                )
+                if erro is None:
                     queued_count += 1
                     logger.info(f"Batch resync queued: id={sol.id}, operator={operator_user_id}")
-                except Exception as e:
-                    logger.error(f"Failed to queue resync id={sol.id}: {e}")
-                    errors.append({"id": sol.id, "detail": "Erro ao enfileirar operação."})
+                    continue
+                errors.append(erro)
+                if erro.get("code") == _FILA_INDISPONIVEL:
+                    errors.extend(_nao_enfileirados(ids[posicao + 1 :]))
+                    break
             else:
                 # Dry-run: apenas simula
                 queued_count += 1

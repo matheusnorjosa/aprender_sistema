@@ -196,9 +196,15 @@ def test_publish_oauth_mode_com_credencial_retorna_202(
     # Validar 202
     assert response.status_code == http_status.HTTP_202_ACCEPTED
 
-    # Validar task chamada com operator_user_id
+    # Validar task chamada com operator_user_id e com o identificador do pedido gravado na linha (DEF-32)
+    solicitacao_aprovada.refresh_from_db()
+    assert solicitacao_aprovada.gcal_pedido
     mock_task.assert_called_once_with(
-        solicitacao_aprovada.id, dry_run=False, apply_blocked=True, operator_user_id=usuario_controle.id
+        solicitacao_aprovada.id,
+        dry_run=False,
+        apply_blocked=True,
+        operator_user_id=usuario_controle.id,
+        pedido=solicitacao_aprovada.gcal_pedido,
     )
 
 
@@ -269,9 +275,15 @@ def test_resync_oauth_mode_com_credencial_retorna_202(
     # Validar 202
     assert response.status_code == http_status.HTTP_202_ACCEPTED
 
-    # Validar task chamada com operator_user_id
+    # Validar task chamada com operator_user_id e com o identificador do pedido gravado na linha (DEF-32)
+    solicitacao_aprovada.refresh_from_db()
+    assert solicitacao_aprovada.gcal_pedido
     mock_task.assert_called_once_with(
-        solicitacao_aprovada.id, dry_run=False, apply_blocked=False, operator_user_id=usuario_controle.id
+        solicitacao_aprovada.id,
+        dry_run=False,
+        apply_blocked=False,
+        operator_user_id=usuario_controle.id,
+        pedido=solicitacao_aprovada.gcal_pedido,
     )
 
 
@@ -333,7 +345,10 @@ def test_cancel_oauth_mode_com_credencial_retorna_202(
     response = client.post(f"/api/solicitacoes/{solicitacao_aprovada.id}/cancel-gcal/", format="json")
 
     assert response.status_code == http_status.HTTP_202_ACCEPTED
+    solicitacao_aprovada.refresh_from_db()
+    assert solicitacao_aprovada.gcal_pedido
     mock_task.assert_called_once_with(
         solicitacao_aprovada.id,
         operator_user_id=usuario_controle.id,
+        pedido=solicitacao_aprovada.gcal_pedido,
     )

@@ -29,7 +29,7 @@ Formal transactional policy for the critical flows. Tracks issue [#866](https://
 | **OAuth refresh** | `services/oauth/token_manager.py :: refresh_access_token_safe` | Function body | `GoogleOAuthCredential.objects.select_for_update().get(id=...)` + double-check `token_expiry` after lock | Second caller short-circuits if token is still valid | ✅ `@retry_on_deadlock("oauth.refresh_access_token")` |
 | **GCal publish (entry point)** | `services/gcal/sync.py :: apply_one_solicitacao` | ⚠️ **NONE — see "Known gaps" below.** The function has no `transaction.atomic()`; each `s.mark_gcal` / `s.save` commits on its own. HTTP call to Google happens outside any tx | Caller (Celery task / management command) is responsible for `select_for_update` on the batch | Deterministic event id + payload hash on `Solicitacao`; duplicate dispatches collapse via `client.get(...)` existence check | ⚠️ Decorator applied (`@retry_on_deadlock` em `apply_one_solicitacao`) but **ineffective** — see gaps |
 | **GCal low-level upsert** | `services/gcal/sync.py :: upsert_one` | Each `s.save(update_fields=...)` is atomic on its own; HTTP call happens between saves | Caller contract: wrap in `transaction.atomic()` + `select_for_update` for batch sync | Same — event id + hash | Circuit breaker at HTTP layer (`services/gcal/circuit_breaker.py`, #779) |
-| **GCal publish (DRF entry point)** | `services/solicitacao_publish.py :: publish_to_gcal` | ⚠️ **NONE.** `mark_gcal` e `AuditLog.objects.create` (no corpo de `publish_to_gcal`) são escritas independentes | — | — | ❌ **Ausente** — zero ocorrências de `transaction.atomic` ou `retry_on_deadlock` no arquivo |
+| **GCal publish / resync / cancel (DRF entry points and batches)** | `services/solicitacao_publish.py :: publish_to_gcal`, `resync_to_gcal`, `cancel_from_gcal`; `views_gcal/batch.py` | `transaction.atomic` around the request (`pedir_operacao_gcal`), the task `.delay` and the `*_REQUESTED` AuditLog (DEF-32, 2026-11-19); in the batches, one transaction per id with the request and the `.delay` only (no `*_REQUESTED`). If the queue refuses the task, the transaction rolls back (503 `fila_indisponivel`); any other error from `.delay` propagates (500) and rolls back the same way | `Solicitacao.objects.select_for_update().get(pk=...)` with `lock_timeout` 10 s (55P03 → 409 `linha_ocupada`); the preconditions are re-read under the lock | Request id (`Solicitacao.gcal_pedido`) written under the lock; the task acts only if its id is still the row's and the row is still `PENDING` | ❌ No `retry_on_deadlock` (single-row lock; a busy row answers 409 "try again") |
 | **Imports** — 9 services de planilha | `services/*_import.py` (`bloqueios`, `controle_acoes`, `dat_cadastros`, `deslocamentos`, `equipe_gerencia`, `eventos`, `municipios`, `produtos`, `usuarios`) | Outer `transaction.atomic` for dry-run rollback + **savepoint-per-row** via nested `transaction.atomic` | No explicit row locks — idempotency via unique constraints + `external_hash` | One bad row only aborts itself (savepoint); dry-run still discards the whole batch | ❌ Not yet — imports run offline. |
 | **Import canônico** (`import_export_contract`) | `services/export_contract_importer.py` | ⚠️ Um único `transaction.atomic()` grosso (em `_apply_create_only`, chamado por `run()`) — **sem savepoint-per-row** | Sem locks | `external_hash` / chaves naturais | ❌ Não |
 
@@ -76,11 +76,17 @@ and are **open gaps**, not documentation errors to be re-closed silently:
    a função a partir do zero — inclusive a chamada HTTP ao Google — sem rollback de escritas já
    commitadas. Ou seja, o retry existe no papel e não dá a garantia que o contrato promete.
 
-2. **`solicitacao_publish.py` não tem fronteira transacional nem retry.**
+2. **`solicitacao_publish.py` não tinha fronteira transacional — fechado no DEF-32 (2026-11-19).**
    É o service que atende os endpoints DRF de publish/resync/cancel. `publish_to_gcal`
-   faz duas escritas — `mark_gcal` e `AuditLog.objects.create` — sem
-   `transaction.atomic` e sem `retry_on_deadlock` (zero ocorrências no arquivo). Uma falha entre
-   as duas deixa o estado do GCal marcado **sem** o registro de auditoria correspondente.
+   fazia duas escritas — `mark_gcal` e `AuditLog.objects.create` — sem `transaction.atomic`, e uma
+   falha entre as duas deixava o estado do GCal marcado **sem** o registro de auditoria (e, com a
+   fila fora do ar, `PENDING` sem tarefa). Hoje as três entradas fazem o pedido
+   (`pedir_operacao_gcal`: linha travada, pré-condições relidas, identificador do pedido, `PENDING`),
+   o `.delay` da tarefa e o `AuditLog` `*_REQUESTED` numa transação só; os lotes fazem o pedido e o `.delay`
+   numa transação por id, sem `*_REQUESTED` (o identificador fica na linha e no `AuditLog` do desfecho); ver a
+   linha da matriz acima e
+   [`gcal.spec.md`](specs/backend/gcal.spec.md) («Pedido de operação no Google»). Segue sem
+   `retry_on_deadlock`: a trava é de uma linha só e a linha ocupada responde 409.
 
 3. **O importador canônico não tem savepoint-per-row.**
    O método `run()` de `services/export_contract_importer.py` (via `_apply_create_only`) usa um único `transaction.atomic()` para o lote
@@ -88,9 +94,10 @@ and are **open gaps**, not documentation errors to be re-closed silently:
    que seguem o padrão ASQ-016. Como `import_export_contract` é hoje o caminho canônico de import,
    vale decidir se ele deve adotar o mesmo padrão.
 
-Nenhum dos três está coberto por teste de concorrência
+Os itens 1 e 3 não estão cobertos por teste de concorrência
 (`apps/core/tests/test_concurrency_regressions_asq016.py` cobre OAuth `:65`, GCal publish `:199` e
-savepoint de import `:245`, mas não os casos acima).
+savepoint de import `:245`, mas não esses dois casos). O item 2 está, com corridas reais em duas
+conexões, em `apps/core/tests/test_gcal_pedido_de_operacao.py`.
 
 ## Observability
 

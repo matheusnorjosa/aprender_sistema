@@ -75,7 +75,11 @@ death between the Google write and the commit finds the row still `PENDING` with
    Google copy, approval and edit records do not count either. Batches write no `*_REQUESTED`, so a stuck batch
    request may leave no record at all. Read-only, in `python manage.py shell`, with the row id in `ID`:
    ```python
-   from apps.core.models import AuditLog
+   from apps.core.models import AuditLog, Solicitacao
+   ID = int(ID)
+   s = Solicitacao.objects.get(pk=ID)
+   print(s.gcal_status, bool(s.external_event_id))
+   assert s.gcal_status == "PENDING", "a linha não está em PENDING: conferir o ID"
    ACOES = ["PUBLISH_GCAL_REQUESTED", "RESYNC_GCAL_REQUESTED", "CANCEL_GCAL_REQUESTED",
             "PUBLISH_GCAL", "CANCEL_GCAL", "PUBLISH_GCAL_ERROR"]
    conta = lambda r: not r.details.get("dry_run") and r.details.get("operation") != "retry" and not (
@@ -84,7 +88,11 @@ death between the Google write and the commit finds the row still `PENDING` with
    ultimo = next((r for r in regs if conta(r)), None)
    print(ultimo.action if ultimo else "nenhum registro")
    ```
-   The three cases are filtered in Python: `exclude()` on a JSON key would also drop the rows without that key.
+   The `int()` and the row check come first on purpose: the JSON filter also compares the type, and an id as
+   text (`"123"`) does not match the stored number. Without them, a text or wrong id would print
+   "nenhum registro", which sends you to resend. With them, a wrong id stops with an error (`DoesNotExist` or the
+   row not in `PENDING`). "nenhum registro" only counts once the row is confirmed `PENDING`. The three cases are
+   filtered in Python: `exclude()` on a JSON key would also drop the rows without that key.
 2. Check the executions for that `solicitacao_id`, for both tasks (publish and cancel):
    ```bash
    docker compose logs --tail=5000 worker | grep -E "task_publish_solicitacao_to_gcal|task_cancel_solicitacao_from_gcal" | grep "<ID>"

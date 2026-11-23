@@ -822,7 +822,11 @@ Para achar: linha em `PENDING` há mais de 15 min por `gcal_last_sync_at`, e nad
 **Solução:** decidir pelo registro mais recente da linha no `AuditLog` (`details.solicitacao_id`) entre as ações do Google: `PUBLISH_GCAL_REQUESTED`, `RESYNC_GCAL_REQUESTED`, `CANCEL_GCAL_REQUESTED`, `PUBLISH_GCAL`, `CANCEL_GCAL` e `PUBLISH_GCAL_ERROR`. A regra vale para linha marcada por qualquer versão, antes ou depois do DEF-32. Três casos dessas ações não contam, porque podem ser gravados depois de um "Tirar do Google" com a linha ainda em `PENDING`: a prévia (`details.dry_run` verdadeiro), o erro da nova tentativa depois do disjuntor (`details.operation` igual a `retry`; ela só age em linha `ERROR`, e o `GCAL_RETRY_SUCCESS` dela nem entra na lista) e o `PUBLISH_GCAL` com `details.action` igual a `SKIP`, que a versão anterior ao DEF-32 gravava sem tirar a linha de `PENDING`. A cópia do Google, a aprovação e a edição também não contam. No shell do Django (`python manage.py shell`, só leitura), com o id da linha em `ID`:
 
 ```python
-from apps.core.models import AuditLog
+from apps.core.models import AuditLog, Solicitacao
+ID = int(ID)
+s = Solicitacao.objects.get(pk=ID)
+print(s.gcal_status, bool(s.external_event_id))
+assert s.gcal_status == "PENDING", "a linha não está em PENDING: conferir o ID"
 ACOES = ["PUBLISH_GCAL_REQUESTED", "RESYNC_GCAL_REQUESTED", "CANCEL_GCAL_REQUESTED",
          "PUBLISH_GCAL", "CANCEL_GCAL", "PUBLISH_GCAL_ERROR"]
 conta = lambda r: not r.details.get("dry_run") and r.details.get("operation") != "retry" and not (
@@ -832,7 +836,7 @@ ultimo = next((r for r in regs if conta(r)), None)
 print(ultimo.action if ultimo else "nenhum registro")
 ```
 
-O filtro dos três casos fica no Python: `exclude()` sobre uma chave do JSON também tiraria os registros que não têm a chave.
+O `int()` e a conferência da linha vêm antes de propósito: o filtro do JSON compara também o tipo, e o id em texto (`"123"`) não casa com o número gravado. Sem eles, um id em texto ou errado imprimiria "nenhum registro", que manda reenviar. Com eles, um id errado para em erro (`DoesNotExist` ou a linha fora de `PENDING`). "Nenhum registro" só vale com a linha confirmada em `PENDING`. O filtro dos três casos fica no Python: `exclude()` sobre uma chave do JSON também tiraria os registros que não têm a chave.
 
 - **O mais recente é `CANCEL_GCAL_REQUESTED`:** é um "Tirar do Google" parado. **Nunca** reenviar nem reaplicar. Isso desfaz a remoção e pode trazer de volta o evento já apagado: o delete do Google é soft-delete, e o UPDATE manda `status: confirmed`. Esperar só serve se a mensagem ainda está em `unacked` ou na fila (`LLEN celery` maior que 0), e leva até cerca de 1 hora. A linha achada pelo "Para achar" não tem mensagem para voltar: refazer o cancelamento já, por `POST /api/solicitacoes/{id}/cancel-gcal/`, que aceita linha `PENDING` com `external_event_id`. A tela não tem esse botão para linha em `PENDING`. Se alguém reenviou em lote por cima do "Tirar do Google" ainda em andamento, o lote não deixou registro e a regra lê o cancelamento: fica o lado que não devolve ao Google o que alguém mandou tirar.
 - **Qualquer outro caso, inclusive sem nenhum registro:** o pedido parado é de publicar, reenviar ou reaplicar (o lote não grava `*_REQUESTED`, por isso pode não haver registro dele). Reenviar pela Pré-agenda: o reenvio aceita linha em `PENDING`, o pedido novo substitui o antigo, e a mensagem antiga, quando voltar, devolve `SKIP`. Ele força o UPDATE e, com `GCAL_SEND_UPDATES` diferente de `none`, manda e-mail aos convidados externos mesmo sem mudança. O reaplicar não serve aqui: ele recusa linha em `PENDING` (`operacao_em_andamento`).

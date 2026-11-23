@@ -116,7 +116,7 @@ Release. Nenhum ambiente é atualizado nesse passo.
 ### Regras de produção
 
 - Só tag imutável `vYYYY.MM.DD-<sha7>`; `latest` é bloqueada para promoção. O pipeline não faz retag `latest`.
-- **Rollback = promover a tag anterior** pelo mesmo caminho gated: `gh workflow run promote.yml -f release=<tag-anterior>`.
+- **Rollback = promover a tag anterior** pelo mesmo caminho gated: `gh workflow run promote.yml -f release=<tag-anterior>`. Volta ou reavanço que cruze o DEF-32 (pedido de operação no Google) tem condição antes e conferência depois: ver [`deploy.spec.md`](specs/infra/deploy.spec.md) (topologia do Redis).
 - Alterar o compose exige edição **manual** no Editor do Portainer + re-captura do pinado (senão o agente recusa por `compose_drift`).
 
 ### Depreciado / removido

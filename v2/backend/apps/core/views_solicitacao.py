@@ -66,7 +66,7 @@ from .services.solicitacao_exclusao import (
     tem_decisao_humana,
 )
 from .services.solicitacao_projetos import ids_dos_projetos, q_tem_projeto
-from .services.solicitacao_publish import cancel_from_gcal
+from .services.solicitacao_publish import MSG_LINHA_OCUPADA, cancel_from_gcal
 from .services.solicitacao_publish import preview_gcal as preview_gcal_service
 from .services.solicitacao_publish import publish_to_gcal, remover_do_google_agora, resync_to_gcal
 from .services.solicitacao_scope import (
@@ -930,10 +930,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     # de produção (30 s), para a edição desistir com 400 "tente de novo", e não com o 500 do statement
     # cancelado, sem prender a thread do gunicorn enquanto o Google está lento.
     _EDICAO_LOCK_TIMEOUT = "10s"
-    _MSG_EDICAO_LINHA_OCUPADA = (
-        "Este evento está sendo alterado por outra operação agora (como a publicação no Google Agenda ou "
-        "uma aprovação). Tente de novo em instantes."
-    )
+    _MSG_EDICAO_LINHA_OCUPADA = MSG_LINHA_OCUPADA
 
     def get_object(self):
         """DEF-30: na edição, o teto `_EDICAO_LOCK_TIMEOUT` vale só para a leitura travada da linha. Depois

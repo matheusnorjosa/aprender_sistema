@@ -354,11 +354,12 @@ def test_publish_gcal_api_success(mock_task_delay, api_client, user_super, setup
     assert data["task_id"] == "task-123-456"
     assert data["solicitacao_id"] == sol.id
 
-    # Verificar que task foi disparada
-    mock_task_delay.assert_called_once_with(sol.id, dry_run=False, apply_blocked=True)
+    # Verificar que task foi disparada, com o identificador do pedido gravado na linha (DEF-32)
+    sol.refresh_from_db()
+    assert sol.gcal_pedido
+    mock_task_delay.assert_called_once_with(sol.id, dry_run=False, apply_blocked=True, pedido=sol.gcal_pedido)
 
     # PR14: Validar que gcal_status foi marcado como PENDING
-    sol.refresh_from_db()
     assert sol.gcal_status == "PENDING"
 
     # Validar AuditLog

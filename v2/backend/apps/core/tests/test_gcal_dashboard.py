@@ -423,10 +423,12 @@ class TestGCalBulkReapply:
         )
 
         assert response.status_code == 202
-        mock_delay.assert_called_once_with(sol1.id, dry_run=False, apply_blocked=True)
+        # A task leva o identificador do pedido gravado na linha (DEF-32)
+        sol1.refresh_from_db()
+        assert sol1.gcal_pedido
+        mock_delay.assert_called_once_with(sol1.id, dry_run=False, apply_blocked=True, pedido=sol1.gcal_pedido)
 
         # Verificar que status mudou para PENDING
-        sol1.refresh_from_db()
         assert sol1.gcal_status == Solicitacao.GCalStatus.PENDING
 
     def test_reapply_dry_run_does_not_modify(self, api_client, usuario_controle, setup_solicitacoes):

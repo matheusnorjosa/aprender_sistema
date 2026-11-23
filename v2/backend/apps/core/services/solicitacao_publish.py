@@ -11,17 +11,45 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
+from uuid import uuid4
 
 from django.conf import settings
+from django.db import OperationalError, connection, transaction
 from django.utils import timezone
+
+from kombu.exceptions import OperationalError as FilaForaDoAr
 
 from apps.core.exceptions import APIError, ConflictError, ValidationAPIError
 from apps.core.models import AuditLog, GoogleOAuthCredential, Solicitacao, Usuario
+from apps.core.services.db_retry import _extract_pgcode  # pyright: ignore[reportPrivateUsage]
 from apps.core.services.evento_de_formacao import falta_numero_da_formacao
 from apps.core.utils.net import get_client_ip
 
 logger = logging.getLogger(__name__)
+
+# Quem desiste de esperar a trava da linha diz isto: a edição (DEF-30) e o pedido de operação no Google (DEF-32).
+MSG_LINHA_OCUPADA = (
+    "Este evento está sendo alterado por outra operação agora (como a publicação no Google Agenda ou "
+    "uma aprovação). Tente de novo em instantes."
+)
+
+# Teto da espera do pedido pela trava da linha, o mesmo da edição: abaixo do statement_timeout de produção
+# (30 s), para desistir com "tente de novo" e não com o 500 do statement cancelado.
+_PEDIDO_LOCK_TIMEOUT = "10s"
+
+_MSG_FILA_INDISPONIVEL = (
+    "Não foi possível enviar o pedido para a fila de publicação. Nada foi alterado. Tente de novo em instantes."
+)
+
+_MSG_OPERACAO_EM_ANDAMENTO = (
+    "Este evento já tem uma operação no Google em andamento. Espere alguns minutos; se não terminar, siga "
+    "«Evento parado em Publicando…» no GUIDE_GCAL (não reenvie se foi um Tirar do Google)."
+)
+
+# Erros do broker no `.delay`: o Celery embrulha os erros de conexão do Redis no OperationalError do kombu; os
+# outros três são de socket. Qualquer outra exceção é defeito de código e sobe (500), sem virar "fila fora".
+_ERROS_DA_FILA = (FilaForaDoAr, ConnectionError, TimeoutError, OSError)
 
 # Por que o evento não pode ir ao Google agora (virada, 16/10/2026). Mensagem para a tela e o lote.
 MENSAGENS_NAO_PUBLICAVEL: dict[str, str] = {
@@ -60,6 +88,93 @@ def motivo_nao_publicavel(s: Solicitacao, *, reenvio: bool = False) -> str | Non
     if falta_numero_da_formacao(s):
         return "sem_numero_da_formacao"
     return None
+
+
+def pedir_operacao_gcal(solicitacao_id: int, operacao: Literal["publicar", "reenviar", "reaplicar", "cancelar"]) -> str:
+    """Registra o pedido de uma operação no Google e devolve o identificador dele (DEF-32).
+
+    Trava a linha, confere sobre ela o que a entrada conferiu sem trava, grava um identificador novo em
+    `gcal_pedido` e marca PENDING. A tarefa recebe o identificador e só age se ele ainda for o da linha.
+
+    Exige transação aberta por quem chama e não abre outra: o `.delay` da tarefa entra na mesma transação,
+    e a fila fora do ar desfaz o PENDING. Fora de transação o `select_for_update` levanta.
+
+    Hash do payload: publicar e reenviar zeram (o envio é forçado); cancelar mantém; reaplicar mantém só o
+    de linha PUBLISHED, para o envio sem mudança virar SKIP.
+
+    Reaplicar sobre linha em PENDING é recusado: outra operação está em andamento, e o pedido novo zeraria o
+    hash (UPDATE sem mudança no Google, com e-mail aos convidados) ou desfaria um "Tirar do Google".
+
+    Raises:
+        ConflictError `linha_ocupada`: outra operação segurou a linha além de `_PEDIDO_LOCK_TIMEOUT`.
+        ConflictError `operacao_em_andamento`: reaplicar sobre linha em PENDING.
+        ValidationAPIError, ConflictError: as recusas das entradas, agora sobre a linha travada.
+        Solicitacao.DoesNotExist: a linha foi apagada depois da leitura de quem chama.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT set_config('lock_timeout', %s, true)", [_PEDIDO_LOCK_TIMEOUT])
+    try:
+        s = Solicitacao.objects.select_for_update().get(pk=solicitacao_id)
+    except OperationalError as exc:
+        if _extract_pgcode(exc) != "55P03":  # lock_not_available
+            raise
+        raise ConflictError(message=MSG_LINHA_OCUPADA, details={"code": "linha_ocupada"}) from exc
+
+    if operacao == "reaplicar" and s.gcal_status == Solicitacao.GCalStatus.PENDING:
+        raise ConflictError(message=_MSG_OPERACAO_EM_ANDAMENTO, details={"code": "operacao_em_andamento"})
+
+    if operacao == "cancelar":
+        if not s.external_event_id and s.gcal_status != Solicitacao.GCalStatus.PUBLISHED:
+            raise ConflictError(
+                message="Solicitação não possui evento publicado no Google Calendar.",
+                details={
+                    "code": "not_published",
+                    "hint": "Apenas eventos publicados podem ser cancelados.",
+                },
+            )
+    else:
+        reenvio = operacao != "publicar"
+        if s.status != "aprovado":
+            raise ValidationAPIError(
+                message=(
+                    "Apenas solicitações aprovadas podem ser resincronizadas."
+                    if reenvio
+                    else "Apenas solicitações aprovadas podem ser publicadas no Google Calendar."
+                ),
+                code="not_approved",
+            )
+        motivo = motivo_nao_publicavel(s, reenvio=reenvio)
+        if motivo is not None:
+            raise ValidationAPIError(message=MENSAGENS_NAO_PUBLICAVEL[motivo], code=motivo)
+
+    mantem_hash = operacao == "cancelar" or (
+        operacao == "reaplicar" and s.gcal_status == Solicitacao.GCalStatus.PUBLISHED
+    )
+    s.gcal_pedido = uuid4().hex
+    s.save(update_fields=["gcal_pedido"])
+    s.mark_gcal(
+        status=Solicitacao.GCalStatus.PENDING,
+        payload_hash=s.gcal_payload_hash if mantem_hash else None,
+        error="",
+    )
+    return s.gcal_pedido
+
+
+def enfileirar_tarefa_gcal(tarefa: Any, solicitacao_id: int, **kwargs: Any) -> Any:
+    """`.delay` da tarefa, de dentro da transação do pedido.
+
+    Fila fora do ar (`_ERROS_DA_FILA`) vira 503 `fila_indisponivel`; ao sair do `atomic` de quem chama, o erro
+    desfaz o PENDING e o identificador. Não fica pedido gravado sem tarefa na fila. Outro erro sobe como veio
+    (500) e desfaz do mesmo jeito.
+    """
+    try:
+        return tarefa.delay(solicitacao_id, **kwargs)
+    except _ERROS_DA_FILA as exc:
+        logger.exception(
+            "gcal_fila_indisponivel",
+            extra={"event": "gcal_fila_indisponivel", "solicitacao_id": solicitacao_id},
+        )
+        raise APIError(code="fila_indisponivel", message=_MSG_FILA_INDISPONIVEL, status_code=503) from exc
 
 
 @dataclass
@@ -280,44 +395,36 @@ def publish_to_gcal(
             },
         )
 
-    # Mark as PENDING before enqueueing (if not dry-run)
-    if not dry_run:
-        solicitacao.mark_gcal(
-            status=Solicitacao.GCalStatus.PENDING,
-            payload_hash=None,
-            error="",
-        )
-
-    # Dispatch Celery task
-    auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
-    if auth_mode == "oauth":
-        task = task_publish_solicitacao_to_gcal.delay(
-            solicitacao.id,
-            dry_run=dry_run,
-            apply_blocked=apply_blocked,
-            operator_user_id=operator_user_id,
+    kwargs: dict[str, Any] = {"dry_run": dry_run, "apply_blocked": apply_blocked}
+    if getattr(settings, "GCAL_AUTH_MODE", "service_account") == "oauth":
+        kwargs["operator_user_id"] = operator_user_id
+    client_ip = get_client_ip(request)
+    detalhes = {
+        "solicitacao_id": solicitacao.id,
+        "dry_run": dry_run,
+        "apply_blocked": apply_blocked,
+        "ip_address": client_ip,
+    }
+    if dry_run:
+        # A prévia não grava nada na linha: sem pedido e fora de transação.
+        task = task_publish_solicitacao_to_gcal.delay(solicitacao.id, **kwargs)
+        AuditLog.objects.create(
+            usuario=user,
+            action=AuditLog.Action.PUBLISH_GCAL_REQUESTED,
+            model_name="Solicitacao",
+            details={**detalhes, "task_id": task.id},
         )
     else:
-        task = task_publish_solicitacao_to_gcal.delay(
-            solicitacao.id,
-            dry_run=dry_run,
-            apply_blocked=apply_blocked,
-        )
-
-    # AuditLog
-    client_ip = get_client_ip(request)
-    AuditLog.objects.create(
-        usuario=user,
-        action=AuditLog.Action.PUBLISH_GCAL_REQUESTED,
-        model_name="Solicitacao",
-        details={
-            "solicitacao_id": solicitacao.id,
-            "task_id": task.id,
-            "dry_run": dry_run,
-            "apply_blocked": apply_blocked,
-            "ip_address": client_ip,
-        },
-    )
+        # DEF-32: o pedido (PENDING sob trava), a tarefa e o registro numa transação só.
+        with transaction.atomic():
+            pedido = pedir_operacao_gcal(solicitacao.id, "publicar")
+            task = enfileirar_tarefa_gcal(task_publish_solicitacao_to_gcal, solicitacao.id, **kwargs, pedido=pedido)
+            AuditLog.objects.create(
+                usuario=user,
+                action=AuditLog.Action.PUBLISH_GCAL_REQUESTED,
+                model_name="Solicitacao",
+                details={**detalhes, "task_id": task.id, "pedido": pedido},
+            )
 
     logger.info(
         "publish_gcal_requested",
@@ -379,41 +486,26 @@ def resync_to_gcal(
     if motivo is not None:
         raise ValidationAPIError(message=MENSAGENS_NAO_PUBLICAVEL[motivo], code=motivo)
 
-    # Mark as PENDING (will be republished)
-    solicitacao.mark_gcal(
-        status=Solicitacao.GCalStatus.PENDING,
-        payload_hash=None,  # Reset hash to force UPDATE
-        error="",
-    )
-
-    # Dispatch Celery task
-    auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
-    if auth_mode == "oauth":
-        task = task_publish_solicitacao_to_gcal.delay(
-            solicitacao.id,
-            dry_run=False,
-            apply_blocked=False,
-            operator_user_id=operator_user_id,
-        )
-    else:
-        task = task_publish_solicitacao_to_gcal.delay(
-            solicitacao.id,
-            dry_run=False,
-            apply_blocked=False,
-        )
-
-    # AuditLog
+    kwargs: dict[str, Any] = {"dry_run": False, "apply_blocked": False}
+    if getattr(settings, "GCAL_AUTH_MODE", "service_account") == "oauth":
+        kwargs["operator_user_id"] = operator_user_id
     client_ip = get_client_ip(request)
-    AuditLog.objects.create(
-        usuario=user,
-        action=AuditLog.Action.RESYNC_GCAL_REQUESTED,
-        model_name="Solicitacao",
-        details={
-            "solicitacao_id": solicitacao.id,
-            "task_id": task.id,
-            "ip_address": client_ip,
-        },
-    )
+    # DEF-32: o pedido (PENDING sob trava, hash zerado para forçar o UPDATE), a tarefa e o registro numa
+    # transação só.
+    with transaction.atomic():
+        pedido = pedir_operacao_gcal(solicitacao.id, "reenviar")
+        task = enfileirar_tarefa_gcal(task_publish_solicitacao_to_gcal, solicitacao.id, **kwargs, pedido=pedido)
+        AuditLog.objects.create(
+            usuario=user,
+            action=AuditLog.Action.RESYNC_GCAL_REQUESTED,
+            model_name="Solicitacao",
+            details={
+                "solicitacao_id": solicitacao.id,
+                "task_id": task.id,
+                "pedido": pedido,
+                "ip_address": client_ip,
+            },
+        )
 
     logger.info(
         "resync_gcal_requested",
@@ -472,36 +564,27 @@ def cancel_from_gcal(
             },
         )
 
-    # Mark as PENDING temporarily (task will change to NONE after delete)
-    solicitacao.mark_gcal(
-        status=Solicitacao.GCalStatus.PENDING,
-        payload_hash=solicitacao.gcal_payload_hash,  # Keep hash during cancellation
-        error="",
-    )
-
-    # Dispatch Celery task (pass operator_user_id for OAuth mode)
-    auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
-    if auth_mode == "oauth":
-        task = task_cancel_solicitacao_from_gcal.delay(
-            solicitacao.id,
-            operator_user_id=operator_user_id,
-        )
-    else:
-        task = task_cancel_solicitacao_from_gcal.delay(solicitacao.id)
-
-    # AuditLog
+    kwargs: dict[str, Any] = {}
+    if getattr(settings, "GCAL_AUTH_MODE", "service_account") == "oauth":
+        kwargs["operator_user_id"] = operator_user_id
     client_ip = get_client_ip(request)
-    AuditLog.objects.create(
-        usuario=user,
-        action=AuditLog.Action.CANCEL_GCAL_REQUESTED,
-        model_name="Solicitacao",
-        details={
-            "solicitacao_id": solicitacao.id,
-            "task_id": task.id,
-            "external_event_id": solicitacao.external_event_id,
-            "ip_address": client_ip,
-        },
-    )
+    # DEF-32: o pedido (PENDING sob trava, hash mantido; a tarefa grava NONE depois do delete), a tarefa e o
+    # registro numa transação só.
+    with transaction.atomic():
+        pedido = pedir_operacao_gcal(solicitacao.id, "cancelar")
+        task = enfileirar_tarefa_gcal(task_cancel_solicitacao_from_gcal, solicitacao.id, **kwargs, pedido=pedido)
+        AuditLog.objects.create(
+            usuario=user,
+            action=AuditLog.Action.CANCEL_GCAL_REQUESTED,
+            model_name="Solicitacao",
+            details={
+                "solicitacao_id": solicitacao.id,
+                "task_id": task.id,
+                "pedido": pedido,
+                "external_event_id": solicitacao.external_event_id,
+                "ip_address": client_ip,
+            },
+        )
 
     logger.info(
         "cancel_gcal_requested",

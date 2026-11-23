@@ -268,6 +268,17 @@ class Solicitacao(models.Model):
         blank=True,
         help_text="SHA1 do payload aplicado no GCal (drift detection)",
     )
+    gcal_pedido = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        db_default="",
+        editable=False,
+        help_text=(
+            "Identificador do último pedido de publicar, reenviar, reaplicar ou cancelar no Google. "
+            "A tarefa só age se o identificador dela for este."
+        ),
+    )
     publicado_fora_do_sistema = models.BooleanField(
         db_default=False,
         default=False,

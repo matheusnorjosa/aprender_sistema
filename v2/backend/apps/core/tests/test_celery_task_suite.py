@@ -1155,9 +1155,10 @@ _PUBLICAR_E_CANCELAR = pytest.mark.parametrize("tarefa", ["publicar", "cancelar"
 
 class TestFalhaDeBancoPedeNovaExecucao:
     """DEF-32: OperationalError ou InterfaceError que escapa da tarefa (na prática, a marca de ERROR que falha) faz
-    o Celery rodar a tarefa de novo (180 s depois, até 3 vezes), e a nova execução passa pela guarda do pedido. Os testes trocam o
-    `retry` e chamam a tarefa direto: não cobrem a entrega com o banco fora, que o Celery confirma sem rodar (a
-    gravação de STARTED falha antes do corpo da tarefa) e deixa a linha em PENDING (limite em gcal.spec.md)."""
+    o Celery rodar a tarefa de novo (180 s depois, até 3 vezes), e a nova execução passa pela guarda do pedido.
+    Os testes trocam o `retry` e chamam a tarefa direto: não cobrem a entrega com o banco fora, que o Celery
+    confirma sem rodar (a gravação de STARTED falha antes do corpo da tarefa) e deixa a linha em PENDING (limite
+    em gcal.spec.md)."""
 
     @_PUBLICAR_E_CANCELAR
     def test_tarefa_repete_em_falha_de_conexao_com_o_banco(self, tarefa):

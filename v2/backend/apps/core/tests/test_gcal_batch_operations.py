@@ -918,7 +918,10 @@ def test_reaplicar_em_lote_com_o_mesmo_id_duas_vezes_enfileira_uma(api_client, u
     assert response.data["errors"] == [
         {
             "id": sol.id,
-            "detail": "Este evento já tem uma operação no Google em andamento. Espere ela terminar e tente de novo.",
+            "detail": (
+                "Este evento já tem uma operação no Google em andamento. Espere alguns minutos; se não terminar, "
+                "siga «Evento parado em Publicando…» no GUIDE_GCAL (não reenvie se foi um Tirar do Google)."
+            ),
             "code": "operacao_em_andamento",
         }
     ]

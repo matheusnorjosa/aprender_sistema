@@ -163,7 +163,8 @@ class TestPedirOperacaoGcal:
 
         assert erro.value.details == {"code": "operacao_em_andamento"}
         assert erro.value.message == (
-            "Este evento já tem uma operação no Google em andamento. Espere ela terminar e tente de novo."
+            "Este evento já tem uma operação no Google em andamento. Espere alguns minutos; se não terminar, siga "
+            "«Evento parado em Publicando…» no GUIDE_GCAL (não reenvie se foi um Tirar do Google)."
         )
         assert _linha(sol) == antes
         assert (antes["gcal_pedido"], antes["gcal_payload_hash"]) == (primeiro, _HASH)
@@ -422,9 +423,10 @@ def test_erro_do_delay_que_nao_e_da_fila_sobe_e_desfaz_o_pedido(settings):
     sol = _evento()
     antes = _linha(sol)
 
-    with patch(_DELAY_PUBLICAR, side_effect=TypeError("unexpected keyword argument 'pedido'")):
+    with patch(_DELAY_PUBLICAR, side_effect=TypeError("unexpected keyword argument 'pedido'")) as delay:
         resposta = _api(raise_request_exception=False).post(f"/api/solicitacoes/{sol.pk}/publish/", {}, format="json")
 
+    delay.assert_called_once()
     assert resposta.status_code == 500
     assert _linha(sol) == antes
     assert not _pediu(sol, "PUBLISH_GCAL_REQUESTED")

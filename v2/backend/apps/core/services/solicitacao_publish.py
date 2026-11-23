@@ -42,7 +42,8 @@ _MSG_FILA_INDISPONIVEL = (
 )
 
 _MSG_OPERACAO_EM_ANDAMENTO = (
-    "Este evento já tem uma operação no Google em andamento. Espere ela terminar e tente de novo."
+    "Este evento já tem uma operação no Google em andamento. Espere alguns minutos; se não terminar, siga "
+    "«Evento parado em Publicando…» no GUIDE_GCAL (não reenvie se foi um Tirar do Google)."
 )
 
 # Erros do broker no `.delay`: o Celery embrulha os erros de conexão do Redis no OperationalError do kombu; os

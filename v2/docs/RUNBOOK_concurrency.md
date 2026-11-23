@@ -67,7 +67,8 @@ death between the Google write and the commit finds the row still `PENDING` with
 
 1. Find the latest Google record of the row: the newest AuditLog with that `details.solicitacao_id` among
    `PUBLISH_GCAL_REQUESTED`, `RESYNC_GCAL_REQUESTED`, `CANCEL_GCAL_REQUESTED`, `PUBLISH_GCAL`, `CANCEL_GCAL` and
-   `PUBLISH_GCAL_ERROR`. It works for rows marked by any version, before or after DEF-32. Three cases do not count,
+   `PUBLISH_GCAL_ERROR`. It works for rows marked by any version, before or after DEF-32, with three pre-DEF-32 limits listed in
+   [gcal.spec.md](specs/backend/gcal.spec.md) ("Linha parada em `PENDING`"). Three cases do not count,
    because they can be written after a cancel request while the row is still `PENDING`: the preview
    (`details.dry_run` true), the circuit-breaker retry error (`details.operation` = `retry`; the retry only acts
    on `ERROR` rows, and its `GCAL_RETRY_SUCCESS` is not in the list) and a `PUBLISH_GCAL` with

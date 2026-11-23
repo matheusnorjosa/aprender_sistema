@@ -681,4 +681,45 @@ describe('MySolicitacoesPage — evento cancelado na agenda', { timeout: 20000 }
       informar.mockRestore();
     }
   );
+
+  // Revisão da rodada 1: o Excluir de formação não tira do Google, marca "(CANCELADO) " (decisão P2 do dono).
+  test.each([
+    {
+      gcal_status: 'PUBLISHED' as const,
+      botao: 'Por que não dá para editar nem excluir: 10/05/2099 · Crato',
+      novo: 'exclui o evento em Publicar na agenda (ele sai do sistema e fica no Google Agenda com (CANCELADO) no título)',
+      antigo: '(ele sai do Google e do sistema)',
+    },
+    {
+      gcal_status: 'ERROR' as const,
+      botao: 'Por que não dá para excluir: 10/05/2099 · Crato',
+      novo: 'Este evento pode estar no Google Agenda, e excluir aqui também o marcaria como cancelado lá, com (CANCELADO) no título.',
+      antigo: 'excluir aqui também o tiraria de lá',
+    },
+  ])('formação $gcal_status não cancelada, sem poder tirar do Google: o motivo diz (CANCELADO)', async ({ gcal_status, botao, novo, antigo }) => {
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 9,
+          municipio_nome: 'Crato',
+          status: 'aprovado',
+          gcal_status,
+          external_event_id: 'asv29',
+          tipo_evento_de_formacao: true,
+          pode_tirar_do_google: false,
+          inicio: '2099-05-10T13:00:00Z',
+          fim: '2099-05-10T17:00:00Z',
+        }),
+      ])
+    );
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: botao }));
+    const texto = String(informar.mock.calls[0]![0].content);
+    expect(texto).toContain(novo);
+    expect(texto).not.toContain(antigo);
+    informar.mockRestore();
+  });
 });

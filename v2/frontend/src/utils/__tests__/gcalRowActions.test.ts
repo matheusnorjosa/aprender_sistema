@@ -178,4 +178,21 @@ describe('gcalRowActions — cancelar evento de formação', () => {
       '10/10/2099 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e do Google Agenda. Não dá para desfazer.',
     );
   });
+
+  test('formação em ERROR sem id: a confirmação não promete que o evento está no Google', () => {
+    const evento = {
+      inicio: '2099-10-10T12:00:00Z',
+      municipio_nome: 'Sobral',
+      projeto_nome: 'Vidas Em Rede',
+      gcal_status: 'ERROR' as const,
+      meet_link: null,
+      tipo_evento_de_formacao: true,
+    };
+    expect(confirmacaoDeExcluirNoGoogle({ ...evento, external_event_id: null }).content).toBe(
+      '10/10/2099 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e, se chegou ao Google Agenda, fica lá com (CANCELADO) no título. Não dá para desfazer.',
+    );
+    expect(confirmacaoDeExcluirNoGoogle({ ...evento, external_event_id: 'asv29' }).content).toBe(
+      '10/10/2099 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e fica no Google Agenda com (CANCELADO) no título. Não dá para desfazer.',
+    );
+  });
 });

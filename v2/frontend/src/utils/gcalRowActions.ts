@@ -166,17 +166,22 @@ export function resumoDoEvento(row: EventoDaExclusao): string {
  * Confirmação de excluir evento que está no Google (`estaNoGoogle`): sai dos dois lados. A mesma em
  * Minhas Solicitações e em Publicar na agenda. Em ERROR o evento pode não ter chegado ao Google; o
  * Meet só é citado quando existe. Evento de formação (CON-08, decisão do dono de 23/11) não sai do
- * Google: o título lá ganha "(CANCELADO) ".
+ * Google: o título lá ganha "(CANCELADO) ". Em ERROR sem id ele pode nunca ter chegado lá, e o texto
+ * não promete que está.
  */
 export function confirmacaoDeExcluirNoGoogle(
   row: EventoDaExclusao &
     Pick<Solicitacao, 'gcal_status' | 'meet_link'> &
-    Partial<Pick<Solicitacao, 'tipo_evento_de_formacao' | 'cancelado_na_agenda'>>,
+    Partial<Pick<Solicitacao, 'tipo_evento_de_formacao' | 'cancelado_na_agenda' | 'external_event_id'>>,
 ): { title: string; content: string } {
   if (excluirMarcaCancelado(row)) {
+    const fica =
+      row.gcal_status === 'ERROR' && !row.external_event_id
+        ? 'e, se chegou ao Google Agenda, fica lá com (CANCELADO) no título'
+        : 'e fica no Google Agenda com (CANCELADO) no título';
     return {
       title: 'Excluir evento?',
-      content: `${resumoDoEvento(row)}. Ele sai do sistema e fica no Google Agenda com (CANCELADO) no título. Não dá para desfazer.`,
+      content: `${resumoDoEvento(row)}. Ele sai do sistema ${fica}. Não dá para desfazer.`,
     };
   }
   const doGoogle = row.gcal_status === 'ERROR' ? 'do Google Agenda, se estiver lá' : 'do Google Agenda';

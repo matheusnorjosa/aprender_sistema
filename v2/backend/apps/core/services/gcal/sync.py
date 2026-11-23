@@ -650,9 +650,11 @@ def marcar_cancelado_no_google(
             raise
         evento = None
 
+    # Só o id adotado que o GET não acha levanta (como o `upsert_one`): o ponteiro pode estar errado. Achado e
+    # apagado (`cancelled`), o evento já saiu, adotado ou não.
+    if evento is None and adotado:
+        raise ValueError(f"Solicitação #{s.id}: o evento adotado não foi achado no Google; nada foi feito.")
     if evento is None or evento.get("status") == "cancelled":
-        if adotado:
-            raise ValueError(f"Solicitação #{s.id}: o evento adotado não foi achado no Google; nada foi feito.")
         return SyncOutcome("SKIP", s.id, event_id, "ja_saiu")
 
     titulo = str(evento.get("summary") or "")

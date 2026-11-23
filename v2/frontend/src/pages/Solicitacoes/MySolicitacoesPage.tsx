@@ -42,6 +42,7 @@ import {
   MSG_CANCELADO_NA_AGENDA,
   confirmacaoDeExcluirNoGoogle,
   estaNoGoogle,
+  excluirMarcaCancelado,
   motivoNaoPublicavel,
   resumoDoEvento,
 } from '../../utils/gcalRowActions';
@@ -103,6 +104,8 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
   const isPublished = naPlanilha || record.gcal_status === ('PUBLISHED' as GCalStatus);
   const noGoogle = estaNoGoogle(record);
   const podeTirarDoGoogle = record.pode_tirar_do_google === true;
+  // CON-08 (decisão do dono de 23/11): o Excluir de formação não tira do Google, marca "(CANCELADO) ".
+  const marcaCancelado = excluirMarcaCancelado(record);
   const isSuper = record.fluxo === ('SUPER' as FluxoType);
   const superForaDePendente = isSuper && record.status !== 'pendente';
   const podeEditar = !cancelado && !isPublished && record.status !== 'reprovado';
@@ -141,7 +144,11 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
       );
     } else {
       motivos.push(
-        'Este evento já está no Google Agenda. Para editar, peça ao Apoio de Coordenação da sua gerência, na tela Publicar na agenda, ou ao Controle, na Pré-agenda, que tire o evento só do Google; depois disso, você consegue editar aqui. Para excluir, peça ao Apoio de Coordenação da sua gerência, que exclui o evento em Publicar na agenda (ele sai do Google e do sistema). Se lá também não der para excluir, fale com a administração do sistema.'
+        `Este evento já está no Google Agenda. Para editar, peça ao Apoio de Coordenação da sua gerência, na tela Publicar na agenda, ou ao Controle, na Pré-agenda, que tire o evento só do Google; depois disso, você consegue editar aqui. Para excluir, peça ao Apoio de Coordenação da sua gerência, que exclui o evento em Publicar na agenda (${
+          marcaCancelado
+            ? 'ele sai do sistema e fica no Google Agenda com (CANCELADO) no título'
+            : 'ele sai do Google e do sistema'
+        }). Se lá também não der para excluir, fale com a administração do sistema.`
       );
     }
   } else if (isPublished) {
@@ -157,7 +164,8 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
         : 'Este evento já está no Google Agenda e não dá para editá-lo aqui. Para mudar, fale com a administração do sistema.'
     );
   } else if (noGoogle && !podeTirarDoGoogle && !superForaDePendente) {
-    // ERROR: a publicação deu erro, mas o evento pode estar no Google; excluir aqui o tiraria de lá.
+    // ERROR: a publicação deu erro, mas o evento pode estar no Google; excluir aqui o tiraria de lá (o de
+    // formação ficaria lá com "(CANCELADO) ").
     // Só a Apoio, em Publicar na agenda, tira do Google um ERROR, e só aprovado, com id e de hoje em
     // diante (a tela lista só 'aprovado'; gcalRowActions; a Pré-agenda só cancela o publicado). Fora
     // disso, nenhuma tela tira. A SUPER fora de pendente não chega aqui: tirar do Google não devolve
@@ -169,7 +177,10 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
     const saida = apoioConsegueTirar
       ? 'Para excluir, peça ao Apoio de Coordenação da sua gerência que tire o evento só do Google, na tela Publicar na agenda; depois disso, você consegue excluir aqui.'
       : 'Para excluir, fale com a administração do sistema.';
-    motivos.push(`Este evento pode estar no Google Agenda, e excluir aqui também o tiraria de lá. ${saida}`);
+    const efeito = marcaCancelado
+      ? 'excluir aqui também o marcaria como cancelado lá, com (CANCELADO) no título'
+      : 'excluir aqui também o tiraria de lá';
+    motivos.push(`Este evento pode estar no Google Agenda, e ${efeito}. ${saida}`);
   } else if (record.status === 'reprovado') {
     motivos.push('Solicitações reprovadas não podem ser editadas.');
   }

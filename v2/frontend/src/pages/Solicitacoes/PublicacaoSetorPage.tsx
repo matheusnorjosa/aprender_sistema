@@ -386,7 +386,10 @@ export default function PublicacaoSetorPage(): JSX.Element {
         }
         let excluido = 'Evento excluído do sistema e do Google Agenda.';
         if (excluirMarcaCancelado(row)) {
-          excluido = 'Evento excluído do sistema; no Google Agenda ele fica com (CANCELADO) no título.';
+          excluido =
+            row.gcal_status === 'ERROR' && !row.external_event_id
+              ? 'Evento excluído do sistema; se chegou ao Google Agenda, ele fica lá com (CANCELADO) no título.'
+              : 'Evento excluído do sistema; no Google Agenda ele fica com (CANCELADO) no título.';
         } else if (row.gcal_status === 'ERROR' && !row.external_event_id) {
           excluido = 'Evento excluído do sistema e do Google Agenda, se estava lá.';
         }

@@ -357,6 +357,31 @@ def test_marcar_id_adotado_nao_achado_levanta(google):
     assert _linha(s) == antes
 
 
+_ADOTADO = "0a1b2c3d4e5f6g7h8i9j0k1l2m"
+
+
+def _apagado_no_google(fake: FakeCalendarClient, s: Solicitacao) -> Solicitacao:
+    """Evento que alguém apagou direto no Google (DELETE brando): o GET ainda o acha, com `status: cancelled`."""
+    _no_google(fake, s)
+    fake.delete(CAL, s.external_event_id)
+    return s
+
+
+@pytest.mark.django_db
+def test_marcar_id_adotado_apagado_no_google_da_ja_saiu(google):
+    """Passo 5 do desenho: só o id adotado que o GET não acha levanta; achado e apagado, o evento já saiu."""
+    s = _apagado_no_google(google, _formacao(external_event_id=_ADOTADO))
+    contador = _Contador(google)
+    antes = _linha(s)
+
+    resultado = _marcar(s, client=contador)
+
+    assert (resultado.action, resultado.summary) == ("SKIP", "ja_saiu")
+    assert contador.chamadas == [], "nada de insert, update nem patch"
+    assert _linha(s) == antes, "a linha guarda o id adotado e o hash"
+    assert google.get(CAL, _ADOTADO)["status"] == "cancelled", "não traz de volta"
+
+
 @pytest.mark.django_db
 def test_marcar_sem_acesso_ao_calendario_levanta(google):
     s = _formacao()
@@ -547,6 +572,29 @@ def test_tarefa_skip_tambem_volta_a_published(google, preparo, resultado_esperad
     assert _linha(s)["gcal_status"] == "PUBLISHED"
     registro = AuditLog.objects.get(action="CANCELAR_NA_AGENDA", details__solicitacao_id=s.pk)
     assert registro.details["resultado"] == resultado_esperado
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("modo_google")
+def test_tarefa_id_adotado_apagado_no_google_volta_a_published(google):
+    """Sem isso a linha ficava presa em ERROR "Erro ao cancelar", e refazer dava o mesmo erro."""
+    from apps.core.tasks import task_cancelar_na_agenda
+
+    s = _apagado_no_google(google, _formacao(external_event_id=_ADOTADO))
+    pedido = _pedir(s)
+
+    resultado = task_cancelar_na_agenda(s.pk, pedido=pedido)
+
+    assert resultado["action"] == "SKIP"
+    linha = _linha(s)
+    assert (linha["gcal_status"], linha["cancelado_na_agenda"], linha["external_event_id"]) == (
+        "PUBLISHED",
+        True,
+        _ADOTADO,
+    )
+    registro = AuditLog.objects.get(action="CANCELAR_NA_AGENDA", details__solicitacao_id=s.pk)
+    assert registro.details["resultado"] == "ja_saiu"
+    assert not AuditLog.objects.filter(action="PUBLISH_GCAL_ERROR", details__solicitacao_id=s.pk).exists()
 
 
 @pytest.mark.django_db
@@ -865,6 +913,29 @@ class TestExcluir:
         assert _titulo(google, s) == _TITULO
         assert _acoes(s.pk) == []
 
+    def test_formacao_com_id_adotado_apagado_no_google_apaga(self, apoio, gerencia, google):
+        """Evento da virada apagado direto no Google (GET devolve `cancelled`): o Excluir apaga a linha."""
+        s = _apagado_no_google(google, _da_gerencia(gerencia, usuario=apoio, external_event_id=_ADOTADO))
+        sol_id = s.pk
+
+        resposta = _api(apoio).delete(f"/api/solicitacoes/{sol_id}/")
+
+        assert resposta.status_code == 204, resposta.data
+        assert not Solicitacao.objects.filter(pk=sol_id).exists()
+        evento = google.get(CAL, _ADOTADO)
+        assert (evento["summary"], evento["status"]) == (_TITULO, "cancelled"), "não traz de volta nem marca"
+
+    def test_formacao_com_id_adotado_nao_achado_recusa(self, apoio, gerencia, google):
+        """Id adotado que o GET não acha (404): recusa e nada some, como o `upsert_one`. Escolha em aberto com o dono
+        (revisão da rodada 1): manter a recusa ou apagar a linha com o aviso de que o evento não foi achado."""
+        s = _da_gerencia(gerencia, usuario=apoio, external_event_id=_ADOTADO)
+
+        resposta = _api(apoio).delete(f"/api/solicitacoes/{s.pk}/")
+
+        assert resposta.status_code == 400, resposta.data
+        assert _linha(s)["cancelado_na_agenda"] is False
+        assert _acoes(s.pk) == []
+
     def test_nao_formacao_segue_tirando_do_google(self, apoio, gerencia, google):
         s = _da_gerencia(gerencia, usuario=apoio)
         s.tipo_evento = TipoEventoFactory(nome="Reunião de Alinhamento")
@@ -897,14 +968,31 @@ class TestExcluir:
 
 
 @pytest.mark.django_db
-def test_o_campo_vem_na_lista_e_e_so_leitura():
-    s = _formacao(cancelado_na_agenda=True)
+def test_o_campo_vem_na_lista():
+    marcada = _formacao(cancelado_na_agenda=True)
+    normal = _formacao()
 
-    resposta = _api().get(f"/api/solicitacoes/{s.pk}/")
-    _api().patch(f"/api/solicitacoes/{s.pk}/", {"cancelado_na_agenda": False}, format="json")
+    resposta = _api().get("/api/solicitacoes/", {"page_size": 100})
 
-    assert resposta.data["cancelado_na_agenda"] is True
-    assert _linha(s)["cancelado_na_agenda"] is True
+    assert resposta.status_code == 200, resposta.data
+    itens = resposta.data["results"] if isinstance(resposta.data, dict) else resposta.data
+    por_id = {item["id"]: item for item in itens}
+    assert por_id[marcada.pk]["cancelado_na_agenda"] is True
+    assert por_id[normal.pk]["cancelado_na_agenda"] is False
+
+
+@pytest.mark.django_db
+def test_o_campo_e_so_leitura_na_edicao():
+    """Na linha NÃO marcada (a marcada já recusa toda edição): o PATCH passa, mas a marca não entra por ele."""
+    s = _formacao(gcal_status="NONE", external_event_id=None, gcal_payload_hash=None)
+
+    resposta = _api().patch(
+        f"/api/solicitacoes/{s.pk}/", {"cancelado_na_agenda": True, "observacoes": "x"}, format="json"
+    )
+
+    assert resposta.status_code == 200, resposta.data
+    s.refresh_from_db()
+    assert (s.observacoes, s.cancelado_na_agenda) == ("x", False)
 
 
 def test_acoes_novas_na_auditoria_linha_do_tempo_e_importer():

@@ -1154,4 +1154,29 @@ describe('PublicacaoSetorPage — cancelar evento de formação', { timeout: 200
       ),
     );
   });
+
+  test('Excluir de formação em ERROR sem id não promete que o evento está no Google', async () => {
+    listResponse = pageOf([
+      makeSolic({ ...FORMACAO, gcal_status: 'ERROR', external_event_id: null, pode_excluir: true }),
+    ]);
+    deleteResult = () => {
+      listResponse = pageOf([]);
+      return Promise.resolve(undefined);
+    };
+    renderPage();
+
+    fireEvent.click(await screen.findByLabelText(/^Excluir: Vidas Em Rede/));
+    const dialogo = await screen.findByRole('dialog');
+    expect(dialogo).toHaveTextContent(
+      '10/10/2099 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e, se chegou ao Google Agenda, fica lá com (CANCELADO) no título. Não dá para desfazer.',
+    );
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Sim, excluir' }));
+
+    await waitFor(() => expect(deleteCalls()).toHaveLength(1));
+    await waitFor(() =>
+      expect(message.success).toHaveBeenCalledWith(
+        'Evento excluído do sistema; se chegou ao Google Agenda, ele fica lá com (CANCELADO) no título.',
+      ),
+    );
+  });
 });

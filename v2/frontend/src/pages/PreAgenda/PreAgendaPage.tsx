@@ -558,7 +558,11 @@ export default function PreAgendaPage(): JSX.Element {
           await deleteSolicitacao(record.id);
           if (!noGoogle) message.success('Solicitação excluída.');
           else if (excluirMarcaCancelado(record))
-            message.success('Evento excluído do sistema; no Google Agenda ele fica com (CANCELADO) no título.');
+            message.success(
+              record.gcal_status === ('ERROR' as GCalStatus) && !record.external_event_id
+                ? 'Evento excluído do sistema; se chegou ao Google Agenda, ele fica lá com (CANCELADO) no título.'
+                : 'Evento excluído do sistema; no Google Agenda ele fica com (CANCELADO) no título.'
+            );
           else if (record.gcal_status === ('ERROR' as GCalStatus) && !record.external_event_id)
             message.success('Evento excluído do sistema e do Google Agenda, se estava lá.');
           else message.success('Evento excluído do sistema e do Google Agenda.');

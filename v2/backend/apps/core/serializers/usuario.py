@@ -705,7 +705,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         # o conjunto final não muda) e não é aplicado. Assim o salvar não dispara o que deriva das funções
         # (`encerrar_gerente_aprovador`, re-sincronizar a lotação) nem grava a partir dos grupos lidos na
         # validação, fora desta transação. Limite: se o salvar também troca a gerência, a lotação recalcula os
-    # grupos a partir do retrato lido antes (ver rbac.spec.md, "Os próprios grupos").
+        # grupos a partir do retrato lido antes (ver rbac.spec.md, "Os próprios grupos").
         if actor is not None and actor.pk == instance.pk:
             groups = None
         before_group_ids = set(instance.groups.values_list("pk", flat=True))

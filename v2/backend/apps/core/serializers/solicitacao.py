@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from django.utils import timezone
 from rest_framework import serializers  # type: ignore[attr-defined]
 
 from drf_spectacular.utils import extend_schema_field
@@ -28,6 +29,13 @@ from apps.core.services.compra_elegibilidade import (
     par_liberado,
     projeto_em_espera,
     solicitacoes_com_par_liberado,
+)
+from apps.core.services.evento_de_formacao import (
+    MSG_NUMERO_DA_FORMACAO,
+    eh_evento_de_formacao,
+    eh_tipo_de_formacao,
+    falta_numero_da_formacao,
+    numero_da_formacao,
 )
 from apps.core.services.solicitacao_approval import DECISAO_IMPEDIDA, decisoes_impedidas_na_lista
 from apps.core.services.solicitacao_exclusao import ids_ja_decididas, motivo_que_impede_excluir
@@ -96,6 +104,10 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
     projetos = serializers.SerializerMethodField()
     projeto_geral_nome = serializers.CharField(source="projeto.projeto_geral.nome", read_only=True, allow_null=True)
     tipo_evento_nome = serializers.CharField(source="tipo_evento.nome", read_only=True)
+    # CON-09: o tipo é de formação (`evento_de_formacao`); a tela de edição exige o Nº da formação com ele.
+    tipo_evento_de_formacao = serializers.SerializerMethodField()
+    # CON-09: evento de formação sem Nº da formação válido; a Pré-agenda desabilita o Publicar com o motivo.
+    falta_numero_da_formacao = serializers.SerializerMethodField()
     # Decisão do dono (05/10/2026): a resposta "pretende avaliar o formador" é lida por outro
     # sistema interno; o nome sai junto para a tela não precisar de outra chamada.
     formador_avaliado_nome = serializers.SerializerMethodField()
@@ -134,6 +146,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "projeto_geral_nome",
             "tipo_evento",
             "tipo_evento_nome",
+            "tipo_evento_de_formacao",
+            "falta_numero_da_formacao",
             "tipo",
             "encontro",
             "segmento",
@@ -378,6 +392,12 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             self.context["_sem_compra"] = calculados
         return calculados[obj.pk]
 
+    def get_tipo_evento_de_formacao(self, obj: Solicitacao) -> bool:
+        return eh_evento_de_formacao(obj)
+
+    def get_falta_numero_da_formacao(self, obj: Solicitacao) -> bool:
+        return falta_numero_da_formacao(obj)
+
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """
         Validações para criação e edição de solicitações.
@@ -401,6 +421,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
            o padrão do model (False) esconderia a falta da resposta. Null o campo já recusa.
         6. Evento de dois projetos (#2036): a regra do par (`_conferir_projetos`) e, na Regra 4, o conjunto
            dos projetos no lugar do projeto (os dois cobertos; o 2º "em espera" dá 400 em `projeto_2`).
+        7. Nº da formação (CON-09): `_conferir_numero_da_formacao`.
         """
         instance = getattr(self, "instance", None)
 
@@ -504,7 +525,28 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
                 {"coordenador_acompanha": ["Informe se o coordenador responsável vai acompanhar o evento."]}
             )
 
+        # Regra 7
+        self._conferir_numero_da_formacao(attrs, instance, fim)
+
         return super().validate(attrs)
+
+    def _conferir_numero_da_formacao(self, attrs: dict[str, Any], instance: Any, fim: Any) -> None:
+        """CON-09 (plano aprovado pelo dono em 23/11/2026): evento de formação (`evento_de_formacao`) leva o Nº da
+        formação, só o número de 1 a 999, guardado só com algarismos ("3º" vira "3").
+
+        Vale no estado final do evento (o tipo e o número que chegam, senão os gravados), ao criar e ao editar
+        evento que ainda não terminou: a tela de edição manda todos os campos em todo salvamento. Evento que já
+        terminou não vai ao Google e edita sem o número. Tipo que não é de formação segue com o campo livre."""
+        tipo = attrs.get("tipo_evento", getattr(instance, "tipo_evento", None))
+        if not eh_tipo_de_formacao(getattr(tipo, "nome", None)):
+            return
+        numero = numero_da_formacao(attrs["encontro"] if "encontro" in attrs else getattr(instance, "encontro", None))
+        if numero is not None:
+            if "encontro" in attrs:
+                attrs["encontro"] = numero
+            return
+        if instance is None or fim is None or fim >= timezone.now():
+            raise serializers.ValidationError({"encontro": [MSG_NUMERO_DA_FORMACAO]})
 
     def _conferir_projetos(self, attrs: dict[str, Any], instance: Any) -> tuple[Any, Any]:
         """Evento de dois projetos (#2036; decisões do dono de 08/11/2026): os projetos finais, conferidos.

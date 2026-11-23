@@ -83,7 +83,7 @@ export async function lookupProjetos(q: string = '', params: LookupProjetosParam
 }
 
 /**
- * Buscar tipos de evento (autocomplete)
+ * Buscar tipos de evento (autocomplete). Cada item traz `de_formacao` (CON-09): o tipo pede o "Nº da formação".
  *
  * @param q - Query string
  */

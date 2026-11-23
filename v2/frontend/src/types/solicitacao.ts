@@ -79,6 +79,10 @@ export interface Solicitacao {
   projetos?: Array<{ id: ID; nome: string }>;
   tipo_evento: ID | null;
   tipo_evento_nome: string | null;
+  /** CON-09: o tipo é de formação (pede o "Nº da formação"). */
+  tipo_evento_de_formacao?: boolean;
+  /** CON-09: evento de formação sem Nº da formação válido (o servidor recusa Publicar e Reenviar). */
+  falta_numero_da_formacao?: boolean;
   tipo: string | null;
   encontro: string | null;
   segmento: string | null;

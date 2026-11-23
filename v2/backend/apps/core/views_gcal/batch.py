@@ -170,7 +170,7 @@ class GCalPublishBatchView(APIView):
 
         # Buscar solicitações
         solicitacoes = Solicitacao.objects.filter(id__in=solicitacao_ids).select_related(
-            "projeto", "projeto_2", "municipio"
+            "projeto", "projeto_2", "municipio", "tipo_evento"
         )
 
         # Verificar GCAL_CLIENT
@@ -312,8 +312,8 @@ class GCalBatchReapplyView(APIView):
         if len(ids) > 500:
             return Response({"detail": "Limite de 500 IDs por requisição"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Buscar solicitações
-        solicitacoes = Solicitacao.objects.filter(id__in=ids)
+        # Buscar solicitações (com o tipo: o `motivo_nao_publicavel` lê, CON-09)
+        solicitacoes = Solicitacao.objects.filter(id__in=ids).select_related("tipo_evento")
 
         # MP4: Otimização O(N) - dict lookup em vez de linear search O(N²)
         solicitacoes_dict = {s.id: s for s in solicitacoes}
@@ -448,8 +448,8 @@ class GCalBatchResyncView(APIView):
         if len(ids) > 500:
             return Response({"detail": "Limite de 500 IDs por requisição"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Buscar solicitações
-        solicitacoes = Solicitacao.objects.filter(id__in=ids)
+        # Buscar solicitações (com o tipo: o `motivo_nao_publicavel` lê, CON-09)
+        solicitacoes = Solicitacao.objects.filter(id__in=ids).select_related("tipo_evento")
 
         # MP4: Otimização O(N) - dict lookup em vez de linear search O(N²)
         solicitacoes_dict = {s.id: s for s in solicitacoes}

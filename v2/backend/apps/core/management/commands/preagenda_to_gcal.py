@@ -59,8 +59,9 @@ from apps.core.services.gcal_sync_service import upsert_one
 
 
 def _upsert_ou_pula(**kwargs: Any) -> SyncOutcome:
-    """`upsert_one`, mas a recusa da guarda do CREATE (evento passado ou já no Google pela planilha) vira
-    SKIP: um evento recusado não derruba a execução inteira (virada, 16/10/2026)."""
+    """`upsert_one`, mas a recusa da guarda do CREATE (evento passado, já no Google pela planilha ou de
+    formação sem o Nº da formação) vira SKIP: um evento recusado não derruba a execução inteira (virada,
+    16/10/2026; CON-09)."""
     try:
         return upsert_one(**kwargs)
     except CriacaoRecusada as e:

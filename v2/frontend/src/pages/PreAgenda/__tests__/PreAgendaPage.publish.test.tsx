@@ -152,6 +152,18 @@ describe('PreAgendaPage — evento passado e publicado fora do sistema', () => {
     expect(screen.getByLabelText('Selecionar evento: o evento já terminou')).toBeDisabled();
     expect(screen.getByLabelText('Selecionar evento')).not.toBeDisabled();
   });
+
+  // CON-09: o servidor recusaria (`sem_numero_da_formacao`); a marca vem na linha da lista.
+  test('Publicar e a seleção ficam desabilitados no evento de formação sem o Nº da formação', async () => {
+    mockRows([
+      row({ id: 70, municipio_nome: 'Iguatu', falta_numero_da_formacao: true, ...FUTURO }),
+      row({ id: 71, municipio_nome: 'Tauá', gcal_status: 'PUBLISHED', falta_numero_da_formacao: true, ...FUTURO }),
+    ]);
+    render(<PreAgendaPage />);
+    await screen.findByText('Tauá');
+    expect(screen.getByLabelText('Publicar evento no Google Calendar: falta o Nº da formação')).toBeDisabled();
+    expect(screen.getByLabelText('Selecionar evento: falta o Nº da formação')).toBeDisabled();
+  });
 });
 
 // Widget de debug do preview ("Informações Técnicas"): a regra É o superusuário (ehSuperusuario).

@@ -16,6 +16,7 @@ from django.utils import timezone
 
 from apps.core.models import Solicitacao
 from apps.core.services.db_retry import retry_on_deadlock
+from apps.core.services.evento_de_formacao import falta_numero_da_formacao
 from apps.core.types import CalendarId, EventId, JsonDict
 
 from .client import CalendarClientAdapter
@@ -31,8 +32,9 @@ class CriacaoRecusada(ValueError):
     """O sync ia CRIAR (ou adotar o `asv2{id}`) no Google e a guarda da virada recusou (`code` diz por quê).
 
     `evento_passado`: o evento já terminou. `publicado_fora_do_sistema`: ele já está no Google pela
-    planilha e não foi adotado, então criar daria um segundo evento. Quem chama marca ERROR (tarefa)
-    ou conta como SKIP (`preagenda_to_gcal`)."""
+    planilha e não foi adotado, então criar daria um segundo evento. `sem_numero_da_formacao` (CON-09):
+    evento de formação sem o Nº da formação, que o título no Google precisa. Quem chama marca ERROR
+    (tarefa) ou conta como SKIP (`preagenda_to_gcal`)."""
 
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
@@ -49,6 +51,11 @@ def _motivo_para_nao_criar(s: Solicitacao) -> CriacaoRecusada | None:
         )
     if s.fim < timezone.now():
         return CriacaoRecusada("evento_passado", f"Solicitação #{s.id} já terminou; o sistema não cria evento passado.")
+    if falta_numero_da_formacao(s):
+        return CriacaoRecusada(
+            "sem_numero_da_formacao",
+            f"Solicitação #{s.id} é de formação e está sem o Nº da formação; o título no Google precisa dele.",
+        )
     return None
 
 

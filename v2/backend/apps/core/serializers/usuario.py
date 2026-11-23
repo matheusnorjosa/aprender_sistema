@@ -70,6 +70,18 @@ def _lotacao_vigente(user: Any) -> list[list[Any]]:
     )
 
 
+def grupos_resultantes(antes: list[Group], enviados: list[Group] | None, funcoes: set[str]) -> list[Group]:
+    """Os grupos da conta depois de um salvar com `group_ids` (#2071), antes do grupo de setor da gerência.
+
+    Os grupos que não são de FUNÇÃO (`funcoes`) ficam; os enviados entram. `enviados=None` (o form não
+    mandou `group_ids`) mantém tudo. Usada por `_apply_lotacao` e pela trava da própria conta (LIB-64).
+    """
+    final = [g for g in antes if enviados is None or g.name not in funcoes]
+    if enviados is not None:
+        final += [g for g in enviados if g not in final]
+    return final
+
+
 class UserSlimSerializer(serializers.ModelSerializer):
     """
     Serializer slim para Usuario (usado em aninhamentos).
@@ -427,14 +439,18 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
         Rules:
         - Only groups in ALLOWED_GROUPS can be assigned
-        - Users cannot modify their own groups
+        - Users cannot modify their own groups: LIB-64 (23/11/2026) — vale para o conjunto FINAL
+          (`grupos_resultantes`). O form reenvia as funções em todo salvar; reenviar as mesmas não muda nada.
         """
         request = self.context.get("request")
         instance = self.instance  # None for create, User object for update
 
         # Check if user is trying to modify their own groups (P1.1)
         if instance and request and instance.id == request.user.id:
-            raise serializers.ValidationError("Você não pode modificar seus próprios grupos.")
+            antes = list(instance.groups.all())
+            final = grupos_resultantes(antes, value, nomes_grupos_funcao())
+            if {g.pk for g in final} != {g.pk for g in antes}:
+                raise serializers.ValidationError("Você não pode modificar seus próprios grupos.")
 
         allowed_groups = get_assignable_group_names()
 
@@ -534,9 +550,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         anterior = exibido.gerencia if exibido is not None else None
         nova_lotacao = has_gerencia and (anterior is None or anterior.pk != gerencia.pk)
 
-        final = [g for g in antes if groups is None or g.name not in funcoes]
-        if groups is not None:
-            final += [g for g in groups if g not in final]
+        final = grupos_resultantes(antes, groups, funcoes)
         # O grupo de setor só vem de lotação com papel de FUNÇÃO (FORMADOR/COORDENADOR/APOIO/GERENTE): o papel
         # EQUIPE nunca concede grupo, e sem função com papel não há lotação que o explique.
         if nova_lotacao and papeis_de_grupos(final):
@@ -687,6 +701,13 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         equipe = validated_data.pop("equipe_administrativa", None)
         password = validated_data.pop("password", None)
         actor = self._actor()
+        # LIB-64 (SEG-2/SEG-3): na própria conta, `group_ids` só é validado (`validate_group_ids` já provou que
+        # o conjunto final não muda) e não é aplicado. Assim o salvar não dispara o que deriva das funções
+        # (`encerrar_gerente_aprovador`, re-sincronizar a lotação) nem grava a partir dos grupos lidos na
+        # validação, fora desta transação. Limite: se o salvar também troca a gerência, a lotação recalcula os
+        # grupos a partir do retrato lido antes (ver rbac.spec.md, "Os próprios grupos").
+        if actor is not None and actor.pk == instance.pk:
+            groups = None
         before_group_ids = set(instance.groups.values_list("pk", flat=True))
         # M07-03 (#1618): snapshot dos flags ANTES do super().update (DRF muta a instance
         # in-place — ler depois daria before==after e nada auditaria).

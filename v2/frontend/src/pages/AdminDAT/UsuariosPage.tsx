@@ -388,10 +388,11 @@ export default function UsuariosPage(): JSX.Element {
   const equipeMarcada = Form.useWatch('equipe_administrativa', form);
   // 17/10/2026: o DAT (`manage_lotacao_comum`) lota nas gerências comuns, menos a própria conta e a que tem
   // vínculo reservado (o backend recusa com 400; aqui os campos travam com o motivo).
+  const propriaConta = !!editingUser && editingUser.id === currentUserId;
   const travaDoDat = motivoDaLotacaoTravada({
     currentIsSuperuser,
     podeLotarComum: caps.canManageLotacaoComum,
-    propria: !!editingUser && editingUser.id === currentUserId,
+    propria: propriaConta,
     reservada: !!editingUser?.lotacao_reservada,
   });
   const lotaComum = !currentIsSuperuser && caps.canManageLotacaoComum && travaDoDat === null;
@@ -640,6 +641,7 @@ export default function UsuariosPage(): JSX.Element {
         cpfEditUnlocked,
         currentIsSuperuser,
         lotaComum,
+        propriaConta,
         funcoesCarregadas: funcoesProntasParaSalvar({
           isEditing: !!editingUser,
           hidratouComFuncoes,
@@ -1052,6 +1054,8 @@ export default function UsuariosPage(): JSX.Element {
             // P0-1 Tier-0 (D-1=2a): membership segue o mesmo gate (ver gerencia_id acima).
             // #2071: obrigatória só ao criar (na edição, o DAT não tem função).
             rules={obrigatorio.funcao ? [{ required: true, message: 'Selecione pelo menos uma função' }] : []}
+            // LIB-64: as próprias funções só outro superusuário altera (o backend recusa mudar o próprio conjunto).
+            extra={propriaConta && editaLotacao ? 'Suas funções só outro superusuário altera.' : undefined}
           >
             <Select
               mode="multiple"
@@ -1061,7 +1065,7 @@ export default function UsuariosPage(): JSX.Element {
               maxTagCount="responsive"
               placeholder="Selecione uma ou mais funções"
               options={funcaoOptions}
-              disabled={!editaLotacao}
+              disabled={!editaLotacao || propriaConta}
             />
           </Form.Item>
 

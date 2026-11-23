@@ -110,6 +110,8 @@ describe('UsuariosPage — o superusuário na própria conta (LIB-64)', () => {
     expect(await within(dialog).findByText('Suas funções só outro superusuário altera.')).toBeInTheDocument();
     await vi.waitFor(() => expect(gerenciaDoForm(dialog)).toBeEnabled(), { timeout: 10000 });
     expect(funcoesDoForm(dialog)).toBeDisabled();
+    // R4: o motivo é a descrição acessível do campo travado (o leitor de tela o ouve junto do campo).
+    expect(funcoesDoForm(dialog)).toHaveAccessibleDescription('Suas funções só outro superusuário altera.');
     await user.click(within(dialog).getByRole('button', { name: /^salvar$/i }));
 
     await vi.waitFor(() => expect(updateUser).toHaveBeenCalled(), { timeout: 10000 });

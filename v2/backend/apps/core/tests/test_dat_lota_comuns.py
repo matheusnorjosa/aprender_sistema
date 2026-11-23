@@ -280,8 +280,12 @@ class TestDatRecebe400:
 
     def test_propria_conta_reenviando_os_mesmos_grupos_salva_o_cadastro(self, dat):
         # LIB-64 (23/11/2026): reenviar os grupos que já tem não é mexer neles; a lotação segue travada.
+        # O vínculo EQUIPE do fixture não dá grupo: uma função e um grupo que não é função, para o reenvio
+        # ter o que reenviar (R2).
+        dat.groups.add(_grupo("Formador"), _grupo("Controle"))
         vinculo = EquipeGerencia.vigentes_em().get(usuario=dat)
         ids = list(dat.groups.values_list("pk", flat=True))
+        assert len(ids) == 2
         resp = _patch(dat, dat, {"first_name": "Nome Novo", "group_ids": ids, "gerencia_id": vinculo.gerencia_id})
         assert resp.status_code == status.HTTP_200_OK, resp.data
         dat.refresh_from_db()

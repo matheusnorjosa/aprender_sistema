@@ -13,14 +13,16 @@ Valida hardening do serializer de admin de usuários:
 
 from __future__ import annotations
 
+from unittest import mock
+
 from django.test import TestCase
 from rest_framework.test import APIClient, APIRequestFactory
 
 import pytest
 
-from apps.core.models import AuditLog, PermissaoFuncional
+from apps.core.models import AuditLog, EquipeGerencia, Gerencia, PermissaoFuncional, Usuario
 from apps.core.serializers import UsuarioAdminSerializer
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GerenciaFactory, GroupFactory, UsuarioFactory
 
 
 class AdminUserSecurityTests(TestCase):
@@ -462,6 +464,15 @@ def _assign_groups_auditados(alvo):
     return AuditLog.objects.filter(action=AuditLog.Action.ASSIGN_GROUPS, details__target_user_id=alvo.pk)
 
 
+def _espia_groups_set():
+    """`groups.set` de qualquer conta, trocado por um mock: prova que o salvar não grava grupo nenhum (R3).
+
+    Sem delta, `auditar_assign_groups` não grava nada, então "nenhum AuditLog" não distingue um no-op de
+    um `groups.set` com o mesmo conjunto.
+    """
+    return mock.patch.object(Usuario.groups.related_manager_cls, "set")
+
+
 @pytest.mark.django_db
 class TestPropriaConta:
     @pytest.fixture
@@ -475,19 +486,92 @@ class TestPropriaConta:
 
     def test_muda_so_o_nome_reenviando_as_funcoes(self, root):
         formador = GroupFactory(name="Formador")
-        resp = _patch_admin(root, root, {"first_name": "Nome Novo", "group_ids": [formador.id], "gerencia_id": None})
+        with _espia_groups_set() as groups_set:
+            resp = _patch_admin(
+                root, root, {"first_name": "Nome Novo", "group_ids": [formador.id], "gerencia_id": None}
+            )
         assert resp.status_code == 200, resp.data
         root.refresh_from_db()
         assert root.first_name == "Nome Novo"
         assert self._grupos(root) == {"Formador", "Controle"}
-        assert not _assign_groups_auditados(root).exists()
+        groups_set.assert_not_called()
 
     def test_reenviar_grupo_que_nao_e_funcao_e_ja_tem(self, root):
         ids = [GroupFactory(name="Formador").id, GroupFactory(name="Controle").id]
-        resp = _patch_admin(root, root, {"first_name": "Outro", "group_ids": ids})
+        with _espia_groups_set() as groups_set:
+            resp = _patch_admin(root, root, {"first_name": "Outro", "group_ids": ids})
         assert resp.status_code == 200, resp.data
         assert self._grupos(root) == {"Formador", "Controle"}
+        groups_set.assert_not_called()
+
+    @pytest.mark.parametrize("com_gerencia", [False, True], ids=["sem-gerencia_id", "com-a-gerencia-exibida"])
+    def test_reenviar_as_funcoes_nao_encerra_o_proprio_vinculo_gerente(self, root, com_gerencia):
+        """SEG-3: reenviar as mesmas funções não tem efeito derivado (aqui, `encerrar_gerente_aprovador`).
+
+        Vínculo GERENTE na gerência aprovadora sem o grupo Gerente (dado importado). Para OUTRA pessoa, o
+        salvar do form encerra esse vínculo mesmo sem mudar as funções (#2071, "tirado pela tela de Grupos");
+        na própria conta o `group_ids` só é validado: o salvar não muda grupo, então não muda o que deriva dele.
+        """
+        g1, _ = Gerencia.objects.get_or_create(
+            nome="SUPERINTENDENCIA", defaults={"nome_setor": "Super", "setor_canonico": "Superintendência"}
+        )
+        EquipeGerencia.objects.create(gerencia=g1, usuario=root, papel="GERENTE", ativo=True)
+        payload = {"first_name": "Nome Novo", "group_ids": [GroupFactory(name="Formador").id]}
+        if com_gerencia:
+            payload["gerencia_id"] = g1.id
+
+        resp = _patch_admin(root, root, payload)
+
+        assert resp.status_code == 200, resp.data
+        ativos = {(v.gerencia_id, v.papel) for v in EquipeGerencia.objects.filter(usuario=root, ativo=True)}
+        assert ativos == {(g1.id, "GERENTE")}
+
+    def test_troca_simultanea_por_outro_superusuario_nao_e_desfeita(self, root):
+        """SEG-2: entre a validação e a gravação, outro superusuário troca as funções desta conta.
+
+        O serializer sem `prefetch_related` relê os grupos na gravação; com o `group_ids` validado aplicado,
+        o salvar da própria conta devolveria o Formador e desfaria a troca.
+        """
+        coordenador, controle = GroupFactory(name="Coordenador"), GroupFactory(name="Controle")
+        request = APIRequestFactory().patch(f"/api/usuarios-admin/{root.pk}/")
+        request.user = root
+        serializer = UsuarioAdminSerializer(
+            Usuario.objects.get(pk=root.pk),
+            data={"group_ids": [GroupFactory(name="Formador").id]},
+            partial=True,
+            context={"request": request},
+        )
+        assert serializer.is_valid(), serializer.errors
+
+        Usuario.objects.get(pk=root.pk).groups.set([coordenador, controle])
+        serializer.save()
+
+        assert self._grupos(root) == {"Coordenador", "Controle"}
         assert not _assign_groups_auditados(root).exists()
+
+    @pytest.mark.parametrize("envia_funcoes", [True, False], ids=["com-group_ids", "sem-group_ids"])
+    def test_trocar_a_propria_gerencia_troca_o_grupo_de_setor(self, root, envia_funcoes):
+        """SEG-1/R1: a trava vale para as funções e os grupos ENVIADOS. O grupo de setor derivado da gerência
+        (etiqueta, sem capacidade: `setor_group_for`) entra e sai quando o superusuário troca a própria
+        lotação, como para qualquer pessoa (#2071)."""
+        vidas, _fluir = GroupFactory(name="Vidas"), GroupFactory(name="Fluir")
+        g_vidas = GerenciaFactory(nome="GERENCIA VIDAS LIB64", nome_setor="Vidas", setor_canonico="Vidas")
+        g_fluir = GerenciaFactory(nome="GERENCIA FLUIR LIB64", nome_setor="Fluir", setor_canonico="Fluir")
+        root.groups.add(vidas)
+        EquipeGerencia.objects.create(gerencia=g_vidas, usuario=root, papel="FORMADOR", ativo=True)
+        payload = {"gerencia_id": g_fluir.id}
+        if envia_funcoes:
+            payload["group_ids"] = [GroupFactory(name="Formador").id]
+
+        resp = _patch_admin(root, root, payload)
+
+        assert resp.status_code == 200, resp.data
+        assert self._grupos(root) == {"Formador", "Controle", "Fluir"}
+        ativos = {(v.gerencia_id, v.papel) for v in EquipeGerencia.objects.filter(usuario=root, ativo=True)}
+        assert ativos == {(g_fluir.id, "FORMADOR")}
+        auditado = _assign_groups_auditados(root).get()
+        assert auditado.details["added_groups"] == ["Fluir"]
+        assert auditado.details["removed_groups"] == ["Vidas"]
 
     @pytest.mark.parametrize(
         "enviados",

@@ -701,6 +701,12 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         equipe = validated_data.pop("equipe_administrativa", None)
         password = validated_data.pop("password", None)
         actor = self._actor()
+        # LIB-64 (SEG-2/SEG-3): na própria conta, `group_ids` só é validado (`validate_group_ids` já provou que
+        # o conjunto final não muda) e não é aplicado. Assim o salvar não dispara o que deriva das funções
+        # (`encerrar_gerente_aprovador`, re-sincronizar a lotação) nem grava a partir dos grupos lidos na
+        # validação, fora desta transação (desfaria a troca feita ao mesmo tempo por outro superusuário).
+        if actor is not None and actor.pk == instance.pk:
+            groups = None
         before_group_ids = set(instance.groups.values_list("pk", flat=True))
         # M07-03 (#1618): snapshot dos flags ANTES do super().update (DRF muta a instance
         # in-place — ler depois daria before==after e nada auditaria).

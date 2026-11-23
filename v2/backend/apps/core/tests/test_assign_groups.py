@@ -12,11 +12,13 @@ Security tests added for Issue #561 (C-04):
 
 from __future__ import annotations
 
+from unittest import mock
+
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, PermissaoFuncional
+from apps.core.models import PermissaoFuncional, Usuario
 from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 
@@ -244,23 +246,26 @@ class TestAssignGroups:
         assert "próprios grupos" in response.data["error"]
 
     def test_assign_groups_self_same_groups_is_noop(self, api_client, usuario_dat):
-        """LIB-64 (23/11/2026): reenviar os MESMOS grupos para si mesmo não muda nada; 200 sem auditoria."""
+        """LIB-64 (23/11/2026): reenviar os MESMOS grupos para si mesmo não muda nada; 200 sem gravar.
+
+        `groups.set` espiado: sem delta, a auditoria não grava nada de qualquer jeito, então só o mock
+        distingue o no-op da view de um `groups.set` com o mesmo conjunto.
+        """
         formador = GroupFactory(name="Formador")
         controle = GroupFactory(name="Controle")
         usuario_dat.groups.set([formador, controle])
         api_client.force_authenticate(usuario_dat)
 
-        response = api_client.post(
-            f"/api/usuarios-admin/{usuario_dat.id}/assign_groups/",
-            {"group_ids": [controle.id, formador.id, formador.id]},
-            format="json",
-        )
+        with mock.patch.object(Usuario.groups.related_manager_cls, "set") as groups_set:
+            response = api_client.post(
+                f"/api/usuarios-admin/{usuario_dat.id}/assign_groups/",
+                {"group_ids": [controle.id, formador.id, formador.id]},
+                format="json",
+            )
 
         assert response.status_code == 200, response.data
         assert set(usuario_dat.groups.values_list("name", flat=True)) == {"Formador", "Controle"}
-        assert not AuditLog.objects.filter(
-            action=AuditLog.Action.ASSIGN_GROUPS, details__target_user_id=usuario_dat.pk
-        ).exists()
+        groups_set.assert_not_called()
 
     def test_assign_groups_self_removing_a_group_blocked(self, api_client, usuario_dat):
         """LIB-64: tirar um grupo de si mesmo continua 403 (mudar o conjunto é que é proibido)."""

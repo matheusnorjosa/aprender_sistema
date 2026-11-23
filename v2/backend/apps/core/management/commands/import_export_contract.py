@@ -262,6 +262,12 @@ class Command(BaseCommand):
                 if v.get("conjunto_incompleto_eventos"):
                     # #2036: evento de dois projetos que fica com um, com o motivo (só evento_id ou s<id>)
                     self.stdout.write(f"    conjunto_incompleto_eventos={v['conjunto_incompleto_eventos']}")
+                if v.get("formacao_sem_numero"):
+                    # CON-09: evento novo de formação sem Nº da formação válido, para corrigir na planilha (só evento_id)
+                    self.stdout.write(
+                        f"    formacao_sem_numero={v['formacao_sem_numero']}"
+                        + f" formacao_sem_numero_eventos={v['formacao_sem_numero_eventos']}"
+                    )
                 if v.get("lotacao_perdida_contas"):
                     # #1658: quem a regra antiga lotaria e a nova deixa de fora (só u<id>), para o dono no ensaio
                     self.stdout.write(f"    lotacao_perdida_contas={v['lotacao_perdida_contas']}")

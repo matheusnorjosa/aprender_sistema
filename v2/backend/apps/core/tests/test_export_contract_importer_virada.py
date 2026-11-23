@@ -82,6 +82,7 @@ _SOL_COLS = [
     "external_event_id",
     "external_event_id_confianca",
     "projetos",
+    "encontro",
 ]
 _PART_COLS = ["evento_id", "usuario", "usuario_cpf", "usuario_email", "role", "match_procedencia"]
 _CPF_COORD = "11144477735"
@@ -1526,3 +1527,36 @@ def test_2036_comando_em_texto_mostra_a_lista(tmp_path, m, g):
         stdout=out,
     )
     assert f"apply_conjunto_incompleto_eventos=[{{'evento': 's{s.id}'" in out.getvalue()
+
+
+# ---------- CON-09: evento de formação sem Nº da formação vai para a lista do ensaio, sem barrar ----------
+def _linhas_con09() -> list[dict[str, str]]:
+    return [
+        _sol(evento_id="EVSEM", tipo_evento="Presencial"),
+        _sol(evento_id="EVTXT", tipo_evento="Presencial", encontro="Encontro 1", hora_inicio="13:00", hora_fim="15:00"),
+        _sol(evento_id="EVCOM", tipo_evento="Presencial", encontro="3º", hora_inicio="16:00", hora_fim="17:00"),
+        _sol(evento_id="EVOUT", hora_inicio="18:00", hora_fim="19:00"),  # tipo que não é de formação
+        _sol(evento_id="EVPAS", tipo_evento="Presencial", data=PASSADO_ISO),  # já terminou: não vai ao Google
+        _sol(evento_id="EVCAN", tipo_evento="Presencial", cancelado="true", hora_inicio="19:00", hora_fim="20:00"),
+    ]
+
+
+@pytest.mark.parametrize("modo", ["create-only", "virada"])
+def test_con09_formacao_sem_numero_vai_para_a_lista_e_entra(tmp_path, m, modo):
+    TipoEventoFactory(nome="Presencial")
+    path = _export(tmp_path, _linhas_con09())
+    tally = ExportContractImporter(path=path, mode=modo).run()["por_entidade"]["solicitacao"]
+    assert tally["formacao_sem_numero"] == 2
+    assert tally["formacao_sem_numero_eventos"] == ["EVSEM", "EVTXT"]
+    ExportContractImporter(path=path, mode=modo, apply=True, allow=("solicitacao", "participation")).run()
+    numeros = dict(Solicitacao.objects.values_list("external_hash", "encontro"))
+    assert numeros["EVSEM"] is None, "a carga não barra: o evento entra e fica na lista"
+    assert numeros["EVTXT"] == "Encontro 1"
+    assert numeros["EVCOM"] == "3", "o número do evento de formação entra só com algarismos"
+
+
+def test_con09_comando_em_texto_mostra_a_lista(tmp_path, m):
+    TipoEventoFactory(nome="Presencial")
+    out = io.StringIO()
+    call_command("import_export_contract", "--path", _export(tmp_path, _linhas_con09()), "--mode", "virada", stdout=out)
+    assert "formacao_sem_numero=2 formacao_sem_numero_eventos=['EVSEM', 'EVTXT']" in out.getvalue()

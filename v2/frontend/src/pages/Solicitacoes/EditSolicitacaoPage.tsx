@@ -39,7 +39,13 @@ import timezone from 'dayjs/plugin/timezone';
 import { getSolicitacao, updateSolicitacao } from '../../api/solicitacoes';
 import { useAcesso } from '../../contexts/AcessoContext';
 import { optionalText } from './optionalText';
-import { AVISO_SEM_COMPRA, MSG_PROJETO_EM_ESPERA, opcaoDoMunicipio } from './evento';
+import {
+  AVISO_SEM_COMPRA,
+  MSG_NUMERO_DA_FORMACAO,
+  MSG_PROJETO_EM_ESPERA,
+  numeroDaFormacaoObrigatorio,
+  opcaoDoMunicipio,
+} from './evento';
 import {
   lookupMunicipiosWithFilters,
   lookupProjetos,
@@ -80,6 +86,8 @@ interface ComboBoxValue {
   sem_compra?: boolean;
   /** Município escolhido na lista: o projeto está em espera (sem compra em município nenhum). */
   projeto_em_espera?: boolean;
+  /** Tipo de evento (lookup de tipos e detalhe, CON-09): é de formação e pede o "Nº da formação". */
+  de_formacao?: boolean;
 }
 
 /** Formador type */
@@ -307,7 +315,9 @@ export default function EditSolicitacaoPage(): JSX.Element {
               }
             : null,
           projeto_2: data.projeto_2 ? { id: data.projeto_2, label: data.projetos?.[1]?.nome ?? '' } : null,
-          tipoEvento: data.tipo_evento ? { id: data.tipo_evento, label: data.tipo_evento_nome || '' } : null,
+          tipoEvento: data.tipo_evento
+            ? { id: data.tipo_evento, label: data.tipo_evento_nome || '', de_formacao: data.tipo_evento_de_formacao === true }
+            : null,
           municipio: data.municipio ? { id: data.municipio, label: data.municipio_nome || '' } : null,
           inicio: data.inicio,
           fim: data.fim,
@@ -495,6 +505,14 @@ export default function EditSolicitacaoPage(): JSX.Element {
   const avaliarObrigatoria =
     perguntaAvaliar && (solicitacao?.pretende_avaliar_formador != null || !avaliarAplicavaAoCarregar);
 
+  // CON-09 (a regra do servidor): o "Nº da formação" é obrigatório no evento de formação (marca do servidor) que
+  // ainda não terminou. Trocar o tipo ou a data reconfere o número que já mostra erro.
+  const numeroObrigatorio =
+    numeroDaFormacaoObrigatorio(formData.tipoEvento) && (!formData.fim || !dayjs(formData.fim).isBefore(dayjs()));
+  useEffect(() => {
+    if (form.getFieldError('encontro').length > 0) form.validateFields(['encontro']).catch(() => undefined);
+  }, [numeroObrigatorio, form]);
+
   // Trocar o 1º coordenador troca o responsável: a resposta de acompanhar era do anterior e é apagada.
   const handleCoordenadoresChange = (value: CoordenadorItem[]): void => {
     setFormData(prev => ({
@@ -538,6 +556,18 @@ export default function EditSolicitacaoPage(): JSX.Element {
 
       if (!formData.tipoEvento) {
         message.error('Por favor, selecione um tipo de evento');
+        setSaving(false);
+        return;
+      }
+
+      // CON-09: o "Nº da formação" (obrigatório no evento de formação que não terminou). O erro fica no campo.
+      const erroDoNumero = await form
+        .validateFields(['encontro'])
+        .then(() => null)
+        .catch((err: { errorFields?: Array<{ errors: string[] }> }) => err.errorFields?.[0]?.errors[0] ?? MSG_NUMERO_DA_FORMACAO);
+      if (erroDoNumero) {
+        message.error(erroDoNumero);
+        form.scrollToField('encontro', { block: 'center', focus: true });
         setSaving(false);
         return;
       }
@@ -635,6 +665,11 @@ export default function EditSolicitacaoPage(): JSX.Element {
       const motivoDoCampo = Object.values(data?.errors ?? {})
         .flat()
         .find((texto): texto is string => typeof texto === 'string');
+      // A recusa do número (CON-09) vai também ao campo, onde o leitor de tela a encontra.
+      const errosDoNumero = data?.errors?.['encontro'];
+      if (Array.isArray(errosDoNumero)) {
+        form.setFields([{ name: 'encontro', errors: errosDoNumero.filter((texto): texto is string => typeof texto === 'string') }]);
+      }
       if (data?.code === 'availability_conflict' && data.detail) {
         // Conflito de agenda: o motivo está no `detail`. `errors` traz objetos e os e-mails dos
         // convidados externos (`skipped_guests`), que não são a mensagem.
@@ -897,7 +932,11 @@ export default function EditSolicitacaoPage(): JSX.Element {
           <Form.Item
             label="Nº da formação"
             name="encontro"
-            rules={[{ max: 100, message: 'Máximo 100 caracteres' }]}
+            rules={[
+              { required: numeroObrigatorio, whitespace: true, message: MSG_NUMERO_DA_FORMACAO },
+              { max: 100, message: 'Máximo 100 caracteres' },
+            ]}
+            extra={numeroObrigatorio ? 'Obrigatório neste tipo de evento. Só o número (ex.: 4).' : undefined}
           >
             <Input
               placeholder="Ex: 4"

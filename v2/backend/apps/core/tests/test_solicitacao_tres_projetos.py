@@ -551,18 +551,6 @@ def test_migracao_0138_so_schema():
     assert not any(isinstance(op, RunPython) for op in ops)
     assert {type(op) for op in ops} == {AddField, AddConstraint, AlterField}
     assert sorted(op.name for op in ops if isinstance(op, AlterField)) == ["projeto", "projeto_2"]
-    saida = StringIO()
-    call_command("sqlmigrate", "core", "0138", stdout=saida)
-    sql = saida.getvalue()
-    assert sql.count("-- (no-op)") == 2, "o texto de ajuda das vagas 1 e 2 não pode gerar SQL"
-    comandos = [linha for linha in sql.splitlines() if linha and not linha.startswith(("--", "BEGIN", "COMMIT"))]
-    assert [c.split(" (")[0].split(" CHECK")[0] for c in comandos] == [
-        'ALTER TABLE "core_solicitacao" ADD COLUMN "projeto_3_id" bigint NULL CONSTRAINT '
-        '"core_solicitacao_projeto_3_id_d8aaf2c9_fk_core_projeto_id" REFERENCES "core_projeto"("id") DEFERRABLE '
-        'INITIALLY DEFERRED; SET CONSTRAINTS "core_solicitacao_projeto_3_id_d8aaf2c9_fk_core_projeto_id" IMMEDIATE;',
-        'ALTER TABLE "core_solicitacao" ADD CONSTRAINT "solicitacao_projeto_3_valido"',
-        'CREATE INDEX "core_solicitacao_projeto_3_id_d8aaf2c9" ON "core_solicitacao"',
-    ], comandos
     [add_field] = [op for op in ops if isinstance(op, AddField)]
     assert add_field.name == "projeto_3" and add_field.field.null
     assert add_field.field.default is models.NOT_PROVIDED

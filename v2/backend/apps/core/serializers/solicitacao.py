@@ -34,6 +34,7 @@ from apps.core.services.evento_de_formacao import (
     MSG_NUMERO_DA_FORMACAO,
     eh_evento_de_formacao,
     eh_tipo_de_formacao,
+    falta_numero_da_formacao,
     numero_da_formacao,
 )
 from apps.core.services.solicitacao_approval import DECISAO_IMPEDIDA, decisoes_impedidas_na_lista
@@ -105,6 +106,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
     tipo_evento_nome = serializers.CharField(source="tipo_evento.nome", read_only=True)
     # CON-09: o tipo é de formação (`evento_de_formacao`); a tela de edição exige o Nº da formação com ele.
     tipo_evento_de_formacao = serializers.SerializerMethodField()
+    # CON-09: evento de formação sem Nº da formação válido; a Pré-agenda desabilita o Publicar com o motivo.
+    falta_numero_da_formacao = serializers.SerializerMethodField()
     # Decisão do dono (05/10/2026): a resposta "pretende avaliar o formador" é lida por outro
     # sistema interno; o nome sai junto para a tela não precisar de outra chamada.
     formador_avaliado_nome = serializers.SerializerMethodField()
@@ -144,6 +147,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "tipo_evento",
             "tipo_evento_nome",
             "tipo_evento_de_formacao",
+            "falta_numero_da_formacao",
             "tipo",
             "encontro",
             "segmento",
@@ -390,6 +394,9 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
 
     def get_tipo_evento_de_formacao(self, obj: Solicitacao) -> bool:
         return eh_evento_de_formacao(obj)
+
+    def get_falta_numero_da_formacao(self, obj: Solicitacao) -> bool:
+        return falta_numero_da_formacao(obj)
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """

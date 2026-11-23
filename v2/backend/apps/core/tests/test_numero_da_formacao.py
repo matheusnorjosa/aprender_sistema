@@ -19,6 +19,7 @@ from datetime import timedelta
 from typing import cast
 from unittest.mock import patch
 
+from django.core.management import call_command
 from django.test import RequestFactory, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -32,6 +33,8 @@ from apps.core.services.evento_de_formacao import (
     eh_tipo_de_formacao,
     numero_da_formacao,
 )
+from apps.core.services.gcal.sync import CriacaoRecusada, upsert_one
+from apps.core.services.gcal_fake_client import FakeCalendarClient
 from apps.core.services.solicitacao_approval import approve_solicitacao
 from apps.core.services.solicitacao_publish import motivo_nao_publicavel, publish_to_gcal, resync_to_gcal
 from apps.core.tests.conftest import get_field_errors
@@ -300,6 +303,18 @@ class TestEdicao:
         assert client.get(f"{URL}{de_formacao.pk}/").data["tipo_evento_de_formacao"] is True
         assert client.get(f"{URL}{outro.pk}/").data["tipo_evento_de_formacao"] is False
 
+    def test_lista_manda_se_falta_o_numero(self, coordenador, projeto, municipio, presencial, reuniao):
+        """A Pré-agenda desabilita o Publicar com o motivo (espelho do `motivo_nao_publicavel`), sem repetir na
+        tela a conferência do formato: quem diz se falta o número é o servidor."""
+        sem = self._evento(coordenador, projeto, municipio, presencial, dias=10, encontro=None)
+        invalido = self._evento(coordenador, projeto, municipio, presencial, dias=11, encontro="Encontro 1")
+        com = self._evento(coordenador, projeto, municipio, presencial, dias=12, encontro="03")
+        outro = self._evento(coordenador, projeto, municipio, reuniao, dias=13, encontro=None)
+        response = _client(coordenador).get(URL, {"page_size": 50})
+        assert response.status_code == 200, response.data
+        falta = {linha["id"]: linha["falta_numero_da_formacao"] for linha in response.json()["results"]}
+        assert falta == {sem.pk: True, invalido.pk: True, com.pk: False, outro.pk: False}
+
 
 # ---------- lookup ----------
 def test_lookup_de_tipos_manda_a_marca(presencial, online, workshop, reuniao):
@@ -408,3 +423,34 @@ def test_aprovar_nao_pede_o_numero(presencial):
     approve_solicitacao(s, aprovador, RequestFactory().post("/x/"))
     s.refresh_from_db()
     assert s.status == "aprovado"
+
+
+# ---------- preagenda_to_gcal e auto-apply: a guarda do CREATE ----------
+def test_guarda_do_create_recusa_formacao_sem_numero(presencial, reuniao):
+    """O `upsert_one` não cria evento de formação sem o número (o `preagenda_to_gcal` e o auto-apply chegam
+    nele sem passar pelo `motivo_nao_publicavel`)."""
+    sem = _futuro(presencial, encontro=None)
+    with pytest.raises(CriacaoRecusada) as exc:
+        upsert_one(client=FakeCalendarClient(), calendar_id="cal", s=sem)
+    assert exc.value.code == SEM_NUMERO
+    assert upsert_one(client=FakeCalendarClient(), calendar_id="cal", s=_futuro(presencial, encontro="4")).action == (
+        "CREATE"
+    )
+    assert upsert_one(client=FakeCalendarClient(), calendar_id="cal", s=_futuro(reuniao, encontro=None)).action == (
+        "CREATE"
+    )
+
+
+def test_preagenda_to_gcal_pula_formacao_sem_numero(presencial):
+    sem = _futuro(presencial, encontro=None)
+    com = _futuro(presencial, encontro="4")
+    inserts: list[str] = []
+    original = FakeCalendarClient.insert
+
+    def _conta(self, calendar_id, event_id, payload):
+        inserts.append(event_id)
+        return original(self, calendar_id, event_id, payload)
+
+    with patch.object(FakeCalendarClient, "insert", _conta):
+        call_command("preagenda_to_gcal", "--client", "fake", "--calendar-id", "cal", "--ids", f"{sem.id},{com.id}")
+    assert inserts == [f"asv2{com.id}"]

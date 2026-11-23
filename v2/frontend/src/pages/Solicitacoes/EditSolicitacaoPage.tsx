@@ -57,7 +57,7 @@ import ComboBox from '../../components/ComboBox';
 import CoordenadoresPicker, { type CoordenadorItem } from '../../components/CoordenadoresPicker';
 import FormadoresPicker from '../../components/FormadoresPicker';
 import logger from '../../utils/logger';
-import { MOTIVO_NAO_PUBLICAVEL, motivoNaoPublicavel } from '../../utils/gcalRowActions';
+import { MOTIVO_NAO_PUBLICAVEL, MSG_CANCELADO_NA_AGENDA, motivoNaoPublicavel } from '../../utils/gcalRowActions';
 import type { ID, Solicitacao, SolicitacaoStatus, GCalStatus, Participation } from '../../types';
 
 dayjs.extend(utc);
@@ -178,6 +178,10 @@ function travaDaEdicao(s: Solicitacao): { titulo: string; texto: string; publica
       texto: `Este evento ${MOTIVO_NAO_PUBLICAVEL.publicado_fora_do_sistema}; mudar aqui não muda a agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle.`,
       publicado: true,
     };
+  }
+  // CON-08: cancelado na agenda não se edita, nem no erro do cancelamento (o servidor recusa com este texto).
+  if (s.cancelado_na_agenda === true) {
+    return { titulo: 'Evento cancelado na agenda', texto: MSG_CANCELADO_NA_AGENDA, publicado: true };
   }
   if (s.gcal_status === 'PUBLISHED') {
     // Publicar na agenda (Apoio) e a Pré-agenda (Controle) só tiram do Google o aprovado com id, de hoje em diante.

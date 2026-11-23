@@ -185,6 +185,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "gcal_last_error",
             # Virada (16/10/2026): no Google pela planilha e não adotado → a tela não oferece Publicar.
             "publicado_fora_do_sistema",
+            # CON-08: cancelado na agenda ("(CANCELADO) " no título do Google) → a tela não publica nem tira.
+            "cancelado_na_agenda",
             # gcal_payload_hash removed: internal implementation detail
             # PR19/RF06: Google Meet link
             "meet_link",
@@ -204,6 +206,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "gcal_last_sync_at",
             "gcal_last_error",
             "publicado_fora_do_sistema",
+            "cancelado_na_agenda",
             # gcal_payload_hash removed: internal implementation detail
             # PR19/RF06: Google Meet link (gerado automaticamente)
             "meet_link",
@@ -438,6 +441,11 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
                             "muda a agenda. Ajuste no Google, ou peça a adoção."
                         ]
                     }
+                )
+            # CON-08: cancelado na agenda não se edita, nem em ERROR: o evento fica no Google como cancelado.
+            if getattr(instance, "cancelado_na_agenda", False):
+                raise serializers.ValidationError(
+                    {"non_field_errors": ["Este evento foi cancelado na agenda: não se edita nem se publica de novo."]}
                 )
             if getattr(instance, "gcal_status", None) == "PUBLISHED":
                 raise serializers.ValidationError(
@@ -711,6 +719,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
         - PUBLISH_GCAL_ERROR
         - CANCEL_GCAL
         - CANCEL_GCAL_REQUESTED
+        - CANCELAR_NA_AGENDA_REQUESTED / CANCELAR_NA_AGENDA (CON-08: título marcado com "(CANCELADO) ")
         - RESYNC_GCAL_REQUESTED
         - GOOGLE_CONNECT
         - GOOGLE_DISCONNECT
@@ -727,6 +736,8 @@ class EventDetailSerializer(serializers.ModelSerializer):
             "PUBLISH_GCAL_ERROR",
             "CANCEL_GCAL",
             "CANCEL_GCAL_REQUESTED",
+            "CANCELAR_NA_AGENDA_REQUESTED",
+            "CANCELAR_NA_AGENDA",
             "RESYNC_GCAL_REQUESTED",
             "GOOGLE_CONNECT",
             "GOOGLE_DISCONNECT",

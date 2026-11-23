@@ -17,6 +17,7 @@ from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast
 
 from apps.core.models import AuditLog
+from apps.core.services.solicitacao_publish import excluir_marca_cancelado
 
 # Reprovação que não é decisão de pessoa: a cópia Google → sistema (`gcal/copia.py`) e a carga da
 # planilha (`export_contract_importer`), que gravam `details.origem` e o motivo do cancelamento.
@@ -108,9 +109,15 @@ def motivo_que_impede_excluir(sol: Any, *, ja_decidida: bool, pode_tirar_do_goog
             )
         return f"Esta solicitação já foi aprovada e não pode ser excluída. {saida}"
     if esta_no_google(sol) and not pode_tirar_do_google:
-        # D25: o Apoio, em Publicar na agenda, exclui o evento ou o tira só do Google.
+        # D25: o Apoio, em Publicar na agenda, exclui o evento ou o tira só do Google. O de formação (CON-08)
+        # não sai do Google: o Excluir marca "(CANCELADO) " no título dele.
+        efeito = (
+            "excluir aqui também o marcaria como cancelado lá, com (CANCELADO) no título"
+            if excluir_marca_cancelado(sol)
+            else "excluir aqui também o tiraria de lá"
+        )
         return (
-            "Este evento está no Google Agenda, ou pode estar, e excluir aqui também o tiraria de lá. "
+            f"Este evento está no Google Agenda, ou pode estar, e {efeito}. "
             "Para excluir, peça ao Apoio de Coordenação da sua gerência, na tela Publicar na agenda. "
             "Se lá também não der, fale com a administração do sistema."
         )

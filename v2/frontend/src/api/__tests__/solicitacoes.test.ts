@@ -15,6 +15,7 @@ import {
   approveSolicitacao,
   approveSolicitacoesBatch,
   cancelSolicitacao,
+  cancelarNaAgenda,
   createSolicitacoesEmLote,
   deleteSolicitacao,
   getSolicitacao,
@@ -247,6 +248,17 @@ describe('solicitacoes API (MSW)', () => {
 
     expect(requests).toHaveLength(1);
     expect(new URL(requests[0].url).pathname).toBe('/api/solicitacoes/21/cancel-gcal/');
+    expect(requests[0].method).toBe('POST');
+    expect(requests[0].body).toEqual({});
+  });
+
+  test('cancelarNaAgenda posta em cancelar-na-agenda/ com body vazio (CON-08)', async () => {
+    server.use(capturePost('/solicitacoes/22/cancelar-na-agenda/', { detail: 'ok', solicitacao_id: 22 }, requests));
+
+    await cancelarNaAgenda(22);
+
+    expect(requests).toHaveLength(1);
+    expect(new URL(requests[0].url).pathname).toBe('/api/solicitacoes/22/cancelar-na-agenda/');
     expect(requests[0].method).toBe('POST');
     expect(requests[0].body).toEqual({});
   });

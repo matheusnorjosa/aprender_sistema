@@ -17,11 +17,15 @@
  *
  * Evento no Google pela planilha e não adotado (`publicado_fora_do_sistema`, virada de 16/10/2026)
  * não oferece ação nenhuma: publicar criaria um segundo evento, e o backend recusa.
+ *
+ * Evento de formação (`tipo_evento_de_formacao`, CON-08) no Google ganha `cancelar` ("Cancelar evento": o
+ * título lá ganha "(CANCELADO) "), ao lado de `remover`. A linha já cancelada na agenda só mostra o estado
+ * ("Cancelado na agenda", "Cancelando…" ou "Erro ao cancelar"); no erro com id, oferece cancelar de novo.
  */
 import type { GCalStatus, Solicitacao } from '../types';
 import { formatFortaleza } from './datetime';
 
-export type GcalRowAction = 'publicar' | 'tentar' | 'atualizar' | 'remover';
+export type GcalRowAction = 'publicar' | 'tentar' | 'atualizar' | 'remover' | 'cancelar';
 
 export interface GcalRowTag {
   label: string;
@@ -56,30 +60,49 @@ function actionsFor(status: GCalStatus, hasEventId: boolean): GcalRowAction[] {
 
 const TAG_FORA_DO_SISTEMA: GcalRowTag = { label: 'Na agenda pela planilha', color: 'default' };
 
+/** Estado da linha cancelada na agenda: a etiqueta só diz "Cancelado" quando o Google confirmou. */
+const TAGS_CANCELADO: Record<GCalStatus, GcalRowTag> = {
+  NONE: { label: 'Cancelado na agenda', color: 'default' },
+  PENDING: { label: 'Cancelando…', color: 'processing' },
+  PUBLISHED: { label: 'Cancelado na agenda', color: 'default' },
+  ERROR: { label: 'Erro ao cancelar', color: 'error' },
+};
+
 export function gcalRowActions(
-  row: Pick<Solicitacao, 'gcal_status' | 'external_event_id'> & Partial<Pick<Solicitacao, 'publicado_fora_do_sistema'>>,
+  row: Pick<Solicitacao, 'gcal_status' | 'external_event_id'> &
+    Partial<Pick<Solicitacao, 'publicado_fora_do_sistema' | 'tipo_evento_de_formacao' | 'cancelado_na_agenda'>>,
   { ready }: { ready: boolean },
 ): GcalRowActionsResult {
   if (row.publicado_fora_do_sistema) {
     return { tag: TAG_FORA_DO_SISTEMA, actions: [], disabled: !ready };
   }
-  return {
-    tag: TAGS[row.gcal_status],
-    actions: actionsFor(row.gcal_status, !!row.external_event_id),
-    disabled: !ready,
-  };
+  if (row.cancelado_na_agenda) {
+    const refazer = row.gcal_status === 'ERROR' && !!row.external_event_id;
+    return { tag: TAGS_CANCELADO[row.gcal_status], actions: refazer ? ['cancelar'] : [], disabled: !ready };
+  }
+  const actions = actionsFor(row.gcal_status, !!row.external_event_id);
+  // O servidor aceita o cancelar como o "Tirar": com o id de lá, ou PUBLISHED (o id determinístico).
+  const noGoogle =
+    row.gcal_status === 'PUBLISHED' || (row.gcal_status === 'ERROR' && !!row.external_event_id);
+  if (row.tipo_evento_de_formacao && noGoogle) actions.push('cancelar');
+  return { tag: TAGS[row.gcal_status], actions, disabled: !ready };
 }
 
 /** Códigos do `motivo_nao_publicavel` do backend (services/solicitacao_publish.py). */
 export type MotivoNaoPublicavel =
+  | 'cancelado_na_agenda'
   | 'publicado_fora_do_sistema'
   | 'evento_passado'
   | 'ja_publicado'
   | 'nao_publicado'
   | 'sem_numero_da_formacao';
 
+/** Por que a linha cancelada na agenda não se edita (o mesmo texto do 400 do servidor, CON-08). */
+export const MSG_CANCELADO_NA_AGENDA = 'Este evento foi cancelado na agenda: não se edita nem se publica de novo.';
+
 /** Motivo curto, para completar o nome acessível do botão ou da caixa de seleção. */
 export const MOTIVO_NAO_PUBLICAVEL: Record<MotivoNaoPublicavel, string> = {
+  cancelado_na_agenda: 'foi cancelado na agenda',
   publicado_fora_do_sistema: 'já está no Google Agenda pela planilha',
   evento_passado: 'o evento já terminou',
   ja_publicado: 'já publicado',
@@ -96,9 +119,12 @@ export const MOTIVO_NAO_PUBLICAVEL: Record<MotivoNaoPublicavel, string> = {
  */
 export function motivoNaoPublicavel(
   row: Pick<Solicitacao, 'gcal_status'> &
-    Partial<Pick<Solicitacao, 'fim' | 'publicado_fora_do_sistema' | 'falta_numero_da_formacao'>>,
+    Partial<
+      Pick<Solicitacao, 'fim' | 'publicado_fora_do_sistema' | 'falta_numero_da_formacao' | 'cancelado_na_agenda'>
+    >,
   { reenvio = false, agora = Date.now() }: { reenvio?: boolean; agora?: number } = {},
 ): MotivoNaoPublicavel | null {
+  if (row.cancelado_na_agenda) return 'cancelado_na_agenda';
   if (row.publicado_fora_do_sistema) return 'publicado_fora_do_sistema';
   if (row.fim && Date.parse(row.fim) < agora) return 'evento_passado';
   if (reenvio) {
@@ -118,6 +144,16 @@ export function estaNoGoogle(row: Pick<Solicitacao, 'gcal_status' | 'external_ev
   return row.gcal_status === 'PUBLISHED' || row.gcal_status === 'ERROR' || Boolean(row.external_event_id);
 }
 
+/**
+ * Espelho do `excluir_marca_cancelado` do backend: o Excluir de um evento que está no Google marca o título
+ * com "(CANCELADO) " em vez de tirá-lo de lá (evento de formação ou linha já cancelada na agenda).
+ */
+export function excluirMarcaCancelado(
+  row: Partial<Pick<Solicitacao, 'tipo_evento_de_formacao' | 'cancelado_na_agenda'>>,
+): boolean {
+  return Boolean(row.cancelado_na_agenda || row.tipo_evento_de_formacao);
+}
+
 type EventoDaExclusao = Pick<Solicitacao, 'inicio' | 'municipio_nome' | 'projeto_nome'>;
 
 /** O evento nas confirmações de excluir: "10/05/2026 09:00 · Crato · Vidas Em Rede". */
@@ -129,11 +165,20 @@ export function resumoDoEvento(row: EventoDaExclusao): string {
 /**
  * Confirmação de excluir evento que está no Google (`estaNoGoogle`): sai dos dois lados. A mesma em
  * Minhas Solicitações e em Publicar na agenda. Em ERROR o evento pode não ter chegado ao Google; o
- * Meet só é citado quando existe.
+ * Meet só é citado quando existe. Evento de formação (CON-08, decisão do dono de 23/11) não sai do
+ * Google: o título lá ganha "(CANCELADO) ".
  */
 export function confirmacaoDeExcluirNoGoogle(
-  row: EventoDaExclusao & Pick<Solicitacao, 'gcal_status' | 'meet_link'>,
+  row: EventoDaExclusao &
+    Pick<Solicitacao, 'gcal_status' | 'meet_link'> &
+    Partial<Pick<Solicitacao, 'tipo_evento_de_formacao' | 'cancelado_na_agenda'>>,
 ): { title: string; content: string } {
+  if (excluirMarcaCancelado(row)) {
+    return {
+      title: 'Excluir evento?',
+      content: `${resumoDoEvento(row)}. Ele sai do sistema e fica no Google Agenda com (CANCELADO) no título. Não dá para desfazer.`,
+    };
+  }
   const doGoogle = row.gcal_status === 'ERROR' ? 'do Google Agenda, se estiver lá' : 'do Google Agenda';
   const meet = row.meet_link ? ', junto com o link do Meet' : '';
   return {

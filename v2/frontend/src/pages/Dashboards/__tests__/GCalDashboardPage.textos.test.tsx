@@ -139,3 +139,22 @@ describe('GCalDashboardPage — textos sem dado técnico', { timeout: 20000 }, (
     erro.mockRestore();
   });
 });
+
+// CON-08 B: o cancelamento na agenda não aparece como "Removido do Google": o evento ficou lá, com (CANCELADO).
+describe('GCalDashboardPage — cancelamento na agenda na linha do tempo', { timeout: 20000 }, () => {
+  test('pedido e desfecho têm frase própria', async () => {
+    getEventDetailMock.mockResolvedValue({
+      ...(await getEventDetailMock()),
+      timeline: [
+        log({ id: 4, action: 'CANCELAR_NA_AGENDA_REQUESTED', details: { solicitacao_id: 7 } }),
+        log({ id: 5, action: 'CANCELAR_NA_AGENDA', details: { solicitacao_id: 7, resultado: 'marcado' } }),
+      ],
+    });
+    await abrirDetalhe();
+
+    expect(screen.getByText('Cancelamento na agenda pedido')).toBeInTheDocument();
+    expect(screen.getByText('Cancelado na agenda (título marcado)')).toBeInTheDocument();
+    expect(screen.queryByText('Removido do Google')).not.toBeInTheDocument();
+    expect(screen.queryByText('Registro do Google')).not.toBeInTheDocument();
+  });
+});

@@ -139,6 +139,9 @@ const ACAO_LABELS: Record<string, string> = {
   PUBLISH_GCAL_ERROR: 'Erro ao publicar no Google',
   CANCEL_GCAL_REQUESTED: 'Remoção do Google pedida',
   CANCEL_GCAL: 'Removido do Google',
+  // CON-08: o evento de formação fica no Google, com "(CANCELADO) " no título.
+  CANCELAR_NA_AGENDA_REQUESTED: 'Cancelamento na agenda pedido',
+  CANCELAR_NA_AGENDA: 'Cancelado na agenda (título marcado)',
   RESYNC_GCAL_REQUESTED: 'Reenvio pedido',
   GOOGLE_CONNECT: 'Conta Google conectada',
   GOOGLE_DISCONNECT: 'Conta Google desconectada',

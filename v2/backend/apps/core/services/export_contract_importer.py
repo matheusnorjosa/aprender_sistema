@@ -855,7 +855,15 @@ def diff_and_classify(
 ORIGEM_IMPORTER = "import_export_contract"
 # Ações que, com ip (texto), são uma pessoa mexendo no evento pela tela. Aprovação e reprovação não
 # contam (decisão 6 do dono): a regra da reaprovação cuida do status. PREVIEW_GCAL só lê.
-_ACOES_DE_PESSOA = frozenset({"UPDATE", "PUBLISH_GCAL_REQUESTED", "RESYNC_GCAL_REQUESTED", "CANCEL_GCAL_REQUESTED"})
+_ACOES_DE_PESSOA = frozenset(
+    {
+        "UPDATE",
+        "PUBLISH_GCAL_REQUESTED",
+        "RESYNC_GCAL_REQUESTED",
+        "CANCEL_GCAL_REQUESTED",
+        "CANCELAR_NA_AGENDA_REQUESTED",
+    }
+)
 # Ações de script que não mudam campo de dado da virada: o status nunca trava (decisão 1), e as do
 # ciclo do Google já marcam "publicado pelo sistema" pelos campos gcal_*.
 _ACOES_SEM_TRAVA = frozenset(
@@ -868,6 +876,7 @@ _ACOES_SEM_TRAVA = frozenset(
         "PUBLISH_GCAL",
         "PUBLISH_GCAL_ERROR",
         "CANCEL_GCAL",
+        "CANCELAR_NA_AGENDA",
         "CELERY_GCAL_SYNC",
         "GCAL_RETRY_SUCCESS",
     }

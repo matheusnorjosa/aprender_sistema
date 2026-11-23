@@ -69,6 +69,14 @@ class CalendarClientAdapter:
         """
         raise NotImplementedError
 
+    def patch_titulo(self, calendar_id: CalendarId, event_id: EventId, titulo: str) -> JsonDict:
+        """
+        Troca só o título do evento, sem avisar os convidados (Cancelar evento de formação, CON-08).
+
+        Não manda `status`: o `confirmed` traria de volta um evento apagado no Google.
+        """
+        raise NotImplementedError
+
     def delete(self, calendar_id: CalendarId, event_id: EventId) -> None:
         """
         Deleta evento.

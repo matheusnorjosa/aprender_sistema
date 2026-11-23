@@ -640,3 +640,45 @@ describe('MySolicitacoesPage — Excluir sai do sistema e do Google', { timeout:
     confirmar.mockRestore();
   });
 });
+
+// CON-08 B (objeção C1-1): a linha cancelada na agenda diz isso, e não manda pedir que tire do Google.
+describe('MySolicitacoesPage — evento cancelado na agenda', { timeout: 20000 }, () => {
+  beforeEach(() => {
+    listSolicitacoesMock.mockReset();
+    deleteSolicitacaoMock.mockReset();
+  });
+
+  test.each(['PUBLISHED', 'ERROR'] as const)(
+    '%s: etiqueta "Cancelado na agenda", sem Editar, e o motivo novo',
+    async (gcal_status) => {
+      const informar = vi
+        .spyOn(Modal, 'info')
+        .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+      listSolicitacoesMock.mockResolvedValue(
+        pagina([
+          makeSolic({
+            id: 9,
+            municipio_nome: 'Crato',
+            status: 'aprovado',
+            gcal_status,
+            external_event_id: 'asv29',
+            tipo_evento_de_formacao: true,
+            cancelado_na_agenda: true,
+            inicio: '2099-05-10T13:00:00Z',
+            fim: '2099-05-10T17:00:00Z',
+          }),
+        ])
+      );
+      renderPage();
+      expect(await screen.findByText('Cancelado na agenda')).toBeInTheDocument();
+      expect(screen.queryByText('Na agenda')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Editar:/ })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /^Por que não dá para editar/ }));
+      const texto = String(informar.mock.calls[0]![0].content);
+      expect(texto).toContain('Este evento foi cancelado na agenda: não se edita nem se publica de novo.');
+      expect(texto).not.toContain('tire o evento só do Google');
+      expect(texto).not.toContain('tire-o do Google');
+      informar.mockRestore();
+    }
+  );
+});

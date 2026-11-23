@@ -7,7 +7,13 @@
  * (cancel exige external_event_id).
  */
 import { describe, expect, test } from 'vitest';
-import { gcalRowActions, motivoNaoPublicavel, type GcalRowAction } from '../gcalRowActions';
+import {
+  MOTIVO_NAO_PUBLICAVEL,
+  confirmacaoDeExcluirNoGoogle,
+  gcalRowActions,
+  motivoNaoPublicavel,
+  type GcalRowAction,
+} from '../gcalRowActions';
 import type { GCalStatus } from '../../types';
 
 type Case = [GCalStatus, string | null, GcalRowAction[], string];
@@ -104,5 +110,72 @@ describe('motivoNaoPublicavel', () => {
     expect(motivoNaoPublicavel(linha({ ...sem, gcal_status: 'PUBLISHED' }), { agora })).toBe('ja_publicado');
     expect(motivoNaoPublicavel(linha(sem), { agora, reenvio: true })).toBe('nao_publicado');
     expect(motivoNaoPublicavel(linha({ falta_numero_da_formacao: false }), { agora })).toBeNull();
+  });
+});
+
+// CON-08 B: "Cancelar evento" de formação (o título no Google ganha "(CANCELADO) ").
+describe('gcalRowActions — cancelar evento de formação', () => {
+  test.each<[GCalStatus, string | null, GcalRowAction[]]>([
+    ['PUBLISHED', 'asv27', ['atualizar', 'remover', 'cancelar']],
+    ['PUBLISHED', null, ['atualizar', 'cancelar']],
+    ['ERROR', 'asv27', ['atualizar', 'remover', 'cancelar']],
+    ['ERROR', null, ['tentar']],
+    ['NONE', null, ['publicar']],
+    ['PENDING', 'asv27', []],
+  ])('formação %s com id=%s → %j', (gcal_status, external_event_id, actions) => {
+    const result = gcalRowActions(
+      { gcal_status, external_event_id, tipo_evento_de_formacao: true },
+      { ready: true },
+    );
+    expect(result.actions).toEqual(actions);
+  });
+
+  test('evento que não é de formação não ganha Cancelar', () => {
+    const result = gcalRowActions(
+      { gcal_status: 'PUBLISHED', external_event_id: 'asv27', tipo_evento_de_formacao: false },
+      { ready: true },
+    );
+    expect(result.actions).toEqual(['atualizar', 'remover']);
+  });
+
+  test.each<[GCalStatus, string | null, string, string, GcalRowAction[]]>([
+    ['PUBLISHED', 'asv27', 'Cancelado na agenda', 'default', []],
+    ['NONE', null, 'Cancelado na agenda', 'default', []],
+    ['PENDING', 'asv27', 'Cancelando…', 'processing', []],
+    ['ERROR', 'asv27', 'Erro ao cancelar', 'error', ['cancelar']],
+    ['ERROR', null, 'Erro ao cancelar', 'error', []],
+  ])('linha cancelada na agenda %s com id=%s → "%s"', (gcal_status, external_event_id, label, color, actions) => {
+    const result = gcalRowActions(
+      { gcal_status, external_event_id, tipo_evento_de_formacao: true, cancelado_na_agenda: true },
+      { ready: true },
+    );
+    expect(result.tag).toEqual({ label, color });
+    expect(result.actions).toEqual(actions);
+  });
+
+  test('motivoNaoPublicavel diz primeiro que foi cancelado na agenda', () => {
+    expect(
+      motivoNaoPublicavel(
+        { gcal_status: 'ERROR', cancelado_na_agenda: true, fim: '2000-01-01T00:00:00Z', publicado_fora_do_sistema: true },
+        { reenvio: true },
+      ),
+    ).toBe('cancelado_na_agenda');
+    expect(MOTIVO_NAO_PUBLICAVEL.cancelado_na_agenda).toBe('foi cancelado na agenda');
+  });
+
+  test('confirmação de excluir evento de formação diz que ele fica no Google com (CANCELADO)', () => {
+    const evento = {
+      inicio: '2099-10-10T12:00:00Z',
+      municipio_nome: 'Sobral',
+      projeto_nome: 'Vidas Em Rede',
+      gcal_status: 'PUBLISHED' as const,
+      meet_link: null,
+    };
+    expect(confirmacaoDeExcluirNoGoogle({ ...evento, tipo_evento_de_formacao: true }).content).toBe(
+      '10/10/2099 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e fica no Google Agenda com (CANCELADO) no título. Não dá para desfazer.',
+    );
+    expect(confirmacaoDeExcluirNoGoogle({ ...evento, tipo_evento_de_formacao: false }).content).toBe(
+      '10/10/2099 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e do Google Agenda. Não dá para desfazer.',
+    );
   });
 });

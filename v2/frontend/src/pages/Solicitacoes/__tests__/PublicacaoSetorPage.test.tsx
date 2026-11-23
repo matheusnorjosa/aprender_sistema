@@ -1056,3 +1056,102 @@ describe('PublicacaoSetorPage — sem rolagem horizontal', () => {
     expect(erro).toHaveStyle({ overflowWrap: 'anywhere', whiteSpace: 'normal' });
   });
 });
+
+// CON-08 B: "Cancelar evento" de formação, ao lado do "Tirar só do Google" (decisão do dono, 23/11).
+describe('PublicacaoSetorPage — cancelar evento de formação', { timeout: 20000 }, () => {
+  const FORMACAO = {
+    gcal_status: 'PUBLISHED' as const,
+    external_event_id: 'asv27',
+    tipo_evento_nome: 'Presencial',
+    tipo_evento_de_formacao: true,
+  };
+
+  test('o botão fica ao lado do Tirar, confirma num diálogo e faz UM POST em /cancelar-na-agenda/', async () => {
+    listResponse = pageOf([makeSolic(FORMACAO)]);
+    actionResult = () => {
+      listResponse = pageOf([makeSolic({ ...FORMACAO, gcal_status: 'PENDING', cancelado_na_agenda: true })]);
+      return Promise.resolve({ detail: 'ok', solicitacao_id: 7 });
+    };
+    renderPage();
+
+    expect(await screen.findByLabelText(/^Tirar só do Google: Vidas Em Rede/)).toBeInTheDocument();
+    const botao = await screen.findByLabelText(/^Cancelar evento: Vidas Em Rede, 10\/10\/2099 09:00/);
+    expect(botao).toHaveTextContent(/^Cancelar evento$/);
+    fireEvent.click(botao);
+    const dialogo = await screen.findByRole('dialog');
+    expect(dialogo).toHaveAccessibleName('Cancelar o evento na agenda: Vidas Em Rede, 10/10/2099 09:00?');
+    expect(dialogo).toHaveTextContent('(CANCELADO)');
+    expect(dialogo).toHaveTextContent('não se edita nem se publica de novo');
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Sim, cancelar evento' }));
+
+    await waitFor(() => expect(actionCalls()).toHaveLength(1));
+    const [url, options] = actionCalls()[0] ?? [];
+    expect(url).toBe('/solicitacoes/7/cancelar-na-agenda/');
+    expect(options).toMatchObject({ method: 'POST', body: '{}' });
+    expect(await screen.findByText('Cancelando…')).toBeInTheDocument();
+    expect(message.success).toHaveBeenCalledWith(
+      'Pedido enviado: o título do evento no Google Agenda ganha (CANCELADO) em alguns segundos.',
+    );
+  });
+
+  test('evento que não é de formação não tem Cancelar evento', async () => {
+    listResponse = pageOf([makeSolic({ ...FORMACAO, tipo_evento_de_formacao: false })]);
+    renderPage();
+
+    await screen.findByLabelText(/^Tirar só do Google: Vidas Em Rede/);
+    expect(screen.queryByLabelText(/^Cancelar evento:/)).not.toBeInTheDocument();
+  });
+
+  test('linha cancelada na agenda: etiqueta e nenhuma ação de Google', async () => {
+    listResponse = pageOf([makeSolic({ ...FORMACAO, cancelado_na_agenda: true })]);
+    renderPage();
+
+    expect(await screen.findByText('Cancelado na agenda')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Atualizar no Google:/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Tirar só do Google:/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Cancelar evento:/)).not.toBeInTheDocument();
+  });
+
+  test('cancelamento que falhou: "Erro ao cancelar" e só o Cancelar evento, para refazer', async () => {
+    listResponse = pageOf([
+      makeSolic({ ...FORMACAO, gcal_status: 'ERROR', cancelado_na_agenda: true, gcal_last_error: 'Google fora' }),
+    ]);
+    renderPage();
+
+    expect(await screen.findByText('Erro ao cancelar')).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Cancelar evento: Vidas Em Rede/)).toBeEnabled();
+    expect(screen.queryByLabelText(/^Atualizar no Google:/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Tirar só do Google:/)).not.toBeInTheDocument();
+  });
+
+  test('evento que já terminou: Cancelar evento segue habilitado, como o Tirar', async () => {
+    listResponse = pageOf([makeSolic({ ...FORMACAO, inicio: '2000-01-01T12:00:00Z', fim: '2000-01-01T15:00:00Z' })]);
+    renderPage();
+
+    expect(await screen.findByLabelText(/^Cancelar evento: Vidas Em Rede/)).toBeEnabled();
+    expect(screen.getByLabelText(/^Atualizar no Google: Vidas Em Rede/)).toBeDisabled();
+  });
+
+  test('Excluir de formação diz que o evento fica no Google com (CANCELADO) no título', async () => {
+    listResponse = pageOf([makeSolic({ ...FORMACAO, pode_excluir: true })]);
+    deleteResult = () => {
+      listResponse = pageOf([]);
+      return Promise.resolve(undefined);
+    };
+    renderPage();
+
+    fireEvent.click(await screen.findByLabelText(/^Excluir: Vidas Em Rede/));
+    const dialogo = await screen.findByRole('dialog');
+    expect(dialogo).toHaveTextContent(
+      '10/10/2099 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e fica no Google Agenda com (CANCELADO) no título. Não dá para desfazer.',
+    );
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Sim, excluir' }));
+
+    await waitFor(() => expect(deleteCalls()).toHaveLength(1));
+    await waitFor(() =>
+      expect(message.success).toHaveBeenCalledWith(
+        'Evento excluído do sistema; no Google Agenda ele fica com (CANCELADO) no título.',
+      ),
+    );
+  });
+});

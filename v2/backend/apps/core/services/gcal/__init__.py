@@ -28,7 +28,13 @@ from apps.core.services.gcal.payload import (
 )
 
 # Sync operations
-from apps.core.services.gcal.sync import apply_one_solicitacao, cancel_solicitacao, resync_solicitacao, upsert_one
+from apps.core.services.gcal.sync import (
+    apply_one_solicitacao,
+    cancel_solicitacao,
+    marcar_cancelado_no_google,
+    resync_solicitacao,
+    upsert_one,
+)
 
 # Types
 from apps.core.services.gcal.types import Action, SyncOutcome
@@ -58,6 +64,7 @@ __all__ = [
     # Sync
     "apply_one_solicitacao",
     "cancel_solicitacao",
+    "marcar_cancelado_no_google",
     "resync_solicitacao",
     "upsert_one",
 ]

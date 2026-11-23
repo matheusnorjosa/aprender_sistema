@@ -23,7 +23,7 @@ from kombu.exceptions import OperationalError as FilaForaDoAr
 from apps.core.exceptions import APIError, ConflictError, ValidationAPIError
 from apps.core.models import AuditLog, GoogleOAuthCredential, Solicitacao, Usuario
 from apps.core.services.db_retry import _extract_pgcode  # pyright: ignore[reportPrivateUsage]
-from apps.core.services.evento_de_formacao import falta_numero_da_formacao
+from apps.core.services.evento_de_formacao import eh_evento_de_formacao, falta_numero_da_formacao
 from apps.core.utils.net import get_client_ip
 
 logger = logging.getLogger(__name__)
@@ -53,6 +53,10 @@ _ERROS_DA_FILA = (FilaForaDoAr, ConnectionError, TimeoutError, OSError)
 
 # Por que o evento não pode ir ao Google agora (virada, 16/10/2026). Mensagem para a tela e o lote.
 MENSAGENS_NAO_PUBLICAVEL: dict[str, str] = {
+    "cancelado_na_agenda": (
+        "Este evento foi cancelado na agenda: ele fica no Google com (CANCELADO) no título e não se publica "
+        "nem se reenvia de novo."
+    ),
     "publicado_fora_do_sistema": (
         "Este evento já está no Google Agenda pela planilha e o sistema não o adotou: publicar criaria um "
         "segundo evento. Ajuste no Google, ou peça a adoção."
@@ -75,7 +79,10 @@ def motivo_nao_publicavel(s: Solicitacao, *, reenvio: bool = False) -> str | Non
     que nunca foi ao Google (`NONE`), porque nele o sync cria. Os dois recusam o evento que já terminou e
     o que está no Google pela planilha sem adoção (`publicado_fora_do_sistema`). Depois desses, os dois recusam
     o evento de formação sem o Nº da formação (`sem_numero_da_formacao`, CON-09): sem ele o título no Google sai
-    fora da forma que o DFF lê."""
+    fora da forma que o DFF lê. Antes de tudo, os dois recusam a linha cancelada na agenda (`cancelado_na_agenda`,
+    CON-08): o envio tiraria o "(CANCELADO) " do título e traria de volta o evento."""
+    if s.cancelado_na_agenda:
+        return "cancelado_na_agenda"
     if s.publicado_fora_do_sistema:
         return "publicado_fora_do_sistema"
     if s.fim < timezone.now():
@@ -90,7 +97,25 @@ def motivo_nao_publicavel(s: Solicitacao, *, reenvio: bool = False) -> str | Non
     return None
 
 
-def pedir_operacao_gcal(solicitacao_id: int, operacao: Literal["publicar", "reenviar", "reaplicar", "cancelar"]) -> str:
+_MSG_CANCELADO_NA_AGENDA_NAO_TIRA = (
+    "Este evento foi cancelado na agenda: ele fica no Google com (CANCELADO) no título e não se tira de lá por aqui."
+)
+_MSG_NAO_E_EVENTO_DE_FORMACAO = (
+    "Só evento de formação (Presencial, Online ou Workshop) se cancela na agenda. Para os outros, use Tirar só "
+    "do Google ou Excluir."
+)
+
+
+def excluir_marca_cancelado(s: Solicitacao) -> bool:
+    """O Excluir desta linha, que está no Google, marca o título com "(CANCELADO) " em vez de tirar o evento
+    de lá? Sim para evento de formação e para a linha já cancelada na agenda (decisão do dono, 23/11/2026)."""
+    return s.cancelado_na_agenda or eh_evento_de_formacao(s)
+
+
+OperacaoGcal = Literal["publicar", "reenviar", "reaplicar", "cancelar", "cancelar_na_agenda"]
+
+
+def pedir_operacao_gcal(solicitacao_id: int, operacao: OperacaoGcal) -> str:
     """Registra o pedido de uma operação no Google e devolve o identificador dele (DEF-32).
 
     Trava a linha, confere sobre ela o que a entrada conferiu sem trava, grava um identificador novo em
@@ -99,8 +124,12 @@ def pedir_operacao_gcal(solicitacao_id: int, operacao: Literal["publicar", "reen
     Exige transação aberta por quem chama e não abre outra: o `.delay` da tarefa entra na mesma transação,
     e a fila fora do ar desfaz o PENDING. Fora de transação o `select_for_update` levanta.
 
-    Hash do payload: publicar e reenviar zeram (o envio é forçado); cancelar mantém; reaplicar mantém só o
-    de linha PUBLISHED, para o envio sem mudança virar SKIP.
+    Hash do payload: publicar e reenviar zeram (o envio é forçado); cancelar e cancelar na agenda mantêm;
+    reaplicar mantém só o de linha PUBLISHED, para o envio sem mudança virar SKIP.
+
+    Cancelar na agenda (CON-08) aceita o que o cancelar aceita, só em evento de formação, e grava a marca
+    `cancelado_na_agenda` aqui, no pedido: já no PENDING a linha não se publica, não se reenvia e não se tira
+    do Google (o cancelar recusa a linha marcada). Não há desfazer.
 
     Reaplicar sobre linha em PENDING é recusado: outra operação está em andamento, e o pedido novo zeraria o
     hash (UPDATE sem mudança no Google, com e-mail aos convidados) ou desfaria um "Tirar do Google".
@@ -123,7 +152,12 @@ def pedir_operacao_gcal(solicitacao_id: int, operacao: Literal["publicar", "reen
     if operacao == "reaplicar" and s.gcal_status == Solicitacao.GCalStatus.PENDING:
         raise ConflictError(message=_MSG_OPERACAO_EM_ANDAMENTO, details={"code": "operacao_em_andamento"})
 
-    if operacao == "cancelar":
+    if operacao == "cancelar_na_agenda" and not eh_evento_de_formacao(s):
+        raise ConflictError(message=_MSG_NAO_E_EVENTO_DE_FORMACAO, details={"code": "nao_e_evento_de_formacao"})
+    if operacao == "cancelar" and s.cancelado_na_agenda:
+        raise ConflictError(message=_MSG_CANCELADO_NA_AGENDA_NAO_TIRA, details={"code": "cancelado_na_agenda"})
+
+    if operacao in ("cancelar", "cancelar_na_agenda"):
         if not s.external_event_id and s.gcal_status != Solicitacao.GCalStatus.PUBLISHED:
             raise ConflictError(
                 message="Solicitação não possui evento publicado no Google Calendar.",
@@ -147,11 +181,13 @@ def pedir_operacao_gcal(solicitacao_id: int, operacao: Literal["publicar", "reen
         if motivo is not None:
             raise ValidationAPIError(message=MENSAGENS_NAO_PUBLICAVEL[motivo], code=motivo)
 
-    mantem_hash = operacao == "cancelar" or (
+    mantem_hash = operacao in ("cancelar", "cancelar_na_agenda") or (
         operacao == "reaplicar" and s.gcal_status == Solicitacao.GCalStatus.PUBLISHED
     )
     s.gcal_pedido = uuid4().hex
-    s.save(update_fields=["gcal_pedido"])
+    if operacao == "cancelar_na_agenda":
+        s.cancelado_na_agenda = True
+    s.save(update_fields=["gcal_pedido", "cancelado_na_agenda"])
     s.mark_gcal(
         status=Solicitacao.GCalStatus.PENDING,
         payload_hash=s.gcal_payload_hash if mantem_hash else None,
@@ -607,6 +643,64 @@ def cancel_from_gcal(
     )
 
 
+def cancelar_na_agenda(
+    solicitacao: Solicitacao,
+    user: Usuario,
+    request: Any,
+) -> CancelResult:
+    """Cancela na agenda um evento de formação: o título no Google ganha "(CANCELADO) " (CON-08), pela tarefa.
+
+    Mesmo molde do `cancel_from_gcal`: a conta Google de quem pede primeiro; depois o pedido (marca, PENDING
+    sob trava), a tarefa e o registro numa transação só. As recusas (não é de formação, nunca foi ao Google)
+    vêm do pedido, sobre a linha travada.
+
+    Raises:
+        APIError 403 `google_not_connected`, 409 `google_calendar_not_configured`: modo OAuth sem como escrever.
+        ConflictError 409 `nao_e_evento_de_formacao`, `not_published`, `linha_ocupada`.
+    """
+    from apps.core.tasks import task_cancelar_na_agenda
+
+    operator_user_id = _check_google_oauth(user)
+
+    kwargs: dict[str, Any] = {}
+    if getattr(settings, "GCAL_AUTH_MODE", "service_account") == "oauth":
+        kwargs["operator_user_id"] = operator_user_id
+    client_ip = get_client_ip(request)
+    with transaction.atomic():
+        pedido = pedir_operacao_gcal(solicitacao.id, "cancelar_na_agenda")
+        task = enfileirar_tarefa_gcal(task_cancelar_na_agenda, solicitacao.id, **kwargs, pedido=pedido)
+        AuditLog.objects.create(
+            usuario=user,
+            action=AuditLog.Action.CANCELAR_NA_AGENDA_REQUESTED,
+            model_name="Solicitacao",
+            details={
+                "solicitacao_id": solicitacao.id,
+                "task_id": task.id,
+                "pedido": pedido,
+                "external_event_id": solicitacao.external_event_id,
+                "ip_address": client_ip,
+            },
+        )
+
+    logger.info(
+        "cancelar_na_agenda_requested",
+        extra={
+            "event": "cancelar_na_agenda_requested",
+            "user_id": user.id,
+            "solicitacao_id": solicitacao.id,
+            "task_id": task.id,
+            "ip_address": client_ip,
+        },
+    )
+
+    return CancelResult(
+        success=True,
+        task_id=task.id,
+        solicitacao_id=solicitacao.id,
+        message="Cancelamento na agenda solicitado: o título no Google ganha (CANCELADO) em instantes.",
+    )
+
+
 _MSG_SINCRONIZACAO_EM_ANDAMENTO = (
     "Não é possível excluir enquanto a sincronização com o Google Calendar está em andamento. Aguarde a conclusão."
 )
@@ -628,6 +722,11 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | No
     Google. ERROR sem id (publicação que falhou) usa o id determinístico do insert, porque o evento
     pode ter sido criado lá. O AuditLog vem antes do Google: depois dele só sobra o save da linha.
 
+    Evento de formação (ou linha já cancelada na agenda, `excluir_marca_cancelado`): em vez de tirar do Google,
+    marca o título com "(CANCELADO) " (`marcar_cancelado_no_google`) e grava `cancelado_na_agenda`; o evento fica
+    lá, cancelado, e quem chama apaga a linha (decisão do dono, 23/11/2026). O AuditLog é `CANCELAR_NA_AGENDA`.
+    Se o Google falha, o rollback desfaz a marca.
+
     Returns:
         O `external_event_id` que estava (ou podia estar) no Google.
 
@@ -641,6 +740,7 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | No
     from apps.core.services.gcal_sync_service import (  # pyright: ignore[reportPrivateUsage]
         _event_id_for,
         cancel_solicitacao,
+        marcar_cancelado_no_google,
     )
     from apps.core.tasks import (  # pyright: ignore[reportPrivateUsage]
         _MSG_CREDENCIAL_GOOGLE,
@@ -665,18 +765,34 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | No
             if s.gcal_status == Solicitacao.GCalStatus.ERROR and not s.external_event_id:
                 s.external_event_id = _event_id_for(s)
             external_event_id = s.external_event_id
-            AuditLog.objects.create(
-                usuario=user,
-                action=AuditLog.Action.CANCEL_GCAL,
-                model_name="Solicitacao",
-                details={
-                    "solicitacao_id": s.id,
-                    "action": "DELETE",
-                    "external_event_id": external_event_id,
-                    "origem": "exclusao",
-                },
-            )
-            cancel_solicitacao(s, client=client)
+            if excluir_marca_cancelado(s):
+                s.cancelado_na_agenda = True
+                s.save(update_fields=["cancelado_na_agenda"])
+                AuditLog.objects.create(
+                    usuario=user,
+                    action=AuditLog.Action.CANCELAR_NA_AGENDA,
+                    model_name="Solicitacao",
+                    details={
+                        "solicitacao_id": s.id,
+                        "action": "UPDATE",
+                        "external_event_id": external_event_id,
+                        "origem": "exclusao",
+                    },
+                )
+                marcar_cancelado_no_google(s, client=client)
+            else:
+                AuditLog.objects.create(
+                    usuario=user,
+                    action=AuditLog.Action.CANCEL_GCAL,
+                    model_name="Solicitacao",
+                    details={
+                        "solicitacao_id": s.id,
+                        "action": "DELETE",
+                        "external_event_id": external_event_id,
+                        "origem": "exclusao",
+                    },
+                )
+                cancel_solicitacao(s, client=client)
     except ValidationAPIError:
         raise
     except Exception as e:

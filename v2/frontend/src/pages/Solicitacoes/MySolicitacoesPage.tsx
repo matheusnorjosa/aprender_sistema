@@ -39,6 +39,7 @@ import { formatFortaleza } from '../../utils/datetime';
 import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 import {
   MOTIVO_NAO_PUBLICAVEL,
+  MSG_CANCELADO_NA_AGENDA,
   confirmacaoDeExcluirNoGoogle,
   estaNoGoogle,
   motivoNaoPublicavel,
@@ -96,16 +97,21 @@ function nomeDaSolicitacao(record: Solicitacao): string {
  */
 function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcluir: boolean; motivos: string[] } {
   const naPlanilha = record.publicado_fora_do_sistema === true;
+  // CON-08: cancelado na agenda vem antes de tudo. Os ramos de baixo mandariam pedir que tire do Google,
+  // o que o servidor recusa na linha cancelada.
+  const cancelado = record.cancelado_na_agenda === true;
   const isPublished = naPlanilha || record.gcal_status === ('PUBLISHED' as GCalStatus);
   const noGoogle = estaNoGoogle(record);
   const podeTirarDoGoogle = record.pode_tirar_do_google === true;
   const isSuper = record.fluxo === ('SUPER' as FluxoType);
   const superForaDePendente = isSuper && record.status !== 'pendente';
-  const podeEditar = !isPublished && record.status !== 'reprovado';
+  const podeEditar = !cancelado && !isPublished && record.status !== 'reprovado';
   const deduzido = !naPlanilha && (!noGoogle || podeTirarDoGoogle) && !superForaDePendente;
   const podeExcluir = deduzido && record.pode_excluir !== false;
   const motivos: string[] = [];
-  if (naPlanilha) {
+  if (cancelado) {
+    motivos.push(MSG_CANCELADO_NA_AGENDA);
+  } else if (naPlanilha) {
     // Não foi o sistema que publicou: não há publicação para cancelar aqui.
     motivos.push(
       `Este evento ${MOTIVO_NAO_PUBLICAVEL.publicado_fora_do_sistema}; mudar aqui não muda a agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle.`
@@ -371,7 +377,9 @@ export default function MySolicitacoesPage(): JSX.Element {
           >
             {STATUS_LABELS[record.status] || record.status}
           </Tag>
-          {record.publicado_fora_do_sistema || record.gcal_status === ('PUBLISHED' as GCalStatus) ? (
+          {record.cancelado_na_agenda ? (
+            <Tag style={{ marginInlineEnd: 0 }}>Cancelado na agenda</Tag>
+          ) : record.publicado_fora_do_sistema || record.gcal_status === ('PUBLISHED' as GCalStatus) ? (
             <Tag color="blue" style={{ marginInlineEnd: 0 }}>Na agenda</Tag>
           ) : null}
         </Space>

@@ -10,6 +10,7 @@ Usado nos testes para simular Google Calendar API.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 from apps.core.services.gcal.client import SyncTokenExpirado
 from apps.core.services.gcal.validation import GCAL_EVENT_ID_PREFIX
@@ -21,6 +22,14 @@ _FORTALEZA = timezone(timedelta(hours=-3))
 # Campos que o `list_changes` do cliente real pede (`CAMPOS_LIST_CHANGES`).
 _CAMPOS_LIST_CHANGES = ("id", "status", "start", "end", "updated", "recurringEventId", "recurrence")
 _PREFIXO_TOKEN = "fake-sync-"
+
+
+class _EventoNaoAchado(Exception):
+    """404 do fake, com `resp.status` como o HttpError do Google."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.resp = SimpleNamespace(status=404)
 
 
 def _como_google(event: JsonDict) -> JsonDict:
@@ -126,6 +135,15 @@ class FakeCalendarClient(CalendarClientAdapter):
     def patch_descricao(self, calendar_id: CalendarId, event_id: EventId, descricao: str) -> JsonDict:
         """PATCH só da descrição (mesma semântica do `update`)."""
         return self.update(calendar_id, event_id, {"description": descricao})
+
+    def patch_titulo(self, calendar_id: CalendarId, event_id: EventId, titulo: str) -> JsonDict:
+        """PATCH só do título. Evento que não existe dá 404, como no Google: o `update` o criaria do nada."""
+        event = self._store.get(self._key(calendar_id, event_id))
+        if event is None:
+            raise _EventoNaoAchado(f"Evento {event_id} não existe (fake, 404)")
+        self._store[self._key(calendar_id, event_id)] = {**event, "summary": titulo}
+        self._registrar_mudanca(calendar_id, event_id)
+        return _como_google(self._store[self._key(calendar_id, event_id)])
 
     def delete(self, calendar_id: CalendarId, event_id: EventId) -> None:
         """

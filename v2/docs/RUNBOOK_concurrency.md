@@ -66,8 +66,8 @@ death between the Google write and the commit finds the row still `PENDING` with
 `GCAL_SEND_UPDATES` other than `none` the e-mail may go out again.
 
 1. Find the latest Google record of the row: the newest AuditLog with that `details.solicitacao_id` among
-   `PUBLISH_GCAL_REQUESTED`, `RESYNC_GCAL_REQUESTED`, `CANCEL_GCAL_REQUESTED`, `PUBLISH_GCAL`, `CANCEL_GCAL` and
-   `PUBLISH_GCAL_ERROR`. It works for rows marked by any version, before or after DEF-32, with three pre-DEF-32 limits listed in
+   `PUBLISH_GCAL_REQUESTED`, `RESYNC_GCAL_REQUESTED`, `CANCEL_GCAL_REQUESTED`, `CANCELAR_NA_AGENDA_REQUESTED`,
+   `PUBLISH_GCAL`, `CANCEL_GCAL`, `CANCELAR_NA_AGENDA` and `PUBLISH_GCAL_ERROR`. It works for rows marked by any version, before or after DEF-32, with three pre-DEF-32 limits listed in
    [gcal.spec.md](specs/backend/gcal.spec.md) ("Linha parada em `PENDING`"). Three cases do not count,
    because they can be written after a cancel request while the row is still `PENDING`: the preview
    (`details.dry_run` true), the circuit-breaker retry error (`details.operation` = `retry`; the retry only acts
@@ -79,10 +79,11 @@ death between the Google write and the commit finds the row still `PENDING` with
    from apps.core.models import AuditLog, Solicitacao
    ID = int(ID)
    s = Solicitacao.objects.get(pk=ID)
-   print(s.gcal_status, bool(s.external_event_id))
+   print(s.gcal_status, bool(s.external_event_id), s.cancelado_na_agenda)
    assert s.gcal_status == "PENDING", "a linha não está em PENDING: conferir o ID"
    ACOES = ["PUBLISH_GCAL_REQUESTED", "RESYNC_GCAL_REQUESTED", "CANCEL_GCAL_REQUESTED",
-            "PUBLISH_GCAL", "CANCEL_GCAL", "PUBLISH_GCAL_ERROR"]
+            "CANCELAR_NA_AGENDA_REQUESTED", "PUBLISH_GCAL", "CANCEL_GCAL", "CANCELAR_NA_AGENDA",
+            "PUBLISH_GCAL_ERROR"]
    conta = lambda r: not r.details.get("dry_run") and r.details.get("operation") != "retry" and not (
        r.action == "PUBLISH_GCAL" and r.details.get("action") == "SKIP")
    regs = AuditLog.objects.filter(details__solicitacao_id=ID, action__in=ACOES).order_by("-created_at", "-id")
@@ -96,7 +97,7 @@ death between the Google write and the commit finds the row still `PENDING` with
    filtered in Python: `exclude()` on a JSON key would also drop the rows without that key.
 2. Check the executions for that `solicitacao_id`, for both tasks (publish and cancel):
    ```bash
-   docker compose logs --tail=5000 worker | grep -E "task_publish_solicitacao_to_gcal|task_cancel_solicitacao_from_gcal" | grep "<ID>"
+   docker compose logs --tail=5000 worker | grep -E "task_publish_solicitacao_to_gcal|task_cancel_solicitacao_from_gcal|task_cancelar_na_agenda" | grep "<ID>"
    ```
    More than one execution is fine as long as only one acted; the others log `pedido superado ou já concluído`.
 3. A row stuck in `PENDING`. The request never commits `PENDING` without a queued task (if the queue refuses
@@ -118,6 +119,11 @@ death between the Google write and the commit finds the row still `PENDING` with
    To find them: `PENDING` for more than 15 min by `gcal_last_sync_at`, and nothing in `unacked` or in the queue
    on the broker Redis (DB 1, `ZCARD unacked_index` and `LLEN celery` at 0; counts only, never print the content).
 4. Recover, by the latest record found in step 1:
+   - the row has `cancelado_na_agenda` (printed `True`), or the latest record is `CANCELAR_NA_AGENDA_REQUESTED`, or
+     a `PUBLISH_GCAL_ERROR` with `details.operation` = `cancelar_na_agenda`: a stuck cancel-in-calendar (CON-08).
+     Redo it with `POST /api/solicitacoes/{id}/cancelar-na-agenda/`, which accepts a `PENDING` row with
+     `external_event_id` and does not repeat the marker if the title already has it. A row cancelled in the
+     calendar is **never** resent nor removed from Google: both refuse it;
    - `CANCEL_GCAL_REQUESTED`: a stuck cancel, from any version. **Never** resend or reapply. That undoes the
      removal and may bring back an event Google already deleted (the Google delete is a soft delete, and the
      UPDATE sends `status: confirmed`). Waiting only helps while the message is still in `unacked` or in the

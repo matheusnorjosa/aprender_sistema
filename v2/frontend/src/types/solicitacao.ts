@@ -121,6 +121,11 @@ export interface Solicitacao {
   gcal_last_error: string | null;
   /** No Google Agenda pela planilha e não adotado (virada): o sistema não publica. */
   publicado_fora_do_sistema?: boolean;
+  /**
+   * Evento de formação cancelado na agenda (CON-08): o título no Google ganhou "(CANCELADO) " e o evento ficou
+   * lá. Sem volta: não se publica, não se reenvia, não se tira do Google e não se edita.
+   */
+  cancelado_na_agenda?: boolean;
   /** Quem lê pode tirar este evento do Google (`can_publish_solicitacao`): Excluir tira de lá também. */
   pode_tirar_do_google?: boolean;
   /**

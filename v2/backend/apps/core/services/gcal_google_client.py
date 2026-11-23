@@ -197,6 +197,18 @@ class GoogleCalendarClient(CalendarClientAdapter):
 
         return _update()
 
+    def patch_titulo(self, calendar_id: CalendarId, event_id: EventId, titulo: str) -> JsonDict:
+        """PATCH só do título, sem e-mail aos convidados e sem `status` (CON-08; ver o cliente OAuth)."""
+
+        def _patch():
+            return (
+                self.service.events()
+                .patch(calendarId=calendar_id, eventId=event_id, body={"summary": titulo}, sendUpdates="none")
+                .execute(num_retries=NUM_RETRIES_GOOGLE)
+            )
+
+        return _patch()
+
     def delete(self, calendar_id: CalendarId, event_id: EventId) -> None:
         """
         Deleta evento.

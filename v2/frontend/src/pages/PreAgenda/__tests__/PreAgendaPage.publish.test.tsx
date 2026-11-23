@@ -35,6 +35,7 @@ vi.mock('../../../api/solicitacoes', () => ({
   publishSolicitacao: vi.fn(),
   resyncSolicitacao: vi.fn(),
   cancelSolicitacao: vi.fn(),
+  cancelarNaAgenda: vi.fn(),
 }));
 vi.mock('../../../api/gcal', () => ({
   getStatusSummary: getStatusSummaryMock,

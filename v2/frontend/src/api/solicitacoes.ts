@@ -254,6 +254,22 @@ export async function cancelSolicitacao(id: ID): Promise<PublishResult> {
   return result;
 }
 
+/**
+ * Cancelar na agenda um evento de formação (CON-08): o título no Google ganha "(CANCELADO) " e o evento fica
+ * lá. A linha passa a `cancelado_na_agenda` já no pedido e nunca mais é publicada. Sem e-mail aos convidados.
+ *
+ * @param id - ID da solicitação de formação que está no Google
+ */
+export async function cancelarNaAgenda(id: ID): Promise<PublishResult> {
+  const result = await fetchAPI<PublishResult>(`/solicitacoes/${id}/cancelar-na-agenda/`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  syncChannel.publish('preagenda', { action: 'cancelled' });
+  syncChannel.publish('solicitacoes', { action: 'updated' });
+  return result;
+}
+
 // ========================================
 // Endpoints de operações em lote
 // ========================================

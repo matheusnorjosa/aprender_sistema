@@ -80,6 +80,8 @@ EXPECTED_PERMISSIONS: dict[str, tuple[str, object]] = {
     "publish": ("or", (CanUseGcal, CanPublishSetorSolicitacao)),
     "resync_gcal": ("or", (CanUseGcal, CanPublishSetorSolicitacao)),
     "cancel_gcal": ("or", (CanUseGcal, CanPublishSetorSolicitacao)),
+    # CON-08: o Cancelar evento de formação tem o gate do cancel-gcal (quem tira do Google cancela na agenda).
+    "cancelar_na_agenda": ("or", (CanUseGcal, CanPublishSetorSolicitacao)),
 }
 
 

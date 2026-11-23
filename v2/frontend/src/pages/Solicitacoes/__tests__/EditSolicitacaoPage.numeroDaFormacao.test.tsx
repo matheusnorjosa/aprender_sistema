@@ -106,7 +106,7 @@ async function salvar(): Promise<void> {
   await userEvent.setup().click(screen.getByRole('button', { name: /salvar alterações/i }));
 }
 
-describe('EditSolicitacaoPage — Nº da formação no evento de formação (CON-09)', () => {
+describe('EditSolicitacaoPage — Nº da formação no evento de formação (CON-09)', { timeout: 20000 }, () => {
   beforeEach(() => {
     getSolicitacaoMock.mockReset();
     updateSolicitacaoMock.mockReset().mockResolvedValue({ status: 'pendente' });

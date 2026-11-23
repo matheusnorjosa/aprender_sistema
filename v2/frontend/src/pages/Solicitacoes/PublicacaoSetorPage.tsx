@@ -547,7 +547,9 @@ export default function PublicacaoSetorPage(): JSX.Element {
             </Title>
             <Text type="secondary">
               Eventos aprovados do seu setor, a partir de hoje. Publique ou atualize cada um na agenda
-              oficial da organização. Tirar só do Google deixa o evento no sistema; Excluir tira dos dois lados.
+              oficial da organização. Tirar só do Google deixa o evento no sistema; Excluir tira dos dois lados,
+              menos o evento de formação, que sai do sistema e fica no Google Agenda com (CANCELADO) no título.
+              Cancelar evento, só no evento de formação, põe (CANCELADO) no título lá e deixa o evento nos dois lados.
             </Text>
           </header>
         </Card>

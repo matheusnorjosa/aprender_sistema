@@ -895,7 +895,12 @@ describe('PublicacaoSetorPage — excluir evento que está no Google (decisão d
     renderPage();
     const titulo = await screen.findByText('Publicar na agenda do Google');
     const topo = titulo.closest('header') as HTMLElement;
-    expect(topo).toHaveTextContent('Tirar só do Google deixa o evento no sistema; Excluir tira dos dois lados.');
+    // Revisão da rodada 2: o Excluir de formação não tira do Google (decisão P2 do dono), e o topo cita o Cancelar evento.
+    expect(topo).toHaveTextContent(
+      'Tirar só do Google deixa o evento no sistema; Excluir tira dos dois lados, menos o evento de formação, que ' +
+        'sai do sistema e fica no Google Agenda com (CANCELADO) no título. Cancelar evento, só no evento de ' +
+        'formação, põe (CANCELADO) no título lá e deixa o evento nos dois lados.',
+    );
   });
 });
 

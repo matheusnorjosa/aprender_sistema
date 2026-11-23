@@ -673,14 +673,47 @@ describe('MySolicitacoesPage — evento cancelado na agenda', { timeout: 20000 }
       expect(await screen.findByText('Cancelado na agenda')).toBeInTheDocument();
       expect(screen.queryByText('Na agenda')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /^Editar:/ })).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: /^Por que não dá para editar/ }));
+      // Revisão da rodada 2: o nome exato do botão, e o texto responde também o "nem excluir".
+      fireEvent.click(screen.getByRole('button', { name: 'Por que não dá para editar nem excluir: 10/05/2099 · Crato' }));
       const texto = String(informar.mock.calls[0]![0].content);
       expect(texto).toContain('Este evento foi cancelado na agenda: não se edita nem se publica de novo.');
+      expect(texto).toContain(
+        'Para excluir, peça ao Apoio de Coordenação da sua gerência, que exclui o evento em Publicar na agenda (ele sai do sistema e fica no Google Agenda com (CANCELADO) no título).'
+      );
       expect(texto).not.toContain('tire o evento só do Google');
       expect(texto).not.toContain('tire-o do Google');
       informar.mockRestore();
     }
   );
+
+  // Revisão da rodada 2: Publicar na agenda só lista aprovado de hoje em diante; fora disso, a saída é a administração.
+  test('cancelado na agenda, evento que já terminou, sem poder tirar do Google: para excluir, a administração', async () => {
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 9,
+          municipio_nome: 'Crato',
+          status: 'aprovado',
+          gcal_status: 'PUBLISHED',
+          external_event_id: 'asv29',
+          tipo_evento_de_formacao: true,
+          cancelado_na_agenda: true,
+          inicio: '2020-05-10T13:00:00Z',
+          fim: '2020-05-10T17:00:00Z',
+        }),
+      ])
+    );
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: /^Por que não dá para editar nem excluir: / }));
+    const texto = String(informar.mock.calls[0]![0].content);
+    expect(texto).toContain('Este evento foi cancelado na agenda: não se edita nem se publica de novo.');
+    expect(texto).toContain('Para excluir, fale com a administração do sistema.');
+    expect(texto).not.toContain('Publicar na agenda');
+    informar.mockRestore();
+  });
 
   // Revisão da rodada 1: o Excluir de formação não tira do Google, marca "(CANCELADO) " (decisão P2 do dono).
   test.each([

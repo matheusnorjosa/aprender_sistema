@@ -114,6 +114,16 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
   const motivos: string[] = [];
   if (cancelado) {
     motivos.push(MSG_CANCELADO_NA_AGENDA);
+    // Revisão da rodada 2: sem poder tirar do Google, o botão também pergunta "nem excluir". A Apoio exclui em
+    // Publicar na agenda, que só lista aprovado de hoje em diante; a decisão registrada e a SUPER têm o motivo abaixo.
+    if (noGoogle && !podeTirarDoGoogle && !superForaDePendente) {
+      const passou = Boolean(record.fim) && Date.parse(record.fim) < Date.now();
+      motivos.push(
+        record.status === 'aprovado' && !passou
+          ? 'Para excluir, peça ao Apoio de Coordenação da sua gerência, que exclui o evento em Publicar na agenda (ele sai do sistema e fica no Google Agenda com (CANCELADO) no título). Se lá também não der para excluir, fale com a administração do sistema.'
+          : 'Para excluir, fale com a administração do sistema.'
+      );
+    }
   } else if (naPlanilha) {
     // Não foi o sistema que publicou: não há publicação para cancelar aqui.
     motivos.push(

@@ -33,6 +33,7 @@ from apps.core.services.compra_elegibilidade import (
     projeto_em_espera,
     projetos_liberados,
 )
+from apps.core.services.evento_de_formacao import eh_tipo_de_formacao
 from apps.core.services.normalize import norm_text
 from apps.core.services.solicitacao_scope import (
     scope_projetos_por_gerencia,
@@ -260,7 +261,10 @@ class ProjetoLookup(APIView):
 class TipoEventoLookup(APIView):
     """
     GET /api/lookup/tipos-evento/?q=formacao
-    Retorna: [{id, label, kind: "tipo_evento"}]
+    Retorna: [{id, label, kind: "tipo_evento", de_formacao}]
+
+    `de_formacao` (CON-09) = o tipo é de formação (`evento_de_formacao`): a Nova Solicitação e a edição
+    exigem o Nº da formação com ele.
     """
 
     permission_classes = [IsAuthenticated]
@@ -280,6 +284,7 @@ class TipoEventoLookup(APIView):
                     "id": tipo.id,
                     "label": tipo.nome,
                     "kind": "tipo_evento",
+                    "de_formacao": eh_tipo_de_formacao(tipo.nome),
                 }
             )
 

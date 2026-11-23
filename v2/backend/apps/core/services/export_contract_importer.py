@@ -80,6 +80,7 @@ from apps.core.services.equipe_gerencia_import import (
     motivo_vinculo_bloqueado,
     vinculo_exige_superusuario,
 )
+from apps.core.services.evento_de_formacao import eh_tipo_de_formacao, numero_da_formacao
 from apps.core.services.eventos_import import _compute_external_hash
 from apps.core.services.export_contract_projeto_resolver import (
     build_projeto_index,
@@ -1420,6 +1421,10 @@ class ExportContractImporter:
         Chave repetida ('Formação' e 'Formacao') levanta ValueError com as ids, como o município (ISS-1658 b)."""
         return _indice_por_nome(TipoEvento.objects.values_list("id", "nome"), "t", "tipo de evento repetido")
 
+    def _tipos_de_formacao(self) -> set[int]:
+        """Ids dos tipos de evento de formação (CON-09; a regra é a de `evento_de_formacao`)."""
+        return {pk for pk, nome in TipoEvento.objects.values_list("id", "nome") if eh_tipo_de_formacao(nome)}
+
     def _dat_area_index(self) -> dict[str, int]:
         """Índice norm(nome) → dat_area_id; chave repetida levanta ValueError com as ids (ISS-1658 b)."""
         return _indice_por_nome(DATArea.objects.values_list("id", "nome"), "a", "área do DAT repetida")
@@ -2090,6 +2095,10 @@ class ExportContractImporter:
             sem_cadastro_eventos: list[str] = []
             # #2036: linha de dois projetos cujo evento fica com um (lista do dono; a mesma do apply).
             conjunto_incompleto: list[dict[str, str]] = []
+            # CON-09: evento NOVO de formação, não cancelado e de hoje em diante, sem Nº da formação válido. A carga
+            # não barra (o evento entra); a lista (só `evento_id`) é para corrigir na planilha antes de gravar.
+            tipos_formacao = self._tipos_de_formacao()
+            formacao_sem_numero: list[str] = []
 
             def recusa_dono(ext_hash: str) -> None:
                 reject_reasons["solicitante_cpf_sem_cadastro"] += 1
@@ -2247,6 +2256,13 @@ class ExportContractImporter:
                         conjunto_incompleto.append({"evento": ext_hash, "motivo": conj[1]})
                     elif conj is not None:
                         _conta(contagem, "conjunto_criado")
+                    if (
+                        key[2] in tipos_formacao
+                        and key[3] >= hoje
+                        and not _to_bool(r.get("cancelado"))
+                        and numero_da_formacao(r.get("encontro")) is None
+                    ):
+                        formacao_sem_numero.append(ext_hash)
                 st, _ = diff_and_classify({} if existe else None, {}, protected)
                 tally[st] += 1
                 if st == "would_create" and _to_bool(r.get("cancelado")):
@@ -2255,6 +2271,8 @@ class ExportContractImporter:
             tally["reject_reasons"] = reject_reasons
             tally["solicitante_cpf_sem_cadastro_eventos"] = sorted(sem_cadastro_eventos)
             tally["conjunto_incompleto_eventos"] = _lista_conjunto(conjunto_incompleto)
+            tally["formacao_sem_numero"] = len(formacao_sem_numero)
+            tally["formacao_sem_numero_eventos"] = sorted(formacao_sem_numero)
             if virada:
                 tally["virada"] = contagem
                 # Evento de prod que a planilha não traz mais (nem como id antigo): só conta, por quando ×
@@ -3200,6 +3218,7 @@ class ExportContractImporter:
         idempotente (só grava se difere), NUNCA esvazia (fonte vazia = ausência de sinal, não remoção)."""
         mun_idx = self._municipio_index()
         tipo_idx = self._tipo_evento_index()
+        tipos_formacao = self._tipos_de_formacao()
         cpf_idx = self._usuario_cpf_index()
         proj_by_id = {p.id: p for p in Projeto.objects.all()}
         existing: dict[str, tuple[int, str]] = {
@@ -3336,6 +3355,11 @@ class ExportContractImporter:
                 if cancelado
                 else resolve_initial_status(projeto=proj_by_id.get(proj_id)).status
             )
+            encontro = (r.get("encontro") or "").strip() or None
+            if tipo_id in tipos_formacao:
+                # CON-09: o número do evento de formação entra só com algarismos ("3º" vira "3"); sem número
+                # válido, entra como veio (a carga não barra; o ensaio lista em `formacao_sem_numero_eventos`).
+                encontro = numero_da_formacao(encontro) or encontro
             sol = Solicitacao.objects.create(
                 usuario_id=coord_id,  # solicitante = coordenador (D3)
                 municipio_id=mun_id,
@@ -3348,7 +3372,7 @@ class ExportContractImporter:
                 segmento=segmento,
                 segmento_norm=seg_norm,
                 segmento_norm_confianca=seg_conf,
-                encontro=(r.get("encontro") or "").strip() or None,
+                encontro=encontro,
                 # Decisão do dono (05/10/2026): a marca da planilha não é confiável; evento importado
                 # = o responsável não acompanha (não ocupa a agenda). A coluna não é mais lida.
                 coordenador_acompanha=False,

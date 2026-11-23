@@ -71,7 +71,12 @@ export function gcalRowActions(
 }
 
 /** Códigos do `motivo_nao_publicavel` do backend (services/solicitacao_publish.py). */
-export type MotivoNaoPublicavel = 'publicado_fora_do_sistema' | 'evento_passado' | 'ja_publicado' | 'nao_publicado';
+export type MotivoNaoPublicavel =
+  | 'publicado_fora_do_sistema'
+  | 'evento_passado'
+  | 'ja_publicado'
+  | 'nao_publicado'
+  | 'sem_numero_da_formacao';
 
 /** Motivo curto, para completar o nome acessível do botão ou da caixa de seleção. */
 export const MOTIVO_NAO_PUBLICAVEL: Record<MotivoNaoPublicavel, string> = {
@@ -79,21 +84,29 @@ export const MOTIVO_NAO_PUBLICAVEL: Record<MotivoNaoPublicavel, string> = {
   evento_passado: 'o evento já terminou',
   ja_publicado: 'já publicado',
   nao_publicado: 'ainda não publicado',
+  sem_numero_da_formacao: 'falta o Nº da formação',
 };
 
 /**
  * Espelho do `motivo_nao_publicavel` do backend: por que a linha não pode ser publicada
  * (`reenvio=false`) ou reaplicada/reenviada (`reenvio=true`), ou null se pode.
  * "Passado" compara instantes (o ISO traz o fuso), então vale em qualquer fuso do navegador.
+ * O Nº da formação (CON-09) não é conferido aqui: a linha traz a resposta do servidor
+ * (`falta_numero_da_formacao`); sem ela, o servidor recusa e diz o motivo.
  */
 export function motivoNaoPublicavel(
-  row: Pick<Solicitacao, 'gcal_status'> & Partial<Pick<Solicitacao, 'fim' | 'publicado_fora_do_sistema'>>,
+  row: Pick<Solicitacao, 'gcal_status'> &
+    Partial<Pick<Solicitacao, 'fim' | 'publicado_fora_do_sistema' | 'falta_numero_da_formacao'>>,
   { reenvio = false, agora = Date.now() }: { reenvio?: boolean; agora?: number } = {},
 ): MotivoNaoPublicavel | null {
   if (row.publicado_fora_do_sistema) return 'publicado_fora_do_sistema';
   if (row.fim && Date.parse(row.fim) < agora) return 'evento_passado';
-  if (reenvio) return row.gcal_status === 'NONE' ? 'nao_publicado' : null;
-  return row.gcal_status === 'PUBLISHED' || row.gcal_status === 'PENDING' ? 'ja_publicado' : null;
+  if (reenvio) {
+    if (row.gcal_status === 'NONE') return 'nao_publicado';
+  } else if (row.gcal_status === 'PUBLISHED' || row.gcal_status === 'PENDING') {
+    return 'ja_publicado';
+  }
+  return row.falta_numero_da_formacao ? 'sem_numero_da_formacao' : null;
 }
 
 /**

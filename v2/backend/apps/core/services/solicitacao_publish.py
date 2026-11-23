@@ -23,6 +23,7 @@ from kombu.exceptions import OperationalError as FilaForaDoAr
 from apps.core.exceptions import APIError, ConflictError, ValidationAPIError
 from apps.core.models import AuditLog, GoogleOAuthCredential, Solicitacao, Usuario
 from apps.core.services.db_retry import _extract_pgcode  # pyright: ignore[reportPrivateUsage]
+from apps.core.services.evento_de_formacao import falta_numero_da_formacao
 from apps.core.utils.net import get_client_ip
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,10 @@ MENSAGENS_NAO_PUBLICAVEL: dict[str, str] = {
     "evento_passado": "Este evento já terminou: o sistema não publica nem reenvia evento passado.",
     "ja_publicado": "Este evento já foi publicado (ou está sendo). Use Atualizar no Google.",
     "nao_publicado": "Este evento ainda não foi publicado: use Publicar, não Reaplicar nem Reenviar.",
+    "sem_numero_da_formacao": (
+        "Este evento de formação está sem o Nº da formação (só o número, de 1 a 999), e o título no Google "
+        "precisa dele. Informe o número antes de publicar ou reenviar."
+    ),
 }
 
 
@@ -68,7 +73,9 @@ def motivo_nao_publicavel(s: Solicitacao, *, reenvio: bool = False) -> str | Non
 
     Publicar: recusa o já publicado (PUBLISHED ou PENDING; ERROR pode tentar de novo). Reenvio: recusa o
     que nunca foi ao Google (`NONE`), porque nele o sync cria. Os dois recusam o evento que já terminou e
-    o que está no Google pela planilha sem adoção (`publicado_fora_do_sistema`)."""
+    o que está no Google pela planilha sem adoção (`publicado_fora_do_sistema`). Depois desses, os dois recusam
+    o evento de formação sem o Nº da formação (`sem_numero_da_formacao`, CON-09): sem ele o título no Google sai
+    fora da forma que o DFF lê."""
     if s.publicado_fora_do_sistema:
         return "publicado_fora_do_sistema"
     if s.fim < timezone.now():
@@ -78,6 +85,8 @@ def motivo_nao_publicavel(s: Solicitacao, *, reenvio: bool = False) -> str | Non
             return "nao_publicado"
     elif s.gcal_status in (Solicitacao.GCalStatus.PUBLISHED, Solicitacao.GCalStatus.PENDING):
         return "ja_publicado"
+    if falta_numero_da_formacao(s):
+        return "sem_numero_da_formacao"
     return None
 
 

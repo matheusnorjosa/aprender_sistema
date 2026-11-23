@@ -91,4 +91,18 @@ describe('motivoNaoPublicavel', () => {
       'evento_passado',
     );
   });
+
+  // CON-09: a marca vem do servidor (`falta_numero_da_formacao`); a tela não confere o formato.
+  test('evento de formação sem o Nº da formação, depois dos outros motivos', () => {
+    const sem = { falta_numero_da_formacao: true };
+    expect(motivoNaoPublicavel(linha(sem), { agora })).toBe('sem_numero_da_formacao');
+    expect(motivoNaoPublicavel(linha({ ...sem, gcal_status: 'ERROR' }), { agora })).toBe('sem_numero_da_formacao');
+    expect(motivoNaoPublicavel(linha({ ...sem, gcal_status: 'PUBLISHED' }), { agora, reenvio: true })).toBe(
+      'sem_numero_da_formacao',
+    );
+    expect(motivoNaoPublicavel(linha({ ...sem, fim: passado }), { agora })).toBe('evento_passado');
+    expect(motivoNaoPublicavel(linha({ ...sem, gcal_status: 'PUBLISHED' }), { agora })).toBe('ja_publicado');
+    expect(motivoNaoPublicavel(linha(sem), { agora, reenvio: true })).toBe('nao_publicado');
+    expect(motivoNaoPublicavel(linha({ falta_numero_da_formacao: false }), { agora })).toBeNull();
+  });
 });

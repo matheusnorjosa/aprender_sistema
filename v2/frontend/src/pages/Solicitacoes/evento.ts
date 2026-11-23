@@ -22,7 +22,21 @@ export type ComboBoxValue = LookupItem & {
   sem_compra?: boolean;
   /** Município (lookup com `marcar_sem_compra`): o projeto não tem compra em município nenhum e não recebe evento. */
   projeto_em_espera?: boolean;
+  /** Tipo de evento (lookup de tipos, CON-09): é de formação e pede o "Nº da formação". */
+  de_formacao?: boolean;
 };
+
+/** CON-09: o mesmo texto do servidor (`evento_de_formacao.MSG_NUMERO_DA_FORMACAO`). */
+export const MSG_NUMERO_DA_FORMACAO =
+  'Este tipo de evento pede o Nº da formação, que vai para o título do evento no Google: só o número, de 1 a 999 (ex.: 4).';
+
+/**
+ * CON-09: o "Nº da formação" é obrigatório quando o tipo escolhido é de formação. A marca vem do servidor (a
+ * tela não compara nome de tipo); o formato do número (1 a 999) quem confere é o servidor.
+ */
+export function numeroDaFormacaoObrigatorio(tipoEvento: Pick<ComboBoxValue, 'de_formacao'> | null): boolean {
+  return tipoEvento?.de_formacao === true;
+}
 
 /** Pedido do dono (03/11/2026): município sem compra pode, e o evento vai para aprovação. */
 export const AVISO_SEM_COMPRA = 'Sem compra neste município para este projeto. O evento vai para aprovação.';

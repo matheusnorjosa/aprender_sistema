@@ -64,6 +64,8 @@ import {
   AVISO_SEM_COMPRA,
   estaEmBranco,
   eventoDoHorario,
+  MSG_NUMERO_DA_FORMACAO,
+  numeroDaFormacaoObrigatorio,
   opcaoDoMunicipio,
   ORDEM_DO_CARTAO,
   ORDEM_DO_HORARIO,
@@ -276,6 +278,13 @@ export default function CartaoEvento({
       lookupProjetos(q, dispensaCompra ? { mesmo_grupo_de: projetoId } : { com_compra: true, mesmo_grupo_de: projetoId }),
     [dispensaCompra, projetoId],
   );
+
+  // CON-09: com tipo de formação (marca do servidor) o "Nº da formação" é obrigatório. Trocar o tipo reconfere o
+  // número que já mostra erro: o obrigatório pode ter saído.
+  const numeroObrigatorio = numeroDaFormacaoObrigatorio(dados.tipoEvento);
+  useEffect(() => {
+    if (form.getFieldError('encontro').length > 0) form.validateFields(['encontro']).catch(() => undefined);
+  }, [numeroObrigatorio, form]);
 
   // Confere o evento e os horários; a ordem é a da tela (os campos do evento antes e depois dos horários).
   const validar = async ({ focar }: { focar: boolean }): Promise<MotivoDoCartao[]> => {
@@ -513,7 +522,15 @@ export default function CartaoEvento({
           </div>
           <div className="min-w-0">
             {/* O número da formação vai para o título do evento no Google ("4º EF", "2º Acompanhamento"). */}
-            <Form.Item label="Nº da formação" name="encontro" rules={[{ max: 100, message: 'Máximo 100 caracteres' }]}>
+            <Form.Item
+              label="Nº da formação"
+              name="encontro"
+              rules={[
+                { required: numeroObrigatorio, whitespace: numeroObrigatorio, message: MSG_NUMERO_DA_FORMACAO },
+                { max: 100, message: 'Máximo 100 caracteres' },
+              ]}
+              extra={numeroObrigatorio ? 'Obrigatório neste tipo de evento. Só o número (ex.: 4).' : undefined}
+            >
               <Input
                 placeholder="Ex: 4"
                 value={dados.encontro}

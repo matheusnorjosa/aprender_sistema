@@ -933,7 +933,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
             label="Nº da formação"
             name="encontro"
             rules={[
-              { required: numeroObrigatorio, whitespace: true, message: MSG_NUMERO_DA_FORMACAO },
+              { required: numeroObrigatorio, whitespace: numeroObrigatorio, message: MSG_NUMERO_DA_FORMACAO },
               { max: 100, message: 'Máximo 100 caracteres' },
             ]}
             extra={numeroObrigatorio ? 'Obrigatório neste tipo de evento. Só o número (ex.: 4).' : undefined}

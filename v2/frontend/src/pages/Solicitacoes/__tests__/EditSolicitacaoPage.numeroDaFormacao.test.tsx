@@ -6,9 +6,10 @@
  * servidor. A recusa do servidor no campo `encontro` também vai ao campo.
  *
  * Os campos do formulário (ComboBox/DateTimeRange/FormadoresPicker) são stubs: o formData vem do
- * GET da solicitação.
+ * GET da solicitação. O stub do tipo devolve o item do lookup (com `de_formacao`) e o da data devolve um dia
+ * que já passou, para provar que trocar o tipo ou a data reconfere o número.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
@@ -27,8 +28,30 @@ vi.mock('../../../api/lookup', () => ({
   lookupProjetos: vi.fn().mockResolvedValue([]),
   lookupTiposEvento: vi.fn().mockResolvedValue([]),
 }));
-vi.mock('../../../components/ComboBox', () => ({ default: () => null }));
-vi.mock('../../../components/DateTimeRange', () => ({ default: () => null }));
+vi.mock('../../../components/ComboBox', () => ({
+  // Só o tipo interessa: devolve o item do lookup, que traz a marca do servidor.
+  default: ({ id, onChange }: { id?: string; onChange?: (v: unknown) => void }) =>
+    id === 'edit-tipo-evento' ? (
+      <button
+        type="button"
+        data-testid="tipo-presencial"
+        onClick={() => onChange?.({ id: 3, label: 'Presencial', kind: 'tipo_evento', de_formacao: true })}
+      >
+        tipo
+      </button>
+    ) : null,
+}));
+vi.mock('../../../components/DateTimeRange', () => ({
+  default: ({ onChange }: { onChange?: (v: unknown) => void }) => (
+    <button
+      type="button"
+      data-testid="data-passada"
+      onClick={() => onChange?.({ date: '2020-01-10', start: '09:00', end: '11:00' })}
+    >
+      data
+    </button>
+  ),
+}));
 vi.mock('../../../components/FormadoresPicker', () => ({ default: () => null }));
 
 import message from 'antd/es/message';
@@ -136,6 +159,44 @@ describe('EditSolicitacaoPage — Nº da formação no evento de formação (CON
     await salvar();
 
     await waitFor(() => expect(updateSolicitacaoMock).toHaveBeenCalledTimes(1));
+  });
+
+  // TELA-1: o "só espaços" vale só quando o campo é obrigatório.
+  test('tipo que não é de formação com o número só de espaços: salva', async () => {
+    getSolicitacaoMock.mockResolvedValue(
+      solicitacao({ tipo_evento_nome: 'Reunião', tipo_evento_de_formacao: false, encontro: ' ' }),
+    );
+    const numero = await abrir();
+
+    await salvar();
+
+    await waitFor(() => expect(updateSolicitacaoMock).toHaveBeenCalledTimes(1));
+    expect(numero).not.toHaveAttribute('aria-invalid');
+  });
+
+  test('trocar para um tipo de formação exige o número', async () => {
+    getSolicitacaoMock.mockResolvedValue(solicitacao({ tipo_evento_nome: 'Reunião', tipo_evento_de_formacao: false }));
+    const numero = await abrir();
+    expect(numero).not.toHaveAttribute('aria-required');
+
+    fireEvent.click(screen.getByTestId('tipo-presencial'));
+    await waitFor(() => expect(numero).toHaveAttribute('aria-required', 'true'));
+    await salvar();
+
+    await waitFor(() => expect(numero).toHaveAttribute('aria-invalid', 'true'));
+    expect(updateSolicitacaoMock).not.toHaveBeenCalled();
+  });
+
+  test('mudar a data para um dia que já passou tira o erro do número', async () => {
+    getSolicitacaoMock.mockResolvedValue(solicitacao({}));
+    const numero = await abrir();
+    await salvar();
+    await waitFor(() => expect(numero).toHaveAttribute('aria-invalid', 'true'));
+
+    fireEvent.click(screen.getByTestId('data-passada'));
+
+    await waitFor(() => expect(numero).not.toHaveAttribute('aria-invalid'));
+    expect(numero).not.toHaveAttribute('aria-required');
   });
 
   test('a recusa do servidor no número vai ao campo', async () => {

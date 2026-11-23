@@ -3,7 +3,7 @@
  *
  * A marca vem do servidor (`de_formacao` no lookup de tipos); a tela não compara nome de tipo. Com a marca, o
  * campo é obrigatório (aria-required), o envio sem o número para no cartão com o motivo no resumo e o foco no
- * campo. Sem a marca, o campo segue livre. Trocar para um tipo sem a marca tira o erro do campo.
+ * campo. Sem a marca, o campo segue livre (até só com espaços). Trocar para um tipo sem a marca tira o erro do campo.
  */
 import { useEffect } from 'react';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
@@ -145,6 +145,18 @@ describe('Nova Solicitação — Nº da formação no evento de formação (CON-
     fireEvent.click(botaoDoTexto('Criar solicitação'));
 
     await waitFor(() => expect(createSolicitacoesEmLoteMock).toHaveBeenCalledTimes(1), ESPERA_VALIDACAO);
+  });
+
+  // TELA-1: o "só espaços" vale só quando o campo é obrigatório.
+  test('tipo sem a marca com o número só de espaços: envia', async () => {
+    tipo.atual = { id: 790, label: 'Reunião', kind: 'tipo_evento', de_formacao: false };
+    const numero = await preencherMenosONumero();
+    fireEvent.change(numero, { target: { value: ' ' } });
+
+    fireEvent.click(botaoDoTexto('Criar solicitação'));
+
+    await waitFor(() => expect(createSolicitacoesEmLoteMock).toHaveBeenCalledTimes(1), ESPERA_VALIDACAO);
+    expect(numero).not.toHaveAttribute('aria-invalid');
   });
 
   test('trocar para um tipo sem a marca tira o erro do número', async () => {

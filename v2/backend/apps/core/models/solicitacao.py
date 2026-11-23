@@ -83,6 +83,19 @@ class Solicitacao(models.Model):
             "(regra em services/solicitacao_projetos)."
         ),
     )
+    # VIR-17 (23/11/2026): evento de até três projetos. A 3ª vaga é igual à 2ª e só existe com ela.
+    projeto_3 = models.ForeignKey(  # type: ignore[misc]
+        "core.Projeto",
+        on_delete=models.PROTECT,
+        related_name="solicitacoes_3",
+        null=True,
+        blank=True,
+        verbose_name="Terceiro projeto",
+        help_text=(
+            "Evento de três projetos. Só com o 2º; os três diferentes, da mesma gerência e do mesmo fluxo "
+            "(regra em services/solicitacao_projetos)."
+        ),
+    )
     tipo_evento = models.ForeignKey(  # type: ignore[misc]
         "core.TipoEvento", on_delete=models.PROTECT, related_name="solicitacoes"
     )
@@ -341,11 +354,21 @@ class Solicitacao(models.Model):
                 name="solicitacao_gcal_status_valid",
             ),
             # #2036: o 2º projeto só com o 1º, e diferente dele. Gerência e fluxo iguais é regra de aplicação
-            # (`par_de_projetos_invalido`), conferida pelo `compliance_audit`.
+            # (`grupo_de_projetos_invalido`), conferida pelo `compliance_audit`.
             models.CheckConstraint(
                 condition=models.Q(projeto_2__isnull=True)
                 | (models.Q(projeto__isnull=False) & ~models.Q(projeto_2=models.F("projeto"))),
                 name="solicitacao_projeto_2_valido",
+            ),
+            # VIR-17: o 3º só com o 2º (e, pela constraint acima, com o 1º), e diferente dos dois.
+            models.CheckConstraint(
+                condition=models.Q(projeto_3__isnull=True)
+                | (
+                    models.Q(projeto_2__isnull=False)
+                    & ~models.Q(projeto_3=models.F("projeto"))
+                    & ~models.Q(projeto_3=models.F("projeto_2"))
+                ),
+                name="solicitacao_projeto_3_valido",
             ),
         ]
 

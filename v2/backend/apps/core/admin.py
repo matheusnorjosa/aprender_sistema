@@ -37,8 +37,8 @@ from .models import (
 from .rbac.helpers import MSG_FLUXO_SUPER_SO_NA_SUPERINTENDENCIA, fluxo_super_fora_da_superintendencia
 from .services.solicitacao_projetos import (
     MSG_SEGUNDO_SEM_PRIMEIRO,
+    grupo_de_projetos_invalido,
     mudanca_de_grupo_bloqueada,
-    par_de_projetos_invalido,
 )
 from .utils.csv_sanitize import sanitize_csv_value
 
@@ -192,7 +192,7 @@ class ProjetoAdminForm(forms.ModelForm):  # type: ignore[type-arg]
     def clean(self) -> dict[str, Any]:
         """Regra do dono (30/09): fluxo SUPER só em projeto da gerência Superintendência.
 
-        #2036, regra 10: projeto em evento de dois projetos não muda de gerência nem de fluxo. O erro vai
+        #2036, regra 10: projeto em evento de mais de um projeto não muda de gerência nem de fluxo. O erro vai
         no campo que mudou. `self.instance` ainda tem os valores gravados (o form só os copia depois do clean).
         """
         cleaned: dict[str, Any] = super().clean() or {}
@@ -228,9 +228,9 @@ class AvailabilityBlockAdmin(admin.ModelAdmin):
 
 
 class SolicitacaoAdminForm(forms.ModelForm):  # type: ignore[type-arg]
-    """#2036: trocar o `projeto` de evento de dois projetos confere o par (regra 2). Sem isso, o mesmo
-    projeto do 2º daria IntegrityError (500) e um projeto de outra gerência furaria a regra. O `projeto_2`
-    é somente leitura aqui; ele muda pela API (PR 4) ou pela carga da virada."""
+    """#2036 e VIR-17: trocar o `projeto` de evento de mais de um projeto confere o grupo (regra 2). Sem isso,
+    o mesmo projeto do 2º ou do 3º daria IntegrityError (500) e um projeto de outra gerência furaria a regra.
+    `projeto_2` e `projeto_3` são somente leitura aqui; eles mudam pela API ou pela carga da virada."""
 
     class Meta:  # type: ignore[misc]
         model = Solicitacao
@@ -238,11 +238,11 @@ class SolicitacaoAdminForm(forms.ModelForm):  # type: ignore[type-arg]
 
     def clean(self) -> dict[str, Any]:
         cleaned: dict[str, Any] = super().clean() or {}
-        outro = self.instance.projeto_2
-        if outro is None or "projeto" not in self.changed_data or "projeto" not in cleaned:
+        outros = [p for p in (self.instance.projeto_2, self.instance.projeto_3) if p is not None]
+        if not outros or "projeto" not in self.changed_data or "projeto" not in cleaned:
             return cleaned
         projeto = cleaned["projeto"]
-        erro = MSG_SEGUNDO_SEM_PRIMEIRO if projeto is None else par_de_projetos_invalido(projeto, outro)
+        erro = MSG_SEGUNDO_SEM_PRIMEIRO if projeto is None else grupo_de_projetos_invalido(projeto, *outros)
         if erro:
             self.add_error("projeto", erro)
         return cleaned
@@ -266,7 +266,7 @@ class SolicitacaoAdmin(admin.ModelAdmin):
         "observacoes",
     )
     list_filter = ("status", "tipo_evento", "created_at")
-    readonly_fields = ("created_at", "updated_at", "external_event_id", "projeto_2")
+    readonly_fields = ("created_at", "updated_at", "external_event_id", "projeto_2", "projeto_3")
     date_hierarchy = "inicio"
 
 

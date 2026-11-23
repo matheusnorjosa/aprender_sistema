@@ -18,8 +18,9 @@ from io import StringIO
 
 from django.core.management import call_command
 from django.db import IntegrityError, connection, models, transaction
-from django.db.migrations.operations import AddConstraint, AddField, RunPython
+from django.db.migrations.operations import AddConstraint, AddField, AlterField, RunPython
 from django.db.models import ProtectedError
+from django.test.utils import CaptureQueriesContext
 from rest_framework import serializers
 from rest_framework.test import APIClient
 
@@ -33,16 +34,24 @@ from apps.core.services.solicitacao_projetos import (
     MSG_MAIS_DE_TRES,
     MSG_MESMO_PROJETO,
     MSG_SEM_GERENCIA,
+    MSG_TERCEIRO_SEM_SEGUNDO,
     VAGAS,
     contar_por_projeto,
     eventos_conjuntos_do_projeto,
     grupo_de_projetos_invalido,
     ids_dos_projetos,
+    projetos_distintos_por,
     projetos_do_evento,
     q_tem_projeto,
     rotulo_dos_projetos,
 )
-from apps.core.tests.factories import GerenciaFactory, ProjetoFactory, SolicitacaoFactory, UsuarioFactory
+from apps.core.tests.factories import (
+    GerenciaFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -194,6 +203,16 @@ def test_contar_por_projeto_conta_o_trio_nos_tres(trio):
     }
 
 
+def test_projetos_distintos_por_conta_a_vaga_3(trio):
+    a, b, c = trio
+    municipio = MunicipioFactory()
+    _trio(a, b, c, municipio=municipio)
+    qs = Solicitacao.objects.all()
+
+    assert projetos_distintos_por(qs, "municipio_id") == {municipio.pk: 3}
+    assert projetos_distintos_por(qs, "municipio_id", so_projeto=c.pk) == {municipio.pk: 1}
+
+
 def test_eventos_conjuntos_conta_a_vaga_3(trio):
     a, b, c = trio
     _trio(a, b, c)
@@ -264,8 +283,13 @@ def test_admin_solicitacao_recusa_projeto_igual_ao_3(trio):
     assert form.errors["projeto"] == [MSG_MESMO_PROJETO]
 
 
-def test_admin_solicitacao_recusa_projeto_de_outra_gerencia_no_trio(trio):
-    form = _solicitacao_admin_form(_trio(*trio), ProjetoFactory(gerencia=GerenciaFactory()))
+def test_admin_solicitacao_confere_a_gerencia_do_3_gravado(trio, gerencia):
+    """O novo `projeto` combina com o 2º, mas não com o 3º (data-fix o pôs em outra gerência). Só o clean que
+    lê a 3ª vaga recusa; o clean antigo, que conferia o par (projeto, projeto_2), deixava passar."""
+    evento = _trio(*trio)
+    Projeto.objects.filter(pk=trio[2].pk).update(gerencia=GerenciaFactory())
+
+    form = _solicitacao_admin_form(Solicitacao.objects.get(pk=evento.pk), ProjetoFactory(gerencia=gerencia))
 
     assert form.errors["projeto"] == [MSG_GERENCIA_DIFERENTE]
 
@@ -303,6 +327,79 @@ def test_nenhum_serializer_de_solicitacao_escreve_projeto_3():
 
 
 # =============================================================================
+# Edição pela API de evento com trio já gravado (VIR17A-R1): a regra vê o estado final, com o 3º gravado
+# =============================================================================
+
+
+@pytest.fixture
+def admin_api() -> APIClient:
+    client = APIClient()
+    client.force_authenticate(user=UsuarioFactory(is_superuser=True, is_staff=True))
+    return client
+
+
+def _patch_trio(client: APIClient, evento: Solicitacao, dados: dict) -> tuple[int, dict]:
+    resp = client.patch(f"/api/solicitacoes/{evento.pk}/", dados, format="json")
+    return resp.status_code, resp.json()
+
+
+@pytest.mark.parametrize(
+    ("caso", "esperado"),
+    [
+        ("tira_o_2", MSG_TERCEIRO_SEM_SEGUNDO),
+        ("1_vira_o_3", MSG_MESMO_PROJETO),
+        ("2_vira_o_3", MSG_MESMO_PROJETO),
+        ("inverte_1_e_3", MSG_MESMO_PROJETO),
+        ("1_de_outra_gerencia", MSG_GERENCIA_DIFERENTE),
+        ("par_de_outra_gerencia", MSG_GERENCIA_DIFERENTE),
+        ("par_de_outro_fluxo", MSG_FLUXO_DIFERENTE),
+    ],
+)
+def test_api_edicao_do_trio_gravado_da_400_e_nao_grava(admin_api, trio, gerencia, caso, esperado):
+    a, b, c = trio
+    outra = GerenciaFactory()
+    fora = ProjetoFactory(gerencia=outra), ProjetoFactory(gerencia=outra)
+    super_ = ProjetoFactory(gerencia=gerencia, fluxo="SUPER"), ProjetoFactory(gerencia=gerencia, fluxo="SUPER")
+    dados = {
+        "tira_o_2": {"projeto_2": None},
+        "1_vira_o_3": {"projeto": c.pk},
+        "2_vira_o_3": {"projeto_2": c.pk},
+        "inverte_1_e_3": {"projeto": c.pk, "projeto_2": b.pk},
+        "1_de_outra_gerencia": {"projeto": fora[0].pk},
+        "par_de_outra_gerencia": {"projeto": fora[0].pk, "projeto_2": fora[1].pk},
+        "par_de_outro_fluxo": {"projeto": super_[0].pk, "projeto_2": super_[1].pk},
+    }[caso]
+    evento = _trio(a, b, c)
+
+    status, corpo = _patch_trio(admin_api, evento, dados)
+
+    assert status == 400, corpo
+    assert corpo["errors"]["projeto_2"] == [esperado]
+    assert _vagas(evento) == (a.pk, b.pk, c.pk)
+
+
+def test_api_edicao_do_trio_sem_mexer_nos_projetos_segue(admin_api, trio):
+    evento = _trio(*trio)
+
+    status, corpo = _patch_trio(admin_api, evento, {"observacoes": "Sala 2"})
+
+    assert status == 200, corpo
+    evento.refresh_from_db()
+    assert evento.observacoes == "Sala 2"
+    assert _vagas(evento) == tuple(p.pk for p in trio)
+
+
+def test_api_edicao_do_trio_inverter_1_e_2_nao_muda_nada(admin_api, trio):
+    a, b, c = trio
+    evento = _trio(a, b, c)
+
+    status, corpo = _patch_trio(admin_api, evento, {"projeto": b.pk, "projeto_2": a.pk})
+
+    assert status == 200, corpo
+    assert _vagas(evento) == (a.pk, b.pk, c.pk)
+
+
+# =============================================================================
 # Merge de projetos: sem vaga vazia no meio, sem projeto repetido
 # =============================================================================
 
@@ -319,14 +416,20 @@ def merge(gerencia):
 @pytest.mark.parametrize(
     ("ordem", "esperado"),
     [
+        # Duplicata e sobrevivente em cada par de vagas (as 6 ordens do trio): o sobrevivente fica na vaga mais à
+        # frente entre a dele e a da duplicata, a outra sai e as de trás sobem.
         (("dup", "s", "x"), ("s", "x", None)),
         (("s", "dup", "x"), ("s", "x", None)),
+        (("dup", "x", "s"), ("s", "x", None)),
+        (("s", "x", "dup"), ("s", "x", None)),
         (("x", "dup", "s"), ("x", "s", None)),
         (("x", "s", "dup"), ("x", "s", None)),
-        (("s", "x", "dup"), ("s", "x", None)),
+        # No par, o mesmo: sobra o sobrevivente na vaga 1.
+        (("dup", "s", None), ("s", None, None)),
+        (("s", "dup", None), ("s", None, None)),
     ],
 )
-def test_merge_no_trio_com_sobrevivente_sobe_as_vagas(merge, gerencia, ordem, esperado):
+def test_merge_com_sobrevivente_no_evento_sobe_as_vagas(merge, gerencia, ordem, esperado):
     survivor, dup = merge
     x = ProjetoFactory(gerencia=gerencia)
     nomes = {"s": survivor, "dup": dup, "x": x, None: None}
@@ -368,6 +471,23 @@ def test_merge_recusa_quando_quebraria_o_trio(trio):
 
     assert _vagas(evento) == (a.pk, b.pk, dup.pk)
     assert Projeto.objects.filter(pk=dup.pk).exists()
+
+
+def test_merge_com_apply_le_os_eventos_com_lock(merge, gerencia):
+    """VIR17A-M5: o UPDATE regrava as três vagas com o que leu; sem lock, um PATCH no meio se perderia."""
+    survivor, dup = merge
+    _trio(dup, ProjetoFactory(gerencia=gerencia), survivor)
+
+    with CaptureQueriesContext(connection) as consultas:
+        merge_projeto_duplicates(pairs=PAR_MERGE, apply=True)
+
+    leituras = [
+        q["sql"]
+        for q in consultas
+        if q["sql"].startswith("SELECT") and 'FROM "core_solicitacao" LEFT OUTER JOIN "core_projeto"' in q["sql"]
+    ]
+    assert leituras, "o merge não leu os eventos da duplicata"
+    assert all("FOR UPDATE" in sql for sql in leituras), leituras
 
 
 def test_merge_dry_run_no_trio_conta_e_nao_muda(merge, gerencia):
@@ -412,7 +532,7 @@ def test_compliance_audit_acusa_terceiro_quebrado_por_data_fix(trio, campo):
 
     assert check["status"] == "FAIL"
     assert check["violations"] == 1
-    assert str(evento.pk) in check["details"]
+    assert check["details"].endswith(f"ids: [{evento.pk}]")
 
 
 # =============================================================================
@@ -421,14 +541,28 @@ def test_compliance_audit_acusa_terceiro_quebrado_por_data_fix(trio, campo):
 
 
 @pytest.mark.migrations
-def test_migracao_0138_so_schema_e_reversivel():
-    """AddField nulo + AddConstraint, sem RunPython: nenhum evento muda e a volta é limpa."""
+def test_migracao_0138_so_schema():
+    """AddField nulo + AddConstraint (+ o texto de ajuda das vagas 1 e 2, sem SQL), sem RunPython: nenhum
+    evento muda na ida. Este teste NÃO roda a volta: voltar para a 0137 apaga a coluna e, com ela, o 3º projeto
+    dos trios gravados (VIR17A-M2). Por isso a volta de versão só vale antes de existir qualquer trio."""
     migracao = importlib.import_module("apps.core.migrations.0138_solicitacao_projeto_3").Migration
     ops = migracao.operations
 
     assert not any(isinstance(op, RunPython) for op in ops)
-    assert all(op.reversible for op in ops)
-    assert {type(op) for op in ops} == {AddField, AddConstraint}
+    assert {type(op) for op in ops} == {AddField, AddConstraint, AlterField}
+    assert sorted(op.name for op in ops if isinstance(op, AlterField)) == ["projeto", "projeto_2"]
+    saida = StringIO()
+    call_command("sqlmigrate", "core", "0138", stdout=saida)
+    sql = saida.getvalue()
+    assert sql.count("-- (no-op)") == 2, "o texto de ajuda das vagas 1 e 2 não pode gerar SQL"
+    comandos = [linha for linha in sql.splitlines() if linha and not linha.startswith(("--", "BEGIN", "COMMIT"))]
+    assert [c.split(" (")[0].split(" CHECK")[0] for c in comandos] == [
+        'ALTER TABLE "core_solicitacao" ADD COLUMN "projeto_3_id" bigint NULL CONSTRAINT '
+        '"core_solicitacao_projeto_3_id_d8aaf2c9_fk_core_projeto_id" REFERENCES "core_projeto"("id") DEFERRABLE '
+        'INITIALLY DEFERRED; SET CONSTRAINTS "core_solicitacao_projeto_3_id_d8aaf2c9_fk_core_projeto_id" IMMEDIATE;',
+        'ALTER TABLE "core_solicitacao" ADD CONSTRAINT "solicitacao_projeto_3_valido"',
+        'CREATE INDEX "core_solicitacao_projeto_3_id_d8aaf2c9" ON "core_solicitacao"',
+    ], comandos
     [add_field] = [op for op in ops if isinstance(op, AddField)]
     assert add_field.name == "projeto_3" and add_field.field.null
     assert add_field.field.default is models.NOT_PROVIDED

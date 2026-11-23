@@ -35,6 +35,7 @@ MSG_GERENCIA_DIFERENTE = "Os projetos do evento precisam ser da mesma gerência.
 MSG_FLUXO_DIFERENTE = "Os projetos do evento precisam ter o mesmo fluxo de aprovação."
 MSG_MAIS_DE_TRES = "O evento tem no máximo três projetos."
 MSG_SEGUNDO_SEM_PRIMEIRO = "Este evento tem mais de um projeto: o projeto não pode ficar vazio."
+MSG_TERCEIRO_SEM_SEGUNDO = "Este evento tem três projetos: o 2º projeto não pode ficar vazio enquanto houver o 3º."
 
 
 def projetos_do_evento(s: Solicitacao) -> list[Projeto]:
@@ -68,7 +69,10 @@ def grupo_de_projetos_invalido(*projetos: Projeto) -> str | None:
 
 
 def par_de_projetos_invalido(a: Projeto, b: Projeto) -> str | None:
-    """Regra 2 para o par (gravação pela API e carga, até a entrega B do VIR-17 passar a conferir o grupo)."""
+    """Regra 2 para o par (validação da criação e carga, até as entregas B e D do VIR-17 conferirem o grupo).
+
+    A edição pela API já confere o grupo com o 3º gravado (`SolicitacaoSerializer._conferir_projetos`).
+    """
     return grupo_de_projetos_invalido(a, b)
 
 

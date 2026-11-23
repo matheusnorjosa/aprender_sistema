@@ -11,6 +11,32 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # Só o texto de ajuda (VIR17A-M3): sem SQL.
+        migrations.AlterField(
+            model_name="solicitacao",
+            name="projeto",
+            field=models.ForeignKey(
+                blank=True,
+                help_text="Um dos projetos do evento (os outros, se houver, ficam em projeto_2 e projeto_3)",
+                null=True,
+                on_delete=django.db.models.deletion.PROTECT,
+                related_name="solicitacoes",
+                to="core.projeto",
+            ),
+        ),
+        migrations.AlterField(
+            model_name="solicitacao",
+            name="projeto_2",
+            field=models.ForeignKey(
+                blank=True,
+                help_text="Evento de mais de um projeto. As vagas valem igual; mesma gerência e mesmo fluxo (regra em services/solicitacao_projetos).",
+                null=True,
+                on_delete=django.db.models.deletion.PROTECT,
+                related_name="solicitacoes_2",
+                to="core.projeto",
+                verbose_name="Outro projeto",
+            ),
+        ),
         migrations.AddField(
             model_name="solicitacao",
             name="projeto_3",

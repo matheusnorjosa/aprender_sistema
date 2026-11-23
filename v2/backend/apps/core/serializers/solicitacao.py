@@ -41,8 +41,9 @@ from apps.core.services.solicitacao_approval import DECISAO_IMPEDIDA, decisoes_i
 from apps.core.services.solicitacao_exclusao import ids_ja_decididas, motivo_que_impede_excluir
 from apps.core.services.solicitacao_projetos import (
     MSG_SEGUNDO_SEM_PRIMEIRO,
+    MSG_TERCEIRO_SEM_SEGUNDO,
+    grupo_de_projetos_invalido,
     ids_dos_projetos,
-    par_de_projetos_invalido,
     projetos_do_evento,
     rotulo_dos_projetos,
 )
@@ -553,12 +554,18 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
 
         - Inverter as vagas não muda nada: o conjunto é o mesmo, e a ordem gravada fica (sem `changed_fields`
           falso, que impediria quem salvou de decidir, PA-02).
-        - Quando o valor de alguma vaga muda, o 2º passa pela regra do par (`par_de_projetos_invalido`: o mesmo
+        - Quando o valor de alguma vaga muda, o 2º passa pela regra do grupo (`grupo_de_projetos_invalido`: o mesmo
           projeto, gerência vazia, outra gerência ou outro fluxo) e não fica sem o 1º. Erro em `projeto_2`.
           Vale também para quem é isento da regra da compra.
+        - VIR-17 A (VIR17A-R1): a API ainda não escreve o 3º, mas a regra vê o estado final, com o 3º já
+          gravado (`grupo_de_projetos_invalido`). Tirar o 2º com o 3º gravado, ou repetir o 3º, dá 400 e não
+          o 500 da constraint `solicitacao_projeto_3_valido`.
         """
         projeto = attrs.get("projeto", getattr(instance, "projeto", None))
         projeto_2 = attrs.get("projeto_2", getattr(instance, "projeto_2", None))
+        projeto_3 = getattr(instance, "projeto_3", None)
+        if projeto_3 is not None and projeto_2 is None:
+            raise serializers.ValidationError({"projeto_2": MSG_TERCEIRO_SEM_SEGUNDO})
         if instance is None:
             mudou = projeto_2 is not None
         else:
@@ -574,7 +581,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
                 instance.projeto_2_id,
             )
         if mudou and projeto_2 is not None:
-            motivo = MSG_SEGUNDO_SEM_PRIMEIRO if projeto is None else par_de_projetos_invalido(projeto, projeto_2)
+            grupo = [p for p in (projeto, projeto_2, projeto_3) if p is not None]
+            motivo = MSG_SEGUNDO_SEM_PRIMEIRO if projeto is None else grupo_de_projetos_invalido(*grupo)
             if motivo:
                 raise serializers.ValidationError({"projeto_2": motivo})
         return projeto, projeto_2

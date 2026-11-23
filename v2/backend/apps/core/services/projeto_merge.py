@@ -65,11 +65,16 @@ def _merge_one(survivor_name: str, dup_name: str, apply: bool) -> dict[str, Any]
         return entry
 
     # #2036 e VIR-17: nos eventos com a duplicata em qualquer vaga, ela vira o sobrevivente. Se ele já estava
-    # no evento, a vaga da duplicata sai e as de trás sobem (sem vaga vazia no meio nem projeto repetido, as
-    # constraints `solicitacao_projeto_2_valido` e `_3_valido`): o conjunto é desfeito. Se o grupo novo for
-    # inválido (gerência ou fluxo diferente), recusa antes de mudar qualquer coisa: o fluxo divergente faria o
-    # evento escapar da aprovação SUPER (PA-01).
+    # no evento, fica na vaga mais à frente entre a dele e a da duplicata, a outra sai e as de trás sobem
+    # ((dup, x, s) vira (s, x); sem vaga vazia no meio nem projeto repetido, as constraints
+    # `solicitacao_projeto_2_valido` e `_3_valido`): o conjunto é desfeito. Se o grupo novo for inválido
+    # (gerência ou fluxo diferente), recusa antes de mudar qualquer coisa: o fluxo divergente faria o evento
+    # escapar da aprovação SUPER (PA-01).
     eventos = Solicitacao.objects.filter(q_tem_projeto(pk=dup.pk)).select_related(*VAGAS).order_by("pk")
+    if apply:
+        # VIR17A-M5: o UPDATE abaixo regrava as três vagas com o que foi lido aqui. O lock (até o fim do
+        # transaction.atomic de `merge_projeto_duplicates`) impede que uma edição no meio se perca.
+        eventos = eventos.select_for_update(of=("self",))
     novas_vagas: list[tuple[int, list[Projeto]]] = []
     entry["conjunto_desfeito"] = 0
     for s in eventos:

@@ -68,9 +68,10 @@ class Solicitacao(models.Model):
         related_name="solicitacoes",
         null=True,
         blank=True,
-        help_text="Um dos projetos do evento (o outro, se houver, fica em projeto_2)",
+        help_text="Um dos projetos do evento (os outros, se houver, ficam em projeto_2 e projeto_3)",
     )
-    # #2036: evento de dois projetos. As duas vagas valem igual (sem principal); mesma gerência e mesmo fluxo.
+    # #2036 e VIR-17: evento de mais de um projeto. As vagas valem igual (sem principal); mesma gerência e mesmo
+    # fluxo.
     projeto_2 = models.ForeignKey(  # type: ignore[misc]
         "core.Projeto",
         on_delete=models.PROTECT,
@@ -79,7 +80,7 @@ class Solicitacao(models.Model):
         blank=True,
         verbose_name="Outro projeto",
         help_text=(
-            "Evento de dois projetos. As duas vagas valem igual; mesma gerência e mesmo fluxo "
+            "Evento de mais de um projeto. As vagas valem igual; mesma gerência e mesmo fluxo "
             "(regra em services/solicitacao_projetos)."
         ),
     )

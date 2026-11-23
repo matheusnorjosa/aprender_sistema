@@ -43,6 +43,11 @@ class CriacaoRecusada(ValueError):
         self.code = code
 
 
+class EventoAdotadoNaoAchado(ValueError):
+    """O `marcar_cancelado_no_google` não achou no Google o evento do id adotado (o da planilha) e não escreveu
+    nada lá. A tarefa do Cancelar desfaz a marca do pedido com isso, para a linha não ficar sem saída (CON-08)."""
+
+
 def _motivo_para_nao_criar(s: Solicitacao) -> CriacaoRecusada | None:
     """Guarda única do CREATE e do ADOPT (Publicar, lote, Reapply, Resync e `preagenda_to_gcal` passam por aqui)."""
     if s.publicado_fora_do_sistema:
@@ -621,7 +626,8 @@ def marcar_cancelado_no_google(
     `summary` do resultado diz o desfecho para a tarefa: `marcado` (UPDATE), `ja_marcado` ou `ja_saiu` (SKIP).
 
     Raises:
-        ValueError: a conta não vê o calendário, ou o id adotado (o da planilha) não foi achado no Google.
+        ValueError: a conta não vê o calendário.
+        EventoAdotadoNaoAchado (um ValueError): o id adotado (o da planilha) não foi achado no Google.
         RuntimeError: o PATCH voltou como 409/412 (sucesso por idempotência) e o título relido não tem o marcador.
     """
     if client is None:
@@ -653,7 +659,7 @@ def marcar_cancelado_no_google(
     # Só o id adotado que o GET não acha levanta (como o `upsert_one`): o ponteiro pode estar errado. Achado e
     # apagado (`cancelled`), o evento já saiu, adotado ou não.
     if evento is None and adotado:
-        raise ValueError(f"Solicitação #{s.id}: o evento adotado não foi achado no Google; nada foi feito.")
+        raise EventoAdotadoNaoAchado(f"Solicitação #{s.id}: o evento adotado não foi achado no Google; nada foi feito.")
     if evento is None or evento.get("status") == "cancelled":
         return SyncOutcome("SKIP", s.id, event_id, "ja_saiu")
 

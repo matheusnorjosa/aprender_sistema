@@ -242,4 +242,22 @@ describe('MeusEventosPage', () => {
     const item = rotulo.closest('.ant-descriptions-item');
     expect(item?.querySelector('.ant-descriptions-item-content')?.textContent).toBe('—');
   });
+
+  // CON-08 B, revisão da rodada 4: o evento cancelado na agenda segue aprovado; sem a etiqueta, o formador o via
+  // como agendado. A etiqueta fica na coluna da data, que aparece em qualquer largura.
+  test('evento cancelado na agenda mostra a etiqueta, também no celular', async () => {
+    getMyEventsMock.mockResolvedValueOnce(
+      makePage([
+        makeEvent({ id: 100, municipio_nome: 'Crato', cancelado_na_agenda: true }),
+        makeEvent({ id: 101, municipio_nome: 'Sobral', cancelado_na_agenda: false }),
+      ])
+    );
+    renderPage();
+    await screen.findByText('Crato');
+    act(() => definirLarguraTela(360));
+    const linhaCancelada = screen.getByText('Crato').closest('tr');
+    const linhaNormal = screen.getByText('Sobral').closest('tr');
+    expect(linhaCancelada).toHaveTextContent('Cancelado na agenda');
+    expect(linhaNormal).not.toHaveTextContent('Cancelado na agenda');
+  });
 });

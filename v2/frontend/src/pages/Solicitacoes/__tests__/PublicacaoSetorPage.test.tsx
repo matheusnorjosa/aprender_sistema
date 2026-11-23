@@ -1160,6 +1160,36 @@ describe('PublicacaoSetorPage — cancelar evento de formação', { timeout: 200
     );
   });
 
+  // Revisão da rodada 3: o caminho que Minhas Solicitações manda seguir na linha já cancelada na agenda. O último
+  // caso isola o `cancelado_na_agenda` em `excluirMarcaCancelado` (sem a flag de formação).
+  test.each([
+    ['PUBLISHED', { gcal_status: 'PUBLISHED' as const }],
+    ['ERROR com id (o Cancelar falhou)', { gcal_status: 'ERROR' as const, gcal_last_error: 'Google fora' }],
+    ['marcada sem a flag de formação', { gcal_status: 'PUBLISHED' as const, tipo_evento_de_formacao: false }],
+  ])('Excluir de linha já cancelada na agenda (%s): fica no Google com (CANCELADO)', async (_caso, extra) => {
+    listResponse = pageOf([makeSolic({ ...FORMACAO, ...extra, cancelado_na_agenda: true, pode_excluir: true })]);
+    deleteResult = () => {
+      listResponse = pageOf([]);
+      return Promise.resolve(undefined);
+    };
+    renderPage();
+
+    fireEvent.click(await screen.findByLabelText(/^Excluir: Vidas Em Rede/));
+    const dialogo = await screen.findByRole('dialog');
+    expect(dialogo).toHaveTextContent(
+      '10/10/2099 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e fica no Google Agenda com (CANCELADO) no título. Não dá para desfazer.',
+    );
+    expect(dialogo).not.toHaveTextContent('do Google Agenda, se estiver lá');
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Sim, excluir' }));
+
+    await waitFor(() => expect(deleteCalls()).toHaveLength(1));
+    await waitFor(() =>
+      expect(message.success).toHaveBeenCalledWith(
+        'Evento excluído do sistema; no Google Agenda ele fica com (CANCELADO) no título.',
+      ),
+    );
+  });
+
   test('Excluir de formação em ERROR sem id não promete que o evento está no Google', async () => {
     listResponse = pageOf([
       makeSolic({ ...FORMACAO, gcal_status: 'ERROR', external_event_id: null, pode_excluir: true }),

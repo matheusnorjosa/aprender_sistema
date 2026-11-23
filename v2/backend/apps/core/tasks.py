@@ -178,6 +178,11 @@ _MSG_SEM_ACESSO_CALENDARIO = (
     "O Google recusou o acesso ao calendário da organização (sem permissão de edição ou calendário "
     "não compartilhado com sua conta). Peça ao Controle o compartilhamento com «Fazer alterações nos eventos»."
 )
+_MSG_ADOTADO_NAO_ACHADO_NO_CANCELAR = (
+    "O evento não foi achado no Google pelo Event ID guardado (pode ter sido apagado de vez ou estar em outro "
+    "calendário). Nada foi marcado e o evento não foi cancelado na agenda. Confira no Google Agenda; se ele não "
+    "existe mais, use Tirar só do Google."
+)
 _MSG_DISJUNTOR_ABERTO = (
     "O Google Agenda falhou várias vezes seguidas; o sistema pausou as chamadas por alguns minutos. "
     "Tente de novo daqui a pouco."
@@ -242,8 +247,12 @@ def _mark_gcal_error(
     dry_run: bool,
     apply_blocked: bool = False,
     pedido: str | None = None,
+    desfaz_cancelado_na_agenda: bool = False,
 ) -> None:
     """Tira a linha de PENDING: marca ERROR com `message` e audita o erro cru.
+
+    `desfaz_cancelado_na_agenda` (CON-08): o Cancelar não escreveu nada no Google, então a marca gravada no pedido
+    sai junto, sob a mesma trava e a mesma guarda do pedido (`details.cancelado_na_agenda_desfeito`).
 
     publish/resync/cancel marcam PENDING antes de enfileirar; se a task sai sem marcar, a linha
     fica PENDING para sempre (publicar some da tela e a edição fica bloqueada). `mark_gcal` não
@@ -271,19 +280,24 @@ def _mark_gcal_error(
             return
         if not _pedido_ainda_vale(s, pedido, Solicitacao.GCalStatus.PENDING):
             return
+        details: dict[str, Any] = {
+            "solicitacao_id": s.id,
+            "operation": operation,
+            "error": raw_error[:500],
+            "dry_run": dry_run,
+            "apply_blocked": apply_blocked,
+            "pedido": pedido,
+        }
+        if desfaz_cancelado_na_agenda:
+            s.cancelado_na_agenda = False
+            s.save(update_fields=["cancelado_na_agenda"])
+            details["cancelado_na_agenda_desfeito"] = True
         s.mark_gcal(status=Solicitacao.GCalStatus.ERROR, payload_hash=None, error=message)
         AuditLog.objects.create(
             usuario=operator,
             action=AuditLog.Action.PUBLISH_GCAL_ERROR,
             model_name="Solicitacao",
-            details={
-                "solicitacao_id": s.id,
-                "operation": operation,
-                "error": raw_error[:500],
-                "dry_run": dry_run,
-                "apply_blocked": apply_blocked,
-                "pedido": pedido,
-            },
+            details=details,
         )
 
 
@@ -706,7 +720,9 @@ def task_cancelar_na_agenda(
     nome de pessoa).
 
     Falha: ERROR pela `_mark_gcal_error` (`operation="cancelar_na_agenda"`), com a marca. Nunca enfileira o
-    `queue_gcal_sync_retry`, que publica: refazer é pedir o Cancelar de novo.
+    `queue_gcal_sync_retry`, que publica: refazer é pedir o Cancelar de novo. Exceção: o id adotado que o Google
+    não acha (`EventoAdotadoNaoAchado`). Nada foi escrito lá e refazer daria o mesmo erro, então a marca sai junto
+    com o ERROR, e o Tirar só do Google volta a ser a saída (revisão da rodada 4).
 
     Entregue de novo depois de uma queda entre o PATCH e o commit, relê o título, acha o marcador e não repete.
     """
@@ -714,6 +730,7 @@ def task_cancelar_na_agenda(
     from django.db import transaction
 
     from apps.core.models import AuditLog, Solicitacao, Usuario
+    from apps.core.services.gcal.sync import EventoAdotadoNaoAchado
     from apps.core.services.gcal_sync_service import marcar_cancelado_no_google
 
     client = None
@@ -787,14 +804,16 @@ def task_cancelar_na_agenda(
             "error": "DoesNotExist",
         }
     except Exception as e:
+        nao_achado = isinstance(e, EventoAdotadoNaoAchado)
         _mark_gcal_error(
             solicitation_id,
-            _friendly_gcal_error(e),
+            _MSG_ADOTADO_NAO_ACHADO_NO_CANCELAR if nao_achado else _friendly_gcal_error(e),
             raw_error=str(e),
             operator=operator,
             operation="cancelar_na_agenda",
             dry_run=False,
             pedido=pedido,
+            desfaz_cancelado_na_agenda=nao_achado,
         )
         return {
             "action": "ERROR",

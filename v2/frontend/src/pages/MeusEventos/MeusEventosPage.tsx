@@ -82,6 +82,13 @@ export default function MeusEventosPage(): JSX.Element {
           <Text type="secondary">
             {`${formatFortaleza(record.inicio, 'HH:mm')} – ${formatFortaleza(record.fim, 'HH:mm')}`}
           </Text>
+          {/* CON-08 B: segue aprovado, mas não vai acontecer. Na coluna da data, que aparece em qualquer largura. */}
+          {record.cancelado_na_agenda && (
+            <>
+              <br />
+              <Tag style={{ marginInlineEnd: 0 }}>Cancelado na agenda</Tag>
+            </>
+          )}
         </>
       ),
     },

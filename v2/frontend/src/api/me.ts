@@ -39,6 +39,8 @@ export interface MeEvent {
   is_online: boolean;
   meet_link: string | null;
   status: 'aprovado' | 'pendente' | 'reprovado';
+  // CON-08 B: o evento segue aprovado, mas foi cancelado na agenda ("(CANCELADO)" no título do Google).
+  cancelado_na_agenda?: boolean;
 }
 
 /**

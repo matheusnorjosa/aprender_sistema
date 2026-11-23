@@ -657,6 +657,62 @@ def test_tarefa_erro_marca_error_e_nao_enfileira_retry(google):
 
 @pytest.mark.django_db
 @pytest.mark.usefixtures("modo_google")
+def test_tarefa_id_adotado_nao_achado_desfaz_a_marca_e_o_tirar_conclui(google, monkeypatch):
+    """Revisão da rodada 4: o Cancelar de evento adotado que o GET não acha (404/410) deixava a linha marcada e sem
+    saída (Cancelar, Tirar, Excluir e edição recusados). Nada foi escrito no Google, então a marca do pedido se
+    desfaz sob a trava: a linha fica em ERROR com o motivo, e o Tirar só do Google conclui, como antes do CON-08."""
+    from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+    from apps.core.tasks import task_cancel_solicitacao_from_gcal, task_cancelar_na_agenda
+
+    s = _formacao(external_event_id=_ADOTADO)
+    contador = _Contador(google)
+    monkeypatch.setattr(_FABRICA, lambda: (contador, CAL))
+    pedido = _pedir(s)
+
+    resultado = task_cancelar_na_agenda(s.pk, pedido=pedido)
+
+    assert resultado["action"] == "ERROR"
+    assert contador.chamadas == [], "nada foi escrito no Google"
+    linha = _linha(s)
+    assert (linha["gcal_status"], linha["cancelado_na_agenda"], linha["external_event_id"]) == (
+        "ERROR",
+        False,
+        _ADOTADO,
+    )
+    assert "Tirar só do Google" in (Solicitacao.objects.get(pk=s.pk).gcal_last_error or "")
+    erro = AuditLog.objects.get(action="PUBLISH_GCAL_ERROR", details__solicitacao_id=s.pk)
+    assert (erro.details["operation"], erro.details["cancelado_na_agenda_desfeito"]) == ("cancelar_na_agenda", True)
+    assert not AuditLog.objects.filter(action="CANCELAR_NA_AGENDA", details__solicitacao_id=s.pk).exists()
+
+    with transaction.atomic():
+        tirar = pedir_operacao_gcal(s.pk, "cancelar")
+    task_cancel_solicitacao_from_gcal(s.pk, pedido=tirar)
+
+    linha = _linha(s)
+    assert (linha["gcal_status"], linha["external_event_id"], linha["cancelado_na_agenda"]) == ("NONE", None, False)
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("modo_google")
+def test_tarefa_erro_de_outro_tipo_nao_desfaz_a_marca(google):
+    """Só o id adotado não achado desfaz a marca: outra falha (aqui, o calendário que a conta não vê) mantém a linha
+    marcada, e refazer o Cancelar é a saída."""
+    from apps.core.tasks import task_cancelar_na_agenda
+
+    s = _formacao(external_event_id=_ADOTADO)
+    pedido = _pedir(s)
+    google.calendar_accessible = lambda _cal: False
+
+    task_cancelar_na_agenda(s.pk, pedido=pedido)
+
+    linha = _linha(s)
+    assert (linha["gcal_status"], linha["cancelado_na_agenda"]) == ("ERROR", True)
+    erro = AuditLog.objects.get(action="PUBLISH_GCAL_ERROR", details__solicitacao_id=s.pk)
+    assert "cancelado_na_agenda_desfeito" not in erro.details
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("modo_google")
 def test_tarefa_de_pedido_superado_nao_faz_nada(google):
     from apps.core.tasks import task_cancelar_na_agenda
 
@@ -936,6 +992,55 @@ class TestExcluir:
         assert _linha(s)["cancelado_na_agenda"] is False
         assert _acoes(s.pk) == []
 
+    @pytest.mark.parametrize("gcal_status", ["PUBLISHED", "ERROR"])
+    def test_linha_ja_cancelada_na_agenda_a_apoio_exclui_sem_marcar_de_novo(
+        self, apoio, gerencia, google, monkeypatch, gcal_status
+    ):
+        """O caminho que Minhas Solicitações manda seguir: a Apoio exclui, em Publicar na agenda, o evento de outra
+        pessoa já cancelado na agenda. PUBLISHED (o Cancelar deu certo) ou ERROR com id (o Cancelar falhou)."""
+        s = _da_gerencia(gerencia, usuario=UsuarioFactory(), gcal_status=gcal_status, cancelado_na_agenda=True)
+        _no_google(google, s, _MARCADO)
+        sol_id, eid = s.pk, s.external_event_id
+        contador = _Contador(google)
+        monkeypatch.setattr(_FABRICA, lambda: (contador, CAL))
+
+        resposta_lista = _api(apoio).get(
+            "/api/solicitacoes/", {"status": "aprovado", "publishable": "true", "page_size": 100}
+        )
+        assert resposta_lista.status_code == 200, resposta_lista.data
+        linha = {item["id"]: item for item in resposta_lista.data["results"]}[sol_id]
+        assert (linha["cancelado_na_agenda"], linha["pode_excluir"]) == (True, True)
+
+        resposta = _api(apoio).delete(f"/api/solicitacoes/{sol_id}/")
+
+        assert resposta.status_code == 204, resposta.data
+        assert not Solicitacao.objects.filter(pk=sol_id).exists()
+        evento = google.get(CAL, eid)
+        assert (evento["summary"], evento["status"]) == (_MARCADO, "confirmed"), "sem marcador duplo, fica no Google"
+        assert "patch_titulo" not in contador.chamadas and "delete" not in contador.chamadas
+        assert _acoes(sol_id) == ["CANCELAR_NA_AGENDA", "DELETE"]
+
+    def test_linha_em_error_marcada_com_titulo_sem_marca_o_excluir_poe_a_marca(
+        self, apoio, gerencia, google, monkeypatch
+    ):
+        """Revisão da rodada 4: o caso realista do Cancelar que falhou (disjuntor, 5xx) é a linha ERROR marcada e o
+        título no Google ainda sem "(CANCELADO)". O Excluir põe a marca que faltou, uma vez, e só então apaga a
+        linha (o caso acima começa com o título já marcado e não prova isso)."""
+        s = _da_gerencia(gerencia, usuario=UsuarioFactory(), gcal_status="ERROR", cancelado_na_agenda=True)
+        _no_google(google, s)
+        sol_id, eid = s.pk, s.external_event_id
+        contador = _Contador(google)
+        monkeypatch.setattr(_FABRICA, lambda: (contador, CAL))
+
+        resposta = _api(apoio).delete(f"/api/solicitacoes/{sol_id}/")
+
+        assert resposta.status_code == 204, resposta.data
+        assert not Solicitacao.objects.filter(pk=sol_id).exists()
+        assert contador.chamadas.count("patch_titulo") == 1 and "delete" not in contador.chamadas
+        evento = google.get(CAL, eid)
+        assert (evento["summary"], evento["status"]) == (_MARCADO, "confirmed")
+        assert _acoes(sol_id) == ["CANCELAR_NA_AGENDA", "DELETE"]
+
     def test_nao_formacao_segue_tirando_do_google(self, apoio, gerencia, google):
         s = _da_gerencia(gerencia, usuario=apoio)
         s.tipo_evento = TipoEventoFactory(nome="Reunião de Alinhamento")
@@ -979,6 +1084,25 @@ def test_o_campo_vem_na_lista():
     por_id = {item["id"]: item for item in itens}
     assert por_id[marcada.pk]["cancelado_na_agenda"] is True
     assert por_id[normal.pk]["cancelado_na_agenda"] is False
+
+
+@pytest.mark.django_db
+def test_meus_eventos_traz_a_marca():
+    """Revisão da rodada 4: o formador vê em Meus Eventos que o evento foi cancelado na agenda (a linha segue
+    aprovada, e antes só o título no Google dizia isso)."""
+    from apps.core.models import Participation
+
+    formador = UsuarioFactory(username="formador_meus_eventos_cancelado", cpf="64000000013")
+    marcada = _formacao(cancelado_na_agenda=True)
+    normal = _formacao()
+    for s in (marcada, normal):
+        Participation.objects.create(solicitacao=s, usuario=formador, role=Participation.Role.FORMADOR)
+
+    resposta = _api(formador).get("/api/me/events/")
+
+    assert resposta.status_code == 200, resposta.data
+    por_id = {item["id"]: item for item in resposta.data["results"]}
+    assert (por_id[marcada.pk]["cancelado_na_agenda"], por_id[normal.pk]["cancelado_na_agenda"]) == (True, False)
 
 
 @pytest.mark.django_db

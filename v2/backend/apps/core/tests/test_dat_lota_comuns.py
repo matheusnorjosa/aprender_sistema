@@ -278,6 +278,24 @@ class TestDatRecebe400:
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
         assert "própria" in str(_erros(resp)["gerencia_id"])
 
+    def test_propria_conta_reenviando_os_mesmos_grupos_salva_o_cadastro(self, dat):
+        # LIB-64 (23/11/2026): reenviar os grupos que já tem não é mexer neles; a lotação segue travada.
+        vinculo = EquipeGerencia.vigentes_em().get(usuario=dat)
+        ids = list(dat.groups.values_list("pk", flat=True))
+        resp = _patch(dat, dat, {"first_name": "Nome Novo", "group_ids": ids, "gerencia_id": vinculo.gerencia_id})
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        dat.refresh_from_db()
+        assert dat.first_name == "Nome Novo"
+        assert set(dat.groups.values_list("pk", flat=True)) == set(ids)
+        assert _vigentes(dat) == {(vinculo.gerencia_id, vinculo.papel)}
+
+    def test_propria_conta_dar_funcao_a_si_mesmo(self, dat):
+        ids = [*dat.groups.values_list("pk", flat=True), _grupo("Formador").pk]
+        resp = _patch(dat, dat, {"group_ids": ids})
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert "próprios grupos" in str(_erros(resp)["group_ids"])
+        assert not dat.groups.filter(name="Formador").exists()
+
     @pytest.mark.parametrize("nome", ["Superintendência", "DAT", "Assistente Administrativo"])
     def test_grupo_que_nao_e_de_funcao_com_papel(self, dat, comum, nome):
         alvo = UsuarioFactory()

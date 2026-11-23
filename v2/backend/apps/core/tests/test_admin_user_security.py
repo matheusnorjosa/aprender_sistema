@@ -14,11 +14,11 @@ Valida hardening do serializer de admin de usuários:
 from __future__ import annotations
 
 from django.test import TestCase
-from rest_framework.test import APIRequestFactory
+from rest_framework.test import APIClient, APIRequestFactory
 
 import pytest
 
-from apps.core.models import PermissaoFuncional
+from apps.core.models import AuditLog, PermissaoFuncional
 from apps.core.serializers import UsuarioAdminSerializer
 from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
@@ -445,3 +445,75 @@ class AdminUserSecurityTests(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn("is_active", serializer.errors)
         self.assertIn("último superusuário ativo", str(serializer.errors["is_active"]))
+
+
+# LIB-64 (23/11/2026): o superusuário editou a própria conta só para mudar o nome e recebeu "Você não pode
+# modificar seus próprios grupos": o form reenvia as funções em todo salvar. A trava vale para o conjunto
+# FINAL de grupos (`grupos_resultantes`), não para o envio.
+
+
+def _patch_admin(ator, alvo, payload):
+    client = APIClient()
+    client.force_authenticate(ator)
+    return client.patch(f"/api/usuarios-admin/{alvo.id}/", payload, format="json")
+
+
+def _assign_groups_auditados(alvo):
+    return AuditLog.objects.filter(action=AuditLog.Action.ASSIGN_GROUPS, details__target_user_id=alvo.pk)
+
+
+@pytest.mark.django_db
+class TestPropriaConta:
+    @pytest.fixture
+    def root(self):
+        user = UsuarioFactory(superuser=True)
+        user.groups.set([GroupFactory(name="Formador"), GroupFactory(name="Controle")])
+        return user
+
+    def _grupos(self, user):
+        return set(user.groups.values_list("name", flat=True))
+
+    def test_muda_so_o_nome_reenviando_as_funcoes(self, root):
+        formador = GroupFactory(name="Formador")
+        resp = _patch_admin(root, root, {"first_name": "Nome Novo", "group_ids": [formador.id], "gerencia_id": None})
+        assert resp.status_code == 200, resp.data
+        root.refresh_from_db()
+        assert root.first_name == "Nome Novo"
+        assert self._grupos(root) == {"Formador", "Controle"}
+        assert not _assign_groups_auditados(root).exists()
+
+    def test_reenviar_grupo_que_nao_e_funcao_e_ja_tem(self, root):
+        ids = [GroupFactory(name="Formador").id, GroupFactory(name="Controle").id]
+        resp = _patch_admin(root, root, {"first_name": "Outro", "group_ids": ids})
+        assert resp.status_code == 200, resp.data
+        assert self._grupos(root) == {"Formador", "Controle"}
+        assert not _assign_groups_auditados(root).exists()
+
+    @pytest.mark.parametrize(
+        "enviados",
+        [["Coordenador"], [], ["Formador", "Coordenador"], ["Formador", "DAT"]],
+        ids=["troca-funcao", "tira-funcao", "da-funcao", "da-grupo-nao-funcao"],
+    )
+    def test_mudar_os_proprios_grupos_continua_recusado(self, root, enviados):
+        ids = [GroupFactory(name=nome).id for nome in enviados]
+        resp = _patch_admin(root, root, {"first_name": "Nome Novo", "group_ids": ids})
+        assert resp.status_code == 400
+        assert "não pode modificar seus próprios grupos" in str(resp.data)
+        root.refresh_from_db()
+        assert root.first_name != "Nome Novo"
+        assert self._grupos(root) == {"Formador", "Controle"}
+        assert not _assign_groups_auditados(root).exists()
+
+    def test_outro_superusuario_muda_as_funcoes_como_antes(self, root):
+        outro = UsuarioFactory(superuser=True)
+        resp = _patch_admin(outro, root, {"group_ids": [GroupFactory(name="Coordenador").id]})
+        assert resp.status_code == 200, resp.data
+        assert self._grupos(root) == {"Coordenador", "Controle"}
+        assert _assign_groups_auditados(root).exists()
+
+    def test_o_proprio_privilegio_de_superusuario_continua_travado(self, root):
+        resp = _patch_admin(root, root, {"is_superuser": False, "group_ids": [GroupFactory(name="Formador").id]})
+        assert resp.status_code == 400
+        assert "próprio privilégio" in str(resp.data)
+        root.refresh_from_db()
+        assert root.is_superuser

@@ -436,7 +436,8 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
         Payload: {"group_ids": [1, 2, 3]}
 
         Security (Issue #561 C-04):
-        - Users cannot modify their own groups (self-modification blocked)
+        - Users cannot modify their own groups (self-modification blocked); LIB-64 (23/11/2026): reenviar
+          para si mesmo exatamente os grupos que já tem é no-op (200, sem auditoria)
         - Only groups in ALLOWED_USER_GROUPS whitelist can be assigned
         - Reuses validation logic from UsuarioAdminSerializer (P1.1)
 
@@ -445,13 +446,6 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
         """
         usuario = self.get_object()
         group_ids = request.data.get("group_ids", [])
-
-        # Security (C-04): Block self-modification of groups
-        if usuario.id == request.user.id:
-            return Response(
-                {"error": "Você não pode modificar seus próprios grupos."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
 
         # Validar tipo de dados
         if not isinstance(group_ids, list):
@@ -471,6 +465,15 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
 
         # Remover duplicados
         group_ids = list(set(group_ids))
+
+        # Security (C-04): Block self-modification of groups. LIB-64: os mesmos grupos não são modificação.
+        if usuario.id == request.user.id:
+            if set(group_ids) != set(usuario.groups.values_list("id", flat=True)):
+                return Response(
+                    {"error": "Você não pode modificar seus próprios grupos."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            return Response(self.get_serializer(usuario).data, status=status.HTTP_200_OK)
 
         # PERF-SQL-05: single query instead of count() + values_list()
         groups = Group.objects.filter(id__in=group_ids)

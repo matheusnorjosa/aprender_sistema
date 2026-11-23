@@ -16,7 +16,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import PermissaoFuncional
+from apps.core.models import AuditLog, PermissaoFuncional
 from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 
@@ -242,6 +242,42 @@ class TestAssignGroups:
 
         assert response.status_code == 403
         assert "próprios grupos" in response.data["error"]
+
+    def test_assign_groups_self_same_groups_is_noop(self, api_client, usuario_dat):
+        """LIB-64 (23/11/2026): reenviar os MESMOS grupos para si mesmo não muda nada; 200 sem auditoria."""
+        formador = GroupFactory(name="Formador")
+        controle = GroupFactory(name="Controle")
+        usuario_dat.groups.set([formador, controle])
+        api_client.force_authenticate(usuario_dat)
+
+        response = api_client.post(
+            f"/api/usuarios-admin/{usuario_dat.id}/assign_groups/",
+            {"group_ids": [controle.id, formador.id, formador.id]},
+            format="json",
+        )
+
+        assert response.status_code == 200, response.data
+        assert set(usuario_dat.groups.values_list("name", flat=True)) == {"Formador", "Controle"}
+        assert not AuditLog.objects.filter(
+            action=AuditLog.Action.ASSIGN_GROUPS, details__target_user_id=usuario_dat.pk
+        ).exists()
+
+    def test_assign_groups_self_removing_a_group_blocked(self, api_client, usuario_dat):
+        """LIB-64: tirar um grupo de si mesmo continua 403 (mudar o conjunto é que é proibido)."""
+        formador = GroupFactory(name="Formador")
+        controle = GroupFactory(name="Controle")
+        usuario_dat.groups.set([formador, controle])
+        api_client.force_authenticate(usuario_dat)
+
+        response = api_client.post(
+            f"/api/usuarios-admin/{usuario_dat.id}/assign_groups/",
+            {"group_ids": [formador.id]},
+            format="json",
+        )
+
+        assert response.status_code == 403
+        assert "próprios grupos" in response.data["error"]
+        assert set(usuario_dat.groups.values_list("name", flat=True)) == {"Formador", "Controle"}
 
     def test_assign_groups_whitelist_validation(self, api_client, usuario_dat, usuario_formador):
         """

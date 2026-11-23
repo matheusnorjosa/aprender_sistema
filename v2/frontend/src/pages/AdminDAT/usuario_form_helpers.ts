@@ -57,6 +57,11 @@ export interface BuildPayloadOptions {
    * vazias; mandar `group_ids` tiraria todas as funções (e a aprovação) por falha de carga.
    */
   funcoesCarregadas?: boolean;
+  /**
+   * LIB-64 (23/11/2026): editando a própria conta. As funções ficam travadas na tela (só outro superusuário as
+   * altera) e o salvar não manda `group_ids`; o backend recusa só se o conjunto final de grupos mudar.
+   */
+  propriaConta?: boolean;
 }
 
 /**
@@ -77,7 +82,14 @@ export function buildUsuarioPayload(
 ): Record<string, unknown> {
   const { funcao_ids = [], gerencia_id, equipe_administrativa, is_superuser, cpf, username: _login, email, ...rest } =
     values;
-  const { isEditing, cpfEditUnlocked, currentIsSuperuser, lotaComum = false, funcoesCarregadas = true } = options;
+  const {
+    isEditing,
+    cpfEditUnlocked,
+    currentIsSuperuser,
+    lotaComum = false,
+    funcoesCarregadas = true,
+    propriaConta = false,
+  } = options;
   const editaLotacao = (currentIsSuperuser || lotaComum) && funcoesCarregadas;
 
   // CPF: incluir se create OU se edit+unlocked com valor preenchido
@@ -91,7 +103,8 @@ export function buildUsuarioPayload(
   // superuser e, desde 17/10/2026, do DAT que lota nas gerências comuns (`lotaComum`).
   // Fora disso o editor não-superuser NÃO envia group_ids (cadastral/senha/ativo só).
   // Só as FUNÇÕES — o grupo de setor é auto-atribuído pelo backend a partir da Gerência.
-  const groupsPayload = editaLotacao ? { group_ids: [...funcao_ids] } : {};
+  // Na própria conta as funções não mudam (campo travado): não vão (LIB-64).
+  const groupsPayload = editaLotacao && !propriaConta ? { group_ids: [...funcao_ids] } : {};
 
   // gerencia_id (lotação): mesmo gate. O backend cria/sincroniza
   // o vínculo EquipeGerencia; null = não altera o vínculo existente.

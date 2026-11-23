@@ -1,16 +1,19 @@
 """Evento de formação e o Nº da formação (CON-09, plano aprovado pelo dono em 23/11/2026).
 
 Evento de formação é o de tipo Presencial, Online ou Workshop, pelo nome sem acento e sem maiúscula. É a
-definição única: nenhum outro lugar compara nome de tipo. O nome conta porque é ele que vai ao título do
-evento no Google ("EF - Presencial"), e é pelo título que o DFF lê a formação.
+definição única: nenhum outro lugar decide se o tipo é de formação. O nome do tipo é lido em outros pontos, para
+outro fim: o título do Google trata "Acompanhamento" à parte (`gcal/payload.py`) e o comando de dev
+`backfill_is_online` deduz a modalidade pelo nome. Quem renomear um tipo confere os três. O nome conta porque é
+ele que vai ao título do evento no Google ("EF - Presencial"), e é pelo título que o DFF lê a formação.
 
 O Nº da formação (`Solicitacao.encontro`) do evento de formação é só o número, de 1 a 999. Aceita "3º", "3°",
 "03" e espaço nas pontas e guarda "3" (o título põe o "º"). Só algarismos comuns: "²" ou o "3" de largura cheia
 quebrariam a leitura do título. Tipo que não é de formação segue com o campo livre.
 
-Quem usa: o serializer (criar, criar em lote e editar evento que ainda não terminou), `motivo_nao_publicavel`
-(Publicar, Reenviar e Reaplicar), o lookup de tipos e o detalhe do evento (a marca para a tela) e a carga
-export-contract (lista no ensaio, sem barrar).
+Quem usa: o serializer (criar, criar em lote e editar evento que ainda não terminou; a marca e a falta do número
+para a tela), `motivo_nao_publicavel` (Publicar, Reenviar e Reaplicar), a guarda do CREATE no `upsert_one` (por
+onde passam o `preagenda_to_gcal` e o auto-apply), o lookup de tipos e a carga export-contract (lista no ensaio,
+sem barrar).
 """
 
 from __future__ import annotations

@@ -1555,6 +1555,35 @@ def test_con09_formacao_sem_numero_vai_para_a_lista_e_entra(tmp_path, m, modo):
     assert numeros["EVCOM"] == "3", "o número do evento de formação entra só com algarismos"
 
 
+@pytest.mark.parametrize("modo", ["create-only", "virada"])
+def test_con09_evento_que_ja_existe_fica_fora_da_lista(tmp_path, m, modo):
+    """Decisão 7: a carga não muda o `encontro` de evento que já existe, então corrigir na planilha não teria
+    efeito; ele não entra na lista. Vale também para o achado pelo id antigo (`evento_ids_anteriores`)."""
+    existe = _existente(m, "EVEXI")
+    velho = _existente(m, "EVVELHO", horas=(13, 15))
+    presencial = TipoEventoFactory(nome="Presencial")
+    Solicitacao.objects.filter(pk__in=[existe.pk, velho.pk]).update(tipo_evento=presencial)
+    linhas = [
+        *_linhas_con09(),
+        _sol(evento_id="EVEXI", tipo_evento="Presencial"),
+        _sol(
+            evento_id="EVNOVO",
+            tipo_evento="Presencial",
+            hora_inicio="13:00",
+            hora_fim="15:00",
+            evento_ids_anteriores='["EVVELHO"]',
+        ),
+    ]
+    path = _export(tmp_path, linhas)
+    tally = ExportContractImporter(path=path, mode=modo).run()["por_entidade"]["solicitacao"]
+    assert tally["formacao_sem_numero_eventos"] == ["EVSEM", "EVTXT"]
+    assert tally["formacao_sem_numero"] == 2
+    ExportContractImporter(path=path, mode=modo, apply=True, allow=("solicitacao", "participation")).run()
+    existe.refresh_from_db()
+    velho.refresh_from_db()
+    assert existe.encontro is None and velho.encontro is None
+
+
 def test_con09_comando_em_texto_mostra_a_lista(tmp_path, m):
     TipoEventoFactory(nome="Presencial")
     out = io.StringIO()

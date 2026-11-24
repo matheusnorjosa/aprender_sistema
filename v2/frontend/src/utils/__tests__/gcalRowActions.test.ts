@@ -117,7 +117,8 @@ describe('motivoNaoPublicavel', () => {
 describe('gcalRowActions — cancelar evento de formação', () => {
   test.each<[GCalStatus, string | null, GcalRowAction[]]>([
     ['PUBLISHED', 'asv27', ['atualizar', 'remover', 'cancelar']],
-    ['PUBLISHED', null, ['atualizar', 'cancelar']],
+    // Sem id, nem Remover nem Cancelar (como a Pré-agenda): um Cancelar que falhasse deixaria ERROR sem id, sem refazer.
+    ['PUBLISHED', null, ['atualizar']],
     ['ERROR', 'asv27', ['atualizar', 'remover', 'cancelar']],
     ['ERROR', null, ['tentar']],
     ['NONE', null, ['publicar']],

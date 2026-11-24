@@ -341,7 +341,7 @@ curl -s http://localhost:8000/api/availability-blocks/ -b cookies.txt | jq
 
 ## Google Calendar
 
-As acoes por solicitacao (preview-gcal, publish, resync-gcal, cancel-gcal) exigem a policy
+As acoes por solicitacao (preview-gcal, publish, resync-gcal, cancel-gcal, cancelar-na-agenda) exigem a policy
 `use_gcal` (`CanUseGcal`) OU `publish_setor_solicitacao` (`CanPublishSetorSolicitacao`, a Apoio
 escopada pela gerencia); o preview tambem aceita quem aprova (`CanAccessSolicitationApprovals`).
 O publish-batch exige so `use_gcal`.
@@ -373,8 +373,10 @@ Resposta **202 Accepted** (processamento via Celery):
 `{"detail": "...", "task_id": "...", "solicitacao_id": 123}`.
 
 Relacionadas, mesmo contrato 202:
-`POST /api/solicitacoes/{id}/resync-gcal/` e
-`POST /api/solicitacoes/{id}/cancel-gcal/`.
+`POST /api/solicitacoes/{id}/resync-gcal/`,
+`POST /api/solicitacoes/{id}/cancel-gcal/` e
+`POST /api/solicitacoes/{id}/cancelar-na-agenda/` (so evento de formacao: o titulo no Google ganha
+`(CANCELADO) `; 409 `nao_e_evento_de_formacao`).
 
 ### Publicar em Lote
 

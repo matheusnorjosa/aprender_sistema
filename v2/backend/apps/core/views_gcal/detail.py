@@ -145,6 +145,8 @@ class DashboardEventsExportView(APIView):
                 "meet_link",
                 "gcal_payload_hash",
                 "updated_at",
+                # CON-08: a linha cancelada na agenda segue PUBLISHED; a coluna fica no fim para não reordenar.
+                "cancelado_na_agenda",
             ]
         )
 
@@ -174,6 +176,7 @@ class DashboardEventsExportView(APIView):
                     s.meet_link or "",
                     s.gcal_payload_hash or "",
                     s.updated_at.isoformat() if s.updated_at else "",
+                    "sim" if s.cancelado_na_agenda else "não",
                 ]
             )
 

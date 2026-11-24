@@ -143,6 +143,22 @@ describe('PreAgendaPage — Cancelar evento de formação (CON-08)', { timeout: 
     expect(within(russas).queryByLabelText(REMOVER)).not.toBeInTheDocument();
   });
 
+  test('refazer o Cancelar da linha marcada não depende de o tipo ainda ser de formação (tipo renomeado)', async () => {
+    mockRows([
+      row({ id: 7, municipio_nome: 'Quixadá', gcal_status: 'ERROR', tipo_evento_de_formacao: false, cancelado_na_agenda: true }),
+    ]);
+    renderComo(DAT);
+    expect(within(await linha('Quixadá')).getByLabelText(CANCELAR)).toBeInTheDocument();
+  });
+
+  test('os dois botões vermelhos de ícone dizem o que fazem ao passar o mouse', async () => {
+    mockRows([row({ id: 8, municipio_nome: 'Tauá', tipo_evento_de_formacao: true })]);
+    renderComo(DAT);
+    const taua = await linha('Tauá');
+    expect(within(taua).getByLabelText(CANCELAR)).toHaveAttribute('title', 'Cancelar evento');
+    expect(within(taua).getByLabelText(REMOVER)).toHaveAttribute('title', 'Remover do Google Agenda');
+  });
+
   test('a confirmação cita o evento, explica o (CANCELADO) e chama o endpoint novo', async () => {
     const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
     mockRows([row({ id: 5, municipio_nome: 'Aracati', tipo_evento_de_formacao: true })]);
@@ -152,6 +168,7 @@ describe('PreAgendaPage — Cancelar evento de formação (CON-08)', { timeout: 
     confirmar.mockRestore();
     expect(String(config.title)).toMatch(/^Cancelar evento: .*Aracati/);
     expect(config.okText).toBe('Sim, cancelar evento');
+    expect(config.cancelText).toBe('Voltar');
     expect(config.autoFocusButton).toBe('cancel');
     render(<>{config.content}</>);
     expect(screen.getByText(/ganha \(CANCELADO\) na frente/)).toBeInTheDocument();

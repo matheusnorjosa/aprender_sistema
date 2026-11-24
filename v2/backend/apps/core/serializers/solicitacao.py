@@ -411,7 +411,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
            usa o valor atual da instância para validar o intervalo.
         2. Bloqueia edição de solicitações já publicadas no Google Calendar
            (gcal_status == 'PUBLISHED') para evitar drift, e das que estão lá pela planilha
-           (`publicado_fora_do_sistema`, mesma regra).
+           (`publicado_fora_do_sistema`, mesma regra). A cancelada na agenda (`cancelado_na_agenda`,
+           CON-08) não se edita em estado nenhum, nem em ERROR.
         3. Bloqueia edição de solicitações reprovadas.
         4. Confere a compra que libera o par município+projeto (regra única em
            `services/compra_elegibilidade`) na criação e quando o VALOR de município ou de

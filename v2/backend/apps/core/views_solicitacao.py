@@ -68,7 +68,6 @@ from .services.solicitacao_exclusao import (
 from .services.solicitacao_projetos import ids_dos_projetos, q_tem_projeto
 from .services.solicitacao_publish import MSG_LINHA_OCUPADA, cancel_from_gcal
 from .services.solicitacao_publish import cancelar_na_agenda as cancelar_na_agenda_service
-from .services.solicitacao_publish import excluir_marca_cancelado
 from .services.solicitacao_publish import preview_gcal as preview_gcal_service
 from .services.solicitacao_publish import publish_to_gcal, remover_do_google_agora, resync_to_gcal
 from .services.solicitacao_scope import (
@@ -1345,13 +1344,17 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         removido_do_google: dict[str, Any] = {}
         aviso: str | None = None
         if no_google:
-            marca = excluir_marca_cancelado(instance)
-            external_event_id, nao_achado = remover_do_google_agora(instance, self.request.user)
-            removido_do_google = {
-                "cancelado_na_agenda" if marca else "removido_do_google": True,
-                "external_event_id": external_event_id,
-            }
-            if nao_achado:
+            external_event_id, resultado = remover_do_google_agora(instance, self.request.user)
+            if resultado is None:
+                removido_do_google = {"removido_do_google": True, "external_event_id": external_event_id}
+            else:
+                # O evento fica no Google com "(CANCELADO) "; no "já saiu" ele não está mais lá e nada foi marcado.
+                removido_do_google = {
+                    "cancelado_na_agenda": resultado != "ja_saiu",
+                    "resultado": resultado,
+                    "external_event_id": external_event_id,
+                }
+            if resultado == "nao_achado":
                 # P5 (decisão do dono, 24/11/2026): linha já cancelada na agenda cujo evento sumiu do Google.
                 removido_do_google["evento_nao_achado_no_google"] = True
                 aviso = _AVISO_EVENTO_NAO_ACHADO_NO_GOOGLE
@@ -1381,7 +1384,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             # As checagens acima leram `instance` sem lock: uma publicação ou reenvio concorrente pode
             # ter posto o evento no Google desde então (a task trava a linha enquanto fala com o Google).
-            # A linha cancelada na agenda guarda o id de propósito (o evento ficou no Google, marcado): sai.
+            # A linha cancelada na agenda guarda o id de propósito (o evento ficou no Google, marcado): sai, mas só
+            # quando o remover rodou nesta requisição e pôs (ou conferiu) a marca. Marcada sem ele é linha que
+            # alguém publicou e cancelou depois da checagem: o título pode estar sem a marca, então recusa.
+            # Depois do remover, PENDING só pode ser um Cancelar concorrente, que acharia o título já marcado.
             # Desvincular antes daria a janela em que um Publicar adotaria o `asv2{id}` e tiraria a marca.
             atual = (
                 Solicitacao.objects.select_for_update()
@@ -1389,7 +1395,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 .values_list("gcal_status", "external_event_id", "cancelado_na_agenda")
                 .first()
             )
-            if atual is not None and not atual[2] and (atual[0] != "NONE" or atual[1]):
+            aceita_marcada = no_google and atual is not None and atual[2]
+            if atual is not None and not aceita_marcada and (atual[0] != "NONE" or atual[1]):
                 raise ValidationError(
                     {
                         "detail": "O evento mudou no Google Agenda enquanto você excluía (alguém publicou ou "

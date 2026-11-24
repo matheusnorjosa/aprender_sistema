@@ -637,10 +637,15 @@ outcome = cancel_solicitacao(solicitacao)
    - **Modal.confirm**: Warning (okType: 'warning')
    - **Ação**: Chama `resyncSolicitacao(id)` → message.success → reload
 
-2. **Botão "Cancelar"** (ícone: `StopOutlined`, cor: vermelho)
-   - **Visível quando**: `gcal_status === 'PUBLISHED' && external_event_id`
+2. **Botão "Remover do Google Agenda"** (ícone: `StopOutlined`, cor: vermelho; `title` com o mesmo texto)
+   - **Visível quando**: `gcal_status === 'PUBLISHED' && external_event_id`, fora da linha cancelada na agenda
    - **Modal.confirm**: Danger (okType: 'danger')
    - **Ação**: Chama `cancelSolicitacao(id)` → message.success → reload
+
+3. **Botão "Cancelar evento"** (CON-08 B; ícone: `CloseCircleOutlined`, cor: vermelho; `title` "Cancelar evento")
+   - **Visível quando**: `external_event_id` e, ou evento de formação `PUBLISHED` ainda não cancelado, ou linha já cancelada na agenda em `ERROR` (refazer o que falhou, mesmo com o tipo renomeado)
+   - **Modal.confirm**: Danger, "Sim, cancelar evento" e "Voltar" para desistir
+   - **Ação**: Chama `cancelarNaAgenda(id)` (`POST /cancelar-na-agenda/`) → message.success → reload
 
 **Exemplo de uso**:
 ```jsx
@@ -660,8 +665,9 @@ outcome = cancel_solicitacao(solicitacao)
     size="small"
     danger
     icon={<StopOutlined />}
-    onClick={() => handleCancel(record.id)}
-    title="Cancelar evento no Calendar"
+    onClick={() => handleCancel(record)}
+    aria-label={`Remover do Google Agenda: ${rotuloDoEvento(record)}`}
+    title="Remover do Google Agenda"
   />
 )}
 ```

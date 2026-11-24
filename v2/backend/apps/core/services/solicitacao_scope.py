@@ -244,10 +244,10 @@ class EscritaEmSolicitacao:
 
 
 def can_publish_solicitacao(user: Any, obj: Any) -> bool:
-    """True sse `user` pode publicar/prever/resincronizar/cancelar o evento GCal `obj`.
+    """True sse `user` pode publicar/prever/resincronizar/tirar do Google/cancelar na agenda o evento GCal `obj`.
 
-    Guarda de OBJETO das 4 @actions GCal (#1656 Feature 2). Separa "publicabilidade"
-    de "visibilidade": o `scope_solicitacoes` deixa a Apoio VER as próprias (qualquer
+    Guarda de OBJETO das 5 @actions GCal (#1656 Feature 2; `cancelar-na-agenda` desde o CON-08). Separa
+    "publicabilidade" de "visibilidade": o `scope_solicitacoes` deixa a Apoio VER as próprias (qualquer
     status) + as APROVADAS da gerência; mas PUBLICAR exige que o evento seja de uma gerência
     onde ela é APOIO, inclusive o próprio.
 
@@ -268,7 +268,7 @@ def _publish_tier(user: Any) -> tuple[bool, frozenset[int]]:
     """(global?, gerências de APOIO) de quem publica no GCal — SSOT da guarda de objeto e da lista.
 
     `can_publish_solicitacao` (objeto) e `scope_publishable_solicitacoes` (lista) leem
-    daqui, então a lista nunca mostra evento que as 4 ações recusariam.
+    daqui, então a lista nunca mostra evento que as 5 ações recusariam.
     """
     if not user or not getattr(user, "is_authenticated", False):
         return False, frozenset()

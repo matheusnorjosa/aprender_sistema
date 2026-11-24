@@ -309,11 +309,12 @@ def _mark_gcal_error(
 _FALHAS_DE_BANCO_QUE_REPETEM = (OperationalError, InterfaceError)
 
 
-# ISS-1970: publicar e cancelar só confirmam a mensagem depois de terminar (`acks_late`), e o processo do
-# worker que morre no meio a devolve à fila na hora (`reject_on_worker_lost`). Se o servidor inteiro cai, a
-# mensagem volta quando vence o prazo do Redis (`visibility_timeout`, 1 h). Só nestas duas, que têm a guarda
-# do pedido: a segunda entrega não regrava o que já foi gravado; se o processo morreu entre a escrita no Google
-# e o commit, ela escreve de novo no mesmo evento (sem duplicar; o e-mail pode se repetir). Global segue desligado.
+# ISS-1970: publicar, cancelar e cancelar na agenda (CON-08) só confirmam a mensagem depois de terminar
+# (`acks_late`), e o processo do worker que morre no meio a devolve à fila na hora (`reject_on_worker_lost`). Se o
+# servidor inteiro cai, a mensagem volta quando vence o prazo do Redis (`visibility_timeout`, 1 h). Só nestas três,
+# que têm a guarda do pedido: a segunda entrega não regrava o que já foi gravado; se o processo morreu entre a
+# escrita no Google e o commit, ela escreve de novo no mesmo evento (sem duplicar; o e-mail pode se repetir; no
+# cancelar na agenda, o título já marcado dá SKIP). Global segue desligado.
 @shared_task(
     name="apps.core.tasks.task_publish_solicitacao_to_gcal",
     autoretry_for=_FALHAS_DE_BANCO_QUE_REPETEM,

@@ -1087,6 +1087,9 @@ describe('PublicacaoSetorPage — cancelar evento de formação', { timeout: 200
     expect(dialogo).toHaveAccessibleName('Cancelar o evento na agenda: Vidas Em Rede, 10/10/2099 09:00?');
     expect(dialogo).toHaveTextContent('(CANCELADO)');
     expect(dialogo).toHaveTextContent('não se edita nem se publica de novo');
+    // Desistir é "Voltar": "Cancelar" ao lado de "Sim, cancelar evento" confunde.
+    expect(within(dialogo).getByRole('button', { name: 'Voltar' })).toBeInTheDocument();
+    expect(within(dialogo).queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument();
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Sim, cancelar evento' }));
 
     await waitFor(() => expect(actionCalls()).toHaveLength(1));
@@ -1097,6 +1100,15 @@ describe('PublicacaoSetorPage — cancelar evento de formação', { timeout: 200
     expect(message.success).toHaveBeenCalledWith(
       'Pedido enviado: o título do evento no Google Agenda ganha (CANCELADO) em alguns segundos.',
     );
+  });
+
+  test('formação PUBLISHED sem o id do Google: sem Cancelar evento, como sem Tirar (igual à Pré-agenda)', async () => {
+    listResponse = pageOf([makeSolic({ ...FORMACAO, external_event_id: null })]);
+    renderPage();
+
+    await screen.findByLabelText(/^Atualizar no Google: Vidas Em Rede/);
+    expect(screen.queryByLabelText(/^Cancelar evento:/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Tirar só do Google:/)).not.toBeInTheDocument();
   });
 
   test('evento que não é de formação não tem Cancelar evento', async () => {

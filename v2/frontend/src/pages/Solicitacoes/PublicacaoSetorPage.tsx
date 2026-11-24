@@ -98,6 +98,8 @@ interface ActionConfig {
   confirmTitle: string;
   confirmDescription: string;
   okText: string;
+  /** Botão de desistir do diálogo; "Cancelar" quando falta. */
+  cancelText?: string;
   danger: boolean;
   successText: string;
   run: (id: ID) => Promise<unknown>;
@@ -157,6 +159,7 @@ const ACTIONS: Record<GcalRowAction, ActionConfig> = {
       'O título do evento no Google Agenda ganha (CANCELADO) na frente e o evento continua lá, sem e-mail aos ' +
       'convidados. Depois disso ele não se edita nem se publica de novo. Não dá para desfazer.',
     okText: 'Sim, cancelar evento',
+    cancelText: 'Voltar', // "Cancelar" ao lado de "Sim, cancelar evento" confunde
     danger: true,
     successText: 'Pedido enviado: o título do evento no Google Agenda ganha (CANCELADO) em alguns segundos.',
     run: (id) => cancelarNaAgenda(id),
@@ -348,7 +351,7 @@ export default function PublicacaoSetorPage(): JSX.Element {
       content: config.confirmDescription,
       okText: config.okText,
       okButtonProps: { danger: config.danger },
-      cancelText: 'Cancelar',
+      cancelText: config.cancelText ?? 'Cancelar',
       autoFocusButton: 'cancel',
       onOk: () => runAction(row, action),
     });

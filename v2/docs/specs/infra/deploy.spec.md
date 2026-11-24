@@ -1,7 +1,7 @@
 ---
 title: Deploy & Produção (spec)
 status: canonical
-last_verified: 2026-11-23
+last_verified: 2026-11-24
 verified_at_commit: 247b74c4cee914c9085019e84780acf2d4905503
 sources_of_truth:
   - v2/infra/docker-compose.prod.yml
@@ -152,7 +152,7 @@ cache (`/0`), Celery broker (`/1`) e sessões (`SESSION_ENGINE=cache`) usam esse
 re-login + perda de tasks Celery em voo) é irrelevante pré-go-live e aceitável no volume previsto.
 Desde o DEF-32 (19/11/2026) a perda não vale mais para publicar e cancelar no Google
 (`task_publish_solicitacao_to_gcal` e `task_cancel_solicitacao_from_gcal`, com `acks_late` e
-`reject_on_worker_lost`): a tarefa interrompida volta sozinha à fila, na hora se só o processo do worker morre e
+`reject_on_worker_lost`; desde o CON-08 B também `task_cancelar_na_agenda`): a tarefa interrompida volta sozinha à fila, na hora se só o processo do worker morre e
 em até 1 hora (o `visibility_timeout` do Redis) se o servidor inteiro é derrubado. A segunda entrega não regrava
 o que já foi gravado; se o processo morreu entre a escrita no Google e o commit, ela escreve de novo no mesmo
 evento (sem duplicar; com `GCAL_SEND_UPDATES` diferente de `none`, o e-mail pode se repetir). Na troca de versão,
@@ -173,6 +173,15 @@ em `PENDING`» de [`gcal.spec.md`](../backend/gcal.spec.md) («Pedido de operaç
 [`GUIDE_GCAL.md`](../../GUIDE_GCAL.md) («Evento parado em *Publicando…*»). A regra tem exceções e um ramo para
 evento passado; não decidir por resumo. O `stop_grace_period` do worker fica como ajuste manual pendente do dono: com ele, quase toda promoção
 vira desligamento educado, em que a tarefa termina antes de o worker parar; sem ele, a tarefa interrompida pela promoção só volta depois de até 1 hora (na primeira promoção do DEF-32, não volta).
+
+**Volta para uma tag anterior ao CON-08 B** (migração 0139, `cancelado_na_agenda`). A versão antiga não conhece a
+marca: a linha cancelada na agenda volta a ser publicável, reenviável, tirável do Google e editável, e qualquer
+dessas ações tira o `(CANCELADO) ` do título (ou o evento da agenda). A coluna fica no banco (`DEFAULT false`),
+então a versão antiga sobe, mas não a lê. Antes de voltar: as mesmas contagens da fila acima em zero e nenhuma
+linha `PENDING` (a mensagem de `task_cancelar_na_agenda` não existe na versão antiga). Enquanto durar a volta,
+as linhas com `cancelado_na_agenda=True` não se publicam, reenviam, reaplicam, tiram do Google nem editam, até
+o reavanço. Para listá-las antes de promover: `Solicitacao.objects.filter(cancelado_na_agenda=True)
+.values_list("id", "gcal_status")` no shell (só ids e estado, sem título).
 
 **Docs de topologia reconciliados (Fase 2 concluída):** `v2/infra/ENVIRONMENTS.md`, `v2/infra/README.md` e
 `.claude/CLAUDE.md` (tabela prod) descrevem o Redis como **container interno na VM01** (serviço `redis`),

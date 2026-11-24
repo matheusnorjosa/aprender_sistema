@@ -157,4 +157,19 @@ describe('GCalDashboardPage — cancelamento na agenda na linha do tempo', { tim
     expect(screen.queryByText('Removido do Google')).not.toBeInTheDocument();
     expect(screen.queryByText('Registro do Google')).not.toBeInTheDocument();
   });
+
+  // O desfecho diz o que a tarefa fez: "título marcado" só quando o título ganhou a marca agora.
+  test.each([
+    ['ja_marcado', 'Cancelado na agenda (o título já tinha a marca)'],
+    ['ja_saiu', 'Cancelado na agenda (o evento já tinha saído do Google)'],
+  ])('desfecho %s: "%s"', async (resultado, frase) => {
+    getEventDetailMock.mockResolvedValue({
+      ...(await getEventDetailMock()),
+      timeline: [log({ id: 6, action: 'CANCELAR_NA_AGENDA', details: { solicitacao_id: 7, resultado } })],
+    });
+    await abrirDetalhe();
+
+    expect(screen.getByText(frase)).toBeInTheDocument();
+    expect(screen.queryByText('Cancelado na agenda (título marcado)')).not.toBeInTheDocument();
+  });
 });

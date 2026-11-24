@@ -525,7 +525,7 @@ export default function PreAgendaPage(): JSX.Element {
       ),
       okText: 'Sim, cancelar evento',
       okType: 'danger',
-      cancelText: 'Cancelar',
+      cancelText: 'Voltar', // "Cancelar" ao lado de "Sim, cancelar evento" confunde
       autoFocusButton: 'cancel',
       onOk: async () => {
         try {
@@ -761,10 +761,11 @@ export default function PreAgendaPage(): JSX.Element {
 
         // CON-08: Cancelar evento de formação publicado; na linha cancelada, só no erro (refazer o que falhou:
         // Publicar na agenda só lista de hoje em diante).
+        // O refazer não exige o tipo ainda de formação (tipo renomeado), como o servidor e Publicar na agenda.
         const showCancelar =
           hasEventId &&
-          record.tipo_evento_de_formacao === true &&
-          ((isPublished && !record.cancelado_na_agenda) || (hasError && record.cancelado_na_agenda === true));
+          ((isPublished && record.tipo_evento_de_formacao === true && !record.cancelado_na_agenda) ||
+            (hasError && record.cancelado_na_agenda === true));
 
         // Virada: evento que já terminou, ou que está no Google pela planilha, não se publica
         // (o backend recusa com o mesmo motivo). O motivo vai no nome acessível do botão.
@@ -807,6 +808,7 @@ export default function PreAgendaPage(): JSX.Element {
                 icon={<StopOutlined />}
                 onClick={() => handleCancel(record)}
                 aria-label={`Remover do Google Agenda: ${rotuloDoEvento(record)}`}
+                title="Remover do Google Agenda"
               />
             )}
             {showCancelar && (
@@ -816,6 +818,7 @@ export default function PreAgendaPage(): JSX.Element {
                 icon={<CloseCircleOutlined />}
                 onClick={() => handleCancelarNaAgenda(record)}
                 aria-label={`Cancelar evento: ${rotuloDoEvento(record)}`}
+                title="Cancelar evento"
               />
             )}
             {podeExcluir && record.pode_excluir === true && (

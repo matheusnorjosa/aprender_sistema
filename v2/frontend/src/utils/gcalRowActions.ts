@@ -81,10 +81,9 @@ export function gcalRowActions(
     return { tag: TAGS_CANCELADO[row.gcal_status], actions: refazer ? ['cancelar'] : [], disabled: !ready };
   }
   const actions = actionsFor(row.gcal_status, !!row.external_event_id);
-  // O servidor aceita o cancelar como o "Tirar": com o id de lá, ou PUBLISHED (o id determinístico).
-  const noGoogle =
-    row.gcal_status === 'PUBLISHED' || (row.gcal_status === 'ERROR' && !!row.external_event_id);
-  if (row.tipo_evento_de_formacao && noGoogle) actions.push('cancelar');
+  // Cancelar só onde há Tirar (com o id de lá), como na Pré-agenda: sem id, um Cancelar que falhasse deixaria a
+  // linha em ERROR sem id, que o servidor não deixa refazer.
+  if (row.tipo_evento_de_formacao && actions.includes('remover')) actions.push('cancelar');
   return { tag: TAGS[row.gcal_status], actions, disabled: !ready };
 }
 

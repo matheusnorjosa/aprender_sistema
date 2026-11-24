@@ -344,10 +344,10 @@ SSOT: [availability.spec.md](specs/backend/availability.spec.md).
 
 As transições por solicitação são **actions do `SolicitacaoViewSet`**, não rotas
 sob `/api/gcal/`. Exigem `CanUseGcal` (policy `use_gcal` =
-`operate_preagenda` OU `approve_solicitation`) **ou** `CanPublishSetorSolicitacao` — actions `preview_gcal`/`publish`/`resync_gcal`/`cancel_gcal` do `SolicitacaoViewSet` (`views_solicitacao.py`).
+`operate_preagenda` OU `approve_solicitation`) **ou** `CanPublishSetorSolicitacao` — actions `preview_gcal`/`publish`/`resync_gcal`/`cancel_gcal`/`cancelar_na_agenda` do `SolicitacaoViewSet` (`views_solicitacao.py`).
 Com `CanPublishSetorSolicitacao` (Apoio de Coordenação) só vale evento **aprovado do próprio setor**: `Projeto.setor` do evento ∈ setores do vínculo vigente da pessoa (`can_publish_solicitacao`); fora disso, 404.
-Em modo OAuth, publish/resync/cancel recusam **antes** de marcar PENDING: 403 `google_not_connected` (sem credencial Google) e 409 `google_calendar_not_configured` (sem calendário de publicação — nem o pino `GCAL_OAUTH_CALENDAR_ID`, nem escolha na credencial; ver `GUIDE_GCAL.md`).
-Fora da prévia (`dry_run`), os três fazem o pedido com a linha travada e enfileiram a task na mesma transação (DEF-32): respondem **409** com `errors.code = linha_ocupada` quando outra operação segura a linha há mais de 10 s, e **503** `fila_indisponivel` quando a fila recusa a task. Nos dois casos nada muda e a ação pode ser repetida. Outro erro ao enfileirar (defeito de código) responde 500, também sem mudar a linha. Regra em [gcal.spec.md](specs/backend/gcal.spec.md) («Pedido de operação no Google»).
+Em modo OAuth, publish/resync/cancel/cancelar-na-agenda recusam **antes** de marcar PENDING: 403 `google_not_connected` (sem credencial Google) e 409 `google_calendar_not_configured` (sem calendário de publicação — nem o pino `GCAL_OAUTH_CALENDAR_ID`, nem escolha na credencial; ver `GUIDE_GCAL.md`).
+Fora da prévia (`dry_run`), os quatro (publish, resync, cancel e cancelar-na-agenda) fazem o pedido com a linha travada e enfileiram a task na mesma transação (DEF-32): respondem **409** com `errors.code = linha_ocupada` quando outra operação segura a linha há mais de 10 s, e **503** `fila_indisponivel` quando a fila recusa a task. Nos dois casos nada muda e a ação pode ser repetida. Outro erro ao enfileirar (defeito de código) responde 500, também sem mudar a linha. Regra em [gcal.spec.md](specs/backend/gcal.spec.md) («Pedido de operação no Google»).
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|

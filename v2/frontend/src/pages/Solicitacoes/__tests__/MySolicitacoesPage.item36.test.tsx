@@ -672,9 +672,13 @@ describe('MySolicitacoesPage — evento cancelado na agenda', { timeout: 20000 }
     deleteSolicitacaoMock.mockReset();
   });
 
-  test.each(['PUBLISHED', 'ERROR'] as const)(
-    '%s: etiqueta "Cancelado na agenda", sem Editar, e o motivo novo',
-    async (gcal_status) => {
+  // A etiqueta segue o estado, como em Publicar na agenda: só diz "Cancelado" quando o Google confirmou.
+  test.each([
+    ['PUBLISHED', 'Cancelado na agenda'],
+    ['ERROR', 'Erro ao cancelar'],
+  ] as const)(
+    '%s: etiqueta "%s", sem Editar, e o motivo novo',
+    async (gcal_status, etiqueta) => {
       const informar = vi
         .spyOn(Modal, 'info')
         .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
@@ -694,7 +698,8 @@ describe('MySolicitacoesPage — evento cancelado na agenda', { timeout: 20000 }
         ])
       );
       renderPage();
-      expect(await screen.findByText('Cancelado na agenda')).toBeInTheDocument();
+      expect(await screen.findByText(etiqueta)).toBeInTheDocument();
+      if (gcal_status === 'ERROR') expect(screen.queryByText('Cancelado na agenda')).not.toBeInTheDocument();
       expect(screen.queryByText('Na agenda')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /^Editar:/ })).not.toBeInTheDocument();
       // Revisão da rodada 2: o nome exato do botão, e o texto responde também o "nem excluir".
@@ -709,6 +714,27 @@ describe('MySolicitacoesPage — evento cancelado na agenda', { timeout: 20000 }
       informar.mockRestore();
     }
   );
+
+  test('cancelamento pedido e ainda não confirmado (PENDING): "Cancelando…", não "Cancelado na agenda"', async () => {
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 9,
+          municipio_nome: 'Crato',
+          status: 'aprovado',
+          gcal_status: 'PENDING',
+          external_event_id: 'asv29',
+          tipo_evento_de_formacao: true,
+          cancelado_na_agenda: true,
+          inicio: '2099-05-10T13:00:00Z',
+          fim: '2099-05-10T17:00:00Z',
+        }),
+      ])
+    );
+    renderPage();
+    expect(await screen.findByText('Cancelando…')).toBeInTheDocument();
+    expect(screen.queryByText('Cancelado na agenda')).not.toBeInTheDocument();
+  });
 
   // Revisão da rodada 2: Publicar na agenda só lista aprovado de hoje em diante; fora disso, a saída é a administração.
   test('cancelado na agenda, evento que já terminou, sem poder tirar do Google: para excluir, a administração', async () => {

@@ -148,6 +148,22 @@ const ACAO_LABELS: Record<string, string> = {
   GOOGLE_REFRESH_TOKEN: 'Acesso ao Google renovado',
 };
 
+// O desfecho do Cancelar pelo `details.resultado`: "título marcado" só quando a tarefa pôs a marca agora.
+const CANCELADO_NA_AGENDA_POR_RESULTADO: Record<string, string> = {
+  ja_marcado: 'Cancelado na agenda (o título já tinha a marca)',
+  ja_saiu: 'Cancelado na agenda (o evento já tinha saído do Google)',
+};
+
+function rotuloDoRegistro(log: { action: string; details?: Record<string, unknown> | null }): string {
+  if (log.action === 'CANCELAR_NA_AGENDA') {
+    const resultado = log.details?.['resultado'];
+    if (typeof resultado === 'string' && CANCELADO_NA_AGENDA_POR_RESULTADO[resultado]) {
+      return CANCELADO_NA_AGENDA_POR_RESULTADO[resultado];
+    }
+  }
+  return ACAO_LABELS[log.action] ?? 'Registro do Google';
+}
+
 // Papel do participante em português (COORD_ACOMPANHA é o coordenador extra da caixa "Coordenador(es)").
 const ROLE_LABELS: Record<string, string> = {
   FORMADOR: 'Formador',
@@ -898,7 +914,7 @@ export default function GCalDashboardPage(): JSX.Element {
                     color: getTimelineColor(log.action),
                     children: (
                       <div>
-                        <Text strong>{ACAO_LABELS[log.action] ?? 'Registro do Google'}</Text>
+                        <Text strong>{rotuloDoRegistro(log)}</Text>
                         <br />
                         <Text type="secondary">
                           {log.usuario_nome} - {formatFortaleza(log.created_at, 'DD/MM/YYYY HH:mm:ss')}

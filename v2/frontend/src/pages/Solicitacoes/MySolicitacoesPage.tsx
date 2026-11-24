@@ -43,11 +43,26 @@ import {
   confirmacaoDeExcluirNoGoogle,
   estaNoGoogle,
   excluirMarcaCancelado,
+  gcalRowActions,
   motivoNaoPublicavel,
   resumoDoEvento,
 } from '../../utils/gcalRowActions';
 
 const { Title, Text } = Typography;
+
+// Cores de preset que passam no AA (components/textoDaTag.ts): blue e red; o resto fica neutro.
+const COR_DO_CANCELADO = { processing: 'blue', error: 'red', default: undefined, success: undefined } as const;
+
+/** "Cancelado na agenda", "Cancelando…" ou "Erro ao cancelar" (a mesma regra de gcalRowActions). */
+function EtiquetaDoCancelado({ record }: { record: Solicitacao }): JSX.Element {
+  const { tag } = gcalRowActions(record, { ready: true });
+  const cor = COR_DO_CANCELADO[tag.color];
+  return (
+    <Tag {...(cor ? { color: cor } : {})} style={{ marginInlineEnd: 0 }}>
+      {tag.label}
+    </Tag>
+  );
+}
 
 /** Status colors */
 const STATUS_COLORS: Record<SolicitacaoStatus, string> = {
@@ -401,7 +416,8 @@ export default function MySolicitacoesPage(): JSX.Element {
             {STATUS_LABELS[record.status] || record.status}
           </Tag>
           {record.cancelado_na_agenda ? (
-            <Tag style={{ marginInlineEnd: 0 }}>Cancelado na agenda</Tag>
+            // Pelo estado, como em Publicar na agenda: "Cancelado" só depois que o Google confirmou.
+            <EtiquetaDoCancelado record={record} />
           ) : record.publicado_fora_do_sistema || record.gcal_status === ('PUBLISHED' as GCalStatus) ? (
             <Tag color="blue" style={{ marginInlineEnd: 0 }}>Na agenda</Tag>
           ) : null}

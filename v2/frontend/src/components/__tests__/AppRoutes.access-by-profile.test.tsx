@@ -7,7 +7,7 @@
  * mensagem precisa ser genérica ("Recurso indisponível" — OWASP: não
  * vazar nome de policy/recurso).
  *
- * 10 atores canônicos × 17 rotas críticas = matriz declarativa.
+ * 10 atores canônicos × 19 rotas críticas = matriz declarativa.
  *
  * Foco: gate de rota. Conteúdo da página é responsabilidade dos testes
  * próprios. Mockamos APIs internas para evitar fetch real.
@@ -159,6 +159,8 @@ const CRITICAL_ROUTES = [
   '/dat/admin',
   '/dat/admin/feedbacks',
   '/dat/importacoes',
+  '/integra',
+  '/integra/ica',
 ] as const;
 
 type CriticalRoute = (typeof CRITICAL_ROUTES)[number];
@@ -186,6 +188,9 @@ const ESCOPO = {
   '/solicitacoes/bloqueios': true,
   '/solicitacoes/deslocamentos': true,
 } as const;
+
+/** Integra (24/11/2026, Q9): a página e as sub-rotas, pela policy access_integra. */
+const INTEGRA = { '/integra': true, '/integra/ica': true } as const;
 
 const ACTORS: ActorSnapshot[] = [
   {
@@ -236,12 +241,15 @@ const ACTORS: ActorSnapshot[] = [
       // PR 10 (decisão do dono de 02/10, nº 13): a Diretoria saiu do painel do Google.
       '/mapa-brasil': true,
       // D8: fora da Grade Mensal.
+      // Integra (24/11/2026, Q9): pelo pacote DIRETORIA.
+      ...INTEGRA,
     },
   },
   {
     // Vínculo GERENTE vigente: Grade, Bloqueios e Deslocamentos (PR A).
     actor: 'Gerente da Superintendência',
-    expectedAccess: { ...NEGA_TUDO, '/solicitacoes/aprovacoes': true, ...ESCOPO, [EDITAR]: true },
+    // Integra (24/11/2026, Q9): pelo vínculo GERENTE vigente na Superintendência.
+    expectedAccess: { ...NEGA_TUDO, '/solicitacoes/aprovacoes': true, ...ESCOPO, [EDITAR]: true, ...INTEGRA },
   },
   {
     actor: 'Gerente pedagógico (Vidas)',

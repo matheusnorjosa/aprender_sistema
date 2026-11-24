@@ -1,0 +1,58 @@
+/*
+ * Regras de toda a moldura da Integra (carregadas pelo IntegraLayout, valem em todas as telas dela).
+ */
+
+/*
+ * Foco visível em todo link da Integra (WCAG 2.4.7). O reset do antd zera o contorno de qualquer link
+ * dentro do Layout com `:where(.css-…) a:focus { outline: 0 }` (especificidade 0,1,1); esta regra tem
+ * 0,2,1 e vence. Uma regra só, em vez de uma classe em cada Link.
+ */
+.integra a:focus-visible {
+  outline: 2px solid #004b3d;
+  outline-offset: 2px;
+}
+
+/*
+ * A faixa "DADOS SIMULADOS" fica presa no topo (sticky). Sem folga, o título de destino de um link
+ * "#seção" (o índice do "Para validar") e o campo que recebe foco por Tab encostam no topo e ficam
+ * embaixo dela. A folga cobre a faixa com quebra de linha no celular (até 4 linhas a 360 px) e é menor
+ * a partir de 768 px, onde ela tem uma linha só.
+ */
+html:has(.integra) {
+  scroll-padding-top: 7rem;
+}
+
+@media (min-width: 768px) {
+  html:has(.integra) {
+    scroll-padding-top: 4rem;
+  }
+}
+
+/*
+ * Impressão e PDF: o aviso "DADOS SIMULADOS" vai na margem de cima de TODA folha. A faixa da tela sai
+ * só uma vez, no começo; uma folha do PDF que circule sozinha precisa levar o aviso. A margem da página
+ * (e não a faixa com `position: fixed`) não cobre a primeira linha das folhas seguintes.
+ * A página com nome `integra` só vale para a moldura: as outras telas do sistema imprimem como antes.
+ * Margem de página com texto: Chrome e Edge 131+. Onde não houver, fica a faixa no começo do documento.
+ */
+@page integra {
+  /* Só a margem de cima, para caber o aviso. Mexer nas laterais (ex.: `margin: 10mm`) fez o Chrome
+     soltar 6 folhas em branco no fim do PDF do Painel. */
+  margin-top: 16mm;
+
+  @top-center {
+    content: 'DADOS SIMULADOS · pessoas fictícias e números gerados na tela; nada foi gravado';
+    color: #5c3b00;
+    font-family: sans-serif;
+    font-size: 9pt;
+    font-weight: 700;
+  }
+}
+
+/* No body inteiro, e não só na `.integra`: troca de página com nome força quebra de folha, e no meio
+   do documento sobravam folhas em branco no fim do PDF. */
+@media print {
+  body:has(.integra) {
+    page: integra;
+  }
+}

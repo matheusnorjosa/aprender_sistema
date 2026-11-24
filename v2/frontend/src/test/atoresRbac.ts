@@ -17,6 +17,8 @@
  *   a Diretoria tem o vínculo EQUIPE na DIRETORIA, sem mudança; o vínculo EQUIPE não entra em
  *   `gerencias` do /me, e quem tem o pacote que aprova recebe `can_approve_super`). Decisão de
  *   17/10/2026 (#2124): `manage_lotacao_comum` (= `manage_admin_registries`) para o superusuário e o DAT.
+ *   Integra (24/11/2026, decisão Q9): `access_integra` para o superusuário, a Diretoria (pacote DIRETORIA)
+ *   e a Gerente da Superintendência (vínculo GERENTE vigente); medida no backend para os 10 atores.
  *   Mudou o seed ou uma policy? Meça de novo e atualize aqui; o backend trava a fórmula em
  *   `test_rbac_politicas_de_tela.py`.
  *
@@ -93,6 +95,7 @@ export const ATORES_RBAC: readonly AtorRbac[] = [
       'access_audit_logs',
       'access_availability_blocks',
       'access_controle_section',
+      'access_integra',
       'access_monthly_availability',
       'access_solicitation_approvals',
       'access_travel',
@@ -176,6 +179,7 @@ export const ATORES_RBAC: readonly AtorRbac[] = [
     ator: 'Diretoria',
     user: usuarioDeTeste({ setores: ['Diretoria'] }),
     policies: [
+      'access_integra',
       'view_compras_dashboard',
       'view_compras_pendencias',
       'view_map_metrics',
@@ -193,6 +197,7 @@ export const ATORES_RBAC: readonly AtorRbac[] = [
     }),
     policies: [
       'access_availability_blocks',
+      'access_integra',
       'access_monthly_availability',
       'access_solicitation_approvals',
       'access_travel',

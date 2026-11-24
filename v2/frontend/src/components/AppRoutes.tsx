@@ -49,6 +49,7 @@ const GerenciasPage = lazy(() => import('../pages/AdminDAT/GerenciasPage'));
 const ProdutosPage = lazy(() => import('../pages/AdminDAT/ProdutosPage'));
 const ProjetosGeraisPage = lazy(() => import('../pages/AdminDAT/ProjetosGeraisPage'));
 const FeedbacksPage = lazy(() => import('../pages/AdminDAT/FeedbacksPage'));
+const IntegraLayout = lazy(() => import('../pages/Integra/IntegraLayout'));
 
 function PageLoader(): JSX.Element {
   return (
@@ -91,6 +92,10 @@ export function AppRoutes({ user }: AppRoutesProps): JSX.Element {
         <Route path="/dashboards/equipe" element={<RequirePolicy policy="view_team_dashboard" policies={policies}><EquipeDashboardPage /></RequirePolicy>} />
         <Route path="/dashboards/gcal" element={<RequirePolicy policy="view_gcal_dashboard" policies={policies}><GCalDashboardPage /></RequirePolicy>} />
         <Route path="/mapa-brasil" element={<RequirePolicy policy="view_map_metrics" policies={policies}><MapaBrasilPage /></RequirePolicy>} />
+
+        {/* Integra (protótipo com dados simulados, 24/11/2026): superusuário, Diretoria, SPE e a gerente
+            da Superintendência (policy composta no servidor). As telas filhas ficam em IntegraRoutes. */}
+        <Route path="/integra/*" element={<RequirePolicy policy="access_integra" policies={policies}><IntegraLayout /></RequirePolicy>} />
 
         {/* === Solicitações (agrupamento — Epic 3, Issue #1227) === */}
         {/* Páginas pré-existentes mantidas */}

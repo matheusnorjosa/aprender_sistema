@@ -213,6 +213,20 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         category="solicitacao",
         group_names=(),
     ),
+    # Integra (decisão do dono de 24/11/2026, Q9): o protótipo das ferramentas do gestor pedagógico.
+    # Vem dos pacotes DIRETORIA e SPE (`rbac_pacotes.PACOTE`; a SPE não tem grupo); o grupo Diretoria do seed
+    # acompanha o pacote DIRETORIA (`test_pacote_contido_no_grupo_do_seed`) e só conta no modo "uniao". A gerente da
+    # Superintendência entra pelo vínculo, na policy composta `access_integra`, não por esta capacidade.
+    FunctionalPermissionSeed(
+        codename="access_integra",
+        label="Visualizar a Integra",
+        description=(
+            "Abrir a Integra, a página das ferramentas do gestor pedagógico (ICA, Semáforo e DFF). No "
+            "protótipo os dados são simulados na tela e nada é gravado no banco."
+        ),
+        category="dashboard",
+        group_names=("Diretoria",),
+    ),
 )
 
 
@@ -224,8 +238,9 @@ def _validate_seed() -> None:
     # Coordenação). Total: 17.
     # Regra da compra (14/10/2026): +1 `create_solicitation_without_purchase` (0 grupos). Total: 18.
     # PR 8 (15/10/2026): -1 `approve_solicitation_batch` (migration 0125). Total: 17.
-    if len(FUNCTIONAL_PERMISSIONS_SEED) != 17:
-        raise ValueError("Seed de permissoes funcionais deve conter exatamente 17 itens.")
+    # Integra (24/11/2026): +1 `access_integra` (migration 0140). Total: 18.
+    if len(FUNCTIONAL_PERMISSIONS_SEED) != 18:
+        raise ValueError("Seed de permissoes funcionais deve conter exatamente 18 itens.")
 
     seen: set[str] = set()
     for item in FUNCTIONAL_PERMISSIONS_SEED:

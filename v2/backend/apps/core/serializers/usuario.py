@@ -497,8 +497,8 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         if instance is not None and tem_lotacao_reservada(instance):
             raise serializers.ValidationError(
                 {
-                    "gerencia_id": "Esta pessoa trabalha no DAT, no Controle ou na Diretoria, ou é Gerente da "
-                    "Superintendência: a lotação dela só o superusuário altera."
+                    "gerencia_id": "Esta pessoa trabalha no DAT, no Controle, na Diretoria ou na SPE, ou é Gerente "
+                    "da Superintendência: a lotação dela só o superusuário altera."
                 }
             )
         fora = sorted(g.name for g in mexidos if g.name not in PAPEL_POR_FUNCAO)
@@ -512,7 +512,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             if gerencia_reservada(alvo) or any(lotacao_reservada(alvo, p) for p in papeis):
                 raise serializers.ValidationError(
                     {
-                        "gerencia_id": "Lotar no DAT, no Controle, na Diretoria ou como Gerente da "
+                        "gerencia_id": "Lotar no DAT, no Controle, na Diretoria, na SPE ou como Gerente da "
                         "Superintendência só o superusuário pode."
                     }
                 )

@@ -3,7 +3,7 @@ O DAT lota nas gerências comuns (decisão do dono de 17/10/2026).
 
 Quem tem a policy `manage_lotacao_comum` (= `manage_admin_registries`, hoje só o pacote ADMIN_OPERACIONAL)
 lota, pela tela de Usuários, nas gerências comuns: FORMADOR, COORDENADOR, APOIO, GERENTE (menos na
-aprovadora) e EQUIPE. Lotar no DAT, no Controle, na Diretoria ou como GERENTE da Superintendência continua
+aprovadora) e EQUIPE. Lotar no DAT, no Controle, na Diretoria, na SPE ou como GERENTE da Superintendência continua
 só com o superusuário (`lotacao_reservada`).
 
 O DAT recebe 400 (não é ignorado em silêncio) quando: a gerência ou o papel é reservado; o alvo tem vínculo
@@ -86,7 +86,17 @@ def _gerencia_diretoria():
     return Gerencia.objects.get_or_create(nome="DIRETORIA", defaults={"nome_setor": "Diretoria"})[0]
 
 
-RESERVADAS = {"DAT": _gerencia_dat, "CONTROLE": _gerencia_controle, "DIRETORIA": _gerencia_diretoria}
+def _gerencia_spe():
+    # PR 2-b da Integra: como a Diretoria, reservada pelo nome mesmo com o perfil ainda PADRAO.
+    return Gerencia.objects.get_or_create(nome="SPE", defaults={"nome_setor": "SPE"})[0]
+
+
+RESERVADAS = {
+    "DAT": _gerencia_dat,
+    "CONTROLE": _gerencia_controle,
+    "DIRETORIA": _gerencia_diretoria,
+    "SPE": _gerencia_spe,
+}
 
 
 def _grupo(nome):
@@ -115,7 +125,7 @@ class TestPredicado:
 
     @pytest.mark.parametrize("nome", sorted(RESERVADAS))
     @pytest.mark.parametrize("papel", ["FORMADOR", "COORDENADOR", "APOIO", "GERENTE", "EQUIPE"])
-    def test_dat_controle_e_diretoria_sao_reservadas_em_qualquer_papel(self, nome, papel):
+    def test_dat_controle_diretoria_e_spe_sao_reservadas_em_qualquer_papel(self, nome, papel):
         gerencia = RESERVADAS[nome]()
         assert gerencia_reservada(gerencia)
         assert lotacao_reservada(gerencia, papel)
@@ -215,6 +225,7 @@ class TestDatRecebe400:
         resp = _patch(dat, alvo, payload)
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
         assert "gerencia_id" in _erros(resp)
+        assert "na SPE" in str(_erros(resp)["gerencia_id"])  # o motivo cita todas as reservadas
         assert _vigentes(alvo) == set()
         assert not alvo.groups.exists()
 
@@ -243,19 +254,22 @@ class TestDatRecebe400:
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
         assert set(alvo.groups.values_list("name", flat=True)) == {"Coordenador"}
 
-    @pytest.mark.parametrize("onde", ["DAT", "CONTROLE", "GERENTE_G1"])
+    @pytest.mark.parametrize("onde", ["DAT", "CONTROLE", "SPE", "GERENTE_G1"])
     def test_alvo_com_vinculo_reservado_nao_e_transferido(self, dat, comum, g1, onde):
         alvo = UsuarioFactory()
         if onde == "DAT":
             com_pacote_do_dat(alvo)
         elif onde == "CONTROLE":
             com_pacote_do_controle(alvo)
+        elif onde == "SPE":
+            com_papel(alvo, "EQUIPE", _gerencia_spe())
         else:
             com_papel(alvo, "GERENTE", g1)
         antes = _vigentes(alvo)
         resp = _patch(dat, alvo, {"group_ids": [_grupo("Formador").id], "gerencia_id": comum.id})
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
         assert "gerencia_id" in _erros(resp)
+        assert "na SPE" in str(_erros(resp)["gerencia_id"])
         assert _vigentes(alvo) == antes
 
     def test_tirar_a_funcao_da_gerente_da_superintendencia(self, dat, g1):

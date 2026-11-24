@@ -19,7 +19,8 @@ usuario (superuser, auditado).
 
 Lotacao com pacote (ADR-020, PR A): EQUIPE ou GERENTE numa gerencia cujo perfil tem pacote
 nao vazio dara as capacidades do pacote (PR B). O import tambem nunca cria nem reativa esse
-vinculo (pendencia `vinculo_com_pacote_bloqueado`). SSOT: `vinculo_exige_superusuario`.
+vinculo (pendencia `vinculo_com_pacote_bloqueado`). SSOT: `vinculo_exige_superusuario`. O nome
+reservado (`PERFIL_PERMITIDO`) trava mesmo antes de o perfil ser gravado, e na SPE todo papel trava.
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
@@ -325,15 +326,34 @@ def is_vinculo_aprovador(gerencia: Gerencia, papel: str) -> bool:
     return papel == "GERENTE" and gerencia.nome == GERENCIA_APROVADORA_NOME
 
 
+# PR 2-b da Integra (24/11/2026): na SPE nenhum papel entra por import. Ela nao tem projeto nem formador, e o
+# papel de campo traria os direitos de evento e as telas de escopo do papel; lotar nela, em qualquer papel, e so
+# do superusuario, como na tela (`gerencia_reservada`). Nas outras gerencias com pacote vale o D3.
+_PERFIS_SEM_IMPORT: frozenset[str] = frozenset({"SPE"})
+
+
+def _perfil_da_trava(gerencia: Gerencia) -> str:
+    """Perfil que a trava dos importadores considera: o gravado ou, com PADRAO, o que o nome reservado vai
+    receber (`PERFIL_PERMITIDO`). Sem isso, o vinculo importado antes do perfil ganharia o pacote depois."""
+    perfil = str(gerencia.perfil)
+    if perfil == Gerencia.Perfil.PADRAO:
+        return PERFIL_PERMITIDO.get(gerencia.nome, perfil)
+    return perfil
+
+
 def vinculo_exige_superusuario(gerencia: Gerencia, papel: str) -> bool:
     """True se (gerencia, papel) da poder: aprovador (PR B1) ou pacote do perfil (ADR-020, D3).
 
-    Cobre exatamente o que da poder: FORMADOR, COORDENADOR e APOIO nao recebem pacote, e
-    perfil de pacote vazio (PADRAO, APROVACAO) nao trava ninguem. Os importadores nunca criam
+    Cobre o que da poder: FORMADOR, COORDENADOR e APOIO nao recebem pacote, e perfil de pacote vazio
+    (PADRAO, APROVACAO) nao trava ninguem. O perfil vale pelo nome reservado mesmo antes de gravado
+    (`_perfil_da_trava`), e na SPE todo papel trava (`_PERFIS_SEM_IMPORT`). Os importadores nunca criam
     nem reativam esse vinculo; quem concede e o superusuario.
     """
-    return is_vinculo_aprovador(gerencia, papel) or (
-        papel in PAPEIS_COM_PACOTE and bool(PACOTE.get(str(gerencia.perfil)))
+    perfil = _perfil_da_trava(gerencia)
+    return (
+        is_vinculo_aprovador(gerencia, papel)
+        or perfil in _PERFIS_SEM_IMPORT
+        or (papel in PAPEIS_COM_PACOTE and bool(PACOTE.get(perfil)))
     )
 
 
@@ -519,7 +539,7 @@ def _process_row(
                 "erro": (
                     "Vinculo que da poder de aprovar so e concedido pelo cadastro de usuario (superuser)."
                     if motivo == "vinculo_aprovador_bloqueado"
-                    else "Vinculo que da o pacote do setor so e concedido pelo superusuario."
+                    else "Vinculo nesta gerencia (pacote do setor) so e concedido pelo superusuario."
                 ),
             }
         )

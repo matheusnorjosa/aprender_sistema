@@ -52,6 +52,7 @@ EXPECTED_PUBLIC_POLICY_KEYS_SORTED: list[str] = [
     "access_audit_logs",
     "access_availability_blocks",  # PR 7 das permissões (15/10/2026): Bloqueios
     "access_controle_section",
+    "access_integra",  # Integra (24/11/2026): protótipo das ferramentas do gestor pedagógico
     "access_monthly_availability",  # PR 7: Grade Mensal
     "access_solicitation_approvals",
     "access_travel",  # PR 7: Deslocamentos

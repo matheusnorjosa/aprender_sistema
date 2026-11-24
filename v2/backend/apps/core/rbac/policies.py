@@ -92,6 +92,7 @@ COMPOSITE_POLICY_KEYS: Final[frozenset[str]] = frozenset(
         "access_monthly_availability",
         "access_availability_blocks",
         "access_travel",
+        "access_integra",
     }
 )
 
@@ -188,7 +189,7 @@ ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
     # --- Admin registries (single-cap, mas vira policy pra estabilizar contrato) ---
     "manage_admin_registries": frozenset({"manage_admin_registries"}),
     # Lotar nas gerências comuns pela tela de Usuários (decisão do dono de 17/10/2026): o DAT. Lotar no
-    # DAT, no Controle, na Diretoria ou como GERENTE da Superintendência segue só do superusuário
+    # DAT, no Controle, na Diretoria, na SPE ou como GERENTE da Superintendência segue só do superusuário
     # (`lotacao_reservada`; a regra vive em `UsuarioAdminSerializer`).
     "manage_lotacao_comum": frozenset({"manage_admin_registries"}),
     "manage_purchases_and_materials": frozenset({"manage_purchases_and_materials"}),
@@ -222,6 +223,9 @@ ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
     "execute_restricted_operations": frozenset({"execute_restricted_operations"}),
     # Nova Solicitação sem compra (regra da compra, 14/10/2026; 0 grupos no seed).
     "create_solicitation_without_purchase": frozenset({"create_solicitation_without_purchase"}),
+    # --- Integra (decisão do dono de 24/11/2026, Q9): composite, ver `_user_has_integra` ---
+    # A capacidade vem dos pacotes DIRETORIA e SPE; a gerente da Superintendência entra pelo vínculo.
+    "access_integra": frozenset({"access_integra"}),
 }
 
 
@@ -389,6 +393,15 @@ class CanCreateSolicitationWithoutPurchase(_PolicyPermission):
     policy = "create_solicitation_without_purchase"
 
 
+class CanAccessIntegra(_PolicyPermission):
+    """Integra (protótipo, 24/11/2026): superusuário, pacotes DIRETORIA e SPE ou GERENTE vigente na Superintendência.
+
+    A semântica vive em `user_has_policy` (`_user_has_integra`); a classe só delega.
+    """
+
+    policy = "access_integra"
+
+
 class CanAccessSolicitationApprovals(_PolicyPermission):
     """
     Policy composta de aprovação de solicitações (PR 3, 2026-04-29; PR B1, 2026-09-29; PR 11, 2026-10-17).
@@ -468,6 +481,8 @@ PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset(
         "create_solicitation_without_purchase",
         # O DAT lota nas gerências comuns (17/10/2026): a tela de Usuários libera os campos de lotação.
         "manage_lotacao_comum",
+        # Integra (24/11/2026): menu, rota e cartões do protótipo.
+        "access_integra",
     }
 )
 
@@ -597,6 +612,25 @@ def _user_has_solicitation_approvals(
     return solicitation_approval_basis(user, capacidades=capacidades) is not None
 
 
+def _user_has_integra(
+    user: AbstractBaseUser | AnonymousUser,
+    capacidades: AbstractSet[str] | None = None,
+) -> bool:
+    """Integra (decisão do dono de 24/11/2026, Q9): a capacidade `access_integra` (pacotes DIRETORIA e SPE) OU o
+    vínculo GERENTE vigente na Superintendência, o mesmo de `solicitation_approval_basis`.
+
+    Sem bypass de superuser (`user_has_policy` decide antes). A Superintendência tem perfil PADRAO, então o
+    vínculo não passa pelo pacote; e o pacote iria também à EQUIPE, que a decisão deixa de fora.
+    `capacidades` vale só para o simulador `rbac_diff`; o vínculo é o de hoje.
+    """
+    if capacidades is not None:
+        if "access_integra" in capacidades:
+            return True
+    elif user_has_any_perm(user, "access_integra"):
+        return True
+    return user_is_gerente_superintendencia(user)
+
+
 def _abre_tela_de_escopo(
     user: AbstractBaseUser | AnonymousUser,
     key: str,
@@ -722,6 +756,8 @@ def user_has_policy(
         return _user_has_solicitation_approvals(user, capacidades)
     if key in TELAS_DE_ESCOPO:
         return _abre_tela_de_escopo(user, key, capacidades, fonte)
+    if key == "access_integra":
+        return _user_has_integra(user, capacidades)
     codenames = ACCESS_POLICIES.get(key)
     if not codenames:
         return False
@@ -824,4 +860,5 @@ __all__ = [
     "CanExecuteRestrictedOperations",
     "CanCreateSolicitationWithoutPurchase",
     "CanManageLotacaoComum",
+    "CanAccessIntegra",
 ]

@@ -73,6 +73,23 @@ describe('resumoDoMenu', () => {
     });
   });
 
+  test('só a Integra (perfil SPE): mostra a Integra e não diz que vê só os próprios eventos', () => {
+    expect(resumoDoMenu(['access_integra'])).toEqual({ itens: ['Meus Eventos', 'Integra'], frase: null });
+  });
+
+  test('só as pendências de compras: Dashboards, como na barra lateral', () => {
+    expect(resumoDoMenu(['view_compras_pendencias'])).toEqual({ itens: ['Meus Eventos', 'Dashboards'], frase: null });
+  });
+
+  test('Integra fica entre Dashboards e DAT, como na barra lateral', () => {
+    expect(resumoDoMenu(['view_team_dashboard', 'access_integra', 'manage_admin_registries']).itens).toEqual([
+      'Meus Eventos',
+      'Dashboards',
+      'Integra',
+      'DAT',
+    ]);
+  });
+
   test('mais que o básico: os itens do menu, na ordem do menu, sem frase', () => {
     expect(
       resumoDoMenu([

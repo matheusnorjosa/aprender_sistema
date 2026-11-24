@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef, type JSX } from 'rea
 import { Layout, Menu, Badge, Button, type MenuProps } from 'antd';
 import { Link, useLocation } from 'react-router';
 import {
+  AppstoreOutlined,
   CalendarOutlined,
   CarOutlined,
   CheckCircleOutlined,
@@ -60,6 +61,8 @@ const ROUTE_TO_MENU_KEY: Record<string, string> = {
   '/dashboards/equipe': 'dashboard-equipe',
   '/dashboards/gcal': 'gcal-dashboard',
   '/mapa-brasil': 'mapa-brasil',
+  // Integra: o prefixo cobre as telas filhas (/integra/ica, /integra/semaforo...).
+  '/integra': 'integra',
   '/dat/admin': 'dat-admin',
   '/dat/admin/equipe-gerencia': 'dat-importacoes',
   '/dat/admin/feedbacks': 'dat-feedbacks',
@@ -406,6 +409,13 @@ export function AppSidebar({
                   <Menu.Item key="mapa-brasil"><Link to="/mapa-brasil">Mapa do Brasil</Link></Menu.Item>
                 )}
               </SubMenu>
+            )}
+
+            {/* Integra (24/11/2026): protótipo das ferramentas do gestor pedagógico (access_integra). */}
+            {caps.canAccessIntegra && (
+              <Menu.Item key="integra" icon={<AppstoreOutlined />} onClick={closeAllSubmenus}>
+                <Link to="/integra">Integra</Link>
+              </Menu.Item>
             )}
 
             {caps.canManageAdminRegistries && (

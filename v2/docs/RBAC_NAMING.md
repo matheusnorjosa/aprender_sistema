@@ -500,7 +500,7 @@ PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset({
     "access_audit_logs",
     "use_gcal",
     "view_compras_dashboard",
-    # ... 24 outras — total 27 (apps/core/rbac/policies.py, PUBLIC_POLICY_KEYS)
+    # ... e as outras: lista e contagem só no SSOT (apps/core/rbac/policies.py, PUBLIC_POLICY_KEYS)
 })
 ```
 

@@ -208,6 +208,7 @@ class Gerencia(models.Model):
         CONTROLE = "CONTROLE", "Controle"
         APROVACAO = "APROVACAO", "Aprovação"
         DIRETORIA = "DIRETORIA", "Diretoria"
+        SPE = "SPE", "SPE"
 
     nome = models.CharField(
         max_length=50,

@@ -137,16 +137,17 @@ def test_labels_follow_infinitive_verb_form():
     )
 
 
-def test_seed_count_is_seventeen_post_pr8():
+def test_seed_count_is_eighteen_post_integra():
     """
     Pós-Onda 1 C3 (2026-04-27): 16 codenames `verb_noun` (+`manage_internal_actions`).
     #1656 Feature 2: +1 `publish_setor_solicitacao` (Apoio de Coordenação). Total: 17.
     Regra da compra (14/10/2026): +1 `create_solicitation_without_purchase` (sem grupo). Total: 18.
     PR 8 das permissões (15/10/2026): -1 `approve_solicitation_batch` (migration 0125). Total: 17.
+    Integra (24/11/2026): +1 `access_integra` (migration 0140). Total: 18.
     """
     assert (
-        len(FUNCTIONAL_PERMISSIONS_SEED) == 17
-    ), f"Seed deve conter exatamente 17 permissões pós-PR 8. Achei {len(FUNCTIONAL_PERMISSIONS_SEED)}."
+        len(FUNCTIONAL_PERMISSIONS_SEED) == 18
+    ), f"Seed deve conter exatamente 18 permissões pós-Integra. Achei {len(FUNCTIONAL_PERMISSIONS_SEED)}."
 
 
 def test_old_pode_codenames_absent_post_epic_4_3():

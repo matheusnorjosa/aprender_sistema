@@ -23,6 +23,7 @@ const FLAGS = [
   'canViewComprasStats',
   'canExecuteRestrictedOperations',
   'canCreateSolicitationWithoutPurchase',
+  'canAccessIntegra',
 ] as const satisfies readonly (keyof Capabilities)[];
 
 type Flag = (typeof FLAGS)[number];
@@ -31,7 +32,8 @@ type Flag = (typeof FLAGS)[number];
 const ESPERADO: Record<NomeDoAtor, readonly Flag[]> = {
   Superuser: FLAGS,
   // PR 10: o DAT é o administrador operacional (pacote final): aprova, cria, exclui, sem a compra.
-  DAT: FLAGS,
+  // Integra (24/11/2026, Q9): o DAT fica de fora.
+  DAT: FLAGS.filter((f) => f !== 'canAccessIntegra'),
   // PR 12a: vínculo EQUIPE na gerência CONTROLE; o pacote aprova (D1 de 06/10).
   Controle: [
     'canAccessApprovals',
@@ -40,7 +42,8 @@ const ESPERADO: Record<NomeDoAtor, readonly Flag[]> = {
     'canAccessTravel',
     'canViewComprasStats',
   ],
-  Diretoria: ['canViewComprasDashboard'],
+  // Integra (24/11/2026, Q9): pelo pacote DIRETORIA.
+  Diretoria: ['canViewComprasDashboard', 'canAccessIntegra'],
   // PR 10: o grupo Superintendência perdeu `execute_restricted_operations` (migration 0126).
   'Gerente da Superintendência': [
     'canAccessApprovals',
@@ -48,6 +51,8 @@ const ESPERADO: Record<NomeDoAtor, readonly Flag[]> = {
     'canAccessMonthlyAvailability',
     'canAccessTravel',
     'canCreateSolicitation',
+    // Integra (24/11/2026, Q9): pelo vínculo GERENTE vigente na Superintendência.
+    'canAccessIntegra',
   ],
   'Gerente pedagógico (Vidas)': [
     'canAccessAvailabilityBlocks',

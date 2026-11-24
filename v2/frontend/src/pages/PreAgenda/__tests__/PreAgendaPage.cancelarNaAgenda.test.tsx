@@ -257,12 +257,20 @@ describe('PreAgendaPage — chave do CON-08 B desligada', { timeout: 20000 }, ()
     expect(within(sobral).queryByLabelText(CANCELAR)).not.toBeInTheDocument();
   });
 
-  test('linha marcada em erro: sem Cancelar evento para refazer (o servidor recusa)', async () => {
-    mockRows([row({ id: 13, municipio_nome: 'Russas', gcal_status: 'ERROR', ...DESLIGADA, cancelado_na_agenda: true })]);
+  // Revisão da rodada 1 da chave: o Cancelar falhou antes do Google; o servidor aceita o Remover (a marca sai com o
+  // evento) e recusa o Cancelar de novo. A linha marcada já confirmada (PUBLISHED) segue sem os dois.
+  test('linha marcada em erro: Remover, sem Cancelar evento para refazer (o servidor recusa)', async () => {
+    mockRows([
+      row({ id: 13, municipio_nome: 'Russas', gcal_status: 'ERROR', ...DESLIGADA, cancelado_na_agenda: true }),
+      row({ id: 15, municipio_nome: 'Crato', ...DESLIGADA, cancelado_na_agenda: true }),
+    ]);
     renderComo(DAT);
     const russas = await linha('Russas');
     expect(within(russas).queryByLabelText(CANCELAR)).not.toBeInTheDocument();
-    expect(within(russas).queryByLabelText(REMOVER)).not.toBeInTheDocument();
+    expect(within(russas).getByLabelText(REMOVER)).toBeInTheDocument();
+    const crato = await linha('Crato');
+    expect(within(crato).queryByLabelText(CANCELAR)).not.toBeInTheDocument();
+    expect(within(crato).queryByLabelText(REMOVER)).not.toBeInTheDocument();
   });
 
   test('Excluir de formação: a confirmação e o aviso dizem que ele sai dos dois lados, como antes', async () => {

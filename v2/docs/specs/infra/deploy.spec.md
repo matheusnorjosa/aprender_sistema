@@ -191,8 +191,13 @@ no Google: a linha vai para `ERROR`, com aviso, e a marca do pedido sai. Ligada 
 ([`gcal.spec.md`](../backend/gcal.spec.md)).
 
 Nos dois estados, a linha já marcada (`cancelado_na_agenda=True`) continua protegida. Ela não se publica, não se
-reenvia, não se tira do Google e não se edita. O Excluir dela continua marcando, sem apagar do Google. Por isso,
-desligar a chave não exige limpar marcas.
+reenvia e não se edita. Se o Cancelar dela terminou no Google, ela também não se tira de lá, e o Excluir continua
+marcando, sem apagar do Google. Por isso, desligar a chave não exige limpar marcas.
+
+A exceção é a linha marcada em `ERROR` cujo Cancelar falhou antes do Google (o título lá sem a marca). Com a chave
+desligada, ela sai como antes do CON-08 B: o Excluir tira o evento do Google, sem pôr a marca, e o Tirar só do
+Google a aceita e tira a marca junto com o evento. Com a chave desligada, só a linha cujo Cancelar terminou segue
+a marca.
 
 - **Ligar ou desligar.** No Portainer, abra a stack e, em *Environment variables* (a `stack.env`), crie ou mude
   `CON08_CANCELAR_NA_AGENDA` para `1` ou `0`. Depois, *Update the stack* sem *re-pull*. O `web` e o `worker`
@@ -204,7 +209,10 @@ desligar a chave não exige limpar marcas.
   chave ligada.
 - **Antes de desligar** com Cancelar em andamento: as linhas `PENDING` cujo último registro é
   `CANCELAR_NA_AGENDA_REQUESTED` terminam em `ERROR` quando a tarefa rodar. Isso é seguro, porque nada vai ao
-  Google, mas elas precisam ser resolvidas depois (Tirar só do Google ou Excluir).
+  Google, mas elas precisam ser resolvidas depois (Tirar só do Google ou Excluir). As linhas que já estão em
+  `ERROR` com a marca (`Solicitacao.objects.filter(cancelado_na_agenda=True, gcal_status="ERROR")`) também: com a
+  chave desligada, o Excluir e o Tirar só do Google tiram o evento do Google em vez de marcá-lo. Quem quiser o
+  "(CANCELADO)" nelas refaz o Cancelar antes de desligar.
 
 **Docs de topologia reconciliados (Fase 2 concluída):** `v2/infra/ENVIRONMENTS.md`, `v2/infra/README.md` e
 `.claude/CLAUDE.md` (tabela prod) descrevem o Redis como **container interno na VM01** (serviço `redis`),

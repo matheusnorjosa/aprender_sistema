@@ -1318,7 +1318,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
           Google vem primeiro e síncrono; se falhar, nada é apagado. Quem não pode recebe 400 e o
           Google não é chamado. Todas as recusas abaixo vêm antes.
         - Evento de formação no Google (com a chave `CON08_CANCELAR_NA_AGENDA` ligada; desligada, ele sai do
-          Google como os outros), ou linha já cancelada na agenda (CON-08, decisão do dono de 23/11):
+          Google como os outros), ou linha já cancelada na agenda (CON-08, decisão do dono de 23/11; com a
+          chave desligada, só a de Cancelar confirmado, `excluir_marca_cancelado`):
           o evento não sai de lá. `remover_do_google_agora` põe "(CANCELADO) " no título e grava
           `cancelado_na_agenda`; o evento fica no Google, cancelado, e a linha sai daqui. Id adotado que o
           Google não acha (P5): com o Cancelar já concluído, a linha sai e o DELETE responde 200 com

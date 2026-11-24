@@ -136,7 +136,10 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
       const passou = Boolean(record.fim) && Date.parse(record.fim) < Date.now();
       motivos.push(
         record.status === 'aprovado' && !passou
-          ? 'Para excluir, peça ao Apoio de Coordenação da sua gerência, que exclui o evento em Publicar na agenda (ele sai do sistema e fica no Google Agenda com (CANCELADO) no título). Se lá também não der para excluir, fale com a administração do sistema.'
+          ? `Para excluir, peça ao Apoio de Coordenação da sua gerência, que exclui o evento em Publicar na agenda (${
+              // Chave desligada e o Cancelar que falhou: o Excluir tira o evento do Google (revisão da rodada 1).
+              marcaCancelado ? 'ele sai do sistema e fica no Google Agenda com (CANCELADO) no título' : 'ele sai do sistema e do Google Agenda'
+            }). Se lá também não der para excluir, fale com a administração do sistema.`
           : 'Para excluir, fale com a administração do sistema.'
       );
     }

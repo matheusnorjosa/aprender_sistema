@@ -855,4 +855,39 @@ describe('MySolicitacoesPage — evento cancelado na agenda', { timeout: 20000 }
     expect(texto).not.toContain('(CANCELADO)');
     informar.mockRestore();
   });
+
+  // Revisão da rodada 1 da chave: o Cancelar falhou antes do Google e a chave desligou. O Excluir da Apoio tira o
+  // evento do Google (o servidor não põe a marca com a chave desligada), e o motivo não promete o (CANCELADO).
+  test('chave desligada: linha marcada em erro sem poder tirar do Google, o Excluir da Apoio tira dos dois lados', async () => {
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 9,
+          municipio_nome: 'Crato',
+          status: 'aprovado',
+          gcal_status: 'ERROR',
+          external_event_id: 'asv29',
+          tipo_evento_de_formacao: true,
+          cancelado_na_agenda: true,
+          exclui_marcando_cancelado: false,
+          pode_tirar_do_google: false,
+          inicio: '2099-05-10T13:00:00Z',
+          fim: '2099-05-10T17:00:00Z',
+        }),
+      ])
+    );
+    renderPage();
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Por que não dá para editar nem excluir: 10/05/2099 · Crato' })
+    );
+    const texto = String(informar.mock.calls[0]![0].content);
+    expect(texto).toContain(
+      'Para excluir, peça ao Apoio de Coordenação da sua gerência, que exclui o evento em Publicar na agenda (ele sai do sistema e do Google Agenda).'
+    );
+    expect(texto).not.toContain('(CANCELADO)');
+    informar.mockRestore();
+  });
 });

@@ -598,6 +598,11 @@ def cancel_solicitacao(
             raise
 
     desvincular_do_google(s)
+    if s.cancelado_na_agenda:
+        # Só chega aqui a linha marcada cujo Cancelar não terminou, com a chave do CON-08 B desligada
+        # (`excluir_marca_cancelado`): o evento saiu do Google, e a marca não tem mais o que proteger.
+        s.cancelado_na_agenda = False
+        s.save(update_fields=["cancelado_na_agenda"])
 
     return SyncOutcome(
         action="DELETE", solicitation_id=s.id, external_event_id=None, summary=f"Solicitação #{s.id} (cancelada)"

@@ -318,8 +318,10 @@ def test_publicar_reenviar_reaplicar_e_lotes_recusam_linha_cancelada(gcal_status
 
 @pytest.mark.django_db
 @pytest.mark.usefixtures("modo_google")
-def test_tirar_do_google_recusa_linha_cancelada_na_agenda(google):
-    s = _formacao(cancelado_na_agenda=True)
+@pytest.mark.parametrize("gcal_status", ["PUBLISHED", "ERROR"])
+def test_tirar_do_google_recusa_linha_cancelada_na_agenda(google, gcal_status):
+    """Com a chave ligada, também a linha ERROR marcada sem Cancelar confirmado: a saída dela é refazer o Cancelar."""
+    s = _formacao(cancelado_na_agenda=True, gcal_status=gcal_status)
     _no_google(google, s, _MARCADO)
 
     with patch(_DELAY_TIRAR) as delay:
@@ -1757,10 +1759,15 @@ def test_excluir_marca_cancelado_so_na_linha_ja_marcada_com_a_chave_desligada(se
     formacao = _formacao()
     marcada = _formacao(cancelado_na_agenda=True)
     outro = _formacao(tipo="Reunião de Alinhamento")
+    # Revisão da rodada 1: a linha ERROR marcada só conta como cancelada quando um Cancelar dela terminou.
+    erro_sem_confirmar = _formacao(gcal_status="ERROR", cancelado_na_agenda=True)
+    erro_confirmado = _formacao(gcal_status="ERROR", cancelado_na_agenda=True)
+    _cancelar_confirmado(erro_confirmado)
+    linhas = (formacao, marcada, outro, erro_sem_confirmar, erro_confirmado)
 
-    assert [excluir_marca_cancelado(s) for s in (formacao, marcada, outro)] == [True, True, False]
+    assert [excluir_marca_cancelado(s) for s in linhas] == [True, True, False, True, True]
     settings.CON08_CANCELAR_NA_AGENDA = False
-    assert [excluir_marca_cancelado(s) for s in (formacao, marcada, outro)] == [False, True, False]
+    assert [excluir_marca_cancelado(s) for s in linhas] == [False, True, False, False, True]
 
 
 @pytest.mark.django_db
@@ -1822,6 +1829,82 @@ class TestChaveDesligada:
         assert (evento["summary"], evento["status"]) == (_MARCADO, "confirmed")
         assert contador.chamadas == []
         assert _acoes(sol_id) == ["CANCELAR_NA_AGENDA", "DELETE"]
+
+    def test_linha_error_marcada_sem_cancelar_confirmado_o_excluir_tira_do_google(
+        self, apoio, gerencia, google, monkeypatch
+    ):
+        """Revisão da rodada 1: o Cancelar falhou antes do Google com a chave ligada (ERROR, marca, título sem
+        "(CANCELADO)"), e depois a chave desligou. O Excluir não põe a marca agora, o que seria um cancelamento
+        novo com a chave desligada: tira o evento do Google, como o de formação não marcado."""
+        s = _da_gerencia(gerencia, usuario=UsuarioFactory(), gcal_status="ERROR", cancelado_na_agenda=True)
+        _no_google(google, s)
+        sol_id, eid = s.pk, s.external_event_id
+        contador = _Contador(google)
+        monkeypatch.setattr(_FABRICA, lambda: (contador, CAL))
+
+        resposta = _api(apoio).delete(f"/api/solicitacoes/{sol_id}/")
+
+        assert resposta.status_code == 204, resposta.data
+        assert not Solicitacao.objects.filter(pk=sol_id).exists()
+        assert "patch_titulo" not in contador.chamadas
+        evento = google.get(CAL, eid)
+        assert (evento["summary"], evento["status"]) == (_TITULO, "cancelled")
+        assert _acoes(sol_id) == ["CANCEL_GCAL", "DELETE"]
+
+    def test_linha_error_marcada_sem_cancelar_confirmado_sai_pelo_tirar_e_perde_a_marca(self, google):
+        """A mesma linha não fica presa: as guardas da marca seguem (não se publica, não se reenvia, não se edita),
+        mas o Tirar só do Google aceita. A marca sai quando o evento sai do Google, e a linha volta a ser comum."""
+        from apps.core.tasks import task_cancel_solicitacao_from_gcal
+
+        s = _formacao(gcal_status="ERROR", cancelado_na_agenda=True)
+        _no_google(google, s)
+        eid = s.external_event_id
+        api = _api()
+
+        with (
+            patch(_DELAY_PUBLICAR) as publicar_delay,
+            patch(_DELAY_TIRAR, return_value=SimpleNamespace(id="tarefa-falsa")) as tirar_delay,
+        ):
+            publicar = api.post(f"/api/solicitacoes/{s.pk}/publish/", {}, format="json")
+            reenviar = api.post(f"/api/solicitacoes/{s.pk}/resync-gcal/", {}, format="json")
+            editar = api.patch(f"/api/solicitacoes/{s.pk}/", {"observacoes": "mudou"}, format="json")
+            tirar = api.post(f"/api/solicitacoes/{s.pk}/cancel-gcal/", {}, format="json")
+
+        assert (publicar.status_code, publicar.data["code"]) == (400, "cancelado_na_agenda")
+        assert (reenviar.status_code, reenviar.data["code"]) == (400, "cancelado_na_agenda")
+        assert editar.status_code == 400, editar.data
+        publicar_delay.assert_not_called()
+        assert tirar.status_code == 202, tirar.data
+        tirar_delay.assert_called_once()
+        assert _linha(s)["cancelado_na_agenda"] is True, "a marca fica até o evento sair do Google"
+
+        task_cancel_solicitacao_from_gcal(s.pk, pedido=_linha(s)["gcal_pedido"])
+
+        linha = _linha(s)
+        assert (linha["gcal_status"], linha["cancelado_na_agenda"], linha["external_event_id"]) == ("NONE", False, None)
+        evento = google.get(CAL, eid)
+        assert (evento["summary"], evento["status"]) == (_TITULO, "cancelled")
+
+    def test_tirar_que_falha_na_linha_error_marcada_mantem_a_marca(self, google, monkeypatch):
+        """Se o Tirar falha, o evento segue no Google: a marca fica, e com ela as guardas."""
+        from apps.core.tasks import task_cancel_solicitacao_from_gcal
+
+        s = _formacao(gcal_status="ERROR", cancelado_na_agenda=True)
+        _no_google(google, s)
+
+        def _falha(*_args: Any, **_kwargs: Any) -> None:
+            raise RuntimeError("Google fora do ar (simulado)")
+
+        monkeypatch.setattr(google, "delete", _falha)
+        with patch(_DELAY_TIRAR, return_value=SimpleNamespace(id="tarefa-falsa")):
+            tirar = _api().post(f"/api/solicitacoes/{s.pk}/cancel-gcal/", {}, format="json")
+        assert tirar.status_code == 202, tirar.data
+
+        task_cancel_solicitacao_from_gcal(s.pk, pedido=_linha(s)["gcal_pedido"])
+
+        linha = _linha(s)
+        assert (linha["gcal_status"], linha["cancelado_na_agenda"]) == ("ERROR", True)
+        assert _titulo(google, s) == _TITULO
 
     def test_a_acao_cancelar_na_agenda_recusa(self, apoio, gerencia):
         s = _da_gerencia(gerencia, usuario=UsuarioFactory())
@@ -1932,10 +2015,13 @@ class TestChaveDesligada:
     @pytest.mark.parametrize("gcal_status", ["PUBLISHED", "ERROR"])
     def test_a_linha_ja_marcada_segue_protegida(self, google, gcal_status):
         """Publicar, reenviar, tirar do Google, o sync e a edição recusam a linha marcada nos dois estados da chave:
-        sem isso, publicar de novo tiraria o "(CANCELADO)" do título no Google."""
+        sem isso, publicar de novo tiraria o "(CANCELADO)" do título no Google. Em ERROR, com o Cancelar confirmado;
+        sem ele, o Tirar aceita (`test_linha_error_marcada_sem_cancelar_confirmado_sai_pelo_tirar_e_perde_a_marca`)."""
         from apps.core.services.gcal.sync import CriacaoRecusada, upsert_one
 
         s = _formacao(cancelado_na_agenda=True, gcal_status=gcal_status)
+        if gcal_status == "ERROR":
+            _cancelar_confirmado(s)
         _no_google(google, s, _MARCADO)
         api = _api()
 

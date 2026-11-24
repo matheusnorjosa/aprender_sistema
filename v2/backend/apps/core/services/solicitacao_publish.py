@@ -133,10 +133,16 @@ def excluir_marca_cancelado(s: Solicitacao) -> bool:
     """O Excluir desta linha, que está no Google, marca o título com "(CANCELADO) " em vez de tirar o evento
     de lá? Sim para evento de formação e para a linha já cancelada na agenda (decisão do dono, 23/11/2026).
 
-    Com a chave do CON-08 B desligada, só a linha já cancelada na agenda (marcada quando a chave esteve ligada): o
-    título dela no Google já tem, ou deveria ter, o "(CANCELADO)", e apagar o evento de lá desfaria o cancelamento
-    que o DFF já leu. O evento de formação não marcado volta a sair do Google, como antes do #2255."""
-    return s.cancelado_na_agenda or (cancelar_na_agenda_ligado() and eh_evento_de_formacao(s))
+    Com a chave do CON-08 B desligada, só a linha cujo Cancelar terminou no Google (`cancelamento_confirmado`,
+    marcada quando a chave esteve ligada): o título dela lá já tem o "(CANCELADO)", e apagar o evento desfaria o
+    cancelamento que o DFF já leu. O evento de formação não marcado volta a sair do Google, como antes do #2255. A
+    linha marcada sem Cancelar confirmado (ERROR: o Cancelar falhou antes do Google) também: marcar o título agora
+    seria um cancelamento novo com a chave desligada (revisão da rodada 1 da chave). É o mesmo critério da tarefa
+    que fica na fila (`_cancelar_na_agenda_desligado`), e o Tirar só do Google também a aceita (`pedir_operacao_gcal`).
+    """
+    if s.cancelado_na_agenda:
+        return cancelar_na_agenda_ligado() or cancelamento_confirmado(s)
+    return cancelar_na_agenda_ligado() and eh_evento_de_formacao(s)
 
 
 # Desfechos de um Cancelar que terminou (`task_cancelar_na_agenda`, ou o remover do Excluir que não apagou a linha).
@@ -183,7 +189,8 @@ def pedir_operacao_gcal(solicitacao_id: int, operacao: OperacaoGcal) -> str:
     a linha). Aceita o que o cancelar aceita, só em evento de formação ou na linha já marcada
     (o refazer do Cancelar que falhou, mesmo com o tipo renomeado: `excluir_marca_cancelado`), e grava a marca
     `cancelado_na_agenda` aqui, no pedido: já no PENDING a linha não se publica, não se reenvia e não se tira
-    do Google (o cancelar recusa a linha marcada). Pela tela não há desfazer; só a tarefa do Cancelar tira a marca,
+    do Google (o cancelar recusa a linha marcada; com a chave desligada, só a de Cancelar confirmado, e a marca da
+    outra sai com o evento em `cancel_solicitacao`). Pela tela não há desfazer; só a tarefa do Cancelar tira a marca,
     quando o Event ID adotado não é achado e nenhum Cancelar anterior terminou (gcal.spec, "A tarefa"). A marca
     sozinha não libera a agenda: só com a linha de volta a PUBLISHED pela tarefa (`cancelado_confirmado_q`). A
     linha marcada só se pede de novo em PENDING ou ERROR (o refazer); fora deles o Cancelar já terminou (409
@@ -224,7 +231,9 @@ def pedir_operacao_gcal(solicitacao_id: int, operacao: OperacaoGcal) -> str:
         and s.gcal_status not in (Solicitacao.GCalStatus.PENDING, Solicitacao.GCalStatus.ERROR)
     ):
         raise ConflictError(message=_MSG_JA_CANCELADO_NA_AGENDA, details={"code": "ja_cancelado_na_agenda"})
-    if operacao == "cancelar" and s.cancelado_na_agenda:
+    # A linha marcada não se tira do Google, salvo com a chave desligada e sem Cancelar confirmado (o título lá não
+    # tem a marca): aí o Tirar é a saída dela, e a marca sai com o evento (`cancel_solicitacao`).
+    if operacao == "cancelar" and s.cancelado_na_agenda and excluir_marca_cancelado(s):
         raise ConflictError(message=_MSG_CANCELADO_NA_AGENDA_NAO_TIRA, details={"code": "cancelado_na_agenda"})
 
     if operacao in ("cancelar", "cancelar_na_agenda"):

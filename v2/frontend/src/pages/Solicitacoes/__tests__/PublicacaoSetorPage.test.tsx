@@ -1294,7 +1294,9 @@ describe('PublicacaoSetorPage — chave do CON-08 B desligada', { timeout: 20000
     expect(screen.queryByLabelText(/^Cancelar evento:/)).not.toBeInTheDocument();
   });
 
-  test('cancelamento que falhou: a etiqueta fica, sem Cancelar evento para refazer', async () => {
+  // Revisão da rodada 1 da chave: o Cancelar falhou antes do Google (o título lá não tem a marca). A linha não fica
+  // presa: Tirar só do Google e o Excluir tiram o evento de lá, como antes do CON-08 B.
+  test('cancelamento que falhou: a etiqueta fica, sem Cancelar evento para refazer, com Tirar só do Google', async () => {
     listResponse = pageOf([
       makeSolic({ ...FORMACAO_DESLIGADA, gcal_status: 'ERROR', cancelado_na_agenda: true, gcal_last_error: 'x' }),
     ]);
@@ -1302,6 +1304,36 @@ describe('PublicacaoSetorPage — chave do CON-08 B desligada', { timeout: 20000
 
     expect(await screen.findByText('Erro ao cancelar')).toBeInTheDocument();
     expect(screen.queryByLabelText(/^Cancelar evento:/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^Tirar só do Google: Vidas Em Rede/)).toBeInTheDocument();
+  });
+
+  test('Excluir do cancelamento que falhou tira dos dois lados', async () => {
+    listResponse = pageOf([
+      makeSolic({
+        ...FORMACAO_DESLIGADA,
+        gcal_status: 'ERROR',
+        cancelado_na_agenda: true,
+        gcal_last_error: 'x',
+        pode_excluir: true,
+      }),
+    ]);
+    deleteResult = () => {
+      listResponse = pageOf([]);
+      return Promise.resolve(undefined);
+    };
+    renderPage();
+
+    fireEvent.click(await screen.findByLabelText(/^Excluir: Vidas Em Rede/));
+    const dialogo = await screen.findByRole('dialog');
+    expect(dialogo).toHaveTextContent(
+      '10/10/2099 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e do Google Agenda, se estiver lá. Não dá para desfazer.',
+    );
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Sim, excluir' }));
+
+    await waitFor(() => expect(deleteCalls()).toHaveLength(1));
+    await waitFor(() =>
+      expect(message.success).toHaveBeenCalledWith('Evento excluído do sistema e do Google Agenda.'),
+    );
   });
 
   test('Excluir de formação tira dos dois lados, como antes', async () => {

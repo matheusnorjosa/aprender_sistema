@@ -159,6 +159,26 @@ describe('PreAgendaPage — Excluir (G27)', () => {
     expect(config.content).toBe('05/11/2099 09:00 · Aracati · Projeto. Esta ação não pode ser desfeita.');
   });
 
+  // P5 (decisão do dono, 24/11/2026): linha já cancelada na agenda cujo evento sumiu do Google. O servidor apaga e
+  // devolve o aviso; a tela mostra o aviso no lugar do sucesso.
+  test('o aviso do servidor aparece no lugar da mensagem de sucesso', async () => {
+    const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
+    const aviso = 'Evento excluído do sistema, mas ele não foi achado no Google Agenda.';
+    deleteSolicitacaoMock.mockResolvedValue(aviso);
+    mockRows([row({ id: 7, municipio_nome: 'Crateús', cancelado_na_agenda: true, tipo_evento_de_formacao: true })]);
+    renderComo(DAT);
+    fireEvent.click(within(await linha('Crateús')).getByLabelText(EXCLUIR));
+    const config = confirmar.mock.calls[0]![0];
+    confirmar.mockRestore();
+    const sucesso = vi.spyOn(message, 'success');
+    const alerta = vi.spyOn(message, 'warning');
+    await config.onOk!();
+    expect(alerta).toHaveBeenCalledWith(aviso);
+    expect(sucesso).not.toHaveBeenCalled();
+    sucesso.mockRestore();
+    alerta.mockRestore();
+  });
+
   test('a recusa do servidor aparece inteira e a lista recarrega', async () => {
     const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
     const detail = 'Esta solicitação já foi aprovada e não pode ser excluída.';

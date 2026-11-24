@@ -135,7 +135,8 @@ class HomeStatsView(APIView):
             pending_approvals = pending_qs.exclude(id__in=impedidas).count()
 
         # === EVENTOS FUTUROS (com fail-safe explícito — fix #1284) ===
-        upcoming_qs = Solicitacao.objects.filter(status="aprovado", inicio__gte=now)
+        # O cancelado na agenda (CON-08 B) segue aprovado, mas não vai acontecer (decisão do dono, 24/11/2026).
+        upcoming_qs = Solicitacao.objects.filter(status="aprovado", cancelado_na_agenda=False, inicio__gte=now)
         upcoming_events: int | None = None
 
         if can_view_global_events:

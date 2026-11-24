@@ -83,6 +83,11 @@ from .utils.net import get_client_ip
 
 logger = logging.getLogger(__name__)
 
+_AVISO_EVENTO_NAO_ACHADO_NO_GOOGLE = (
+    "Evento excluído do sistema, mas ele não foi achado no Google Agenda. Se ainda aparecer lá, apague-o direto no "
+    "Google Agenda."
+)
+
 
 class _ExtraParticipantsSerializer(serializers.Serializer):
     """
@@ -408,8 +413,16 @@ curl -X POST /api/solicitacoes/ \\
     ),
     destroy=extend_schema(
         summary="Excluir solicitação",
-        description="Remove uma solicitação. Requer ser o proprietário ou ter privilégio especial.",
-        responses={204: None, **COMMON_ERROR_RESPONSES},
+        description=(
+            "Remove uma solicitação. Requer ser o proprietário ou ter privilégio especial. Responde 204 sem corpo; "
+            "200 com `aviso` quando a exclusão concluiu com algo a dizer (evento já cancelado na agenda que não foi "
+            "achado no Google)."
+        ),
+        responses={
+            204: None,
+            200: inline_serializer("SolicitacaoExclusaoAviso", fields={"aviso": serializers.CharField()}),
+            **COMMON_ERROR_RESPONSES,
+        },
         tags=["solicitacoes"],
     ),
 )
@@ -1330,13 +1343,18 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # Evento de formação (CON-08, decisão do dono de 23/11): o remover marca "(CANCELADO) " no título e o
         # evento fica no Google; a linha sai daqui do mesmo jeito.
         removido_do_google: dict[str, Any] = {}
+        aviso: str | None = None
         if no_google:
             marca = excluir_marca_cancelado(instance)
-            external_event_id = remover_do_google_agora(instance, self.request.user)
+            external_event_id, nao_achado = remover_do_google_agora(instance, self.request.user)
             removido_do_google = {
                 "cancelado_na_agenda" if marca else "removido_do_google": True,
                 "external_event_id": external_event_id,
             }
+            if nao_achado:
+                # P5 (decisão do dono, 24/11/2026): linha já cancelada na agenda cujo evento sumiu do Google.
+                removido_do_google["evento_nao_achado_no_google"] = True
+                aviso = _AVISO_EVENTO_NAO_ACHADO_NO_GOOGLE
 
         # Capturar dados antes da exclusão para o AuditLog
         solicitacao_data = {
@@ -1394,6 +1412,14 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
             # Executar exclusão
             instance.delete()
+        return aviso
+
+    def destroy(self, request, *args, **kwargs):
+        """204 sem corpo, como sempre; 200 com `aviso` quando a exclusão concluiu com algo a dizer (P5)."""
+        aviso = self.perform_destroy(self.get_object())
+        if aviso:
+            return Response({"aviso": aviso}, status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
         summary="Aprovar solicitação",

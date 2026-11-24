@@ -150,7 +150,7 @@ Cookie: sessionid=<session_id>
 | GET | `/api/solicitacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhes de uma solicitação | IsAuthenticated |
 | PUT | `/api/solicitacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar solicitação completa | `IsOwnerOrPrivileged` |
 | PATCH | `/api/solicitacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar parcialmente | `IsOwnerOrPrivileged` |
-| DELETE | `/api/solicitacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Excluir solicitação | `IsOwnerOrPrivileged` |
+| DELETE | `/api/solicitacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Excluir solicitação (204; 200 com `aviso` quando o evento já cancelado na agenda não foi achado no Google) | `IsOwnerOrPrivileged` |
 | POST | `/api/solicitacoes/lote/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar de 1 a 10 eventos numa transação (tudo ou nada). Corpo `{"eventos": [<payload do POST de 1 evento>, ...]}`; 201 `{"eventos": [{"indice", "id", "status"}]}`; 400 `lote_invalido` com `errors.itens[]` = `{indice, code, detail, errors? \| blocked_participants?}` | `create_solicitation` |
 | POST | `/api/solicitacoes/validate/` | ![Stable](https://img.shields.io/badge/-stable-green) | Validar payload antes de criar | `create_solicitation` ou `manage_admin_registries` |
 

@@ -1190,6 +1190,24 @@ describe('PublicacaoSetorPage — cancelar evento de formação', { timeout: 200
     );
   });
 
+  // P5 (decisão do dono, 24/11/2026): na linha já cancelada na agenda cujo evento sumiu do Google, o servidor apaga a
+  // linha e responde 200 com o aviso. A tela mostra o aviso no lugar da mensagem de sucesso.
+  test('Excluir de linha já cancelada que o Google não achou mostra o aviso do servidor', async () => {
+    const aviso = 'Evento excluído do sistema, mas ele não foi achado no Google Agenda.';
+    listResponse = pageOf([makeSolic({ ...FORMACAO, cancelado_na_agenda: true, pode_excluir: true })]);
+    deleteResult = () => {
+      listResponse = pageOf([]);
+      return Promise.resolve({ aviso });
+    };
+    renderPage();
+
+    fireEvent.click(await screen.findByLabelText(/^Excluir: Vidas Em Rede/));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Sim, excluir' }));
+
+    await waitFor(() => expect(message.warning).toHaveBeenCalledWith(aviso));
+    expect(message.success).not.toHaveBeenCalled();
+  });
+
   test('Excluir de formação em ERROR sem id não promete que o evento está no Google', async () => {
     listResponse = pageOf([
       makeSolic({ ...FORMACAO, gcal_status: 'ERROR', external_event_id: null, pode_excluir: true }),

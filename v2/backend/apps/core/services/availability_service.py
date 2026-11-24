@@ -222,14 +222,18 @@ def _check_conflicts_impl(
     # CONVIDADO bloqueava indevidamente o FORMADOR. Desde 05/10/2026 quem criou também não
     # ocupa por ter criado: `ocupa_agenda_q` (formador, ou responsável que acompanha). O
     # filtro vai na ORIGEM da query (events_qs), não em Python depois.
-    aprovados_qs = Solicitacao.objects.filter(status=Solicitacao.Status.APROVADO).filter(ocupa_agenda_q(usuario))
+    # O evento cancelado na agenda (CON-08 B) segue aprovado, mas não vai acontecer: libera a agenda (decisão do
+    # dono, 24/11/2026).
+    aprovados_qs = Solicitacao.objects.filter(status=Solicitacao.Status.APROVADO, cancelado_na_agenda=False).filter(
+        ocupa_agenda_q(usuario)
+    )
     if exclude_solicitacao_id is not None:
         aprovados_qs = aprovados_qs.exclude(pk=exclude_solicitacao_id)
     # Lote: os irmãos gravados na mesma transação ocupam a agenda mesmo pendentes (decisão do dono, 28/10).
     events_qs = aprovados_qs
     if lote:
         events_qs = Solicitacao.objects.filter(Q(status=Solicitacao.Status.APROVADO) | Q(pk__in=list(lote)))
-        events_qs = events_qs.filter(ocupa_agenda_q(usuario))
+        events_qs = events_qs.filter(cancelado_na_agenda=False).filter(ocupa_agenda_q(usuario))
         if exclude_solicitacao_id is not None:
             events_qs = events_qs.exclude(pk=exclude_solicitacao_id)
 

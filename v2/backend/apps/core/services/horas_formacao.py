@@ -8,7 +8,8 @@ SSOT da contagem usada pela Grade Mensal e pelo painel de Equipe:
 - As CH do dia se somam: não há teto por dia (5 h + 5 h = 10 h).
 - O evento conta inteiro no dia local (America/Fortaleza) do INÍCIO, mesmo cruzando a
   meia-noite. Sem desconto de almoço. Online conta igual.
-- Só evento aprovado, de qualquer projeto ou gerência.
+- Só evento aprovado, de qualquer projeto ou gerência. O cancelado na agenda (`cancelado_na_agenda`, CON-08 B)
+  segue aprovado, mas não vai acontecer: não conta (decisão do dono, 24/11/2026).
 - Conta sempre quem ocupa a agenda pelo papel (`ENFORCED_ROLES`: FORMADOR e, desde 03/11/2026,
   COORD_ACOMPANHA, o coordenador além do responsável); o coordenador responsável (`coordenador`;
   sem ele, quem criou) só quando `coordenador_acompanha=True`. Convidado não conta.
@@ -69,11 +70,13 @@ def ocupacoes_aprovadas(
         role__in=ENFORCED_ROLES,
         usuario__isnull=False,
         solicitacao__status=Solicitacao.Status.APROVADO,
+        solicitacao__cancelado_na_agenda=False,
         solicitacao__inicio__gte=janela_inicio,
         solicitacao__inicio__lt=janela_fim,
     )
     acompanhados = Solicitacao.objects.filter(
         status=Solicitacao.Status.APROVADO,
+        cancelado_na_agenda=False,
         coordenador_acompanha=True,
         inicio__gte=janela_inicio,
         inicio__lt=janela_fim,

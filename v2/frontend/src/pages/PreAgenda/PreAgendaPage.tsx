@@ -555,8 +555,10 @@ export default function PreAgendaPage(): JSX.Element {
       autoFocusButton: 'cancel',
       onOk: async () => {
         try {
-          await deleteSolicitacao(record.id);
-          if (!noGoogle) message.success('Solicitação excluída.');
+          const aviso = await deleteSolicitacao(record.id);
+          // P5: excluída, mas o servidor tem algo a dizer (o evento cancelado na agenda não foi achado no Google).
+          if (aviso) message.warning(aviso);
+          else if (!noGoogle) message.success('Solicitação excluída.');
           else if (excluirMarcaCancelado(record))
             message.success(
               record.gcal_status === ('ERROR' as GCalStatus) && !record.external_event_id

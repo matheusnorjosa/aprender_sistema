@@ -368,8 +368,9 @@ export default function PublicacaoSetorPage(): JSX.Element {
       cancelText: 'Cancelar',
       autoFocusButton: 'cancel',
       onOk: async () => {
+        let aviso: string | undefined;
         try {
-          await deleteSolicitacao(row.id);
+          aviso = await deleteSolicitacao(row.id);
         } catch (error) {
           const err = error as ApiErrorLike;
           const httpStatus = err.response?.status ?? err.status;
@@ -393,7 +394,9 @@ export default function PublicacaoSetorPage(): JSX.Element {
         } else if (row.gcal_status === 'ERROR' && !row.external_event_id) {
           excluido = 'Evento excluído do sistema e do Google Agenda, se estava lá.';
         }
-        message.success(excluido);
+        // P5: excluída, mas o servidor tem algo a dizer (o evento cancelado na agenda não foi achado no Google).
+        if (aviso) message.warning(aviso);
+        else message.success(excluido);
         await load();
       },
     });

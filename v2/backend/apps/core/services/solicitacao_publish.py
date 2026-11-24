@@ -185,9 +185,11 @@ def pedir_operacao_gcal(solicitacao_id: int, operacao: OperacaoGcal) -> str:
         operacao == "reaplicar" and s.gcal_status == Solicitacao.GCalStatus.PUBLISHED
     )
     s.gcal_pedido = uuid4().hex
+    campos = ["gcal_pedido"]
     if operacao == "cancelar_na_agenda":
         s.cancelado_na_agenda = True
-    s.save(update_fields=["gcal_pedido", "cancelado_na_agenda"])
+        campos.append("cancelado_na_agenda")  # o signal libera a agenda dos participantes no cache
+    s.save(update_fields=campos)
     s.mark_gcal(
         status=Solicitacao.GCalStatus.PENDING,
         payload_hash=s.gcal_payload_hash if mantem_hash else None,
@@ -710,7 +712,7 @@ _MSG_GOOGLE_NAO_CONFIRMOU = (
 )
 
 
-def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | None:
+def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> tuple[str | None, bool]:
     """Tira o evento do Google AGORA (síncrono), para a exclusão apagar dos dois lados.
 
     Mesmo caminho da task de cancelamento (`task_cancel_solicitacao_from_gcal`): no modo OAuth o
@@ -725,10 +727,12 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | No
     Evento de formação (ou linha já cancelada na agenda, `excluir_marca_cancelado`): em vez de tirar do Google,
     marca o título com "(CANCELADO) " (`marcar_cancelado_no_google`) e grava `cancelado_na_agenda`; o evento fica
     lá, cancelado, e quem chama apaga a linha (decisão do dono, 23/11/2026). O AuditLog é `CANCELAR_NA_AGENDA`.
-    Se o Google falha, o rollback desfaz a marca.
+    Se o Google falha, o rollback desfaz a marca. Id adotado que o Google não acha (P5, decisão do dono de 24/11):
+    na linha não marcada, recusa (o id pode estar errado); na já marcada, conclui e avisa (`nao_achado`).
 
     Returns:
-        O `external_event_id` que estava (ou podia estar) no Google.
+        O `external_event_id` que estava (ou podia estar) no Google, e se o evento da linha já marcada não foi
+        achado lá (id adotado, 404 ou 410).
 
     Raises:
         ValidationAPIError 400 `gcal_cancel_failed` com o motivo legível. Se o Google falhou, nada
@@ -737,6 +741,7 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | No
     """
     from django.db import DatabaseError, transaction
 
+    from apps.core.services.gcal.sync import EventoAdotadoNaoAchado
     from apps.core.services.gcal_sync_service import (  # pyright: ignore[reportPrivateUsage]
         _event_id_for,
         cancel_solicitacao,
@@ -765,7 +770,9 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | No
             if s.gcal_status == Solicitacao.GCalStatus.ERROR and not s.external_event_id:
                 s.external_event_id = _event_id_for(s)
             external_event_id = s.external_event_id
+            nao_achado = False
             if excluir_marca_cancelado(s):
+                ja_marcada = s.cancelado_na_agenda
                 s.cancelado_na_agenda = True
                 s.save(update_fields=["cancelado_na_agenda"])
                 AuditLog.objects.create(
@@ -779,7 +786,15 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | No
                         "origem": "exclusao",
                     },
                 )
-                marcar_cancelado_no_google(s, client=client)
+                try:
+                    marcar_cancelado_no_google(s, client=client)
+                except EventoAdotadoNaoAchado:
+                    # P5 (decisão do dono, 24/11/2026): na linha já marcada o (CANCELADO) já foi para o Google;
+                    # o evento sumiu de lá depois. Sem saída por outro botão, a exclusão conclui com aviso. Na
+                    # linha não marcada o id pode estar errado (o evento lá com outro id): recusa, abaixo.
+                    if not ja_marcada:
+                        raise
+                    nao_achado = True
             else:
                 AuditLog.objects.create(
                     usuario=user,
@@ -815,4 +830,4 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | No
             mensagem = _MSG_GOOGLE_NAO_CONFIRMOU
         raise ValidationAPIError(message=mensagem, code="gcal_cancel_failed") from e
 
-    return external_event_id
+    return external_event_id, nao_achado

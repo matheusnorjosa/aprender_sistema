@@ -982,15 +982,58 @@ class TestExcluir:
         assert (evento["summary"], evento["status"]) == (_TITULO, "cancelled"), "não traz de volta nem marca"
 
     def test_formacao_com_id_adotado_nao_achado_recusa(self, apoio, gerencia, google):
-        """Id adotado que o GET não acha (404): recusa e nada some, como o `upsert_one`. Escolha em aberto com o dono
-        (revisão da rodada 1): manter a recusa ou apagar a linha com o aviso de que o evento não foi achado."""
+        """P5 (decisão do dono, 24/11/2026), linha NÃO marcada: o id adotado que o GET não acha (404) pode ser um
+        ponteiro errado, com o evento lá com outro id. Recusa e nada some, como o `upsert_one`."""
         s = _da_gerencia(gerencia, usuario=apoio, external_event_id=_ADOTADO)
 
         resposta = _api(apoio).delete(f"/api/solicitacoes/{s.pk}/")
 
         assert resposta.status_code == 400, resposta.data
+        assert "Nada foi excluído" in str(resposta.data["detail"])
         assert _linha(s)["cancelado_na_agenda"] is False
         assert _acoes(s.pk) == []
+
+    @pytest.mark.parametrize("gcal_status", ["PUBLISHED", "ERROR"])
+    def test_linha_ja_marcada_com_id_adotado_nao_achado_apaga_e_avisa(
+        self, apoio, gerencia, google, monkeypatch, gcal_status
+    ):
+        """P5 (decisão do dono, 24/11/2026), linha JÁ marcada: o (CANCELADO) já foi para o Google e depois o evento
+        sumiu de lá pelo id adotado (purgado, movido). Antes a linha ficava presa (o Excluir dava
+        `EventoAdotadoNaoAchado`; o Tirar e a edição recusam a linha marcada). Agora o Excluir apaga a linha e
+        devolve o aviso; o AuditLog do DELETE registra que o evento não foi achado. Nada é escrito no Google."""
+        s = _da_gerencia(
+            gerencia,
+            usuario=UsuarioFactory(),
+            gcal_status=gcal_status,
+            cancelado_na_agenda=True,
+            external_event_id=_ADOTADO,
+        )
+        sol_id = s.pk
+        contador = _Contador(google)
+        monkeypatch.setattr(_FABRICA, lambda: (contador, CAL))
+
+        resposta = _api(apoio).delete(f"/api/solicitacoes/{sol_id}/")
+
+        assert resposta.status_code == 200, resposta.data
+        assert "não foi achado no Google Agenda" in resposta.data["aviso"]
+        assert not Solicitacao.objects.filter(pk=sol_id).exists()
+        assert contador.chamadas == [], "nada escrito no Google"
+        assert google.get(CAL, _ADOTADO) is None, "não cria evento"
+        delete = AuditLog.objects.get(action="DELETE", details__solicitacao_data__id=sol_id)
+        assert delete.details["evento_nao_achado_no_google"] is True
+        assert (delete.details["cancelado_na_agenda"], delete.details["external_event_id"]) == (True, _ADOTADO)
+
+    def test_excluir_que_acha_o_evento_segue_sem_corpo(self, apoio, gerencia, google):
+        """O 204 sem corpo continua sendo a resposta de toda exclusão sem aviso."""
+        s = _da_gerencia(gerencia, usuario=apoio, cancelado_na_agenda=True)
+        _no_google(google, s, _MARCADO)
+
+        resposta = _api(apoio).delete(f"/api/solicitacoes/{s.pk}/")
+
+        assert resposta.status_code == 204
+        assert not resposta.content
+        delete = AuditLog.objects.get(action="DELETE", details__solicitacao_data__id=s.pk)
+        assert "evento_nao_achado_no_google" not in delete.details
 
     @pytest.mark.parametrize("gcal_status", ["PUBLISHED", "ERROR"])
     def test_linha_ja_cancelada_na_agenda_a_apoio_exclui_sem_marcar_de_novo(

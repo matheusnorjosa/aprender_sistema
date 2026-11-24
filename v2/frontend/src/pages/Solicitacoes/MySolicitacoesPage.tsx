@@ -283,8 +283,10 @@ export default function MySolicitacoesPage(): JSX.Element {
 
   const handleDelete = useCallback(async (id: ID): Promise<boolean> => {
     try {
-      await deleteSolicitacao(id);
-      message.success('Solicitação excluída com sucesso!');
+      const aviso = await deleteSolicitacao(id);
+      // P5: excluída, mas o servidor tem algo a dizer (o evento cancelado na agenda não foi achado no Google).
+      if (aviso) message.warning(aviso);
+      else message.success('Solicitação excluída com sucesso!');
       void loadData();
       return true;
     } catch (error) {

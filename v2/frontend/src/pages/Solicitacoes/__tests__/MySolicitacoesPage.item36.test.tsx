@@ -12,6 +12,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 import Modal from 'antd/es/modal';
+import message from 'antd/es/message';
 
 const { listSolicitacoesMock, deleteSolicitacaoMock } = vi.hoisted(() => ({
   listSolicitacoesMock: vi.fn(),
@@ -187,6 +188,29 @@ describe('MySolicitacoesPage — item 36', { timeout: 20000 }, () => {
     });
     expect(deleteSolicitacaoMock).toHaveBeenCalledWith(7);
     confirmar.mockRestore();
+  });
+
+  // P5 (decisão do dono, 24/11/2026): a exclusão que conclui com aviso (evento cancelado na agenda que o Google não
+  // achou) mostra o aviso do servidor no lugar da mensagem de sucesso.
+  test('Excluir com aviso do servidor mostra o aviso, não o sucesso', async () => {
+    const confirmar = vi
+      .spyOn(Modal, 'confirm')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    const sucesso = vi.spyOn(message, 'success').mockImplementation(vi.fn());
+    const alerta = vi.spyOn(message, 'warning').mockImplementation(vi.fn());
+    const aviso = 'Evento excluído do sistema, mas ele não foi achado no Google Agenda.';
+    listSolicitacoesMock.mockResolvedValue(pagina([makeSolic({ id: 7, municipio_nome: 'Crato' })]));
+    deleteSolicitacaoMock.mockResolvedValue(aviso);
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Excluir: 10/05/2026 · Crato' }));
+    await act(async () => {
+      await confirmar.mock.calls[0]![0].onOk?.();
+    });
+    expect(alerta).toHaveBeenCalledWith(aviso);
+    expect(sucesso).not.toHaveBeenCalled();
+    confirmar.mockRestore();
+    sucesso.mockRestore();
+    alerta.mockRestore();
   });
 
   test('depois de excluir, o foco fica na lista mesmo com a recarga ainda em andamento', async () => {

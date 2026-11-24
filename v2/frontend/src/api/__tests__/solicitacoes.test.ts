@@ -202,6 +202,14 @@ describe('solicitacoes API (MSW)', () => {
     expect(new URL(requests[0].url).pathname).toBe('/api/solicitacoes/13/');
   });
 
+  test('deleteSolicitacao devolve o aviso do 200 (evento cancelado na agenda que o Google não achou)', async () => {
+    const aviso = 'Evento excluído do sistema, mas ele não foi achado no Google Agenda.';
+    server.use(http.delete(apiUrl('/solicitacoes/14/'), () => HttpResponse.json({ aviso })));
+
+    expect(await deleteSolicitacao(14)).toBe(aviso);
+    expect(publishMock).toHaveBeenCalledWith('solicitacoes', { action: 'deleted' });
+  });
+
   test('previewSolicitacao posta em preview-gcal/ com body vazio', async () => {
     server.use(
       capturePost(

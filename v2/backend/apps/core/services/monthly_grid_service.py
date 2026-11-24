@@ -160,6 +160,8 @@ def build_monthly_grid(
         # Interseção com o mês: evento.inicio < month_end AND evento.fim > month_start
         inicio__lt=month_end,
         fim__gt=month_start,
+        # O evento cancelado na agenda (CON-08 B) não vai acontecer: não marca o dia (decisão do dono, 24/11/2026).
+        cancelado_na_agenda=False,
     )
 
     if sector and sector.strip():

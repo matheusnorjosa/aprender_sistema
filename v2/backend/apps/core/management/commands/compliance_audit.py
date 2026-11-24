@@ -247,9 +247,11 @@ class Command(BaseCommand):
         ).select_related("usuario")
 
         for block in total_blocks:
-            # Verificar solicitações aprovadas do mesmo usuário no mesmo período
+            # Verificar solicitações aprovadas do mesmo usuário no mesmo período. O cancelado na agenda (CON-08 B)
+            # não ocupa a agenda, como no motor de conflito (decisão do dono, 24/11/2026).
             conflicting = Solicitacao.objects.filter(
                 status="aprovado",
+                cancelado_na_agenda=False,
                 usuario=block.usuario,
                 inicio__lt=block.fim,
                 fim__gt=block.inicio,

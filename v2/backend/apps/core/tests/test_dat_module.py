@@ -710,6 +710,21 @@ class DATCompraAPITests(DATModuleAPITestCase):
         self.assertEqual(data["pendentes"][0]["total_itens"], 20)
         self.assertEqual(data["pendentes"][0]["ultima_compra"], date(2026, 3, 2))
 
+    def test_pendencias_evento_cancelado_na_agenda_nao_atende_a_compra(self):
+        """CON-08 B (decisão do dono, 24/11/2026): o evento cancelado na agenda segue aprovado, mas não vai
+        acontecer; a compra do par volta a ser pendência. O par vizinho, com evento igual sem a marca, é atendido."""
+        self._dat_compra(self.municipio, self.projeto)
+        self._dat_compra(self.municipio2, self.projeto)
+        cancelado = self._evento(self.municipio, self.projeto, status_evento="aprovado")
+        cancelado.cancelado_na_agenda = True
+        cancelado.save(update_fields=["cancelado_na_agenda"])
+        self._evento(self.municipio2, self.projeto, status_evento="aprovado")
+
+        data = self._pendencias()
+
+        self.assertEqual((data["total_com_compra"], data["total_com_evento"]), (2, 1))
+        self.assertEqual([p["municipio"] for p in data["pendentes"]], [self.municipio.nome])
+
     def test_pendencias_le_os_pares_uma_vez_so(self):
         """DEF-22: a lista e os totais saem da MESMA leitura dos pares (antes eram 4 consultas pesadas iguais)."""
         from django.db import connection

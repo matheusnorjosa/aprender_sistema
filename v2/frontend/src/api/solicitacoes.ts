@@ -179,16 +179,19 @@ export async function updateSolicitacao(id: ID, data: Partial<SolicitacaoPayload
  * - Não é possível excluir solicitações já publicadas no Google Calendar
  *
  * @param id - ID da solicitação
+ * @returns O aviso do servidor quando a exclusão concluiu com algo a dizer (200 com `aviso`: evento cancelado na
+ *   agenda que o Google não achou); undefined no 204 de sempre.
  */
-export async function deleteSolicitacao(id: ID): Promise<void> {
+export async function deleteSolicitacao(id: ID): Promise<string | undefined> {
   logger.debug('=== deleteSolicitacao ===');
   logger.debug('ID:', id);
 
-  await fetchAPI(`/solicitacoes/${id}/`, {
+  const resposta = await fetchAPI<{ aviso?: string } | undefined>(`/solicitacoes/${id}/`, {
     method: 'DELETE',
   });
   syncChannel.publish('solicitacoes', { action: 'deleted' });
   syncChannel.publish('availability', { action: 'changed' });
+  return resposta?.aviso;
 }
 
 /**

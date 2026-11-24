@@ -666,9 +666,11 @@ class DATCompraViewSet(LockOnWriteMixin, viewsets.ModelViewSet):
         """
         compras_qs = self.filter_queryset(self.get_queryset()).filter(ativo=True, quantidade__gt=0)
 
+        # O cancelado na agenda (CON-08 B) não vai acontecer: não atende a compra (decisão do dono, 24/11/2026).
         solicitacoes_ativas = Solicitacao.objects.filter(
             municipio_id=OuterRef("municipio_id"),
             status__in=["pendente", "aprovado"],
+            cancelado_na_agenda=False,
         )
         # O evento de dois projetos atende pelos dois (#2036): cada termo olha as duas vagas.
         atendida = (

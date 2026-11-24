@@ -79,6 +79,16 @@ def _invalidate_cache_on_solicitacao_change(
     coordenador_id = getattr(instance, "coordenador_id", None)
     if coordenador_id is not None and coordenador_id != getattr(instance, "usuario_id", None):
         invalidate_availability_cache(usuario_id=coordenador_id)
+    # A marca `cancelado_na_agenda` (CON-08 B) libera ou volta a ocupar a agenda de todos os participantes sem
+    # mexer em Participation (decisão do dono, 24/11/2026): a consulta com cache deles também muda.
+    update_fields = kwargs.get("update_fields")
+    if update_fields and "cancelado_na_agenda" in update_fields:
+        for usuario_id in (
+            Participation.objects.filter(solicitacao_id=instance.pk, usuario_id__isnull=False)
+            .values_list("usuario_id", flat=True)
+            .distinct()
+        ):
+            invalidate_availability_cache(usuario_id=usuario_id)
 
 
 @receiver([post_save, post_delete], sender=AvailabilityBlock)

@@ -1741,15 +1741,25 @@ def test_servico_de_entrada_recusa_sem_formacao_antes_de_enfileirar():
 # Google um evento cujo título já tem "(CANCELADO)".
 
 
-def test_a_chave_vem_desligada_sem_a_variavel_de_ambiente():
-    """O módulo de configuração lê a variável na subida; a CI não a define. O `settings` dos testes é outro objeto,
+@pytest.mark.parametrize(("valor", "esperado"), [(None, False), ("", False), ("0", False), ("1", True)])
+def test_a_chave_so_liga_com_1(valor: str | None, esperado: bool):
+    """Ausente, vazia ou "0": desligada. A regra é testada sem olhar o ambiente do container, que pode trazer a
+    variável (o `.env` feito do exemplo traz `=0`)."""
+    from config.settings import ler_chave_con08
+
+    assert ler_chave_con08(valor) is esperado
+
+
+def test_o_settings_le_a_chave_pela_regra():
+    """O módulo de configuração lê a variável na subida pela mesma regra. O `settings` dos testes é outro objeto,
     que a fixture `_chave_ligada` troca."""
     import importlib
     import os
 
-    assert "CON08_CANCELAR_NA_AGENDA" not in os.environ
+    from config.settings import ler_chave_con08
+
     modulo = importlib.import_module(os.environ["DJANGO_SETTINGS_MODULE"])
-    assert modulo.CON08_CANCELAR_NA_AGENDA is False
+    assert modulo.CON08_CANCELAR_NA_AGENDA is ler_chave_con08(os.environ.get("CON08_CANCELAR_NA_AGENDA"))
 
 
 @pytest.mark.django_db

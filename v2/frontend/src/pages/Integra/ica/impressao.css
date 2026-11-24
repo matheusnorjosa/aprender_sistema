@@ -1,0 +1,41 @@
+/*
+ * Impressão (e "Salvar como PDF") das telas da Integra.
+ *
+ * Só vale quando a página tem a moldura da Integra (`.integra`): as outras telas do sistema imprimem
+ * como antes. Sai o menu lateral, o cabeçalho e o botão de feedback (o que vem depois de #main);
+ * o conteúdo ocupa a largura toda. As faixas de filtro e os botões levam a classe `print:hidden`.
+ * A faixa "DADOS SIMULADOS" fica no começo (ela deixa de ser fixa com `print:static`), e o aviso se
+ * repete na margem de cima de toda folha (`../integra.css`).
+ */
+@media print {
+  body:has(.integra) .ant-layout-sider,
+  body:has(.integra) .ant-layout-header,
+  body:has(.integra) .mobile-sidebar-overlay,
+  body:has(.integra) #main ~ * {
+    display: none !important;
+  }
+
+  body:has(.integra) .ant-layout {
+    margin-left: 0 !important;
+    min-height: 0 !important;
+    background: #fff !important;
+  }
+
+  .integra section,
+  .integra li,
+  .integra tr {
+    break-inside: avoid;
+  }
+
+  /* O botão "Expandir linha" das tabelas não faz nada no papel: sai ele e a coluna dele. */
+  .integra .ant-table-row-expand-icon-cell,
+  .integra .ant-table-expand-icon-col {
+    display: none !important;
+  }
+
+  /* Cores de fundo das etiquetas e das barras também no papel. */
+  .integra {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

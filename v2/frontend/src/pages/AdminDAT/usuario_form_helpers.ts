@@ -135,12 +135,13 @@ interface GerenciaLike {
 /**
  * O que o pacote da gerência dá a quem é Equipe ou Gerente nela; espelha `PERFIL_PERMITIDO` e `PACOTE`
  * (`apps/core/services/rbac_pacotes.py`). PR 11: DAT e Controle aprovam; a Diretoria (D20) supervisiona e
- * vê os painéis, sem aprovar.
+ * vê os painéis, sem aprovar. A SPE (PR 2-b da Integra, 24/11/2026) só abre a Integra.
  */
 const AVISO_DO_PACOTE: Record<string, string> = {
   'GERENCIA DAT': 'Nesta gerência, Equipe e Gerente recebem o pacote do setor, inclusive aprovar solicitações.',
   CONTROLE: 'Nesta gerência, Equipe e Gerente recebem o pacote do setor, inclusive aprovar solicitações.',
   DIRETORIA: 'Nesta gerência, Equipe e Gerente recebem o pacote da Diretoria: supervisão e painéis, sem aprovar solicitações.',
+  SPE: 'Nesta gerência, Equipe e Gerente recebem o pacote da SPE: dá acesso à Integra, sem aprovar solicitações.',
 };
 
 /** O aviso do pacote que a gerência dá a quem é Equipe ou Gerente nela; null se ela não dá pacote. */
@@ -183,7 +184,7 @@ export function motivoDaLotacaoTravada(opts: {
   if (opts.currentIsSuperuser || !opts.podeLotarComum) return null;
   if (opts.propria) return 'Sua própria lotação só o superusuário altera.';
   if (opts.reservada) {
-    return 'Esta pessoa trabalha no DAT, no Controle ou na Diretoria, ou é Gerente da Superintendência: a lotação dela só o superusuário altera.';
+    return 'Esta pessoa trabalha no DAT, no Controle, na Diretoria ou na SPE, ou é Gerente da Superintendência: a lotação dela só o superusuário altera.';
   }
   return null;
 }
@@ -270,12 +271,14 @@ export function resumoDoMenu(policies: readonly string[]): { itens: string[]; fr
   if (
     caps.canViewOverviewDashboard ||
     caps.canViewComprasDashboard ||
+    caps.canViewComprasPendencias ||
     caps.canViewTeamDashboard ||
     caps.canViewGcalDashboard ||
     caps.canViewMapMetrics
   ) {
     itens.push('Dashboards');
   }
+  if (caps.canAccessIntegra) itens.push('Integra');
   if (caps.canManageAdminRegistries) itens.push('DAT');
   if (caps.canAccessMonthlyAvailability) itens.push('Grade Mensal');
   if (caps.canCreateSolicitation) itens.push('Solicitações');

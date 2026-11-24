@@ -131,6 +131,8 @@ describe('UsuariosPage — equipe administrativa', () => {
 
     const caixa = within(dialog).getByRole('checkbox', { name: /equipe administrativa/i });
     expect(caixa).toBeChecked();
+    // A ajuda da caixa diz o que ela dá em cada gerência com pacote, inclusive na SPE (PR 2-b da Integra).
+    expect(within(dialog).getByText(/na da SPE, só a Integra/)).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole('button', { name: /^salvar$/i }));
 

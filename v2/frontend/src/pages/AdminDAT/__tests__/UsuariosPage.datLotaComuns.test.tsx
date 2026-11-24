@@ -2,7 +2,7 @@
  * O DAT lota nas gerências comuns (decisão do dono de 17/10/2026).
  *
  * - Quem tem a policy `manage_lotacao_comum` (o DAT) edita Gerência, Função e Equipe administrativa.
- * - A lista de gerências esconde do DAT as reservadas (`lotacao_reservada`: DAT, Controle, Diretoria).
+ * - A lista de gerências esconde do DAT as reservadas (`lotacao_reservada`: DAT, Controle, Diretoria, SPE).
  * - Conta com vínculo reservado (`lotacao_reservada` do usuário) e a própria conta: campos travados com o
  *   motivo, e o Salvar não envia a lotação.
  * - Sem a policy, nada muda: campos travados e lotação fora do payload.
@@ -133,6 +133,8 @@ describe('motivoDaLotacaoTravada', () => {
   test('a própria conta e a conta reservada travam com o motivo', () => {
     expect(motivoDaLotacaoTravada({ ...dat, propria: true })).toMatch(/sua própria lotação/i);
     expect(motivoDaLotacaoTravada({ ...dat, reservada: true })).toMatch(/a lotação dela só o superusuário altera/i);
+    // As reservadas são as de `gerencia_reservada` no backend, com a SPE (PR 2-b da Integra).
+    expect(motivoDaLotacaoTravada({ ...dat, reservada: true })).toMatch(/no DAT, no Controle, na Diretoria ou na SPE/);
   });
 
   test('superusuário e quem não tem a policy não recebem motivo', () => {

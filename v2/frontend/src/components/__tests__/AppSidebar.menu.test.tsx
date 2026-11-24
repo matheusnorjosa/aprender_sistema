@@ -26,6 +26,7 @@ import {
   type NomeDoAtor,
 } from '../../test/atoresRbac';
 import { ComAcesso } from '../../test/comAcesso';
+import { resumoDoMenu } from '../../pages/AdminDAT/usuario_form_helpers';
 
 // ============================================================================
 // Setup
@@ -75,6 +76,7 @@ const TOP_LEVEL_ITEMS = [
   'Ações Internas',
   'Deslocamentos',
   'Dashboards',
+  'Integra',
   'DAT',
   'Grade Mensal',
   'Solicitações',
@@ -167,15 +169,16 @@ const ACTORS: ActorSnapshot[] = [
   },
   {
     // D8: Diretoria fora da Grade Mensal; só dashboards. PR 10 (02/10, nº 13): fora do painel do Google.
+    // Integra (24/11/2026, Q9): pelo pacote DIRETORIA.
     actor: 'Diretoria',
-    expectedVisible: ['Página Inicial', 'Meus Eventos', 'Dashboards'],
+    expectedVisible: ['Página Inicial', 'Meus Eventos', 'Dashboards', 'Integra'],
     expectedDashboardsChildren: ['Dashboard Geral', 'Dashboard Compras', 'Dashboard Equipe', 'Mapa do Brasil'],
     expectedDatChildren: [],
     expectedControleChildren: [],
     expectedSolicitacoesChildren: [],
   },
   {
-    // Vínculo GERENTE vigente: Bloqueios, Deslocamentos e Grade (PR A).
+    // Vínculo GERENTE vigente: Bloqueios, Deslocamentos e Grade (PR A); a Integra (24/11/2026, Q9).
     actor: 'Gerente da Superintendência',
     expectedVisible: [
       'Página Inicial',
@@ -183,6 +186,7 @@ const ACTORS: ActorSnapshot[] = [
       'Aprovações',
       'Bloqueios',
       'Deslocamentos',
+      'Integra',
       'Grade Mensal',
       'Solicitações',
     ],
@@ -483,6 +487,30 @@ describe('AppSidebar — "Publicar na agenda" (#1656)', () => {
   });
 });
 
+describe('AppSidebar — Integra (24/11/2026)', () => {
+  test('access_integra → Integra visível, levando a /integra', () => {
+    renderSidebar(['access_integra']);
+    expect(screen.getByRole('link', { name: /^Integra$/i }).getAttribute('href')).toBe('/integra');
+  });
+
+  test('sem a policy → Integra escondida', () => {
+    renderSidebar([]);
+    expect(isTopLevelVisible('Integra')).toBe(false);
+  });
+
+  test('dentro da Integra (/integra/ica) o item fica selecionado', () => {
+    render(
+      <MemoryRouter initialEntries={['/integra/ica']}>
+        <ComAcesso policies={['access_integra']}>
+          <AppSidebar {...SIDEBAR_PROPS} />
+        </ComAcesso>
+      </MemoryRouter>,
+    );
+    const link = screen.getByRole('link', { name: /^Integra$/i });
+    expect(link.closest('li')?.className).toContain('ant-menu-item-selected');
+  });
+});
+
 describe('AppSidebar — Pendências de compras (09/11/2026)', () => {
   test('só view_compras_pendencias: o submenu Dashboards aparece, só com Pendências de compras', () => {
     renderSidebar(['view_compras_pendencias']);
@@ -667,5 +695,33 @@ describe('AppSidebar — modo pela largura (Programa C, C1)', () => {
     expect(document.querySelector('.mobile-sidebar-overlay')).toBeNull();
     fireEvent.click(screen.getByRole('link', { name: 'Página Inicial' }));
     expect(toggle).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// Paridade com o resumo da tela de Usuários
+// ============================================================================
+
+/**
+ * "O que vê no menu hoje" (`resumoDoMenu`, tela de Usuários) repete as condições deste menu, e foi assim
+ * que a Integra ficou de fora do resumo (PR 2-b). Aqui os dois andam juntos: os itens de topo do resumo
+ * são os do menu, sem a Página Inicial. No resumo, "Publicar na agenda" é o item de Solicitações.
+ */
+const CASOS_DE_PARIDADE: readonly { ator: string; policies: readonly string[] }[] = [
+  ...ATORES_RBAC.map(({ ator, policies }) => ({ ator, policies })),
+  ...PERSONAS_POR_VINCULO.map(({ ator, policies }) => ({ ator, policies })),
+  { ator: 'EQUIPE na SPE (só a Integra)', policies: ['access_integra'] },
+  { ator: 'Só as pendências de compras', policies: ['view_compras_pendencias'] },
+  { ator: 'Só publicar na agenda', policies: ['publish_setor_solicitacao'] },
+];
+
+describe('AppSidebar — paridade com resumoDoMenu (tela de Usuários)', () => {
+  test.each(CASOS_DE_PARIDADE)('$ator: o resumo lista os itens de topo do menu', ({ policies }) => {
+    renderSidebar(policies);
+    const doMenu = TOP_LEVEL_ITEMS.filter((item) => item !== 'Página Inicial' && isTopLevelVisible(item));
+    const doResumo = [
+      ...new Set(resumoDoMenu(policies).itens.map((item) => (item === 'Publicar na agenda' ? 'Solicitações' : item))),
+    ];
+    expect(doResumo).toEqual(doMenu);
   });
 });

@@ -53,6 +53,8 @@ export interface Capabilities {
   canCreateSolicitationWithoutPurchase: boolean;
   // O DAT lota nas gerências comuns pela tela de Usuários (17/10/2026).
   canManageLotacaoComum: boolean;
+  // Integra (24/11/2026, decisão Q9): superusuário, Diretoria e a gerente da Superintendência.
+  canAccessIntegra: boolean;
 }
 
 /** Versão pura (sem React) — usada em tests e call sites sem render. */
@@ -90,6 +92,7 @@ export function computeCapabilities(policies: readonly string[]): Capabilities {
     canExecuteRestrictedOperations: can('execute_restricted_operations'),
     canCreateSolicitationWithoutPurchase: can('create_solicitation_without_purchase'),
     canManageLotacaoComum: can('manage_lotacao_comum'),
+    canAccessIntegra: can('access_integra'),
   };
 }
 

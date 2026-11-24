@@ -389,6 +389,8 @@ ai_export/
 # Reports
 relatorios/
 dados/
+# Código-fonte (dados simulados da Integra), não dump de dado: exceção explícita a `dados/`
+!v2/frontend/src/pages/Integra/dados/
 
 # Editor
 .vscode/settings.json

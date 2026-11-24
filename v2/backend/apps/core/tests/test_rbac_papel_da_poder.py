@@ -308,9 +308,10 @@ class TestTravas:
         migration.forwards(django_apps, None)
         assert not PermissaoFuncional.objects.filter(codename="approve_solicitation_batch").exists()
 
-    def test_seed_tem_17_itens(self):
+    def test_seed_tem_18_itens(self):
+        """17 depois do PR 8; +1 `access_integra` (Integra, 24/11/2026)."""
         _validate_seed()
-        assert len(FUNCTIONAL_PERMISSIONS_SEED) == 17
+        assert len(FUNCTIONAL_PERMISSIONS_SEED) == 18
 
     def test_approve_solicitation_batch_nao_existe(self):
         assert "approve_solicitation_batch" not in {i.codename for i in FUNCTIONAL_PERMISSIONS_SEED}

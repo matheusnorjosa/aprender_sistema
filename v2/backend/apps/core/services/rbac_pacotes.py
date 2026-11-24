@@ -54,14 +54,20 @@ PACOTE: dict[str, frozenset[str]] = {
     ),
     # A aprovação de SUPER vem do papel GERENTE na gerência aprovadora, não de pacote.
     "APROVACAO": frozenset(),
+    # Integra (decisão do dono de 24/11/2026, Q9): `access_integra` é a única capacidade que entrou depois
+    # da medição de 02/10. Junto do superusuário e do vínculo GERENTE na Superintendência (policy composta).
     "DIRETORIA": frozenset(
         {
+            "access_integra",
             "supervise_operations",
             "view_compras_dashboard",
             "view_map_metrics",
             "view_overview_dashboard",
         }
     ),
+    # PR 2-b da Integra (24/11/2026): a gerência SPE só abre a Integra. Sem supervisão, painel ou aprovação;
+    # o GERENTE nela leva só os direitos de evento do papel (`DIREITOS_PAPEL`), como em qualquer gerência.
+    "SPE": frozenset({"access_integra"}),
 }
 
 # D3 (a): só EQUIPE e GERENTE recebem o pacote. FORMADOR, COORDENADOR e APOIO nunca.
@@ -86,9 +92,11 @@ TECNICAS: frozenset[str] = frozenset({"import_spreadsheet"})
 # `Gerencia.nome` → único perfil ≠ PADRAO aceito nela. `rbac_diff --auditar` sai com exit 1 para
 # qualquer outro. Cresce no PR que liberar o próximo perfil. DIRETORIA entrou no PR 12 (dúvida 2 do dono:
 # sim): depois do corte o grupo Diretoria não dá poder, e o caminho é a gerência DIRETORIA. Hoje ela não
-# existe; o perfil é gravado só por script com ensaio (a API não lê nem grava `perfil`).
+# existe; o perfil é gravado só por script com ensaio (a API não lê nem grava `perfil`). SPE entrou no PR
+# 2-b da Integra (24/11/2026), pelo mesmo caminho: a gerência é criada por script depois da promoção.
 PERFIL_PERMITIDO: dict[str, str] = {
     "GERENCIA DAT": "ADMIN_OPERACIONAL",
     "CONTROLE": "CONTROLE",
     "DIRETORIA": "DIRETORIA",
+    "SPE": "SPE",
 }

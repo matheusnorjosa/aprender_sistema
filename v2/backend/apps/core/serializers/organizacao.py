@@ -29,6 +29,9 @@ from apps.core.services.equipe_gerencia_import import gerencia_reservada
 from apps.core.services.rbac_pacotes import PERFIL_PERMITIDO
 from apps.core.services.solicitacao_projetos import mudanca_de_grupo_bloqueada
 
+# Nomes de `PERFIL_PERMITIDO` sem diferenciar maiúsculas: nem outro `nome` nem outro rótulo de tela os imita.
+_NOMES_RESERVADOS: frozenset[str] = frozenset(nome.casefold() for nome in PERFIL_PERMITIDO)
+
 
 class MunicipioSerializer(serializers.ModelSerializer):
     """
@@ -321,6 +324,35 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
             )
         return attrs
 
+    def _valida_rotulo_reservado(self, campo: str, value: str) -> None:
+        """PR 2-b da Integra: o rótulo de tela não imita uma gerência de nome reservado (`PERFIL_PERMITIDO`).
+
+        Uma gerência-isca exibida como "SPE" apareceria ao lado da SPE de verdade na lista de lotação, sem
+        ser reservada. Vale sem diferenciar maiúsculas, ao criar e quando o campo muda (dado antigo não trava
+        o salvar). A própria gerência reservada pode usar o rótulo do seu nome ("SPE" na gerência SPE).
+        """
+        instance: Any = self.instance
+        rotulo = (value or "").strip().casefold()
+        if not rotulo or rotulo not in _NOMES_RESERVADOS:
+            return
+        if instance is not None and rotulo == (getattr(instance, campo, "") or "").strip().casefold():
+            return
+        dados: Any = self.initial_data
+        nome = dados.get("nome", getattr(instance, "nome", ""))
+        if rotulo == str(nome or "").strip().casefold():
+            return
+        raise serializers.ValidationError(
+            f"'{value}' é o nome de uma gerência reservada e não pode ser o rótulo de outra."
+        )
+
+    def validate_nome_exibicao(self, value: str) -> str:
+        self._valida_rotulo_reservado("nome_exibicao", value)
+        return value
+
+    def validate_nome_setor(self, value: str) -> str:
+        self._valida_rotulo_reservado("nome_setor", value)
+        return value
+
     def validate_nome(self, value: str) -> str:
         """PR B1 (anti-escalada): `nome` da gerência aprovadora é chave de autorização.
 
@@ -345,9 +377,11 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
             raise serializers.ValidationError(
                 "O nome desta gerência não pode ser alterado: ela define permissões de acesso."
             )
-        if value in PERFIL_PERMITIDO and atual != value:
+        # Sem diferenciar maiúsculas (PR 2-b da Integra): "Spe" ao lado de "SPE" seria uma gerência-isca.
+        nome_cf = value.strip().casefold()
+        if nome_cf in _NOMES_RESERVADOS and atual != value:
             raise serializers.ValidationError(f"O nome '{value}' é reservado: ele define permissões de acesso.")
-        if value == GERENCIA_APROVADORA_NOME and atual != GERENCIA_APROVADORA_NOME:
+        if nome_cf == GERENCIA_APROVADORA_NOME.casefold() and atual != value:
             raise serializers.ValidationError(
                 f"O nome '{GERENCIA_APROVADORA_NOME}' é reservado à gerência que aprova solicitações."
             )

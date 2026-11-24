@@ -1072,7 +1072,7 @@ export default function UsuariosPage(): JSX.Element {
           <Form.Item
             name="equipe_administrativa"
             valuePropName="checked"
-            extra="Na gerência do DAT ou do Controle, dá o pacote do setor, inclusive aprovar solicitações; na da Diretoria, supervisão e painéis, sem aprovar. Nas demais, só registra que a pessoa trabalha nesta gerência."
+            extra="Na gerência do DAT ou do Controle, dá o pacote do setor, inclusive aprovar solicitações; na da Diretoria, supervisão e painéis, sem aprovar; na da SPE, só a Integra. Nas demais, só registra que a pessoa trabalha nesta gerência."
           >
             <Checkbox disabled={!editaLotacao}>Equipe administrativa</Checkbox>
           </Form.Item>

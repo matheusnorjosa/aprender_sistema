@@ -85,7 +85,14 @@ def test_perfil_permitido_so_tem_perfis_com_pacote():
         "CONTROLE": Gerencia.Perfil.CONTROLE,
         # PR 12 (dúvida 2 do dono: sim): o caminho da Diretoria pelo lugar.
         "DIRETORIA": Gerencia.Perfil.DIRETORIA,
+        # PR 2-b da Integra (24/11/2026): a gerência SPE só abre a Integra.
+        "SPE": Gerencia.Perfil.SPE,
     }
+
+
+def test_pacote_spe_so_abre_a_integra():
+    """A SPE não supervisiona, não vê painel e não aprova: o pacote é só `access_integra`."""
+    assert PACOTE[Gerencia.Perfil.SPE] == frozenset({"access_integra"})
 
 
 def test_import_do_modulo_nao_cria_ciclo():

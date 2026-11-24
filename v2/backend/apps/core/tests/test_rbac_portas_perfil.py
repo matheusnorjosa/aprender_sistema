@@ -28,6 +28,7 @@ import pytest
 from apps.core.models import EquipeGerencia, Gerencia, Usuario
 from apps.core.services.equipe_gerencia_import import import_equipe_gerencia_from_file
 from apps.core.services.export_contract_importer import ExportContractImporter
+from apps.core.services.rbac_pacotes import PERFIL_PERMITIDO
 from apps.core.tests.factories import UsuarioFactory
 
 pytestmark = pytest.mark.django_db
@@ -110,7 +111,7 @@ def test_nome_de_gerencia_com_perfil_nao_muda_pela_api():
     assert g.nome == "CONTROLE PORTA"
 
 
-@pytest.mark.parametrize("nome", ["GERENCIA DAT", "CONTROLE", "DIRETORIA"])
+@pytest.mark.parametrize("nome", sorted(PERFIL_PERMITIDO))
 def test_nome_de_perfil_permitido_nao_sai_da_gerencia_mesmo_com_perfil_padrao(nome):
     """A auditoria acha a gerência pelo `nome` e a 0120 deixa todas em PADRAO: o nome é a trava."""
     g, _ = Gerencia.objects.update_or_create(nome=nome, defaults={"nome_setor": f"Setor {nome}"})
@@ -127,7 +128,7 @@ def test_nome_de_perfil_permitido_nao_sai_da_gerencia_mesmo_com_perfil_padrao(no
     assert g.nome == nome
 
 
-@pytest.mark.parametrize("nome", ["GERENCIA DAT", "CONTROLE", "DIRETORIA"])
+@pytest.mark.parametrize("nome", sorted(PERFIL_PERMITIDO))
 def test_nome_de_perfil_permitido_nao_vai_para_outra_gerencia(nome):
     Gerencia.objects.filter(nome=nome).delete()  # nome livre: a trava vale mesmo assim
     g = _gerencia()
@@ -142,6 +143,52 @@ def test_nome_de_perfil_permitido_nao_vai_para_outra_gerencia(nome):
     g.refresh_from_db()
     assert g.nome != nome
     assert not Gerencia.objects.filter(nome=nome).exists()
+
+
+@pytest.mark.parametrize("nome", ["spe", "Spe", "diretoria", "Controle", "gerencia dat", "Superintendencia"])
+def test_nome_reservado_vale_sem_diferenciar_maiusculas(nome):
+    """Sem isso, o DAT criaria uma gerência-isca "Spe" que a tela mostra ao lado da SPE de verdade."""
+    g = _gerencia()
+    dat = _cliente(UsuarioFactory(groups=["DAT"]))
+
+    criar = dat.post("/api/gerencias/", {"nome": nome, "nome_setor": "Setor Isca"}, format="json")
+    editar = dat.patch(f"/api/gerencias/{g.id}/", {"nome": nome}, format="json")
+
+    assert criar.status_code == 400, criar.content
+    assert "nome" in criar.json()["errors"]
+    assert editar.status_code == 400, editar.content
+    assert not Gerencia.objects.filter(nome=nome).exists()
+
+
+@pytest.mark.parametrize("campo", ["nome_exibicao", "nome_setor"])
+@pytest.mark.parametrize("rotulo", ["SPE", "spe", "Diretoria"])
+def test_rotulo_reservado_nao_vai_para_outra_gerencia(campo, rotulo):
+    """O rótulo de tela também não pode imitar uma gerência reservada: a isca apareceria como "SPE" na lista."""
+    g = _gerencia()
+    dat = _cliente(UsuarioFactory(groups=["DAT"]))
+
+    criar = dat.post(
+        "/api/gerencias/", {"nome": "GERENCIA ISCA", "nome_setor": "Setor Isca", campo: rotulo}, format="json"
+    )
+    editar = dat.patch(f"/api/gerencias/{g.id}/", {campo: rotulo}, format="json")
+
+    assert criar.status_code == 400, criar.content
+    assert campo in criar.json()["errors"]
+    assert editar.status_code == 400, editar.content
+    assert campo in editar.json()["errors"]
+    assert not Gerencia.objects.filter(nome="GERENCIA ISCA").exists()
+
+
+def test_gerencia_reservada_salva_com_o_proprio_rotulo():
+    """A SPE de verdade (criada por script) tem o rótulo "SPE" e continua salvando pela tela."""
+    g = _gerencia(perfil=Gerencia.Perfil.SPE, nome="SPE", nome_setor="SPE", nome_exibicao="SPE")
+    root = _cliente(UsuarioFactory(superuser=True))
+
+    resp = root.patch(
+        f"/api/gerencias/{g.id}/", {"descricao": "x", "nome_setor": "SPE", "nome_exibicao": "Spe"}, format="json"
+    )
+
+    assert resp.status_code == 200, resp.content
 
 
 def test_nome_de_gerencia_padrao_muda_como_hoje():
@@ -202,6 +249,34 @@ def test_import_equipe_aceita_qualquer_papel_em_gerencia_aprovacao(tmp_path, alv
     assert EquipeGerencia.objects.filter(gerencia=g, usuario=alvo, papel=papel).exists()
 
 
+@pytest.mark.parametrize("nome", sorted(PERFIL_PERMITIDO))
+@pytest.mark.parametrize("papel", ["EQUIPE", "GERENTE"])
+def test_import_equipe_trava_pelo_nome_mesmo_com_perfil_padrao(tmp_path, alvo, nome, papel):
+    """O perfil gravado depois daria o pacote a todos os vínculos que o import criou antes."""
+    g, _ = Gerencia.objects.update_or_create(
+        nome=nome, defaults={"nome_setor": f"Setor {nome}", "perfil": Gerencia.Perfil.PADRAO}
+    )
+
+    result = import_equipe_gerencia_from_file(path=_csv(tmp_path, g, papel, alvo), dry_run=False)
+
+    assert result["stats"]["created"] == 0, result
+    assert result["stats"]["skipped"]["vinculo_com_pacote_bloqueado"] == 1
+    assert not EquipeGerencia.objects.filter(usuario=alvo).exists()
+
+
+@pytest.mark.parametrize("perfil", [Gerencia.Perfil.PADRAO, Gerencia.Perfil.SPE])
+@pytest.mark.parametrize("papel", ["FORMADOR", "COORDENADOR", "APOIO"])
+def test_import_equipe_recusa_qualquer_papel_na_spe(tmp_path, alvo, perfil, papel):
+    """A SPE não tem projeto nem formador; lotar nela, em qualquer papel, é só do superusuário (como na tela)."""
+    g, _ = Gerencia.objects.update_or_create(nome="SPE", defaults={"nome_setor": "SPE", "perfil": perfil})
+
+    result = import_equipe_gerencia_from_file(path=_csv(tmp_path, g, papel, alvo), dry_run=False)
+
+    assert result["stats"]["created"] == 0, result
+    assert result["stats"]["skipped"]["vinculo_com_pacote_bloqueado"] == 1
+    assert not EquipeGerencia.objects.filter(usuario=alvo, gerencia=g).exists()
+
+
 def test_import_equipe_desativa_vinculo_em_gerencia_com_pacote(tmp_path, alvo):
     g = _gerencia(perfil=Gerencia.Perfil.CONTROLE)
     EquipeGerencia.objects.create(gerencia=g, usuario=alvo, papel="EQUIPE", ativo=True)
@@ -245,3 +320,25 @@ def test_export_contract_classify_e_apply_recusam_vinculo_com_pacote(tmp_path, a
     assert report["applied"]["equipe_gerencia"] == 1
     assert not EquipeGerencia.objects.filter(usuario=alvo).exists()
     assert EquipeGerencia.objects.filter(gerencia=g, usuario=formador, papel="FORMADOR").exists()
+
+
+@pytest.mark.parametrize("perfil", [Gerencia.Perfil.PADRAO, Gerencia.Perfil.SPE])
+def test_export_contract_recusa_qualquer_papel_na_spe_e_nao_muda_o_setor_dela(tmp_path, alvo, perfil):
+    spe, _ = Gerencia.objects.update_or_create(
+        nome="SPE", defaults={"nome_setor": "SPE", "perfil": perfil, "setor_canonico": ""}
+    )
+    # Vínculo que o superusuário gravou pela tela: o import não o recria, nem usa a linha para mudar o setor.
+    ja_lotado = UsuarioFactory()
+    EquipeGerencia.objects.create(gerencia=spe, usuario=ja_lotado, papel="COORDENADOR", ativo=True)
+    path = _export(
+        tmp_path,
+        f"gerencia,usuario_cpf,papel,setor_canonico\nSPE,{alvo.cpf},COORDENADOR,Vidas\nSPE,{ja_lotado.cpf},COORDENADOR,Vidas\n",
+    )
+
+    report = ExportContractImporter(path=path, apply=True, allow=("equipe_gerencia",)).run()
+
+    pe = report["por_entidade"]["equipe_gerencia"]
+    assert pe["reject_reasons"]["vinculo_com_pacote_bloqueado"] == 1
+    assert not EquipeGerencia.objects.filter(usuario=alvo).exists()
+    spe.refresh_from_db()
+    assert spe.setor_canonico == ""

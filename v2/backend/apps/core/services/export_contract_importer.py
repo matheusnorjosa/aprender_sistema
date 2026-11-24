@@ -77,6 +77,7 @@ from apps.core.services.equipe_gerencia_import import (
     PAPEL_MAPPING,
     _resolve_gerencia_status,
     _resolve_usuario,
+    gerencia_reservada,
     motivo_vinculo_bloqueado,
     vinculo_exige_superusuario,
 )
@@ -2978,7 +2979,13 @@ class ExportContractImporter:
             setor_canon = (r.get("setor_canonico") or "").strip()
             # setor_canonico é rótulo (desde o PR 9 o escopo é a gerência do projeto): só preenche o vazio, e a
             # linha EQUIPE, inerte, nem isso. Já preenchido não muda pelo import (Avançando Juntos é Vidas e traria outro setor).
-            if setor_canon and papel != EquipeGerencia.PAPEL_EQUIPE and not gerencia.setor_canonico:
+            # Gerência reservada (DAT, Controle, Diretoria, SPE) também não: o setor dela é do superusuário.
+            if (
+                setor_canon
+                and papel != EquipeGerencia.PAPEL_EQUIPE
+                and not gerencia.setor_canonico
+                and not gerencia_reservada(gerencia)
+            ):
                 gerencia.setor_canonico = setor_canon
                 gerencia.save(update_fields=["setor_canonico"])
             if exists:

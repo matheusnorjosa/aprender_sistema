@@ -400,6 +400,10 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     estados: [expandida(T.projetoGeral, 'Usa AVALIAR', [360, 768])],
   },
   { path: '/dat/admin/configuracoes', perfil: 'dat', marco: 'Configurações do Sistema' },
+  // Integra (24/11/2026): o '/integra/*' do AppRoutes, aberto tal qual, cai no "endereço desconhecido" da
+  // Integra e volta para a página dela (os 4 cartões). As telas filhas (ICA, Semáforo, Para validar)
+  // não são rotas do AppRoutes: são medidas, com o axe, em `integra-telas.spec.ts`.
+  { path: '/integra/*', perfil: 'superusuario', marco: 'Integra' },
   // Feedback de uso (11/11/2026): o seed não cria feedback; mede os filtros e a tabela vazia.
   { path: '/dat/admin/feedbacks', perfil: 'dat', marco: 'Feedbacks' },
   // Importação pela tela: só superusuário (decisão do dono, 02/10/2026).

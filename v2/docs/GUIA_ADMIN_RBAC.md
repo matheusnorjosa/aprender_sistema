@@ -25,10 +25,18 @@ O que a pessoa pode fazer vem da **lotação**: o vínculo vigente com uma gerê
 (Formador, Coordenador, Apoio, Gerente ou Equipe administrativa).
 
 1. **Gerência com perfil** (DAT, CONTROLE e, quando existir, DIRETORIA): quem é **Equipe** ou **Gerente** nela
-   recebe o pacote do setor (ex.: o DAT administra os cadastros, aprova e opera a Pré-agenda).
+   recebe o pacote do setor (ex.: o DAT administra os cadastros, aprova e opera a Pré-agenda). O pacote da
+   DIRETORIA também abre a Integra, o protótipo das ferramentas do gestor pedagógico (decisão Q9 de 24/11/2026):
+   lotar alguém como Equipe ou Gerente nessa gerência dá a Integra a essa pessoa. O pacote da gerência **SPE**
+   (quando existir) é só a Integra: Equipe ou Gerente nela entra na Integra e não aprova nem vê painel. Quem
+   for Gerente leva também o que o papel Gerente dá em qualquer gerência (item 2), sem alcance, porque a SPE
+   não tem projeto nem formador; para só abrir a Integra, lote como Equipe. Lotar na DIRETORIA ou na SPE é só
+   do superusuário, e na SPE as importações de equipe recusam qualquer papel.
 2. **Papel em qualquer gerência ativa**: Coordenador, Gerente e Apoio criam e editam eventos da própria
    gerência; o Apoio também publica no Google. Formador e Equipe, nada além do pacote.
-3. **Gerente na Superintendência**: aprova as solicitações SUPER da Superintendência.
+3. **Gerente na Superintendência**: aprova as solicitações SUPER da Superintendência e abre a Integra
+   (protótipo, decisão Q9 de 24/11/2026). Lotar uma aprovadora nova dá a ela as duas coisas. Quem abre a
+   Integra e por quê: [rbac.spec, Contratos e invariantes](specs/backend/rbac.spec.md#contratos-e-invariantes).
 
 Os grupos de Setor e de Função abaixo continuam existindo como etiqueta (e para o escopo de algumas listas,
 até o PR 13), mas não dão capacidade, tela nem aprovação.
@@ -70,7 +78,7 @@ São **5** (`FUNCAO_GROUPS`, `apps/core/constants.py`).
 | **Formador** | Etiqueta. O papel Formador na lotação gerencia os próprios bloqueios; a Grade Mensal exige papel Gerente, Coordenador ou Apoio na gerência, ou a capacidade `view_all_availability` (`TELAS_DE_ESCOPO`, `apps/core/rbac/policies.py`) |
 | **Coordenador** | Cria solicitações de eventos para sua equipe |
 | **Apoio de Coordenação** | Etiqueta. O papel Apoio na lotação cria e edita eventos da gerência e publica no Google (`publish_setor_solicitacao`; `DIREITOS_PAPEL`, `apps/core/services/rbac_pacotes.py`) |
-| **Gerente** | Etiqueta. O papel Gerente na lotação cria e edita eventos da gerência; na Superintendência, aprova |
+| **Gerente** | Etiqueta. O papel Gerente na lotação cria e edita eventos da gerência; na Superintendência, aprova e abre a Integra |
 | **Assistente Administrativo** | Etiqueta. Não aprova (PR 11): quem trabalha no Controle aprova pela lotação |
 
 ---
@@ -126,10 +134,10 @@ Controle deixaram de dar o poder. A regra é `solicitation_approval_basis` (`app
 > - **Superusuário**: lota em qualquer gerência e papel.
 > - **DAT** (policy `manage_lotacao_comum`): lota nas **gerências comuns** como Formador, Coordenador,
 >   Apoio de Coordenação, Gerente (menos na Superintendência) e Equipe administrativa. A lista de
->   gerências não mostra DAT, Controle nem Diretoria. Lotar nelas, ou como Gerente na Superintendência,
+>   gerências não mostra DAT, Controle, Diretoria nem SPE. Lotar nelas, ou como Gerente na Superintendência,
 >   é só do superusuário: o sistema responde com o motivo (400).
 > - O DAT **não** mexe na lotação da própria conta nem de quem trabalha no DAT, no Controle ou na
->   Diretoria, ou é Gerente da Superintendência: os campos aparecem travados com o motivo. Salvar o
+>   Diretoria ou na SPE, ou é Gerente da Superintendência: os campos aparecem travados com o motivo. Salvar o
 >   cadastro dessas pessoas (telefone, cargo, senha) continua funcionando.
 > - O DAT só dá ou tira as funções Formador, Coordenador, Apoio de Coordenação e Gerente; os outros
 >   grupos da pessoa ficam como estão. Toda mudança de lotação fica no AuditLog.
@@ -262,7 +270,7 @@ O outro caminho é estar **lotado como Equipe ou Gerente na gerência Controle o
 
 ### Por que os campos de Gerência/Função aparecem desabilitados para mim?
 Sem a policy `manage_lotacao_comum`, a lotação é **somente do superusuário**. Com ela (o DAT), os campos
-travam na própria conta e em quem trabalha no DAT, no Controle ou na Diretoria, ou é Gerente da
+travam na própria conta e em quem trabalha no DAT, no Controle, na Diretoria ou na SPE, ou é Gerente da
 Superintendência; o formulário mostra o motivo. Não é bug.
 
 ### Posso dar múltiplas funções a um usuário?

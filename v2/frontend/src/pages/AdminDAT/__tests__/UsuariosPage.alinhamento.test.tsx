@@ -123,6 +123,8 @@ describe('helpers — login e e-mail de reserva', () => {
     expect(avisoDoPacote({ nome: 'GERENCIA DAT' })).toMatch(/inclusive aprovar solicitações/);
     expect(avisoDoPacote({ nome: 'CONTROLE' })).toMatch(/inclusive aprovar solicitações/);
     expect(avisoDoPacote({ nome: 'DIRETORIA' })).toMatch(/supervisão e painéis, sem aprovar/);
+    expect(avisoDoPacote({ nome: 'SPE' })).toMatch(/dá acesso à Integra/);
+    expect(avisoDoPacote({ nome: 'SPE' })).toMatch(/sem aprovar/);
     expect(avisoDoPacote({ nome: 'GERENCIA 2' })).toBeNull();
     expect(avisoDoPacote(undefined)).toBeNull();
   });

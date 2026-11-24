@@ -11,4 +11,7 @@ export const EXTERNAL_URLS = {
 
   // Avaliar Platform (Assessment)
   AVALIAR_PLATFORM: (import.meta.env['VITE_AVALIAR_URL'] as string) || 'https://aprenderavaliar.com.br/',
+
+  // DFF (observação de formação e PDI): cartão da Integra, abre em outra aba
+  DFF_PLATFORM: (import.meta.env['VITE_DFF_URL'] as string) || 'https://avaliacao-dff.vercel.app',
 };

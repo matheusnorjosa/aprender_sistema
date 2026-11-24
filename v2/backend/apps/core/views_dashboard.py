@@ -60,6 +60,7 @@ def dashboard_overview(request: Request) -> Response:
     Permissions: HasPerm("view_overview_dashboard")
     """
     from .models import Participation, Solicitacao
+    from .services.availability_service import cancelado_confirmado_q
 
     now = timezone.now()
     # O dia de Fortaleza (RD-06): o filtro `inicio__date` usa o fuso local; o dia UTC vira às 21h (#1900).
@@ -70,7 +71,8 @@ def dashboard_overview(request: Request) -> Response:
     qs_aprovadas = qs_all.filter(status="aprovado")
 
     # KPIs
-    eventos_futuros = qs_aprovadas.filter(inicio__date__gte=hoje).count()
+    # O cancelado na agenda (CON-08 B) segue aprovado, mas não vai acontecer (decisão do dono, 24/11/2026).
+    eventos_futuros = qs_aprovadas.filter(inicio__date__gte=hoje).exclude(cancelado_confirmado_q()).count()
     eventos_aprovados = qs_aprovadas.count()
 
     # Total formadores distintos em solicitações aprovadas (fix #594); só o papel FORMADOR (G20)

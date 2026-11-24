@@ -36,6 +36,7 @@ from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.utils import timezone
 
 from apps.core.models import AuditLog, GCalCopiaCursor, Solicitacao
+from apps.core.services.availability_service import cancelado_confirmado
 from apps.core.services.solicitacao_availability import check_solicitacao_availability
 from apps.core.types import JsonDict
 
@@ -269,9 +270,12 @@ def _copiar_horario(s: Solicitacao, d: Decisao, event_id: str, operador_id: int)
         s.gcal_payload_hash = None
     s.inicio, s.fim = d.inicio, d.fim
     s.save(update_fields=["inicio", "fim", "gcal_payload_hash", "updated_at"])
-    # D3: copia mesmo com choque; só ids e códigos (nada de nome, título ou e-mail de convidado).
-    guarda = check_solicitacao_availability(s, lock=True)
-    choque = sorted({(p.usuario_id, c.code) for p in guarda.blocked for c in p.conflicts})
+    # D3: copia mesmo com choque; só ids e códigos (nada de nome, título ou e-mail de convidado). O evento cancelado
+    # na agenda (CON-08 B, Cancelar confirmado) não ocupa a agenda de ninguém (P6): sem choque (revisão da rodada 6).
+    choque: list[tuple[int, str]] = []
+    if not cancelado_confirmado(s):
+        guarda = check_solicitacao_availability(s, lock=True)
+        choque = sorted({(p.usuario_id, c.code) for p in guarda.blocked for c in p.conflicts})
     details: dict[str, Any] = {
         "solicitacao_id": s.pk,
         "origem": ORIGEM,

@@ -12,6 +12,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 import Modal from 'antd/es/modal';
+import message from 'antd/es/message';
 
 const { listSolicitacoesMock, deleteSolicitacaoMock } = vi.hoisted(() => ({
   listSolicitacoesMock: vi.fn(),
@@ -187,6 +188,29 @@ describe('MySolicitacoesPage — item 36', { timeout: 20000 }, () => {
     });
     expect(deleteSolicitacaoMock).toHaveBeenCalledWith(7);
     confirmar.mockRestore();
+  });
+
+  // P5 (decisão do dono, 24/11/2026): a exclusão que conclui com aviso (evento cancelado na agenda que o Google não
+  // achou) mostra o aviso do servidor no lugar da mensagem de sucesso.
+  test('Excluir com aviso do servidor mostra o aviso, não o sucesso', async () => {
+    const confirmar = vi
+      .spyOn(Modal, 'confirm')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    const sucesso = vi.spyOn(message, 'success').mockImplementation(vi.fn());
+    const alerta = vi.spyOn(message, 'warning').mockImplementation(vi.fn());
+    const aviso = 'Evento excluído do sistema, mas ele não foi achado no Google Agenda.';
+    listSolicitacoesMock.mockResolvedValue(pagina([makeSolic({ id: 7, municipio_nome: 'Crato' })]));
+    deleteSolicitacaoMock.mockResolvedValue(aviso);
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Excluir: 10/05/2026 · Crato' }));
+    await act(async () => {
+      await confirmar.mock.calls[0]![0].onOk?.();
+    });
+    expect(alerta).toHaveBeenCalledWith(aviso);
+    expect(sucesso).not.toHaveBeenCalled();
+    confirmar.mockRestore();
+    sucesso.mockRestore();
+    alerta.mockRestore();
   });
 
   test('depois de excluir, o foco fica na lista mesmo com a recarga ainda em andamento', async () => {
@@ -492,28 +516,34 @@ describe('MySolicitacoesPage — Excluir sai do sistema e do Google', { timeout:
     informar.mockRestore();
   });
 
-  // A saída indicada tem de existir: "Tirar só do Google" (Publicar na agenda) só aparece em ERROR com id
-  // e só lista evento de hoje em diante; nas outras, nenhuma tela tira o evento do Google.
+  // A saída indicada tem de existir. Com id, aprovado: "Tirar só do Google" (Publicar na agenda, de hoje em diante,
+  // da gerência da Apoio) e "Remover do Google Agenda" (Pré-agenda, do Controle, em ERROR também e no evento que já
+  // terminou, desde a revisão da rodada 5). Sem id, nenhuma tela tira o evento do Google.
   test.each([
     {
       caso: 'com id, evento futuro',
       external_event_id: 'evt-1',
       fim: '2099-05-10T17:00:00Z',
-      saida: 'Para excluir, peça ao Apoio de Coordenação da sua gerência que tire o evento só do Google, na tela Publicar na agenda',
+      saida:
+        'Para excluir, peça ao Apoio de Coordenação da sua gerência, na tela Publicar na agenda, ou ao Controle, na Pré-agenda, que tire o evento só do Google; depois disso, você consegue excluir aqui.',
+      controle: true,
     },
     {
       caso: 'com id, evento que já terminou',
       external_event_id: 'evt-1',
       fim: '2026-05-10T17:00:00Z',
-      saida: 'Para excluir, fale com a administração do sistema.',
+      saida:
+        'Para excluir, peça ao Controle, na Pré-agenda, que remova o evento do Google Agenda; depois disso, você consegue excluir aqui. Se lá também não der, fale com a administração do sistema.',
+      controle: true,
     },
     {
       caso: 'sem id',
       external_event_id: null,
       fim: '2099-05-10T17:00:00Z',
       saida: 'Para excluir, fale com a administração do sistema.',
+      controle: false,
     },
-  ])('erro $caso, para quem não pode tirar do Google: sem Excluir, e o motivo dá uma saída que existe', async ({ external_event_id, fim, saida }) => {
+  ])('erro $caso, para quem não pode tirar do Google: sem Excluir, e o motivo dá uma saída que existe', async ({ external_event_id, fim, saida, controle }) => {
     listSolicitacoesMock.mockResolvedValue(
       pagina([
         makeSolic({
@@ -539,8 +569,8 @@ describe('MySolicitacoesPage — Excluir sai do sistema e do Google', { timeout:
     const texto = String(informar.mock.calls[0]![0].content);
     expect(texto).toContain('Este evento pode estar no Google Agenda, e excluir aqui também o tiraria de lá.');
     expect(texto).toContain(saida);
-    // O Controle não tem "tirar do Google" para evento em ERROR (a Pré-agenda só cancela o publicado).
-    expect(texto).not.toContain('Controle');
+    // Sem id, a Pré-agenda também não tem o Remover: o Controle não entra no texto.
+    if (!controle) expect(texto).not.toContain('Controle');
     expect(texto).not.toContain('editar');
     informar.mockRestore();
   });
@@ -638,5 +668,150 @@ describe('MySolicitacoesPage — Excluir sai do sistema e do Google', { timeout:
     expect(opcoes.title).toBe('Excluir solicitação?');
     expect(String(opcoes.content)).toBe('10/05/2026 10:00 · Crato · Vidas. Esta ação não pode ser desfeita.');
     confirmar.mockRestore();
+  });
+});
+
+// CON-08 B (objeção C1-1): a linha cancelada na agenda diz isso, e não manda pedir que tire do Google.
+describe('MySolicitacoesPage — evento cancelado na agenda', { timeout: 20000 }, () => {
+  beforeEach(() => {
+    listSolicitacoesMock.mockReset();
+    deleteSolicitacaoMock.mockReset();
+  });
+
+  // A etiqueta segue o estado, como em Publicar na agenda: só diz "Cancelado" quando o Google confirmou.
+  test.each([
+    ['PUBLISHED', 'Cancelado na agenda'],
+    ['ERROR', 'Erro ao cancelar'],
+  ] as const)(
+    '%s: etiqueta "%s", sem Editar, e o motivo novo',
+    async (gcal_status, etiqueta) => {
+      const informar = vi
+        .spyOn(Modal, 'info')
+        .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+      listSolicitacoesMock.mockResolvedValue(
+        pagina([
+          makeSolic({
+            id: 9,
+            municipio_nome: 'Crato',
+            status: 'aprovado',
+            gcal_status,
+            external_event_id: 'asv29',
+            tipo_evento_de_formacao: true,
+            cancelado_na_agenda: true,
+            inicio: '2099-05-10T13:00:00Z',
+            fim: '2099-05-10T17:00:00Z',
+          }),
+        ])
+      );
+      renderPage();
+      expect(await screen.findByText(etiqueta)).toBeInTheDocument();
+      // Revisão da rodada 6: a coluna Status tem 104 px e a Tag do AntD não quebra linha (nowrap); sem isto a etiqueta
+      // fica por baixo dos botões de Ações. O jsdom não mede, então o teste confere o estilo que quebra.
+      expect(screen.getByText(etiqueta).closest('.ant-tag')).toHaveStyle({ whiteSpace: 'normal' });
+      if (gcal_status === 'ERROR') expect(screen.queryByText('Cancelado na agenda')).not.toBeInTheDocument();
+      expect(screen.queryByText('Na agenda')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Editar:/ })).not.toBeInTheDocument();
+      // Revisão da rodada 2: o nome exato do botão, e o texto responde também o "nem excluir".
+      fireEvent.click(screen.getByRole('button', { name: 'Por que não dá para editar nem excluir: 10/05/2099 · Crato' }));
+      const texto = String(informar.mock.calls[0]![0].content);
+      expect(texto).toContain('Este evento foi cancelado na agenda: não se edita nem se publica de novo.');
+      expect(texto).toContain(
+        'Para excluir, peça ao Apoio de Coordenação da sua gerência, que exclui o evento em Publicar na agenda (ele sai do sistema e fica no Google Agenda com (CANCELADO) no título).'
+      );
+      expect(texto).not.toContain('tire o evento só do Google');
+      expect(texto).not.toContain('tire-o do Google');
+      informar.mockRestore();
+    }
+  );
+
+  test('cancelamento pedido e ainda não confirmado (PENDING): "Cancelando…", não "Cancelado na agenda"', async () => {
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 9,
+          municipio_nome: 'Crato',
+          status: 'aprovado',
+          gcal_status: 'PENDING',
+          external_event_id: 'asv29',
+          tipo_evento_de_formacao: true,
+          cancelado_na_agenda: true,
+          inicio: '2099-05-10T13:00:00Z',
+          fim: '2099-05-10T17:00:00Z',
+        }),
+      ])
+    );
+    renderPage();
+    expect(await screen.findByText('Cancelando…')).toBeInTheDocument();
+    expect(screen.queryByText('Cancelado na agenda')).not.toBeInTheDocument();
+  });
+
+  // Revisão da rodada 2: Publicar na agenda só lista aprovado de hoje em diante; fora disso, a saída é a administração.
+  test('cancelado na agenda, evento que já terminou, sem poder tirar do Google: para excluir, a administração', async () => {
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 9,
+          municipio_nome: 'Crato',
+          status: 'aprovado',
+          gcal_status: 'PUBLISHED',
+          external_event_id: 'asv29',
+          tipo_evento_de_formacao: true,
+          cancelado_na_agenda: true,
+          inicio: '2020-05-10T13:00:00Z',
+          fim: '2020-05-10T17:00:00Z',
+        }),
+      ])
+    );
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: /^Por que não dá para editar nem excluir: / }));
+    const texto = String(informar.mock.calls[0]![0].content);
+    expect(texto).toContain('Este evento foi cancelado na agenda: não se edita nem se publica de novo.');
+    expect(texto).toContain('Para excluir, fale com a administração do sistema.');
+    expect(texto).not.toContain('Publicar na agenda');
+    informar.mockRestore();
+  });
+
+  // Revisão da rodada 1: o Excluir de formação não tira do Google, marca "(CANCELADO) " (decisão P2 do dono).
+  test.each([
+    {
+      gcal_status: 'PUBLISHED' as const,
+      botao: 'Por que não dá para editar nem excluir: 10/05/2099 · Crato',
+      novo: 'exclui o evento em Publicar na agenda (ele sai do sistema e fica no Google Agenda com (CANCELADO) no título)',
+      antigo: '(ele sai do Google e do sistema)',
+    },
+    {
+      gcal_status: 'ERROR' as const,
+      botao: 'Por que não dá para excluir: 10/05/2099 · Crato',
+      novo: 'Este evento pode estar no Google Agenda, e excluir aqui também o marcaria como cancelado lá, com (CANCELADO) no título.',
+      antigo: 'excluir aqui também o tiraria de lá',
+    },
+  ])('formação $gcal_status não cancelada, sem poder tirar do Google: o motivo diz (CANCELADO)', async ({ gcal_status, botao, novo, antigo }) => {
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 9,
+          municipio_nome: 'Crato',
+          status: 'aprovado',
+          gcal_status,
+          external_event_id: 'asv29',
+          tipo_evento_de_formacao: true,
+          pode_tirar_do_google: false,
+          inicio: '2099-05-10T13:00:00Z',
+          fim: '2099-05-10T17:00:00Z',
+        }),
+      ])
+    );
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: botao }));
+    const texto = String(informar.mock.calls[0]![0].content);
+    expect(texto).toContain(novo);
+    expect(texto).not.toContain(antigo);
+    informar.mockRestore();
   });
 });

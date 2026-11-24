@@ -30,6 +30,7 @@ from apps.core.services.gcal import (  # Types; Utils; Client; Validation; Paylo
     build_preview_for_solicitacao,
     cancel_solicitacao,
     compute_payload_hash,
+    marcar_cancelado_no_google,
     resync_solicitacao,
     upsert_one,
 )
@@ -53,6 +54,7 @@ __all__ = [
     # Sync
     "apply_one_solicitacao",
     "cancel_solicitacao",
+    "marcar_cancelado_no_google",
     "resync_solicitacao",
     "upsert_one",
 ]

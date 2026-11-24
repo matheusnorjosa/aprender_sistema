@@ -39,13 +39,31 @@ import { formatFortaleza } from '../../utils/datetime';
 import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 import {
   MOTIVO_NAO_PUBLICAVEL,
+  MSG_CANCELADO_NA_AGENDA,
   confirmacaoDeExcluirNoGoogle,
   estaNoGoogle,
+  excluirMarcaCancelado,
+  gcalRowActions,
   motivoNaoPublicavel,
   resumoDoEvento,
 } from '../../utils/gcalRowActions';
 
 const { Title, Text } = Typography;
+
+// Cores de preset que passam no AA (components/textoDaTag.ts): blue e red; o resto fica neutro.
+const COR_DO_CANCELADO = { processing: 'blue', error: 'red', default: undefined, success: undefined } as const;
+
+/** "Cancelado na agenda", "Cancelando…" ou "Erro ao cancelar" (a mesma regra de gcalRowActions). */
+function EtiquetaDoCancelado({ record }: { record: Solicitacao }): JSX.Element {
+  const { tag } = gcalRowActions(record, { ready: true });
+  const cor = COR_DO_CANCELADO[tag.color];
+  return (
+    // A coluna Status tem largura fixa: a etiqueta quebra linha em vez de passar por baixo de Ações (revisão da rodada 6).
+    <Tag {...(cor ? { color: cor } : {})} style={{ whiteSpace: 'normal', marginInlineEnd: 0 }}>
+      {tag.label}
+    </Tag>
+  );
+}
 
 /** Status colors */
 const STATUS_COLORS: Record<SolicitacaoStatus, string> = {
@@ -96,16 +114,33 @@ function nomeDaSolicitacao(record: Solicitacao): string {
  */
 function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcluir: boolean; motivos: string[] } {
   const naPlanilha = record.publicado_fora_do_sistema === true;
+  // CON-08: cancelado na agenda vem antes de tudo. Os ramos de baixo mandariam pedir que tire do Google,
+  // o que o servidor recusa na linha cancelada.
+  const cancelado = record.cancelado_na_agenda === true;
   const isPublished = naPlanilha || record.gcal_status === ('PUBLISHED' as GCalStatus);
   const noGoogle = estaNoGoogle(record);
   const podeTirarDoGoogle = record.pode_tirar_do_google === true;
+  // CON-08 (decisão do dono de 23/11): o Excluir de formação não tira do Google, marca "(CANCELADO) ".
+  const marcaCancelado = excluirMarcaCancelado(record);
   const isSuper = record.fluxo === ('SUPER' as FluxoType);
   const superForaDePendente = isSuper && record.status !== 'pendente';
-  const podeEditar = !isPublished && record.status !== 'reprovado';
+  const podeEditar = !cancelado && !isPublished && record.status !== 'reprovado';
   const deduzido = !naPlanilha && (!noGoogle || podeTirarDoGoogle) && !superForaDePendente;
   const podeExcluir = deduzido && record.pode_excluir !== false;
   const motivos: string[] = [];
-  if (naPlanilha) {
+  if (cancelado) {
+    motivos.push(MSG_CANCELADO_NA_AGENDA);
+    // Revisão da rodada 2: sem poder tirar do Google, o botão também pergunta "nem excluir". A Apoio exclui em
+    // Publicar na agenda, que só lista aprovado de hoje em diante; a decisão registrada e a SUPER têm o motivo abaixo.
+    if (noGoogle && !podeTirarDoGoogle && !superForaDePendente) {
+      const passou = Boolean(record.fim) && Date.parse(record.fim) < Date.now();
+      motivos.push(
+        record.status === 'aprovado' && !passou
+          ? 'Para excluir, peça ao Apoio de Coordenação da sua gerência, que exclui o evento em Publicar na agenda (ele sai do sistema e fica no Google Agenda com (CANCELADO) no título). Se lá também não der para excluir, fale com a administração do sistema.'
+          : 'Para excluir, fale com a administração do sistema.'
+      );
+    }
+  } else if (naPlanilha) {
     // Não foi o sistema que publicou: não há publicação para cancelar aqui.
     motivos.push(
       `Este evento ${MOTIVO_NAO_PUBLICAVEL.publicado_fora_do_sistema}; mudar aqui não muda a agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle.`
@@ -135,7 +170,11 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
       );
     } else {
       motivos.push(
-        'Este evento já está no Google Agenda. Para editar, peça ao Apoio de Coordenação da sua gerência, na tela Publicar na agenda, ou ao Controle, na Pré-agenda, que tire o evento só do Google; depois disso, você consegue editar aqui. Para excluir, peça ao Apoio de Coordenação da sua gerência, que exclui o evento em Publicar na agenda (ele sai do Google e do sistema). Se lá também não der para excluir, fale com a administração do sistema.'
+        `Este evento já está no Google Agenda. Para editar, peça ao Apoio de Coordenação da sua gerência, na tela Publicar na agenda, ou ao Controle, na Pré-agenda, que tire o evento só do Google; depois disso, você consegue editar aqui. Para excluir, peça ao Apoio de Coordenação da sua gerência, que exclui o evento em Publicar na agenda (${
+          marcaCancelado
+            ? 'ele sai do sistema e fica no Google Agenda com (CANCELADO) no título'
+            : 'ele sai do Google e do sistema'
+        }). Se lá também não der para excluir, fale com a administração do sistema.`
       );
     }
   } else if (isPublished) {
@@ -151,19 +190,23 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
         : 'Este evento já está no Google Agenda e não dá para editá-lo aqui. Para mudar, fale com a administração do sistema.'
     );
   } else if (noGoogle && !podeTirarDoGoogle && !superForaDePendente) {
-    // ERROR: a publicação deu erro, mas o evento pode estar no Google; excluir aqui o tiraria de lá.
-    // Só a Apoio, em Publicar na agenda, tira do Google um ERROR, e só aprovado, com id e de hoje em
-    // diante (a tela lista só 'aprovado'; gcalRowActions; a Pré-agenda só cancela o publicado). Fora
-    // disso, nenhuma tela tira. A SUPER fora de pendente não chega aqui: tirar do Google não devolve
-    // a exclusão a ela, e o motivo dela (abaixo) já dá a saída.
-    const apoioConsegueTirar =
-      record.status === 'aprovado' &&
-      Boolean(record.external_event_id) &&
-      motivoNaoPublicavel(record) !== 'evento_passado';
+    // ERROR: a publicação deu erro, mas o evento pode estar no Google; excluir aqui o tiraria de lá (o de
+    // formação ficaria lá com "(CANCELADO) ").
+    // Tiram do Google um ERROR com id e aprovado (as duas telas só listam 'aprovado'): a Apoio, em Publicar na
+    // agenda, de hoje em diante (gcalRowActions), e o Controle, na Pré-agenda, também o que já terminou ("Remover do
+    // Google Agenda", desde a revisão da rodada 5). Sem id, nenhuma tela tira. A SUPER fora de pendente não chega
+    // aqui: tirar do Google não devolve a exclusão a ela, e o motivo dela (abaixo) já dá a saída.
+    const controleConsegueTirar = record.status === 'aprovado' && Boolean(record.external_event_id);
+    const apoioConsegueTirar = controleConsegueTirar && motivoNaoPublicavel(record) !== 'evento_passado';
     const saida = apoioConsegueTirar
-      ? 'Para excluir, peça ao Apoio de Coordenação da sua gerência que tire o evento só do Google, na tela Publicar na agenda; depois disso, você consegue excluir aqui.'
-      : 'Para excluir, fale com a administração do sistema.';
-    motivos.push(`Este evento pode estar no Google Agenda, e excluir aqui também o tiraria de lá. ${saida}`);
+      ? 'Para excluir, peça ao Apoio de Coordenação da sua gerência, na tela Publicar na agenda, ou ao Controle, na Pré-agenda, que tire o evento só do Google; depois disso, você consegue excluir aqui.'
+      : controleConsegueTirar
+        ? 'Para excluir, peça ao Controle, na Pré-agenda, que remova o evento do Google Agenda; depois disso, você consegue excluir aqui. Se lá também não der, fale com a administração do sistema.'
+        : 'Para excluir, fale com a administração do sistema.';
+    const efeito = marcaCancelado
+      ? 'excluir aqui também o marcaria como cancelado lá, com (CANCELADO) no título'
+      : 'excluir aqui também o tiraria de lá';
+    motivos.push(`Este evento pode estar no Google Agenda, e ${efeito}. ${saida}`);
   } else if (record.status === 'reprovado') {
     motivos.push('Solicitações reprovadas não podem ser editadas.');
   }
@@ -256,8 +299,10 @@ export default function MySolicitacoesPage(): JSX.Element {
 
   const handleDelete = useCallback(async (id: ID): Promise<boolean> => {
     try {
-      await deleteSolicitacao(id);
-      message.success('Solicitação excluída com sucesso!');
+      const aviso = await deleteSolicitacao(id);
+      // P5: excluída, mas o servidor tem algo a dizer (o evento cancelado na agenda não foi achado no Google).
+      if (aviso) message.warning(aviso);
+      else message.success('Solicitação excluída com sucesso!');
       void loadData();
       return true;
     } catch (error) {
@@ -371,7 +416,10 @@ export default function MySolicitacoesPage(): JSX.Element {
           >
             {STATUS_LABELS[record.status] || record.status}
           </Tag>
-          {record.publicado_fora_do_sistema || record.gcal_status === ('PUBLISHED' as GCalStatus) ? (
+          {record.cancelado_na_agenda ? (
+            // Pelo estado, como em Publicar na agenda: "Cancelado" só depois que o Google confirmou.
+            <EtiquetaDoCancelado record={record} />
+          ) : record.publicado_fora_do_sistema || record.gcal_status === ('PUBLISHED' as GCalStatus) ? (
             <Tag color="blue" style={{ marginInlineEnd: 0 }}>Na agenda</Tag>
           ) : null}
         </Space>

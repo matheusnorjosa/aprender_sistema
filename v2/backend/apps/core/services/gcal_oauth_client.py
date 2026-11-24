@@ -323,6 +323,24 @@ class OAuthCalendarClient(CalendarClientAdapter):
 
         return _patch()
 
+    def patch_titulo(self, calendar_id: CalendarId, event_id: EventId, titulo: str) -> JsonDict:
+        """
+        PATCH só do título, com `sendUpdates='none'` qualquer que seja o GCAL_SEND_UPDATES (CON-08).
+
+        Usado pelo Cancelar evento de formação, que põe "(CANCELADO) " na frente do título. Não manda `status`
+        (o `confirmed` traria de volta um evento apagado) nem horário, descrição ou convidados.
+        """
+        calendar_id = self._resolve_calendar_id(calendar_id)
+
+        def _patch():
+            return (
+                self.service.events()
+                .patch(calendarId=calendar_id, eventId=event_id, body={"summary": titulo}, sendUpdates="none")
+                .execute(num_retries=NUM_RETRIES_GOOGLE)
+            )
+
+        return _patch()
+
     def delete(self, calendar_id: str, event_id: str) -> None:
         """
         Deleta evento.

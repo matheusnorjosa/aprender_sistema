@@ -1214,3 +1214,65 @@ def test_patch_descricao_do_cliente_oauth_manda_so_a_descricao_sem_convite(setti
     cliente.patch_descricao(PINO, "evt1", "nova")
 
     assert chamadas == [{"calendarId": PINO, "eventId": "evt1", "body": {"description": "nova"}, "sendUpdates": "none"}]
+
+
+# CON-08 (objeção C1-2): a cópia segue igual para a linha cancelada na agenda. Só a descrição recebe PATCH, então
+# o "(CANCELADO) " do título fica; e o evento apagado no Google vira reprovado (D2), como qualquer outro.
+@pytest.mark.django_db
+def test_copia_segue_igual_para_linha_cancelada(agora, fake, enfileirados):
+    s = _publicada(agora, cancelado_na_agenda=True)
+    _no_google(fake, s)
+    fake.patch_titulo(PINO, s.external_event_id, f"(CANCELADO) {TITULO_SECRETO}")
+    cursor = _cursor()
+    _linha_de_base(cursor, fake, agora)
+    novo = _hora(agora, 6, hora=8)
+    _mover_no_google(fake, s.external_event_id, novo, novo + timedelta(hours=2))
+
+    r = sincronizar(cursor, fake, escrever=True, agora=agora)
+    copia.atualizar_descricao_no_google(s.pk, cursor.operador_id, client=fake)
+
+    assert r.resumo["contagens"] == {"copiar_horario": 1}
+    s.refresh_from_db()
+    assert s.inicio == novo and s.cancelado_na_agenda is True
+    evento = fake.get(PINO, s.external_event_id)
+    assert evento["summary"] == f"(CANCELADO) {TITULO_SECRETO}"
+    assert evento["description"] != "📅 Data: antiga", "a descrição recebeu o PATCH"
+
+
+@pytest.mark.django_db
+def test_linha_cancelada_movida_no_google_nao_aponta_choque(agora, fake, enfileirados):
+    """Revisão da rodada 6: o evento cancelado na agenda (Cancelar confirmado: marcado e PUBLISHED) não ocupa a
+    agenda de ninguém (P6). Arrastado no Google para cima de outro evento do formador, o horário é copiado como hoje,
+    mas sem "choque" no registro, que o painel mostraria como conflito a conferir."""
+    formador = UsuarioFactory()
+    novo = _hora(agora, 6)
+    outro = _publicada(agora, eid="outro", inicio=novo)
+    Participation.objects.create(solicitacao=outro, usuario=formador, role=Participation.Role.FORMADOR)
+    s = _publicada(agora, cancelado_na_agenda=True)
+    Participation.objects.create(solicitacao=s, usuario=formador, role=Participation.Role.FORMADOR)
+    _no_google(fake, s)
+    cursor = _cursor()
+    _linha_de_base(cursor, fake, agora)
+    _mover_no_google(fake, s.external_event_id, novo, novo + timedelta(hours=1))
+
+    sincronizar(cursor, fake, escrever=True, agora=agora)
+
+    s.refresh_from_db()
+    assert s.inicio == novo
+    log = AuditLog.objects.get(action="GCAL_COPIA_GOOGLE")
+    assert log.details["choque"] == []
+
+
+@pytest.mark.django_db
+def test_linha_cancelada_apagada_no_google_vira_reprovada_como_hoje(agora, fake, enfileirados):
+    s = _publicada(agora, cancelado_na_agenda=True)
+    _no_google(fake, s)
+    cursor = _cursor()
+    _linha_de_base(cursor, fake, agora)
+    fake.delete(PINO, s.external_event_id)
+
+    r = sincronizar(cursor, fake, escrever=True, agora=agora)
+
+    assert r.resumo["contagens"] == {"cancelado": 1}
+    s.refresh_from_db()
+    assert s.status == "reprovado" and s.gcal_status == "NONE"

@@ -191,6 +191,7 @@ class TestGCalExport(TestCase):
             "meet_link",
             "gcal_payload_hash",
             "updated_at",
+            "cancelado_na_agenda",
         ]
         self.assertEqual(rows[0], expected_headers)
 

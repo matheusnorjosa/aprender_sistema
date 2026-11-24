@@ -15,7 +15,10 @@
  * - Polling só enquanto alguma linha está PENDING (a cada 20 s, sem ligar o carregando; um 429 o pausa);
  *   `seqRef` descarta resposta obsoleta.
  * - Evento de hoje que já terminou: Publicar, Tentar de novo e Atualizar ficam desabilitados, com o
- *   motivo (o servidor recusa com `evento_passado`); Tirar do Google segue.
+ *   motivo (o servidor recusa com `evento_passado`); Tirar do Google e Cancelar evento seguem.
+ * - Evento de formação no Google (CON-08, decisão do dono de 23/11): "Cancelar evento" ao lado do "Tirar só do
+ *   Google" põe "(CANCELADO) " no título lá; o evento fica no Google e a linha não se publica mais. O Excluir dele
+ *   também marca o título, em vez de tirar o evento de lá.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type JSX } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
@@ -23,6 +26,7 @@ import { Alert, Button, Card, Empty, Grid, Modal, Space, Tag, Typography, messag
 
 import {
   cancelSolicitacao,
+  cancelarNaAgenda,
   deleteSolicitacao,
   listSolicitacoes,
   publishSolicitacao,
@@ -45,6 +49,7 @@ import {
   MOTIVO_NAO_PUBLICAVEL,
   confirmacaoDeExcluirNoGoogle,
   estaNoGoogle,
+  excluirMarcaCancelado,
   gcalRowActions,
   motivoNaoPublicavel,
   type GcalRowAction,
@@ -93,6 +98,8 @@ interface ActionConfig {
   confirmTitle: string;
   confirmDescription: string;
   okText: string;
+  /** Botão de desistir do diálogo; "Cancelar" quando falta. */
+  cancelText?: string;
   danger: boolean;
   successText: string;
   run: (id: ID) => Promise<unknown>;
@@ -143,12 +150,27 @@ const ACTIONS: Record<GcalRowAction, ActionConfig> = {
     successText: 'Pedido enviado: o evento sai do Google Agenda em alguns segundos e continua no sistema.',
     run: (id) => cancelSolicitacao(id),
   },
+  // CON-08: "Cancelar evento", e não "Cancelar", que é o botão de fechar os diálogos.
+  cancelar: {
+    label: 'Cancelar evento',
+    labelCurto: 'Cancelar evento',
+    confirmTitle: 'Cancelar o evento na agenda',
+    confirmDescription:
+      'O título do evento no Google Agenda ganha (CANCELADO) na frente e o evento continua lá, sem e-mail aos ' +
+      'convidados. Depois disso ele não se edita nem se publica de novo. Não dá para desfazer.',
+    okText: 'Sim, cancelar evento',
+    cancelText: 'Voltar', // "Cancelar" ao lado de "Sim, cancelar evento" confunde
+    danger: true,
+    successText: 'Pedido enviado: o título do evento no Google Agenda ganha (CANCELADO) em alguns segundos.',
+    run: (id) => cancelarNaAgenda(id),
+  },
 };
 
 /** Tag da linha em voo (PENDING) depois da ação feita nesta tela; sem ela, fica o "Publicando…" de sempre. */
 const ROTULO_EM_VOO: Partial<Record<GcalRowAction, string>> = {
   atualizar: 'Atualizando…',
   remover: 'Removendo…',
+  cancelar: 'Cancelando…',
 };
 
 /** Formato do erro lançado por `fetchAPI` (status + corpo JSON do backend). */
@@ -329,7 +351,7 @@ export default function PublicacaoSetorPage(): JSX.Element {
       content: config.confirmDescription,
       okText: config.okText,
       okButtonProps: { danger: config.danger },
-      cancelText: 'Cancelar',
+      cancelText: config.cancelText ?? 'Cancelar',
       autoFocusButton: 'cancel',
       onOk: () => runAction(row, action),
     });
@@ -349,8 +371,9 @@ export default function PublicacaoSetorPage(): JSX.Element {
       cancelText: 'Cancelar',
       autoFocusButton: 'cancel',
       onOk: async () => {
+        let aviso: string | undefined;
         try {
-          await deleteSolicitacao(row.id);
+          aviso = await deleteSolicitacao(row.id);
         } catch (error) {
           const err = error as ApiErrorLike;
           const httpStatus = err.response?.status ?? err.status;
@@ -365,11 +388,18 @@ export default function PublicacaoSetorPage(): JSX.Element {
           if (httpStatus !== 404) void load();
           return;
         }
-        message.success(
-          row.gcal_status === 'ERROR' && !row.external_event_id
-            ? 'Evento excluído do sistema e do Google Agenda, se estava lá.'
-            : 'Evento excluído do sistema e do Google Agenda.',
-        );
+        let excluido = 'Evento excluído do sistema e do Google Agenda.';
+        if (excluirMarcaCancelado(row)) {
+          excluido =
+            row.gcal_status === 'ERROR' && !row.external_event_id
+              ? 'Evento excluído do sistema; se chegou ao Google Agenda, ele fica lá com (CANCELADO) no título.'
+              : 'Evento excluído do sistema; no Google Agenda ele fica com (CANCELADO) no título.';
+        } else if (row.gcal_status === 'ERROR' && !row.external_event_id) {
+          excluido = 'Evento excluído do sistema e do Google Agenda, se estava lá.';
+        }
+        // P5: excluída, mas o servidor tem algo a dizer (o evento cancelado na agenda não foi achado no Google).
+        if (aviso) message.warning(aviso);
+        else message.success(excluido);
         await load();
       },
     });
@@ -467,14 +497,15 @@ export default function PublicacaoSetorPage(): JSX.Element {
         const podeExcluir = row.pode_excluir === true && estaNoGoogle(row);
         // Desabilitado: o motivo é o aviso do topo (sem ele, quando o card já explica, nada a apontar).
         const descritoPor = disabled && blocked ? MOTIVO_ID : undefined;
-        // Evento que já terminou: o servidor recusa Publicar, Tentar de novo e Atualizar; tirar do Google segue.
+        // Evento que já terminou: o servidor recusa Publicar, Tentar de novo e Atualizar; tirar do Google e
+        // cancelar na agenda seguem.
         const jaTerminou = motivoNaoPublicavel(row) === 'evento_passado';
         const motivoPassado = MOTIVO_NAO_PUBLICAVEL.evento_passado;
         return (
           <Space wrap size="small">
             {actions.map((action) => {
               const config = ACTIONS[action];
-              const recusada = jaTerminou && action !== 'remover';
+              const recusada = jaTerminou && action !== 'remover' && action !== 'cancelar';
               return (
                 <Button
                   key={action}
@@ -522,7 +553,9 @@ export default function PublicacaoSetorPage(): JSX.Element {
             </Title>
             <Text type="secondary">
               Eventos aprovados do seu setor, a partir de hoje. Publique ou atualize cada um na agenda
-              oficial da organização. Tirar só do Google deixa o evento no sistema; Excluir tira dos dois lados.
+              oficial da organização. Tirar só do Google deixa o evento no sistema; Excluir tira dos dois lados,
+              menos o evento de formação, que sai do sistema e fica no Google Agenda com (CANCELADO) no título.
+              Cancelar evento, só no evento de formação, põe (CANCELADO) no título lá e deixa o evento nos dois lados.
             </Text>
           </header>
         </Card>

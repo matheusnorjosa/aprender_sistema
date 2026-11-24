@@ -196,6 +196,8 @@ def test_serializer_exposes_expected_fields(make_user, make_solicitacao):
         "is_online",
         "meet_link",
         "status",
+        "cancelado_na_agenda",
+        "gcal_status",
     }
     assert set(item.keys()) == expected_fields
     assert item["local"] == "Escola Municipal X"

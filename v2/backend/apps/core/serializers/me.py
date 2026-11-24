@@ -59,6 +59,8 @@ class MeEventSerializer(serializers.ModelSerializer):
             "is_online",
             "meet_link",
             "status",
+            "cancelado_na_agenda",  # CON-08: segue aprovado, mas cancelado na agenda (etiqueta em Meus Eventos)
+            "gcal_status",  # a etiqueta diz "Cancelando…" ou "Erro ao cancelar" antes da confirmação (rodada 6)
         ]
         read_only_fields = fields
 

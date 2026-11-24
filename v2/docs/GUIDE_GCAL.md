@@ -545,7 +545,7 @@ não existe no codebase.)*
 5. Limpa campos: `external_event_id`, `meet_link`, `gcal_payload_hash`
 6. Marca `gcal_status = NONE`, `last_sync_action = DELETE`
 
-**AuditLog**: Actions `CANCEL_GCAL_REQUESTED` (endpoint) e `CANCEL_GCAL` (task)
+**AuditLog**: Actions `CANCEL_GCAL_REQUESTED` (endpoint) e `CANCEL_GCAL` (task). Linha cancelada na agenda (CON-08, `cancelado_na_agenda`): 409 `cancelado_na_agenda`, o evento fica no Google com `(CANCELADO)` no título.
 
 **Retornos**:
 - **202 Accepted**: Cancelamento enfileirado com sucesso
@@ -566,6 +566,20 @@ curl -X POST http://localhost:8002/api/solicitacoes/123/cancel-gcal/ \
   "solicitacao_id": 123
 }
 ```
+
+#### POST /api/solicitacoes/{id}/cancelar-na-agenda/
+
+**Descrição** (CON-08 B, 23/11/2026): cancelar na agenda um evento de formação (Presencial, Online ou Workshop). O título no Google ganha `(CANCELADO) ` na frente e nada mais muda; o evento fica lá, sem e-mail aos convidados (`sendUpdates="none"`). A linha passa a `cancelado_na_agenda` já no pedido e, com a marca, não se publica, reenvia, tira do Google nem edita. Pela tela não há desfazer; só a tarefa tira a marca, quando o Event ID adotado não é achado e nenhum Cancelar anterior terminou (ver o fluxo abaixo e o item "A tarefa" da [`gcal.spec.md`](specs/backend/gcal.spec.md)).
+
+**Permissão**: a mesma do `cancel-gcal` (`CanUseGcal` ou `CanPublishSetorSolicitacao`, com a guarda de objeto por gerência).
+
+**Fluxo**: pedido (`pedir_operacao_gcal(..., "cancelar_na_agenda")`: trava, confere que é de formação e que está no Google, grava a marca e `PENDING`, mantém o hash), `task_cancelar_na_agenda` e `AuditLog` `CANCELAR_NA_AGENDA_REQUESTED` numa transação só. A tarefa lê o título: já com o marcador ou evento que já saiu do Google, não escreve; senão, PATCH só do `summary`. Em todos esses desfechos a linha volta a `PUBLISHED` (mesmo hash, mesmo id) e grava `CANCELAR_NA_AGENDA` (`details.resultado`). Falha: `ERROR` com a marca; refazer pelo mesmo endpoint (Publicar na agenda ou Pré-agenda oferecem "Cancelar evento" na linha "Erro ao cancelar"). Exceção: o Event ID adotado (o da planilha) que o Google não acha (404 ou 410). Nada foi escrito lá e refazer daria o mesmo erro, então a marca sai junto com o `ERROR` (`PUBLISH_GCAL_ERROR` com `details.cancelado_na_agenda_desfeito`) e o `gcal_last_error` diz o que fazer: conferir no Google e, se o evento não existe mais, Tirar só do Google (na Pré-agenda, "Remover do Google Agenda", também em `ERROR` e no evento que já terminou). A ocupação da agenda não muda com o desfaz: a marca sem o Cancelar confirmado nunca a liberou. Se um Cancelar anterior da linha já tinha terminado, a marca não sai: a linha volta a `PUBLISHED` com `resultado=nao_achado`. A linha já cancelada (`PUBLISHED` com a marca) não se pede de novo: 409 `ja_cancelado_na_agenda`.
+
+**Excluir com Event ID adotado que o Google não acha** (decisão do dono P5, 24/11/2026): na linha **não** cancelada na agenda, o Excluir recusa (400, "Nada foi excluído"), porque o id pode estar errado e o evento estar lá com outro id. Na linha cujo Cancelar **já terminou** (`PUBLISHED` com a marca, ou com o registro `CANCELAR_NA_AGENDA` de um Cancelar que terminou; o `(CANCELADO)` já foi para o Google e o evento sumiu depois), o Excluir não escreve no Google, apaga a linha e responde **200** com `{"aviso": "Evento excluído do sistema, mas ele não foi achado no Google Agenda…"}` no lugar do 204; a tela mostra o aviso e o `AuditLog` `DELETE` leva `evento_nao_achado_no_google: true`. A linha marcada em `ERROR` cujo Cancelar falhou antes do Google recusa como a não cancelada (o `(CANCELADO)` pode nunca ter chegado lá).
+
+**O evento cancelado na agenda não vai acontecer** (decisão do dono P6 e P7, 24/11/2026): segue `aprovado`, mas, com o Cancelar confirmado (a linha marcada e `PUBLISHED`), libera a agenda do formador, sai da CH, da Grade Mensal e dos "eventos futuros", e continua nas listas com a etiqueta "Cancelado na agenda". Na fila (`PENDING`) e no Cancelar que falhou (`ERROR`), o evento segue ativo no Google e a linha segue ocupando, com a etiqueta "Cancelando…" ou "Erro ao cancelar" (revisão da rodada 6). O Excluir de formação cujo evento já não estava no Google responde 200 com o aviso "Evento excluído do sistema. Ele não estava no Google Agenda, então nada foi marcado lá.". A lista completa de quem conta e quem não conta está em [`gcal.spec.md`](specs/backend/gcal.spec.md).
+
+**Retornos**: 202; 409 `nao_e_evento_de_formacao`, `ja_cancelado_na_agenda`, `not_published`, `linha_ocupada`; 403 `google_not_connected`; 503 `fila_indisponivel`.
 
 ### Helpers (Service Layer)
 
@@ -623,10 +637,15 @@ outcome = cancel_solicitacao(solicitacao)
    - **Modal.confirm**: Warning (okType: 'warning')
    - **Ação**: Chama `resyncSolicitacao(id)` → message.success → reload
 
-2. **Botão "Cancelar"** (ícone: `StopOutlined`, cor: vermelho)
-   - **Visível quando**: `gcal_status === 'PUBLISHED' && external_event_id`
+2. **Botão "Remover do Google Agenda"** (ícone: `StopOutlined`, cor: vermelho; `title` com o mesmo texto)
+   - **Visível quando**: `gcal_status === 'PUBLISHED' && external_event_id`, fora da linha cancelada na agenda
    - **Modal.confirm**: Danger (okType: 'danger')
    - **Ação**: Chama `cancelSolicitacao(id)` → message.success → reload
+
+3. **Botão "Cancelar evento"** (CON-08 B; ícone: `CloseCircleOutlined`, cor: vermelho; `title` "Cancelar evento")
+   - **Visível quando**: `external_event_id` e, ou evento de formação `PUBLISHED` ainda não cancelado, ou linha já cancelada na agenda em `ERROR` (refazer o que falhou, mesmo com o tipo renomeado)
+   - **Modal.confirm**: Danger, "Sim, cancelar evento" e "Voltar" para desistir
+   - **Ação**: Chama `cancelarNaAgenda(id)` (`POST /cancelar-na-agenda/`) → message.success → reload
 
 **Exemplo de uso**:
 ```jsx
@@ -646,8 +665,9 @@ outcome = cancel_solicitacao(solicitacao)
     size="small"
     danger
     icon={<StopOutlined />}
-    onClick={() => handleCancel(record.id)}
-    title="Cancelar evento no Calendar"
+    onClick={() => handleCancel(record)}
+    aria-label={`Remover do Google Agenda: ${rotuloDoEvento(record)}`}
+    title="Remover do Google Agenda"
   />
 )}
 ```
@@ -819,16 +839,17 @@ export GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
 
 Para achar: linha em `PENDING` há mais de 15 min por `gcal_last_sync_at`, e nada em `unacked` nem na fila no Redis da fila (DB 1, `ZCARD unacked_index` e `LLEN celery` em 0, sem imprimir o conteúdo).
 
-**Solução:** decidir pelo registro mais recente da linha no `AuditLog` (`details.solicitacao_id`) entre as ações do Google: `PUBLISH_GCAL_REQUESTED`, `RESYNC_GCAL_REQUESTED`, `CANCEL_GCAL_REQUESTED`, `PUBLISH_GCAL`, `CANCEL_GCAL` e `PUBLISH_GCAL_ERROR`. A regra vale para linha marcada por qualquer versão, antes ou depois do DEF-32, com três limites da versão anterior listados em [gcal.spec.md](specs/backend/gcal.spec.md) («Linha parada em `PENDING`»). Três casos dessas ações não contam, porque podem ser gravados depois de um "Tirar do Google" com a linha ainda em `PENDING`: a prévia (`details.dry_run` verdadeiro), o erro da nova tentativa depois do disjuntor (`details.operation` igual a `retry`; ela só age em linha `ERROR`, e o `GCAL_RETRY_SUCCESS` dela nem entra na lista) e o `PUBLISH_GCAL` com `details.action` igual a `SKIP`, que a versão anterior ao DEF-32 gravava sem tirar a linha de `PENDING`. A cópia do Google, a aprovação e a edição também não contam. No shell do Django (`python manage.py shell`, só leitura), com o id da linha em `ID`:
+**Solução:** decidir pelo registro mais recente da linha no `AuditLog` (`details.solicitacao_id`) entre as ações do Google: `PUBLISH_GCAL_REQUESTED`, `RESYNC_GCAL_REQUESTED`, `CANCEL_GCAL_REQUESTED`, `CANCELAR_NA_AGENDA_REQUESTED`, `PUBLISH_GCAL`, `CANCEL_GCAL`, `CANCELAR_NA_AGENDA` e `PUBLISH_GCAL_ERROR`. A regra vale para linha marcada por qualquer versão, antes ou depois do DEF-32, com três limites da versão anterior listados em [gcal.spec.md](specs/backend/gcal.spec.md) («Linha parada em `PENDING`»). Três casos dessas ações não contam, porque podem ser gravados depois de um "Tirar do Google" com a linha ainda em `PENDING`: a prévia (`details.dry_run` verdadeiro), o erro da nova tentativa depois do disjuntor (`details.operation` igual a `retry`; ela só age em linha `ERROR`, e o `GCAL_RETRY_SUCCESS` dela nem entra na lista) e o `PUBLISH_GCAL` com `details.action` igual a `SKIP`, que a versão anterior ao DEF-32 gravava sem tirar a linha de `PENDING`. A cópia do Google, a aprovação e a edição também não contam. No shell do Django (`python manage.py shell`, só leitura), com o id da linha em `ID`:
 
 ```python
 from apps.core.models import AuditLog, Solicitacao
 ID = int(ID)
 s = Solicitacao.objects.get(pk=ID)
-print(s.gcal_status, bool(s.external_event_id))
+print(s.gcal_status, bool(s.external_event_id), s.cancelado_na_agenda)
 assert s.gcal_status == "PENDING", "a linha não está em PENDING: conferir o ID"
 ACOES = ["PUBLISH_GCAL_REQUESTED", "RESYNC_GCAL_REQUESTED", "CANCEL_GCAL_REQUESTED",
-         "PUBLISH_GCAL", "CANCEL_GCAL", "PUBLISH_GCAL_ERROR"]
+         "CANCELAR_NA_AGENDA_REQUESTED", "PUBLISH_GCAL", "CANCEL_GCAL", "CANCELAR_NA_AGENDA",
+         "PUBLISH_GCAL_ERROR"]
 conta = lambda r: not r.details.get("dry_run") and r.details.get("operation") != "retry" and not (
     r.action == "PUBLISH_GCAL" and r.details.get("action") == "SKIP")
 regs = AuditLog.objects.filter(details__solicitacao_id=ID, action__in=ACOES).order_by("-created_at", "-id")
@@ -838,6 +859,7 @@ print(ultimo.action if ultimo else "nenhum registro")
 
 O `int()` e a conferência da linha vêm antes de propósito: o filtro do JSON compara também o tipo, e o id em texto (`"123"`) não casa com o número gravado. Sem eles, um id em texto ou errado imprimiria "nenhum registro", que manda reenviar. Com eles, um id errado para em erro (`DoesNotExist` ou a linha fora de `PENDING`). "Nenhum registro" só vale com a linha confirmada em `PENDING`. O filtro dos três casos fica no Python: `exclude()` sobre uma chave do JSON também tiraria os registros que não têm a chave.
 
+- **A linha tem `cancelado_na_agenda` (o `print` mostra `True`), ou o mais recente é `CANCELAR_NA_AGENDA_REQUESTED`, ou `PUBLISH_GCAL_ERROR` com `details.operation` igual a `cancelar_na_agenda`:** é um cancelamento na agenda parado (CON-08). Refazer por `POST /api/solicitacoes/{id}/cancelar-na-agenda/`, que aceita linha `PENDING` com `external_event_id` e não repete o marcador se ele já estiver no título. Linha cancelada na agenda **nunca** se reenvia nem se tira do Google: os dois a recusam. Exceção: o `PUBLISH_GCAL_ERROR` com `details.cancelado_na_agenda_desfeito` (Event ID adotado que o Google não acha) não é cancelamento parado. A marca já saiu, e refazer pelo cancelar-na-agenda daria o mesmo erro: conferir no Google se o evento existe com outro id ou em outro calendário e, se não existe mais, Tirar só do Google (404 e 410 contam como sucesso e soltam a linha). A linha ainda marcada cujo evento adotado não existe mais no Google (foi marcado e depois purgado ou movido) também não fica presa: o Excluir a apaga e responde 200 com um aviso (decisão do dono P5, 24/11/2026), desde que o Cancelar dela tenha terminado (`PUBLISHED`, ou um `CANCELAR_NA_AGENDA` com `resultado`); sem isso, o Excluir recusa e o refazer do Cancelar desfaz a marca.
 - **O mais recente é `CANCEL_GCAL_REQUESTED`:** é um "Tirar do Google" parado. **Nunca** reenviar nem reaplicar. Isso desfaz a remoção e pode trazer de volta o evento já apagado: o delete do Google é soft-delete, e o UPDATE manda `status: confirmed`. Esperar só serve se a mensagem ainda está em `unacked` ou na fila (`LLEN celery` maior que 0), e leva até cerca de 1 hora. A linha achada pelo "Para achar" não tem mensagem para voltar: refazer o cancelamento já, por `POST /api/solicitacoes/{id}/cancel-gcal/`, que aceita linha `PENDING` com `external_event_id`. A tela não tem esse botão para linha em `PENDING`. Se alguém reenviou em lote por cima do "Tirar do Google" ainda em andamento, o lote não deixou registro e a regra lê o cancelamento: fica o lado que não devolve ao Google o que alguém mandou tirar.
 - **Qualquer outro caso, inclusive sem nenhum registro:** o pedido parado é de publicar, reenviar ou reaplicar (o lote não grava `*_REQUESTED`, por isso pode não haver registro dele). Reenviar pela Pré-agenda: o reenvio aceita linha em `PENDING`, o pedido novo substitui o antigo, e a mensagem antiga, quando voltar, devolve `SKIP`. Ele força o UPDATE e, com `GCAL_SEND_UPDATES` diferente de `none`, manda e-mail aos convidados externos mesmo sem mudança. O reaplicar não serve aqui: ele recusa linha em `PENDING` (`operacao_em_andamento`).
 - **Evento que já terminou:** o reenvio e o reaplicar recusam (`evento_passado`). O cancelamento parado ainda sai pelo cancel-gcal, que não olha a data, se a linha tem `external_event_id`. Nos outros casos, conferir no Google se o evento existe (pelo `external_event_id` ou pelo id `asv2{id}`) e passar a linha para `ERROR` pelo admin, onde `gcal_status` é editável (o `external_event_id` é só leitura). A linha parada não tem nova tentativa na fila.

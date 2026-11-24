@@ -15,6 +15,7 @@ import {
   approveSolicitacao,
   approveSolicitacoesBatch,
   cancelSolicitacao,
+  cancelarNaAgenda,
   createSolicitacoesEmLote,
   deleteSolicitacao,
   getSolicitacao,
@@ -201,6 +202,14 @@ describe('solicitacoes API (MSW)', () => {
     expect(new URL(requests[0].url).pathname).toBe('/api/solicitacoes/13/');
   });
 
+  test('deleteSolicitacao devolve o aviso do 200 (evento cancelado na agenda que o Google não achou)', async () => {
+    const aviso = 'Evento excluído do sistema, mas ele não foi achado no Google Agenda.';
+    server.use(http.delete(apiUrl('/solicitacoes/14/'), () => HttpResponse.json({ aviso })));
+
+    expect(await deleteSolicitacao(14)).toBe(aviso);
+    expect(publishMock).toHaveBeenCalledWith('solicitacoes', { action: 'deleted' });
+  });
+
   test('previewSolicitacao posta em preview-gcal/ com body vazio', async () => {
     server.use(
       capturePost(
@@ -249,6 +258,26 @@ describe('solicitacoes API (MSW)', () => {
     expect(new URL(requests[0].url).pathname).toBe('/api/solicitacoes/21/cancel-gcal/');
     expect(requests[0].method).toBe('POST');
     expect(requests[0].body).toEqual({});
+  });
+
+  test('cancelarNaAgenda posta em cancelar-na-agenda/ com body vazio (CON-08)', async () => {
+    server.use(capturePost('/solicitacoes/22/cancelar-na-agenda/', { detail: 'ok', solicitacao_id: 22 }, requests));
+
+    await cancelarNaAgenda(22);
+
+    expect(requests).toHaveLength(1);
+    expect(new URL(requests[0].url).pathname).toBe('/api/solicitacoes/22/cancelar-na-agenda/');
+    expect(requests[0].method).toBe('POST');
+    expect(requests[0].body).toEqual({});
+  });
+
+  test('cancelarNaAgenda avisa a Grade Mensal aberta em outra aba: a marca libera o dia e tira a CH (P6/P7)', async () => {
+    server.use(capturePost('/solicitacoes/22/cancelar-na-agenda/', { detail: 'ok', solicitacao_id: 22 }, requests));
+    publishMock.mockClear();
+
+    await cancelarNaAgenda(22);
+
+    expect(publishMock).toHaveBeenCalledWith('availability', { action: 'changed' });
   });
 
   test('approveSolicitacoesBatch posta em batch-approve/ com ids', async () => {

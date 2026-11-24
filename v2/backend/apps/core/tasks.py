@@ -178,6 +178,11 @@ _MSG_SEM_ACESSO_CALENDARIO = (
     "O Google recusou o acesso ao calendário da organização (sem permissão de edição ou calendário "
     "não compartilhado com sua conta). Peça ao Controle o compartilhamento com «Fazer alterações nos eventos»."
 )
+_MSG_ADOTADO_NAO_ACHADO_NO_CANCELAR = (
+    "O evento não foi achado no Google pelo Event ID guardado (pode ter sido apagado de vez ou estar em outro "
+    "calendário). Nada foi marcado e o evento não foi cancelado na agenda. Confira no Google Agenda; se ele não "
+    "existe mais, use Tirar só do Google (na Pré-agenda, o botão Remover do Google Agenda)."
+)
 _MSG_DISJUNTOR_ABERTO = (
     "O Google Agenda falhou várias vezes seguidas; o sistema pausou as chamadas por alguns minutos. "
     "Tente de novo daqui a pouco."
@@ -242,8 +247,14 @@ def _mark_gcal_error(
     dry_run: bool,
     apply_blocked: bool = False,
     pedido: str | None = None,
+    desfaz_cancelado_na_agenda: bool = False,
 ) -> None:
     """Tira a linha de PENDING: marca ERROR com `message` e audita o erro cru.
+
+    `desfaz_cancelado_na_agenda` (CON-08): o Cancelar não escreveu nada no Google, então a marca gravada no pedido
+    sai junto, sob a mesma trava e a mesma guarda do pedido (`details.cancelado_na_agenda_desfeito`). A ocupação da
+    agenda não muda: a marca sem o Cancelar confirmado nunca a liberou (`cancelado_confirmado_q`, revisão da
+    rodada 6).
 
     publish/resync/cancel marcam PENDING antes de enfileirar; se a task sai sem marcar, a linha
     fica PENDING para sempre (publicar some da tela e a edição fica bloqueada). `mark_gcal` não
@@ -271,19 +282,24 @@ def _mark_gcal_error(
             return
         if not _pedido_ainda_vale(s, pedido, Solicitacao.GCalStatus.PENDING):
             return
+        details: dict[str, Any] = {
+            "solicitacao_id": s.id,
+            "operation": operation,
+            "error": raw_error[:500],
+            "dry_run": dry_run,
+            "apply_blocked": apply_blocked,
+            "pedido": pedido,
+        }
+        if desfaz_cancelado_na_agenda:
+            s.cancelado_na_agenda = False
+            s.save(update_fields=["cancelado_na_agenda"])
+            details["cancelado_na_agenda_desfeito"] = True
         s.mark_gcal(status=Solicitacao.GCalStatus.ERROR, payload_hash=None, error=message)
         AuditLog.objects.create(
             usuario=operator,
             action=AuditLog.Action.PUBLISH_GCAL_ERROR,
             model_name="Solicitacao",
-            details={
-                "solicitacao_id": s.id,
-                "operation": operation,
-                "error": raw_error[:500],
-                "dry_run": dry_run,
-                "apply_blocked": apply_blocked,
-                "pedido": pedido,
-            },
+            details=details,
         )
 
 
@@ -295,11 +311,12 @@ def _mark_gcal_error(
 _FALHAS_DE_BANCO_QUE_REPETEM = (OperationalError, InterfaceError)
 
 
-# ISS-1970: publicar e cancelar só confirmam a mensagem depois de terminar (`acks_late`), e o processo do
-# worker que morre no meio a devolve à fila na hora (`reject_on_worker_lost`). Se o servidor inteiro cai, a
-# mensagem volta quando vence o prazo do Redis (`visibility_timeout`, 1 h). Só nestas duas, que têm a guarda
-# do pedido: a segunda entrega não regrava o que já foi gravado; se o processo morreu entre a escrita no Google
-# e o commit, ela escreve de novo no mesmo evento (sem duplicar; o e-mail pode se repetir). Global segue desligado.
+# ISS-1970: publicar, cancelar e cancelar na agenda (CON-08) só confirmam a mensagem depois de terminar
+# (`acks_late`), e o processo do worker que morre no meio a devolve à fila na hora (`reject_on_worker_lost`). Se o
+# servidor inteiro cai, a mensagem volta quando vence o prazo do Redis (`visibility_timeout`, 1 h). Só nestas três,
+# que têm a guarda do pedido: a segunda entrega não regrava o que já foi gravado; se o processo morreu entre a
+# escrita no Google e o commit, ela escreve de novo no mesmo evento (sem duplicar; o e-mail pode se repetir; no
+# cancelar na agenda, o título já marcado dá SKIP). Global segue desligado.
 @shared_task(
     name="apps.core.tasks.task_publish_solicitacao_to_gcal",
     autoretry_for=_FALHAS_DE_BANCO_QUE_REPETEM,
@@ -682,6 +699,142 @@ def task_cancel_solicitacao_from_gcal(
             "solicitation_id": solicitation_id,
             "external_event_id": None,
             "summary": f"Erro ao cancelar: {str(e)}",
+            "error": str(e)[:500],
+        }
+
+
+@shared_task(
+    name="apps.core.tasks.task_cancelar_na_agenda",
+    autoretry_for=_FALHAS_DE_BANCO_QUE_REPETEM,
+    acks_late=True,  # ISS-1970: ver o comentário do publicar
+    reject_on_worker_lost=True,
+)
+def task_cancelar_na_agenda(
+    solicitation_id: int,
+    operator_user_id: int | None = None,
+    pedido: str | None = None,
+) -> dict[str, Any]:
+    """Cancela na agenda um evento de formação: põe "(CANCELADO) " no título dele no Google (CON-08).
+
+    Cópia estrutural de `task_cancel_solicitacao_from_gcal`: cliente OAuth antes da trava; trava, guarda do
+    pedido (`_pedido_ainda_vale`) e chamada ao Google dentro do mesmo atomic. Em todo desfecho sem erro (título
+    marcado, já marcado, evento que já saiu do Google) a linha volta a PUBLISHED com o mesmo hash e o mesmo id; a
+    marca `cancelado_na_agenda` já veio do pedido. O AuditLog `CANCELAR_NA_AGENDA` não leva o título (pode ter
+    nome de pessoa).
+
+    Falha: ERROR pela `_mark_gcal_error` (`operation="cancelar_na_agenda"`), com a marca. Nunca enfileira o
+    `queue_gcal_sync_retry`, que publica: refazer é pedir o Cancelar de novo. Exceção: o id adotado que o Google
+    não acha (`EventoAdotadoNaoAchado`). Nada foi escrito lá e refazer daria o mesmo erro, então a marca sai junto
+    com o ERROR, e o Tirar só do Google volta a ser a saída (revisão da rodada 4). Mas, se um Cancelar anterior da
+    linha já terminou (`cancelamento_confirmado`), o evento sumiu depois de cancelado: a marca fica e a linha volta
+    a PUBLISHED com `resultado=nao_achado`, como o Excluir da P5 (revisão da rodada 5).
+
+    Entregue de novo depois de uma queda entre o PATCH e o commit, relê o título, acha o marcador e não repete.
+    """
+    from django.conf import settings
+    from django.db import transaction
+
+    from apps.core.models import AuditLog, Solicitacao, Usuario
+    from apps.core.services.gcal.sync import EventoAdotadoNaoAchado
+    from apps.core.services.gcal.types import SyncOutcome
+    from apps.core.services.gcal_sync_service import marcar_cancelado_no_google
+    from apps.core.services.solicitacao_publish import cancelamento_confirmado
+
+    client = None
+    operator = None
+    if getattr(settings, "GCAL_AUTH_MODE", "service_account") == "oauth" and operator_user_id is not None:
+        try:
+            operator = Usuario.objects.get(id=operator_user_id)
+            from apps.core.services.gcal_client_factory import get_oauth_client_for_user
+
+            client, _ = get_oauth_client_for_user(operator)
+        except Exception as e:
+            if isinstance(e, Usuario.DoesNotExist):
+                mensagem = f"Usuário operador #{operator_user_id} não encontrado."
+            elif isinstance(e, ValueError):
+                mensagem = _MSG_CREDENCIAL_GOOGLE
+            else:
+                mensagem = _friendly_gcal_error(e)
+            _mark_gcal_error(
+                solicitation_id,
+                mensagem,
+                raw_error=str(e),
+                operator=operator,
+                operation="cancelar_na_agenda",
+                dry_run=False,
+                pedido=pedido,
+            )
+            return {
+                "action": "ERROR",
+                "solicitation_id": solicitation_id,
+                "external_event_id": None,
+                "summary": f"OAuth credential error: {e}",
+                "error": str(e)[:500],
+            }
+
+    try:
+        with transaction.atomic():
+            s = Solicitacao.objects.select_for_update().get(id=solicitation_id)
+            if not _pedido_ainda_vale(s, pedido, Solicitacao.GCalStatus.PENDING):
+                return _pedido_sem_efeito(s)
+
+            try:
+                outcome = marcar_cancelado_no_google(s, client=client)
+            except EventoAdotadoNaoAchado:
+                # Um Cancelar anterior já terminou (o registro dele está aqui): o evento sumiu do Google depois de
+                # cancelado. Desfazer a marca faria o evento cancelado voltar a ocupar a agenda e a ser publicável;
+                # conclui como o Excluir da P5 (revisão da rodada 5). Sem essa prova, a marca sai (abaixo).
+                if not cancelamento_confirmado(s):
+                    raise
+                outcome = SyncOutcome("SKIP", s.id, s.external_event_id, "nao_achado")
+
+            s.mark_gcal(status=Solicitacao.GCalStatus.PUBLISHED, payload_hash=s.gcal_payload_hash, error="")
+            AuditLog.objects.create(
+                usuario=None,  # tarefa assíncrona; quem pediu está no CANCELAR_NA_AGENDA_REQUESTED
+                action=AuditLog.Action.CANCELAR_NA_AGENDA,
+                model_name="Solicitacao",
+                details={
+                    "solicitacao_id": s.id,
+                    "action": outcome.action,
+                    "resultado": outcome.summary,  # marcado, ja_marcado, ja_saiu ou nao_achado
+                    "external_event_id": outcome.external_event_id,
+                    "pedido": pedido,
+                },
+            )
+
+        return {
+            "action": outcome.action,
+            "solicitation_id": outcome.solicitation_id,
+            "external_event_id": outcome.external_event_id,
+            "summary": outcome.summary,
+            "error": None,
+        }
+
+    except Solicitacao.DoesNotExist:
+        return {
+            "action": "ERROR",
+            "solicitation_id": solicitation_id,
+            "external_event_id": None,
+            "summary": f"Solicitação #{solicitation_id} não encontrada",
+            "error": "DoesNotExist",
+        }
+    except Exception as e:
+        nao_achado = isinstance(e, EventoAdotadoNaoAchado)
+        _mark_gcal_error(
+            solicitation_id,
+            _MSG_ADOTADO_NAO_ACHADO_NO_CANCELAR if nao_achado else _friendly_gcal_error(e),
+            raw_error=str(e),
+            operator=operator,
+            operation="cancelar_na_agenda",
+            dry_run=False,
+            pedido=pedido,
+            desfaz_cancelado_na_agenda=nao_achado,
+        )
+        return {
+            "action": "ERROR",
+            "solicitation_id": solicitation_id,
+            "external_event_id": None,
+            "summary": f"Erro ao cancelar na agenda: {str(e)}",
             "error": str(e)[:500],
         }
 

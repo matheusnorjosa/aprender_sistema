@@ -139,3 +139,69 @@ describe('GCalDashboardPage — textos sem dado técnico', { timeout: 20000 }, (
     erro.mockRestore();
   });
 });
+
+// CON-08 B: o cancelamento na agenda não aparece como "Removido do Google": o evento ficou lá, com (CANCELADO).
+describe('GCalDashboardPage — cancelamento na agenda na linha do tempo', { timeout: 20000 }, () => {
+  test('pedido e desfecho têm frase própria', async () => {
+    getEventDetailMock.mockResolvedValue({
+      ...(await getEventDetailMock()),
+      timeline: [
+        log({ id: 4, action: 'CANCELAR_NA_AGENDA_REQUESTED', details: { solicitacao_id: 7 } }),
+        log({ id: 5, action: 'CANCELAR_NA_AGENDA', details: { solicitacao_id: 7, resultado: 'marcado' } }),
+      ],
+    });
+    await abrirDetalhe();
+
+    expect(screen.getByText('Cancelamento na agenda pedido')).toBeInTheDocument();
+    expect(screen.getByText('Cancelado na agenda (título marcado)')).toBeInTheDocument();
+    expect(screen.queryByText('Removido do Google')).not.toBeInTheDocument();
+    expect(screen.queryByText('Registro do Google')).not.toBeInTheDocument();
+  });
+
+  // O desfecho diz o que a tarefa fez: "título marcado" só quando o título ganhou a marca agora.
+  test.each([
+    ['ja_marcado', 'Cancelado na agenda (o título já tinha a marca)'],
+    ['ja_saiu', 'Cancelado na agenda (o evento já tinha saído do Google)'],
+  ])('desfecho %s: "%s"', async (resultado, frase) => {
+    getEventDetailMock.mockResolvedValue({
+      ...(await getEventDetailMock()),
+      timeline: [log({ id: 6, action: 'CANCELAR_NA_AGENDA', details: { solicitacao_id: 7, resultado } })],
+    });
+    await abrirDetalhe();
+
+    expect(screen.getByText(frase)).toBeInTheDocument();
+    expect(screen.queryByText('Cancelado na agenda (título marcado)')).not.toBeInTheDocument();
+  });
+
+  // Revisão da rodada 6: o erro do Cancelar grava PUBLISH_GCAL_ERROR com operation=cancelar_na_agenda. A etiqueta do
+  // topo diz "Erro ao cancelar"; a linha do tempo não pode dizer que alguém tentou publicar.
+  test.each([
+    [{}, 'Erro ao cancelar na agenda'],
+    [{ cancelado_na_agenda_desfeito: true }, 'Erro ao cancelar na agenda (o cancelamento foi desfeito)'],
+  ])('erro do Cancelar %o: "%s"', async (extra, frase) => {
+    getEventDetailMock.mockResolvedValue({
+      ...(await getEventDetailMock()),
+      timeline: [
+        log({
+          id: 7,
+          action: 'PUBLISH_GCAL_ERROR',
+          details: { solicitacao_id: 7, operation: 'cancelar_na_agenda', ...extra },
+        }),
+      ],
+    });
+    await abrirDetalhe();
+
+    expect(screen.getByText(frase)).toBeInTheDocument();
+    expect(screen.queryByText('Erro ao publicar no Google')).not.toBeInTheDocument();
+  });
+
+  test('o erro de publicar segue "Erro ao publicar no Google"', async () => {
+    getEventDetailMock.mockResolvedValue({
+      ...(await getEventDetailMock()),
+      timeline: [log({ id: 8, action: 'PUBLISH_GCAL_ERROR', details: { solicitacao_id: 7, operation: 'publish' } })],
+    });
+    await abrirDetalhe();
+
+    expect(screen.getByText('Erro ao publicar no Google')).toBeInTheDocument();
+  });
+});

@@ -204,6 +204,8 @@ ActionType: TypeAlias = Literal[
     "RESYNC_GCAL_REQUESTED",
     "CANCEL_GCAL_REQUESTED",
     "CANCEL_GCAL",
+    "CANCELAR_NA_AGENDA_REQUESTED",
+    "CANCELAR_NA_AGENDA",
 ]
 """Tipos de ação para auditoria (AuditLog.action)."""
 

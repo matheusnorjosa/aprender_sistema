@@ -145,6 +145,8 @@ class DashboardEventsExportView(APIView):
                 "meet_link",
                 "gcal_payload_hash",
                 "updated_at",
+                # CON-08: a linha cancelada na agenda segue PUBLISHED; a coluna fica no fim para não reordenar.
+                "cancelado_na_agenda",
             ]
         )
 
@@ -174,6 +176,7 @@ class DashboardEventsExportView(APIView):
                     s.meet_link or "",
                     s.gcal_payload_hash or "",
                     s.updated_at.isoformat() if s.updated_at else "",
+                    "sim" if s.cancelado_na_agenda else "não",
                 ]
             )
 
@@ -266,8 +269,12 @@ class GCalDriftView(APIView):
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Base queryset: apenas PUBLISHED
         # MP4: select_related para evitar N+1 (compute_payload_hash acessa 5 FKs)
-        qs = Solicitacao.objects.filter(status="aprovado", gcal_status=Solicitacao.GCalStatus.PUBLISHED).select_related(
-            "municipio", "projeto", "projeto_2", "tipo_evento", "usuario", "coordenador"
+        # CON-08: a linha cancelada na agenda não se corrige (o Reaplicar a recusa); sem o exclude, ela ficaria
+        # listada para sempre depois de um erro, que zera o hash.
+        qs = (
+            Solicitacao.objects.filter(status="aprovado", gcal_status=Solicitacao.GCalStatus.PUBLISHED)
+            .exclude(cancelado_na_agenda=True)
+            .select_related("municipio", "projeto", "projeto_2", "tipo_evento", "usuario", "coordenador")
         )
 
         # Aplicar filtros

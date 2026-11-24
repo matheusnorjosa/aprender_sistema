@@ -101,6 +101,26 @@ describe('EditSolicitacaoPage — travas antes do Salvar', { timeout: 20000 }, (
     expect(screen.queryByText(FORMULARIO)).not.toBeInTheDocument();
   });
 
+  // CON-08 B: cancelado na agenda (PUBLISHED ou no erro do cancelamento) não se edita; nada de "tire do Google".
+  test.each(['PUBLISHED', 'ERROR'] as const)(
+    'cancelado na agenda (%s): o formulário não abre e o texto diz que não se edita mais',
+    async (gcal_status) => {
+      getSolicitacaoMock.mockResolvedValue({
+        ...SOLICITACAO,
+        gcal_status,
+        external_event_id: 'g-1',
+        cancelado_na_agenda: true,
+      });
+      renderPage();
+      expect(await screen.findByText('Evento cancelado na agenda')).toBeInTheDocument();
+      expect(
+        screen.getByText('Este evento foi cancelado na agenda: não se edita nem se publica de novo.'),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/tire o evento só do Google/)).not.toBeInTheDocument();
+      expect(screen.queryByText(FORMULARIO)).not.toBeInTheDocument();
+    },
+  );
+
   test('sincronização com o Google em andamento: o formulário não abre e manda aguardar', async () => {
     getSolicitacaoMock.mockResolvedValue({ ...SOLICITACAO, gcal_status: 'PENDING' });
     renderPage();

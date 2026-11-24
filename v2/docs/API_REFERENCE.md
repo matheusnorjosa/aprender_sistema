@@ -150,7 +150,7 @@ Cookie: sessionid=<session_id>
 | GET | `/api/solicitacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhes de uma solicitação | IsAuthenticated |
 | PUT | `/api/solicitacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar solicitação completa | `IsOwnerOrPrivileged` |
 | PATCH | `/api/solicitacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar parcialmente | `IsOwnerOrPrivileged` |
-| DELETE | `/api/solicitacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Excluir solicitação | `IsOwnerOrPrivileged` |
+| DELETE | `/api/solicitacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Excluir solicitação (204; 200 com `aviso` quando o evento já cancelado na agenda não foi achado no Google, ou quando o evento de formação já não estava no Google e nada foi marcado) | `IsOwnerOrPrivileged` |
 | POST | `/api/solicitacoes/lote/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar de 1 a 10 eventos numa transação (tudo ou nada). Corpo `{"eventos": [<payload do POST de 1 evento>, ...]}`; 201 `{"eventos": [{"indice", "id", "status"}]}`; 400 `lote_invalido` com `errors.itens[]` = `{indice, code, detail, errors? \| blocked_participants?}` | `create_solicitation` |
 | POST | `/api/solicitacoes/validate/` | ![Stable](https://img.shields.io/badge/-stable-green) | Validar payload antes de criar | `create_solicitation` ou `manage_admin_registries` |
 
@@ -344,10 +344,10 @@ SSOT: [availability.spec.md](specs/backend/availability.spec.md).
 
 As transições por solicitação são **actions do `SolicitacaoViewSet`**, não rotas
 sob `/api/gcal/`. Exigem `CanUseGcal` (policy `use_gcal` =
-`operate_preagenda` OU `approve_solicitation`) **ou** `CanPublishSetorSolicitacao` — actions `preview_gcal`/`publish`/`resync_gcal`/`cancel_gcal` do `SolicitacaoViewSet` (`views_solicitacao.py`).
+`operate_preagenda` OU `approve_solicitation`) **ou** `CanPublishSetorSolicitacao` — actions `preview_gcal`/`publish`/`resync_gcal`/`cancel_gcal`/`cancelar_na_agenda` do `SolicitacaoViewSet` (`views_solicitacao.py`).
 Com `CanPublishSetorSolicitacao` (Apoio de Coordenação) só vale evento **aprovado do próprio setor**: `Projeto.setor` do evento ∈ setores do vínculo vigente da pessoa (`can_publish_solicitacao`); fora disso, 404.
-Em modo OAuth, publish/resync/cancel recusam **antes** de marcar PENDING: 403 `google_not_connected` (sem credencial Google) e 409 `google_calendar_not_configured` (sem calendário de publicação — nem o pino `GCAL_OAUTH_CALENDAR_ID`, nem escolha na credencial; ver `GUIDE_GCAL.md`).
-Fora da prévia (`dry_run`), os três fazem o pedido com a linha travada e enfileiram a task na mesma transação (DEF-32): respondem **409** com `errors.code = linha_ocupada` quando outra operação segura a linha há mais de 10 s, e **503** `fila_indisponivel` quando a fila recusa a task. Nos dois casos nada muda e a ação pode ser repetida. Outro erro ao enfileirar (defeito de código) responde 500, também sem mudar a linha. Regra em [gcal.spec.md](specs/backend/gcal.spec.md) («Pedido de operação no Google»).
+Em modo OAuth, publish/resync/cancel/cancelar-na-agenda recusam **antes** de marcar PENDING: 403 `google_not_connected` (sem credencial Google) e 409 `google_calendar_not_configured` (sem calendário de publicação — nem o pino `GCAL_OAUTH_CALENDAR_ID`, nem escolha na credencial; ver `GUIDE_GCAL.md`).
+Fora da prévia (`dry_run`), os quatro (publish, resync, cancel e cancelar-na-agenda) fazem o pedido com a linha travada e enfileiram a task na mesma transação (DEF-32): respondem **409** com `errors.code = linha_ocupada` quando outra operação segura a linha há mais de 10 s, e **503** `fila_indisponivel` quando a fila recusa a task. Nos dois casos nada muda e a ação pode ser repetida. Outro erro ao enfileirar (defeito de código) responde 500, também sem mudar a linha. Regra em [gcal.spec.md](specs/backend/gcal.spec.md) («Pedido de operação no Google»).
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
@@ -355,6 +355,7 @@ Fora da prévia (`dry_run`), os três fazem o pedido com a linha travada e enfil
 | POST | `/api/solicitacoes/{id}/publish/` | ![Stable](https://img.shields.io/badge/-stable-green) | Publicar no Google Calendar (202) | `CanUseGcal` ou `CanPublishSetorSolicitacao` |
 | POST | `/api/solicitacoes/{id}/resync-gcal/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Resincronizar evento (202) | `CanUseGcal` ou `CanPublishSetorSolicitacao` |
 | POST | `/api/solicitacoes/{id}/cancel-gcal/` | ![Stable](https://img.shields.io/badge/-stable-green) | Cancelar evento no GCal (202) | `CanUseGcal` ou `CanPublishSetorSolicitacao` |
+| POST | `/api/solicitacoes/{id}/cancelar-na-agenda/` | ![Stable](https://img.shields.io/badge/-stable-green) | Evento de formação: título no Google ganha "(CANCELADO) " e a linha não se publica mais (202; CON-08; 409 `ja_cancelado_na_agenda` na linha já cancelada) | `CanUseGcal` ou `CanPublishSetorSolicitacao` |
 | POST | `/api/gcal/publish-batch/` | ![Stable](https://img.shields.io/badge/-stable-green) | Publicar múltiplas solicitações (202) | `IsAuthenticated` + `CanUseGcal` |
 
 `POST /api/gcal/publish-batch/` espera **`solicitacao_ids`** (não `ids`), máx. 500;

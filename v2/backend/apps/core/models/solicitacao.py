@@ -302,6 +302,18 @@ class Solicitacao(models.Model):
             "segundo evento, então o sistema não cria. Ligado pela carga da virada; a adoção do Event ID desliga."
         ),
     )
+    cancelado_na_agenda = models.BooleanField(
+        db_default=False,
+        default=False,
+        editable=False,
+        verbose_name="Cancelado na agenda",
+        help_text=(
+            "Evento de formação cancelado na agenda (CON-08): o título no Google ganha '(CANCELADO) ' e o evento fica "
+            "lá. Gravado no pedido; com a marca, a linha não é publicada, reenviada nem tirada do Google. Pela tela "
+            "não há desfazer: só a tarefa do Cancelar tira a marca, quando o Event ID adotado não é achado no Google "
+            "e nenhum Cancelar anterior terminou."
+        ),
+    )
     is_online = models.BooleanField(
         default=False,
         verbose_name="Evento online",

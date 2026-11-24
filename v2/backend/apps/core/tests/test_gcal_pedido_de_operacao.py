@@ -475,7 +475,11 @@ def test_previa_do_publicar_nao_faz_pedido():
 # =============================================================================
 
 _APPS = Path(__file__).resolve().parents[2]
-_TAREFAS_COM_PEDIDO = ("task_publish_solicitacao_to_gcal", "task_cancel_solicitacao_from_gcal")
+_TAREFAS_COM_PEDIDO = (
+    "task_publish_solicitacao_to_gcal",
+    "task_cancel_solicitacao_from_gcal",
+    "task_cancelar_na_agenda",
+)
 _QUEM_ENFILEIRA = {"core/services/solicitacao_publish.py", "core/views_gcal/batch.py", "core/tasks.py"}
 
 
@@ -507,10 +511,10 @@ def test_a_varredura_acha_quem_enfileira_por_fora(tmp_path):
 
 
 def test_so_as_entradas_enfileiram_publicar_e_cancelar():
-    """Quem enfileira uma das duas tarefas por fora pula o pedido: a linha fica sem identificador novo, a
+    """Quem enfileira uma destas tarefas por fora pula o pedido: a linha fica sem identificador novo, a
     tarefa não age (ou age sobre o pedido de outro) e o PENDING não fica preso à transação da fila. Por isso
-    nenhum outro arquivo de `apps/` sequer cita as duas tarefas: quem precisa publicar ou tirar do Google chama
-    `publish_to_gcal`, `resync_to_gcal`, `cancel_from_gcal` ou os lotes."""
+    nenhum outro arquivo de `apps/` sequer cita as tarefas: quem precisa publicar, tirar do Google ou cancelar na
+    agenda chama `publish_to_gcal`, `resync_to_gcal`, `cancel_from_gcal`, `cancelar_na_agenda` ou os lotes."""
     assert _mencoes_fora_da_lista(_APPS) == []
 
 

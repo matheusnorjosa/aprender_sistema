@@ -79,6 +79,21 @@ def _invalidate_cache_on_solicitacao_change(
     coordenador_id = getattr(instance, "coordenador_id", None)
     if coordenador_id is not None and coordenador_id != getattr(instance, "usuario_id", None):
         invalidate_availability_cache(usuario_id=coordenador_id)
+    # O Cancelar confirmado (CON-08 B: a marca `cancelado_na_agenda` com a linha PUBLISHED) libera ou volta a ocupar
+    # a agenda de todos os participantes sem mexer em Participation (decisão do dono, 24/11/2026): a consulta com
+    # cache deles também muda. Muda quando a marca muda, ou quando a linha marcada muda de estado no Google (a tarefa
+    # que termina a volta a PUBLISHED pelo `mark_gcal`, revisão da rodada 6).
+    update_fields = kwargs.get("update_fields")
+    if update_fields and (
+        "cancelado_na_agenda" in update_fields
+        or ("gcal_status" in update_fields and getattr(instance, "cancelado_na_agenda", False))
+    ):
+        for usuario_id in (
+            Participation.objects.filter(solicitacao_id=instance.pk, usuario_id__isnull=False)
+            .values_list("usuario_id", flat=True)
+            .distinct()
+        ):
+            invalidate_availability_cache(usuario_id=usuario_id)
 
 
 @receiver([post_save, post_delete], sender=AvailabilityBlock)

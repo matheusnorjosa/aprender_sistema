@@ -31,7 +31,12 @@ from django.utils import timezone
 
 from apps.core.models import AvailabilityBlock, Deslocamento, EquipeGerencia, Participation, Solicitacao, Usuario
 from apps.core.pii import busca_por_nome, email_sem_cpf
-from apps.core.services.availability_service import ENFORCED_ROLES, coordenador_ocupante, ocupa_agenda_q
+from apps.core.services.availability_service import (
+    ENFORCED_ROLES,
+    cancelado_confirmado_q,
+    coordenador_ocupante,
+    ocupa_agenda_q,
+)
 from apps.core.services.horas_formacao import horas_formacao
 from apps.core.services.solicitacao_projetos import q_tem_projeto
 from apps.core.types import UserId
@@ -160,6 +165,9 @@ def build_monthly_grid(
         # Interseção com o mês: evento.inicio < month_end AND evento.fim > month_start
         inicio__lt=month_end,
         fim__gt=month_start,
+    ).exclude(
+        # O evento cancelado na agenda (CON-08 B) não vai acontecer: não marca o dia (decisão do dono, 24/11/2026).
+        cancelado_confirmado_q()
     )
 
     if sector and sector.strip():

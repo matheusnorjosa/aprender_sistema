@@ -148,6 +148,7 @@ RBAC_MATRIX_EXEMPT_PREFIXES: dict[str, str] = {
     "/api/solicitacoes/<id>/publish/": "Publish GCal — cobertura via test_solicitacao_*",
     "/api/solicitacoes/<id>/resync-gcal/": "Resync GCal — cobertura via test_solicitacao_*",
     "/api/solicitacoes/<id>/cancel-gcal/": "Cancel GCal — cobertura via test_solicitacao_*",
+    "/api/solicitacoes/<id>/cancelar-na-agenda/": "CON-08 — cobertura em test_gcal_cancelar_na_agenda.py",
     # ── Detail variants compartilham permission_classes da list (mesma ViewSet) ──
     "/api/audit-logs/<id>/": "Detail variant — compartilha permission da list (audit_logs)",
     "/api/ciclos-acoes/<id>/": "Detail variant — compartilha permission da list (ciclos_acoes)",

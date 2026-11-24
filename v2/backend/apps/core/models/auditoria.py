@@ -58,6 +58,9 @@ class AuditLog(models.Model):
         RESYNC_GCAL_REQUESTED = "RESYNC_GCAL_REQUESTED", "Resync GCal solicitado"
         CANCEL_GCAL_REQUESTED = "CANCEL_GCAL_REQUESTED", "Cancelamento GCal solicitado"
         CANCEL_GCAL = "CANCEL_GCAL", "Cancelada no GCal"
+        # CON-08: evento de formação cancelado na agenda (título com "(CANCELADO) "); pedido e desfecho
+        CANCELAR_NA_AGENDA_REQUESTED = "CANCELAR_NA_AGENDA_REQUESTED", "Cancelamento na agenda pedido"
+        CANCELAR_NA_AGENDA = "CANCELAR_NA_AGENDA", "Cancelado na agenda (titulo marcado)"
         CELERY_GCAL_SYNC = "CELERY_GCAL_SYNC", "Sync GCal via Celery"
         GCAL_RETRY_SUCCESS = "GCAL_RETRY_SUCCESS", "Retry GCal bem-sucedido"
         GCAL_ENCRYPTION_KEY_ROTATION = "GCAL_ENCRYPTION_KEY_ROTATION", "Rotacao chave GCal"

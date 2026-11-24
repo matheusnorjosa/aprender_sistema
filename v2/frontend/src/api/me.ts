@@ -6,7 +6,7 @@
  */
 
 import { fetchAPI, fetchBlob, buildUrl, type QueryParams } from './config';
-import type { ID, PaginatedResponse } from '../types';
+import type { GCalStatus, ID, PaginatedResponse } from '../types';
 import type { CurrentUser } from '../types/usuario';
 
 /**
@@ -39,6 +39,10 @@ export interface MeEvent {
   is_online: boolean;
   meet_link: string | null;
   status: 'aprovado' | 'pendente' | 'reprovado';
+  // CON-08 B: o evento segue aprovado, mas foi cancelado na agenda ("(CANCELADO)" no título do Google).
+  cancelado_na_agenda?: boolean;
+  // Com a marca, diz se o Google já confirmou o cancelamento (revisão da rodada 6).
+  gcal_status?: GCalStatus;
 }
 
 /**

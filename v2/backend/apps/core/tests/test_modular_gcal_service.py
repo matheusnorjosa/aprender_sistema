@@ -168,7 +168,9 @@ class TestGCalPackageStructure:
         import apps.core.services.gcal as gcal
 
         assert hasattr(gcal, "__all__")
-        assert len(gcal.__all__) == 14  # All exports (_retry_with_backoff saiu no FER-60)
+        assert (
+            len(gcal.__all__) == 15
+        )  # All exports (_retry_with_backoff saiu no FER-60; CON-08 trouxe marcar_cancelado_no_google)
 
     def test_all_submodules_exist(self):
         """All submodules should be importable."""

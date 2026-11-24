@@ -1,7 +1,7 @@
 ---
 title: Disponibilidade (serviço)
 status: canonical
-last_verified: 2026-11-04
+last_verified: 2026-11-24
 verified_at_commit: 563ec1c36c140292129e985073c29d198d7316e2
 sources_of_truth:
   - v2/backend/apps/core/services/availability_service.py
@@ -46,7 +46,7 @@ O coração é um **serviço puro, sem efeitos colaterais** (`check_conflicts`):
 
 ## Contratos e invariantes
 
-- **RD-01 (X)** — sobreposição com evento aprovado: overlap `inicio__lt=fim & fim__gt=inicio` ≥ 1 min gera conflito; intervalos **adjacentes** (`fim == inicio`) **não** conflitam.
+- **RD-01 (X)** — sobreposição com evento aprovado (o cancelado na agenda com o Cancelar confirmado, `cancelado_na_agenda=True` e `gcal_status=PUBLISHED` do CON-08 B, não conta: decisão do dono de 24/11/2026, `cancelado_confirmado_q`; marcado em `PENDING` ou `ERROR`, o evento segue ativo no Google e conta, revisão da rodada 6; vale também para o RD-04 e para o lote): overlap `inicio__lt=fim & fim__gt=inicio` ≥ 1 min gera conflito; intervalos **adjacentes** (`fim == inicio`) **não** conflitam.
 - **RD-02 (T)** — bloqueio total aprovado que intersecta o intervalo impede qualquer evento.
 - **RD-03 (P)** — bloqueio parcial aprovado impede só dentro do subintervalo.
 - **RD-04 (D)** — buffer de deslocamento entre municípios distintos: exige `>= TRAVEL_BUFFER_MINUTES` (default 120). `municipio=None` é tratado como **cidade diferente** (fix #588) → exige buffer. Buffer **exato** (`== buffer`) passa; só `< buffer` conflita.
@@ -81,7 +81,7 @@ Idioma RBAC canônico: `permission_classes=[HasPerm("codename")]` (grupos direto
 1. Valida intervalo (`fim > inicio`); inválido → `CheckResult(ok=False)` com `Conflict("X", "Intervalo inválido", ...)`.
 2. Carrega `TRAVEL_BUFFER_MINUTES` por `parametros_disponibilidade()` (`config_service.py`): vale a chave gravada no Config `availability` (inclusive Buffer 0); sem ela, o settings (env). A tela de Configurações (`GET /api/config/`) mostra pela mesma função, então o valor exibido é o aplicado (auditoria UX 30/09; antes a tela completava com 120/8 fixos e o motor ignorava o Buffer 0 por causa de `or`). Travado em `test_config_api.py::test_config_buffer_exibido_e_o_aplicado_no_rd04`.
 3. **RD-02/03**: bloqueios aprovados que intersectam → conflito T ou P por `tipo`.
-4. **RD-01**: eventos aprovados que sobrepõem → conflito X (`distinct()` por causa do JOIN de participação).
+4. **RD-01**: eventos aprovados e não cancelados na agenda que sobrepõem → conflito X (`distinct()` por causa do JOIN de participação).
 5. **RD-04**: evento imediatamente anterior/posterior; se cidade distinta e gap `< buffer` → conflito D.
 6. (**RD-05** não roda aqui desde 05/10/2026: é o teto da contagem de horas.)
 7. **RD-07**: retorna `CheckResult(ok=len(conflicts)==0, conflicts=[...], warnings=[...])`.

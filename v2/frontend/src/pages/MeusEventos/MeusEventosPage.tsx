@@ -22,6 +22,7 @@ import type { TablePaginationConfig } from 'antd/es/table';
 import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 
 import { formatFortaleza } from '../../utils/datetime';
+import { gcalRowActions } from '../../utils/gcalRowActions';
 import { getMyEvents, type MeEvent } from '../../api/me';
 import { coordenadoresTexto, extrasNomes, formadoresNomes } from '../../utils/participants';
 import { MeetLink } from '../../components/MeetLink';
@@ -82,6 +83,22 @@ export default function MeusEventosPage(): JSX.Element {
           <Text type="secondary">
             {`${formatFortaleza(record.inicio, 'HH:mm')} – ${formatFortaleza(record.fim, 'HH:mm')}`}
           </Text>
+          {/* CON-08 B: segue aprovado, mas não vai acontecer. Na coluna da data, que aparece em qualquer largura.
+              Pelo estado, como nas outras telas: "Cancelado na agenda" só depois que o Google confirmou. A coluna
+              tem largura fixa: a etiqueta quebra linha em vez de passar por cima do município (revisão da rodada 6). */}
+          {record.cancelado_na_agenda && (
+            <>
+              <br />
+              <Tag style={{ whiteSpace: 'normal', marginInlineEnd: 0 }}>
+                {
+                  gcalRowActions(
+                    { gcal_status: record.gcal_status ?? 'PUBLISHED', external_event_id: null, cancelado_na_agenda: true },
+                    { ready: true },
+                  ).tag.label
+                }
+              </Tag>
+            </>
+          )}
         </>
       ),
     },

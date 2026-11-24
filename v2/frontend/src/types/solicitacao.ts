@@ -121,7 +121,16 @@ export interface Solicitacao {
   gcal_last_error: string | null;
   /** No Google Agenda pela planilha e não adotado (virada): o sistema não publica. */
   publicado_fora_do_sistema?: boolean;
-  /** Quem lê pode tirar este evento do Google (`can_publish_solicitacao`): Excluir tira de lá também. */
+  /**
+   * Evento de formação cancelado na agenda (CON-08): o título no Google ganha "(CANCELADO) " e o evento fica lá.
+   * Com a marca, não se publica, não se reenvia, não se tira do Google e não se edita. Pela tela não há desfazer; só a
+   * tarefa do Cancelar tira a marca, quando o Event ID adotado não é achado e nenhum Cancelar anterior terminou.
+   */
+  cancelado_na_agenda?: boolean;
+  /**
+   * Quem lê pode tirar este evento do Google (`can_publish_solicitacao`): Excluir tira de lá também, ou marca
+   * (CANCELADO) no título do evento de formação, que fica lá (CON-08).
+   */
   pode_tirar_do_google?: boolean;
   /**
    * Quem lê pode excluir esta linha (a regra do DELETE: quem exclui e as recusas que se sabem sem o

@@ -179,16 +179,19 @@ export async function updateSolicitacao(id: ID, data: Partial<SolicitacaoPayload
  * - Não é possível excluir solicitações já publicadas no Google Calendar
  *
  * @param id - ID da solicitação
+ * @returns O aviso do servidor quando a exclusão concluiu com algo a dizer (200 com `aviso`: evento cancelado na
+ *   agenda que o Google não achou); undefined no 204 de sempre.
  */
-export async function deleteSolicitacao(id: ID): Promise<void> {
+export async function deleteSolicitacao(id: ID): Promise<string | undefined> {
   logger.debug('=== deleteSolicitacao ===');
   logger.debug('ID:', id);
 
-  await fetchAPI(`/solicitacoes/${id}/`, {
+  const resposta = await fetchAPI<{ aviso?: string } | undefined>(`/solicitacoes/${id}/`, {
     method: 'DELETE',
   });
   syncChannel.publish('solicitacoes', { action: 'deleted' });
   syncChannel.publish('availability', { action: 'changed' });
+  return resposta?.aviso;
 }
 
 /**
@@ -251,6 +254,24 @@ export async function cancelSolicitacao(id: ID): Promise<PublishResult> {
   });
   syncChannel.publish('preagenda', { action: 'cancelled' });
   syncChannel.publish('solicitacoes', { action: 'updated' });
+  return result;
+}
+
+/**
+ * Cancelar na agenda um evento de formação (CON-08): o título no Google ganha "(CANCELADO) " e o evento fica
+ * lá. A linha passa a `cancelado_na_agenda` já no pedido e nunca mais é publicada. Sem e-mail aos convidados.
+ *
+ * @param id - ID da solicitação de formação que está no Google
+ */
+export async function cancelarNaAgenda(id: ID): Promise<PublishResult> {
+  const result = await fetchAPI<PublishResult>(`/solicitacoes/${id}/cancelar-na-agenda/`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  syncChannel.publish('preagenda', { action: 'cancelled' });
+  syncChannel.publish('solicitacoes', { action: 'updated' });
+  // A marca libera o dia do formador e tira a CH (P6/P7): a Grade Mensal aberta em outra aba recarrega.
+  syncChannel.publish('availability', { action: 'changed' });
   return result;
 }
 

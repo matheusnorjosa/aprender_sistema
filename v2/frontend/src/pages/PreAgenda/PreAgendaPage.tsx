@@ -49,6 +49,7 @@ import {
   InfoCircleOutlined,
   SyncOutlined,
   StopOutlined,
+  CloseCircleOutlined,
   DeleteOutlined,
   EnvironmentOutlined,
   TeamOutlined,
@@ -68,6 +69,7 @@ import {
   publishSolicitacao,
   resyncSolicitacao,
   cancelSolicitacao,
+  cancelarNaAgenda,
   deleteSolicitacao,
 } from '../../api/solicitacoes';
 import { getStatusSummary, reapplyBatch, resyncBatch, type GCalStatusSummary } from '../../api/gcal';
@@ -88,6 +90,7 @@ import {
   MOTIVO_NAO_PUBLICAVEL,
   confirmacaoDeExcluirNoGoogle,
   estaNoGoogle,
+  excluirMarcaCancelado,
   gcalRowActions,
   motivoNaoPublicavel,
   resumoDoEvento,
@@ -505,6 +508,38 @@ export default function PreAgendaPage(): JSX.Element {
     });
   }, [loadData]);
 
+  // CON-08: "Cancelar evento" de formação põe "(CANCELADO) " no título do Google; o evento fica lá e a linha
+  // não se publica mais. Mesma confirmação de Publicar na agenda; abre no Cancelar do diálogo.
+  const handleCancelarNaAgenda = useCallback((record: Solicitacao): void => {
+    Modal.confirm({
+      title: `Cancelar evento: ${rotuloDoEvento(record)}?`,
+      icon: <CloseCircleOutlined className="text-red-500" />,
+      content: (
+        <div>
+          <p>
+            O título do evento no Google Agenda ganha (CANCELADO) na frente e o evento continua lá, sem e-mail aos
+            convidados.
+          </p>
+          <p>Depois disso ele não se edita nem se publica de novo. Não dá para desfazer.</p>
+        </div>
+      ),
+      okText: 'Sim, cancelar evento',
+      okType: 'danger',
+      cancelText: 'Voltar', // "Cancelar" ao lado de "Sim, cancelar evento" confunde
+      autoFocusButton: 'cancel',
+      onOk: async () => {
+        try {
+          await cancelarNaAgenda(record.id);
+          message.success('Pedido enviado: o título do evento no Google Agenda ganha (CANCELADO) em alguns segundos.');
+          void loadData();
+        } catch (error) {
+          const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+          message.error(detail || 'Erro ao cancelar o evento: ' + (error as Error).message);
+        }
+      },
+    });
+  }, [loadData]);
+
   // Excluir tira dos dois lados: a mesma confirmação de Publicar na agenda e de Minhas Solicitações.
   // A recusa do servidor (400 com o motivo) vai inteira para a pessoa; a lista recarrega, porque a
   // recusa pode chegar depois de o Google já ter sido limpo.
@@ -520,8 +555,16 @@ export default function PreAgendaPage(): JSX.Element {
       autoFocusButton: 'cancel',
       onOk: async () => {
         try {
-          await deleteSolicitacao(record.id);
-          if (!noGoogle) message.success('Solicitação excluída.');
+          const aviso = await deleteSolicitacao(record.id);
+          // P5: excluída, mas o servidor tem algo a dizer (o evento cancelado na agenda não foi achado no Google).
+          if (aviso) message.warning(aviso);
+          else if (!noGoogle) message.success('Solicitação excluída.');
+          else if (excluirMarcaCancelado(record))
+            message.success(
+              record.gcal_status === ('ERROR' as GCalStatus) && !record.external_event_id
+                ? 'Evento excluído do sistema; se chegou ao Google Agenda, ele fica lá com (CANCELADO) no título.'
+                : 'Evento excluído do sistema; no Google Agenda ele fica com (CANCELADO) no título.'
+            );
           else if (record.gcal_status === ('ERROR' as GCalStatus) && !record.external_event_id)
             message.success('Evento excluído do sistema e do Google Agenda, se estava lá.');
           else message.success('Evento excluído do sistema e do Google Agenda.');
@@ -713,8 +756,18 @@ export default function PreAgendaPage(): JSX.Element {
         // Reenviar: PUBLISHED ou ERROR, e só o que o backend aceita reenviar (D64: não o que já terminou).
         const showResync = (isPublished || hasError) && motivoNaoPublicavel(record, { reenvio: true }) === null;
 
-        // Cancel: mostrar apenas quando PUBLISHED e tem event_id
-        const showCancel = isPublished && hasEventId;
+        // Cancel: PUBLISHED ou ERROR com event_id, como em Publicar na agenda (e não na linha cancelada na agenda,
+        // CON-08). No ERROR é a saída que o Cancelar de id adotado não achado manda usar, inclusive no evento que já
+        // terminou, que Publicar na agenda não lista.
+        const showCancel = (isPublished || hasError) && hasEventId && !record.cancelado_na_agenda;
+
+        // CON-08: Cancelar evento de formação ao lado do Remover (PUBLISHED ou ERROR com id, como gcalRowActions em
+        // Publicar na agenda; revisão da rodada 6); na linha cancelada, só no erro (refazer o que falhou: Publicar
+        // na agenda só lista de hoje em diante).
+        // O refazer não exige o tipo ainda de formação (tipo renomeado), como o servidor e Publicar na agenda.
+        const showCancelar =
+          (showCancel && record.tipo_evento_de_formacao === true) ||
+          (hasError && hasEventId && record.cancelado_na_agenda === true);
 
         // Virada: evento que já terminou, ou que está no Google pela planilha, não se publica
         // (o backend recusa com o mesmo motivo). O motivo vai no nome acessível do botão.
@@ -757,6 +810,17 @@ export default function PreAgendaPage(): JSX.Element {
                 icon={<StopOutlined />}
                 onClick={() => handleCancel(record)}
                 aria-label={`Remover do Google Agenda: ${rotuloDoEvento(record)}`}
+                title="Remover do Google Agenda"
+              />
+            )}
+            {showCancelar && (
+              <Button
+                size="small"
+                danger
+                icon={<CloseCircleOutlined />}
+                onClick={() => handleCancelarNaAgenda(record)}
+                aria-label={`Cancelar evento: ${rotuloDoEvento(record)}`}
+                title="Cancelar evento"
               />
             )}
             {podeExcluir && record.pode_excluir === true && (
@@ -772,7 +836,7 @@ export default function PreAgendaPage(): JSX.Element {
         );
       },
     },
-  ], [handlePreview, handlePublish, handleResync, handleCancel, handleExcluir, podeExcluir, celular]);
+  ], [handlePreview, handlePublish, handleResync, handleCancel, handleCancelarNaAgenda, handleExcluir, podeExcluir, celular]);
 
   // Google Calendar events loader
   const loadGcalEvents = useCallback(async (): Promise<void> => {

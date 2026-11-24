@@ -67,6 +67,7 @@ from .services.solicitacao_exclusao import (
 )
 from .services.solicitacao_projetos import ids_dos_projetos, q_tem_projeto
 from .services.solicitacao_publish import MSG_LINHA_OCUPADA, cancel_from_gcal
+from .services.solicitacao_publish import cancelar_na_agenda as cancelar_na_agenda_service
 from .services.solicitacao_publish import preview_gcal as preview_gcal_service
 from .services.solicitacao_publish import publish_to_gcal, remover_do_google_agora, resync_to_gcal
 from .services.solicitacao_scope import (
@@ -80,6 +81,16 @@ from .services.solicitacao_scope import (
 from .utils.net import get_client_ip
 
 logger = logging.getLogger(__name__)
+
+_AVISO_EVENTO_NAO_ACHADO_NO_GOOGLE = (
+    "Evento excluído do sistema, mas ele não foi achado no Google Agenda. Se ainda aparecer lá, apague-o direto no "
+    "Google Agenda."
+)
+# Excluir de formação cujo evento já tinha saído do Google (ou nunca chegou lá): nada foi marcado, e a tela não pode
+# dizer que ele ficou lá com (CANCELADO) (revisão da rodada 6).
+_AVISO_EVENTO_JA_SAIU_DO_GOOGLE = (
+    "Evento excluído do sistema. Ele não estava no Google Agenda, então nada foi marcado lá."
+)
 
 
 class _ExtraParticipantsSerializer(serializers.Serializer):
@@ -406,8 +417,16 @@ curl -X POST /api/solicitacoes/ \\
     ),
     destroy=extend_schema(
         summary="Excluir solicitação",
-        description="Remove uma solicitação. Requer ser o proprietário ou ter privilégio especial.",
-        responses={204: None, **COMMON_ERROR_RESPONSES},
+        description=(
+            "Remove uma solicitação. Requer ser o proprietário ou ter privilégio especial. Responde 204 sem corpo; "
+            "200 com `aviso` quando a exclusão concluiu com algo a dizer (evento já cancelado na agenda que não foi "
+            "achado no Google, ou evento de formação que não estava no Google e por isso não foi marcado)."
+        ),
+        responses={
+            204: None,
+            200: inline_serializer("SolicitacaoExclusaoAviso", fields={"aviso": serializers.CharField()}),
+            **COMMON_ERROR_RESPONSES,
+        },
         tags=["solicitacoes"],
     ),
 )
@@ -456,6 +475,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             "publish",
             "resync_gcal",
             "cancel_gcal",
+            "cancelar_na_agenda",
             "batch_approve",
             "batch_reject",
         ]
@@ -1297,8 +1317,15 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
           sem id conta: a publicação que falhou pode ter criado o evento com o id determinístico. O
           Google vem primeiro e síncrono; se falhar, nada é apagado. Quem não pode recebe 400 e o
           Google não é chamado. Todas as recusas abaixo vêm antes.
+        - Evento de formação no Google, ou linha já cancelada na agenda (CON-08, decisão do dono de 23/11):
+          o evento não sai de lá. `remover_do_google_agora` põe "(CANCELADO) " no título e grava
+          `cancelado_na_agenda`; o evento fica no Google, cancelado, e a linha sai daqui. Id adotado que o
+          Google não acha (P5): com o Cancelar já concluído, a linha sai e o DELETE responde 200 com
+          `aviso`; sem ele, 400 e nada é excluído. Evento que já tinha saído do Google (ou nunca chegou
+          lá): nada é marcado, a linha sai e o DELETE responde 200 com `aviso` dizendo isso.
         - O delete relê a linha com lock: se uma publicação ou reenvio concorrente a pôs (de volta)
-          no Google, recusa em vez de deixar o evento órfão lá.
+          no Google, recusa em vez de deixar o evento órfão lá. A linha marcada passa só quando o
+          remover rodou nesta requisição (ela guarda o id de propósito).
         - No Google pela planilha sem adoção (`publicado_fora_do_sistema`): não se exclui (não há id
           para apagar lá, e o evento ficaria no Google).
 
@@ -1324,10 +1351,27 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         # No Google: sai de lá primeiro (fora do atomic do delete: o NONE fica gravado e o delete vem
         # depois; se o delete falhar, sobra a linha "não publicada", que é o estado verdadeiro).
+        # Evento de formação (CON-08, decisão do dono de 23/11): o remover marca "(CANCELADO) " no título e o
+        # evento fica no Google; a linha sai daqui do mesmo jeito.
         removido_do_google: dict[str, Any] = {}
+        aviso: str | None = None
         if no_google:
-            external_event_id = remover_do_google_agora(instance, self.request.user)
-            removido_do_google = {"removido_do_google": True, "external_event_id": external_event_id}
+            external_event_id, resultado = remover_do_google_agora(instance, self.request.user)
+            if resultado is None:
+                removido_do_google = {"removido_do_google": True, "external_event_id": external_event_id}
+            else:
+                # O evento fica no Google com "(CANCELADO) "; no "já saiu" ele não está mais lá e nada foi marcado.
+                removido_do_google = {
+                    "cancelado_na_agenda": resultado != "ja_saiu",
+                    "resultado": resultado,
+                    "external_event_id": external_event_id,
+                }
+            if resultado == "nao_achado":
+                # P5 (decisão do dono, 24/11/2026): linha já cancelada na agenda cujo evento sumiu do Google.
+                removido_do_google["evento_nao_achado_no_google"] = True
+                aviso = _AVISO_EVENTO_NAO_ACHADO_NO_GOOGLE
+            elif resultado == "ja_saiu":
+                aviso = _AVISO_EVENTO_JA_SAIU_DO_GOOGLE
 
         # Capturar dados antes da exclusão para o AuditLog
         solicitacao_data = {
@@ -1354,13 +1398,19 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             # As checagens acima leram `instance` sem lock: uma publicação ou reenvio concorrente pode
             # ter posto o evento no Google desde então (a task trava a linha enquanto fala com o Google).
+            # A linha cancelada na agenda guarda o id de propósito (o evento ficou no Google, marcado): sai, mas só
+            # quando o remover rodou nesta requisição e pôs (ou conferiu) a marca. Marcada sem ele é linha que
+            # alguém publicou e cancelou depois da checagem: o título pode estar sem a marca, então recusa.
+            # Depois do remover, PENDING só pode ser um Cancelar concorrente, que acharia o título já marcado.
+            # Desvincular antes daria a janela em que um Publicar adotaria o `asv2{id}` e tiraria a marca.
             atual = (
                 Solicitacao.objects.select_for_update()
                 .filter(pk=instance.pk)
-                .values_list("gcal_status", "external_event_id")
+                .values_list("gcal_status", "external_event_id", "cancelado_na_agenda")
                 .first()
             )
-            if atual is not None and (atual[0] != "NONE" or atual[1]):
+            aceita_marcada = no_google and atual is not None and atual[2]
+            if atual is not None and not aceita_marcada and (atual[0] != "NONE" or atual[1]):
                 raise ValidationError(
                     {
                         "detail": "O evento mudou no Google Agenda enquanto você excluía (alguém publicou ou "
@@ -1383,6 +1433,14 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
             # Executar exclusão
             instance.delete()
+        return aviso
+
+    def destroy(self, request, *args, **kwargs):
+        """204 sem corpo, como sempre; 200 com `aviso` quando a exclusão concluiu com algo a dizer (P5, já saiu)."""
+        aviso = self.perform_destroy(self.get_object())
+        if aviso:
+            return Response({"aviso": aviso}, status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
         summary="Aprovar solicitação",
@@ -1615,6 +1673,32 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             request=request,
         )
 
+        return Response(
+            {
+                "detail": result.message,
+                "task_id": result.task_id,
+                "solicitacao_id": result.solicitacao_id,
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        # CON-08: o mesmo gate do cancel-gcal (quem tira do Google cancela na agenda); nenhum poder novo.
+        permission_classes=[CanUseGcal | CanPublishSetorSolicitacao],
+        url_path="cancelar-na-agenda",
+    )
+    def cancelar_na_agenda(self, request, pk=None):
+        """
+        Cancelar na agenda um evento de formação: o título no Google ganha "(CANCELADO) " (CON-08).
+
+        O evento fica no Google; a linha nunca mais é publicada, reenviada nem tirada de lá.
+        Permissão: `use_gcal` (global) ou `publish_setor_solicitacao` (gerência do evento).
+        Returns: 202 Accepted (processamento assíncrono)
+        """
+        solicitacao = self._get_publishable_solicitacao()
+        result = cancelar_na_agenda_service(solicitacao=solicitacao, user=request.user, request=request)
         return Response(
             {
                 "detail": result.message,

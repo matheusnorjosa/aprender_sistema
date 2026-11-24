@@ -52,6 +52,7 @@ class Command(BaseCommand):
     def handle(self, *args: Any, **options: Any) -> None:
         """Execute compliance audit."""
         from apps.core.models import AuditLog, AvailabilityBlock, Solicitacao
+        from apps.core.services.availability_service import cancelado_confirmado_q
 
         days = options["days"]
         since = timezone.now() - timedelta(days=days)
@@ -247,13 +248,18 @@ class Command(BaseCommand):
         ).select_related("usuario")
 
         for block in total_blocks:
-            # Verificar solicitações aprovadas do mesmo usuário no mesmo período
-            conflicting = Solicitacao.objects.filter(
-                status="aprovado",
-                usuario=block.usuario,
-                inicio__lt=block.fim,
-                fim__gt=block.inicio,
-            ).exists()
+            # Verificar solicitações aprovadas do mesmo usuário no mesmo período. O cancelado na agenda (CON-08 B)
+            # não ocupa a agenda, como no motor de conflito (decisão do dono, 24/11/2026).
+            conflicting = (
+                Solicitacao.objects.filter(
+                    status="aprovado",
+                    usuario=block.usuario,
+                    inicio__lt=block.fim,
+                    fim__gt=block.inicio,
+                )
+                .exclude(cancelado_confirmado_q())
+                .exists()
+            )
 
             if conflicting:
                 blocks_with_events += 1

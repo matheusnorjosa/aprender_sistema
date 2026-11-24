@@ -3,8 +3,10 @@
 Evento de formação é o de tipo Presencial, Online ou Workshop, pelo nome sem acento e sem maiúscula. É a
 definição única: nenhum outro lugar decide se o tipo é de formação. O nome do tipo é lido em outros pontos, para
 outro fim: o título do Google trata "Acompanhamento" à parte (`gcal/payload.py`) e o comando de dev
-`backfill_is_online` deduz a modalidade pelo nome. Quem renomear um tipo confere os três. O nome conta porque é
-ele que vai ao título do evento no Google ("EF - Presencial"), e é pelo título que o DFF lê a formação.
+`backfill_is_online` deduz a modalidade pelo nome. Quem renomear um tipo confere os três, e sabe que muda também o
+que o Excluir faz no Google: o de evento de formação marca "(CANCELADO) " no título e deixa o evento lá; o dos outros
+tipos tira o evento de lá (CON-08). O nome conta porque é ele que vai ao título do evento no Google
+("EF - Presencial"), e é pelo título que o DFF lê a formação.
 
 O Nº da formação (`Solicitacao.encontro`) do evento de formação é só o número, de 1 a 999. Aceita "3º", "3°",
 "03" e espaço nas pontas e guarda "3" (o título põe o "º"). Só algarismos comuns: "²" ou o "3" de largura cheia
@@ -12,8 +14,9 @@ quebrariam a leitura do título. Tipo que não é de formação segue com o camp
 
 Quem usa: o serializer (criar, criar em lote e editar evento que ainda não terminou; a marca e a falta do número
 para a tela), `motivo_nao_publicavel` (Publicar, Reenviar e Reaplicar), a guarda do CREATE no `upsert_one` (por
-onde passam o `preagenda_to_gcal` e o auto-apply), o lookup de tipos e a carga export-contract (lista no ensaio,
-sem barrar).
+onde passam o `preagenda_to_gcal` e o auto-apply), o lookup de tipos, a carga export-contract (lista no ensaio,
+sem barrar) e, pelo `excluir_marca_cancelado` (CON-08), o pedido `cancelar_na_agenda`, o Excluir de evento que
+está no Google (`remover_do_google_agora`, `perform_destroy`) e o texto do `motivo_que_impede_excluir`.
 """
 
 from __future__ import annotations

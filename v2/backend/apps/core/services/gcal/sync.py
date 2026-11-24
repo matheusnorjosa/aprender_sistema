@@ -9,6 +9,7 @@ Core synchronization operations for Google Calendar.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, cast
 
 from django.conf import settings
@@ -33,12 +34,19 @@ class CriacaoRecusada(ValueError):
 
     `evento_passado`: o evento já terminou. `publicado_fora_do_sistema`: ele já está no Google pela
     planilha e não foi adotado, então criar daria um segundo evento. `sem_numero_da_formacao` (CON-09):
-    evento de formação sem o Nº da formação, que o título no Google precisa. Quem chama marca ERROR
+    evento de formação sem o Nº da formação, que o título no Google precisa. `cancelado_na_agenda` (CON-08): a
+    linha foi cancelada na agenda e nunca mais vai ao Google por sync nenhum, nem para atualizar nem para
+    apagar (este vale também fora do CREATE: o `upsert_one` o confere antes de tudo). Quem chama marca ERROR
     (tarefa) ou conta como SKIP (`preagenda_to_gcal`)."""
 
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
+
+
+class EventoAdotadoNaoAchado(ValueError):
+    """O `marcar_cancelado_no_google` não achou no Google o evento do id adotado (o da planilha) e não escreveu
+    nada lá. A tarefa do Cancelar desfaz a marca do pedido com isso, para a linha não ficar sem saída (CON-08)."""
 
 
 def _motivo_para_nao_criar(s: Solicitacao) -> CriacaoRecusada | None:
@@ -218,6 +226,14 @@ def upsert_one(
     external_event_id: EventId | None = None
 
     try:
+        # CON-08: a linha cancelada na agenda não se escreve mais no Google. O UPDATE mandaria o título sem o
+        # "(CANCELADO) " e o `status: confirmed`; o DELETE do Caso 1 tiraria da agenda o evento que fica lá.
+        if s.cancelado_na_agenda:
+            raise CriacaoRecusada(
+                "cancelado_na_agenda",
+                f"Solicitação #{s.id} foi cancelada na agenda; o sistema não a escreve mais no Google.",
+            )
+
         # ================================================================
         # CONCURRENCY SAFETY: Uso recomendado com update_fields
         # ================================================================
@@ -586,6 +602,94 @@ def cancel_solicitacao(
     return SyncOutcome(
         action="DELETE", solicitation_id=s.id, external_event_id=None, summary=f"Solicitação #{s.id} (cancelada)"
     )
+
+
+MARCADOR_CANCELADO = "(CANCELADO)"
+# Teto do título no payload (`payload.py`): o Google recusa título longo demais.
+_TITULO_MAX = 1000
+# As formas que o `lerTitulo` do DFF lê como cancelada (`lib/agenda.ts`, CANCELADO_NO_COMECO e CANCELADO_NO_FIM;
+# resposta de 24/11/2026): no começo ou no fim, com ou sem parênteses ou colchetes, CANCELADO ou CANCELADA, no
+# plural também. Sem quantificador aninhado (ReDoS).
+_CANCELADO_NO_COMECO = re.compile(r"^\s*[(\[{]?\s*CANCELAD[OA]S?", re.IGNORECASE)
+_CANCELADO_NO_FIM = re.compile(r"CANCELAD[OA]S?\s*[)\]}]?\s*$", re.IGNORECASE)
+
+
+def titulo_ja_marcado(titulo: str | None) -> bool:
+    """O título já tem uma marca de cancelado que o DFF lê: a nossa ("(CANCELADO) " no começo) ou uma digitada à mão
+    antes do CON-08 ("CANCELADA - …", "… (CANCELADA)"). Ignora maiúscula e espaço. Marcado não ganha outra marca
+    (revisão da rodada 6: "(CANCELADO) CANCELADA - …" tinha duas)."""
+    texto = titulo or ""
+    return bool(_CANCELADO_NO_COMECO.match(texto) or _CANCELADO_NO_FIM.search(texto))
+
+
+def marcar_cancelado_no_google(
+    s: Solicitacao,
+    *,
+    client: CalendarClientAdapter | None = None,
+) -> SyncOutcome:
+    """Põe "(CANCELADO) " na frente do título do evento no Google e não mexe em mais nada (CON-08).
+
+    Nunca cria nem traz de volta: lê o evento e, se ele já saiu de lá (404, 410 ou apagado), não escreve. Não
+    desvincula a linha: o id e o hash ficam, para quem vier depois saber onde o evento está.
+
+    `summary` do resultado diz o desfecho para a tarefa: `marcado` (UPDATE), `ja_marcado` ou `ja_saiu` (SKIP).
+
+    Raises:
+        ValueError: a conta não vê o calendário.
+        EventoAdotadoNaoAchado (um ValueError): o id adotado (o da planilha) não foi achado no Google.
+        RuntimeError: o PATCH voltou como 409/412 (sucesso por idempotência) e o título relido não tem o marcador.
+    """
+    if client is None:
+        from apps.core.services.gcal_client_factory import get_gcal_client_and_calendar_id
+
+        client, calendar_id = get_gcal_client_and_calendar_id()
+    elif hasattr(client, "get_default_calendar_id"):
+        calendar_id = client.get_default_calendar_id()
+    else:
+        calendar_id = getattr(settings, "GCAL_CALENDAR_ID", None) or "primary"
+
+    event_id = s.external_event_id or _event_id_for(s)
+    adotado = bool(s.external_event_id) and s.external_event_id != _event_id_for(s)
+
+    # O GET devolve 404 também quando a conta não vê o calendário: sem acesso, "não achado" seria mentira.
+    if hasattr(client, "calendar_accessible") and not client.calendar_accessible(calendar_id):
+        raise ValueError(
+            "Sua conta Google não tem acesso ao calendário da organização; o evento não foi marcado. "
+            "Peça o compartilhamento e tente de novo."
+        )
+
+    try:
+        evento = client.get(calendar_id, event_id)
+    except Exception as e:
+        if not _ja_saiu_do_google(e):
+            raise
+        evento = None
+
+    # Só o id adotado que o GET não acha levanta (como o `upsert_one`): o ponteiro pode estar errado. Achado e
+    # apagado (`cancelled`), o evento já saiu, adotado ou não.
+    if evento is None and adotado:
+        raise EventoAdotadoNaoAchado(f"Solicitação #{s.id}: o evento adotado não foi achado no Google; nada foi feito.")
+    if evento is None or evento.get("status") == "cancelled":
+        return SyncOutcome("SKIP", s.id, event_id, "ja_saiu")
+
+    titulo = str(evento.get("summary") or "")
+    if titulo_ja_marcado(titulo):
+        return SyncOutcome("SKIP", s.id, event_id, "ja_marcado")
+
+    novo = f"{MARCADOR_CANCELADO} {titulo}"
+    if len(novo) > _TITULO_MAX:
+        novo = novo[: _TITULO_MAX - 3] + "..."
+    resposta = _retry_with_circuit_breaker(
+        lambda: client.patch_titulo(calendar_id, event_id, novo),
+        operation_name=f"GCal CANCELAR #{s.id}",
+    )
+    if resposta is None:
+        # 409/412 contado como sucesso (`_executar_uma_vez`): só vale se o título relido tem o marcador.
+        relido = client.get(calendar_id, event_id)
+        if not titulo_ja_marcado((relido or {}).get("summary")):
+            raise RuntimeError(f"Solicitação #{s.id}: o Google não confirmou o título com (CANCELADO).")
+
+    return SyncOutcome("UPDATE", s.id, event_id, "marcado")
 
 
 def desvincular_do_google(s: Solicitacao) -> None:

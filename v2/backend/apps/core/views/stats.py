@@ -56,6 +56,7 @@ from apps.core.rbac.policies import (
     user_has_policy,
 )
 from apps.core.serializers.openapi_critical_contract import HomeStatsResponseSerializer
+from apps.core.services.availability_service import cancelado_confirmado_q
 from apps.core.services.solicitacao_approval import decisoes_impedidas
 
 
@@ -135,7 +136,8 @@ class HomeStatsView(APIView):
             pending_approvals = pending_qs.exclude(id__in=impedidas).count()
 
         # === EVENTOS FUTUROS (com fail-safe explícito — fix #1284) ===
-        upcoming_qs = Solicitacao.objects.filter(status="aprovado", inicio__gte=now)
+        # O cancelado na agenda (CON-08 B) segue aprovado, mas não vai acontecer (decisão do dono, 24/11/2026).
+        upcoming_qs = Solicitacao.objects.filter(status="aprovado", inicio__gte=now).exclude(cancelado_confirmado_q())
         upcoming_events: int | None = None
 
         if can_view_global_events:

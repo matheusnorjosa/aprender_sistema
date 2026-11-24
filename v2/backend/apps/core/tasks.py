@@ -181,7 +181,7 @@ _MSG_SEM_ACESSO_CALENDARIO = (
 _MSG_ADOTADO_NAO_ACHADO_NO_CANCELAR = (
     "O evento não foi achado no Google pelo Event ID guardado (pode ter sido apagado de vez ou estar em outro "
     "calendário). Nada foi marcado e o evento não foi cancelado na agenda. Confira no Google Agenda; se ele não "
-    "existe mais, use Tirar só do Google."
+    "existe mais, use Tirar só do Google (na Pré-agenda, o botão Remover do Google Agenda)."
 )
 _MSG_DISJUNTOR_ABERTO = (
     "O Google Agenda falhou várias vezes seguidas; o sistema pausou as chamadas por alguns minutos. "
@@ -237,6 +237,20 @@ def _pedido_sem_efeito(s: Any) -> dict[str, Any]:
     }
 
 
+def _conflito_ao_desfazer(s: Any) -> list[Any]:
+    """Participantes em conflito depois que a marca `cancelado_na_agenda` sai (revisão da rodada 5).
+
+    A marca do pedido liberou a agenda na hora (P6); enquanto a tarefa esperava na fila, outro evento pode ter sido
+    aprovado no mesmo horário. Mesmo motor e mesma trava dos participantes da aprovação
+    (`check_solicitacao_availability`), sob a transação de quem chama. Só avisa: a linha já estava aprovada, e o
+    desfaz não é uma escolha de quem pediu. Evento fora de `aprovado` não ocupa a agenda."""
+    if s.status != "aprovado":
+        return []
+    from apps.core.services.solicitacao_availability import check_solicitacao_availability
+
+    return list(check_solicitacao_availability(s).blocked)
+
+
 def _mark_gcal_error(
     solicitation_id: int,
     message: str,
@@ -252,7 +266,9 @@ def _mark_gcal_error(
     """Tira a linha de PENDING: marca ERROR com `message` e audita o erro cru.
 
     `desfaz_cancelado_na_agenda` (CON-08): o Cancelar não escreveu nada no Google, então a marca gravada no pedido
-    sai junto, sob a mesma trava e a mesma guarda do pedido (`details.cancelado_na_agenda_desfeito`).
+    sai junto, sob a mesma trava e a mesma guarda do pedido (`details.cancelado_na_agenda_desfeito`). A marca
+    liberava a agenda dos participantes desde o pedido (P6); se outro evento ocupou o horário nesse meio-tempo, a
+    sobreposição volta: o erro diz com quem, e o registro leva `details.conflito_ao_desfazer` (revisão da rodada 5).
 
     publish/resync/cancel marcam PENDING antes de enfileirar; se a task sai sem marcar, a linha
     fica PENDING para sempre (publicar some da tela e a edição fica bloqueada). `mark_gcal` não
@@ -292,6 +308,13 @@ def _mark_gcal_error(
             s.cancelado_na_agenda = False
             s.save(update_fields=["cancelado_na_agenda"])
             details["cancelado_na_agenda_desfeito"] = True
+            bloqueados = _conflito_ao_desfazer(s)
+            if bloqueados:
+                details["conflito_ao_desfazer"] = [p.usuario_id for p in bloqueados]
+                nomes = ", ".join(p.usuario_nome for p in bloqueados)
+                message = (
+                    f"{message} Atenção: o evento voltou a ocupar a agenda e agora conflita com a agenda de {nomes}."
+                )
         s.mark_gcal(status=Solicitacao.GCalStatus.ERROR, payload_hash=None, error=message)
         AuditLog.objects.create(
             usuario=operator,
@@ -723,7 +746,10 @@ def task_cancelar_na_agenda(
     Falha: ERROR pela `_mark_gcal_error` (`operation="cancelar_na_agenda"`), com a marca. Nunca enfileira o
     `queue_gcal_sync_retry`, que publica: refazer é pedir o Cancelar de novo. Exceção: o id adotado que o Google
     não acha (`EventoAdotadoNaoAchado`). Nada foi escrito lá e refazer daria o mesmo erro, então a marca sai junto
-    com o ERROR, e o Tirar só do Google volta a ser a saída (revisão da rodada 4).
+    com o ERROR, e o Tirar só do Google volta a ser a saída (revisão da rodada 4). Se o horário foi ocupado por
+    outro evento enquanto a marca o liberava, o erro avisa (`_mark_gcal_error`). Mas, se um Cancelar anterior da
+    linha já terminou (`cancelamento_confirmado`), o evento sumiu depois de cancelado: a marca fica e a linha volta
+    a PUBLISHED com `resultado=nao_achado`, como o Excluir da P5 (revisão da rodada 5).
 
     Entregue de novo depois de uma queda entre o PATCH e o commit, relê o título, acha o marcador e não repete.
     """
@@ -732,7 +758,9 @@ def task_cancelar_na_agenda(
 
     from apps.core.models import AuditLog, Solicitacao, Usuario
     from apps.core.services.gcal.sync import EventoAdotadoNaoAchado
+    from apps.core.services.gcal.types import SyncOutcome
     from apps.core.services.gcal_sync_service import marcar_cancelado_no_google
+    from apps.core.services.solicitacao_publish import cancelamento_confirmado
 
     client = None
     operator = None
@@ -772,7 +800,15 @@ def task_cancelar_na_agenda(
             if not _pedido_ainda_vale(s, pedido, Solicitacao.GCalStatus.PENDING):
                 return _pedido_sem_efeito(s)
 
-            outcome = marcar_cancelado_no_google(s, client=client)
+            try:
+                outcome = marcar_cancelado_no_google(s, client=client)
+            except EventoAdotadoNaoAchado:
+                # Um Cancelar anterior já terminou (o registro dele está aqui): o evento sumiu do Google depois de
+                # cancelado. Desfazer a marca faria o evento cancelado voltar a ocupar a agenda e a ser publicável;
+                # conclui como o Excluir da P5 (revisão da rodada 5). Sem essa prova, a marca sai (abaixo).
+                if not cancelamento_confirmado(s):
+                    raise
+                outcome = SyncOutcome("SKIP", s.id, s.external_event_id, "nao_achado")
 
             s.mark_gcal(status=Solicitacao.GCalStatus.PUBLISHED, payload_hash=s.gcal_payload_hash, error="")
             AuditLog.objects.create(
@@ -782,7 +818,7 @@ def task_cancelar_na_agenda(
                 details={
                     "solicitacao_id": s.id,
                     "action": outcome.action,
-                    "resultado": outcome.summary,  # marcado, ja_marcado ou ja_saiu
+                    "resultado": outcome.summary,  # marcado, ja_marcado, ja_saiu ou nao_achado
                     "external_event_id": outcome.external_event_id,
                     "pedido": pedido,
                 },

@@ -58,6 +58,7 @@ import logger from '../../utils/logger';
 import { formatFortaleza } from '../../utils/datetime';
 import { TIMING } from '../../constants';
 import { participantLabel } from '../../utils/participants';
+import { gcalRowActions, MOTIVO_NAO_PUBLICAVEL } from '../../utils/gcalRowActions';
 import {
   getDashboardMetrics,
   listDashboardEvents,
@@ -123,6 +124,30 @@ const STATUS_LABELS: Record<GCalStatus, string> = {
   ERROR: 'Erro',
 };
 
+// CON-08: a linha cancelada na agenda segue PUBLISHED (o evento está no Google, com "(CANCELADO) "). A etiqueta é
+// a das outras telas: "Cancelado na agenda", "Cancelando…" ou "Erro ao cancelar"; nunca "Publicado".
+function StatusGcalTag({ status, canceladoNaAgenda }: { status: GCalStatus; canceladoNaAgenda?: boolean | undefined }): JSX.Element {
+  if (canceladoNaAgenda) {
+    const { tag } = gcalRowActions(
+      { gcal_status: status, external_event_id: null, cancelado_na_agenda: true },
+      { ready: true },
+    );
+    return (
+      <Tag color={tag.color} icon={STATUS_ICONS[status === 'PUBLISHED' ? 'NONE' : status]}>
+        {tag.label}
+      </Tag>
+    );
+  }
+  return (
+    <Tag color={STATUS_COLORS[status]} icon={STATUS_ICONS[status]}>
+      {STATUS_LABELS[status]}
+    </Tag>
+  );
+}
+
+// Por que Atualizar no Google e Reenviar ficam desabilitados na linha cancelada na agenda (o servidor recusa).
+const SEM_REENVIO = `Indisponível: o evento ${MOTIVO_NAO_PUBLICAVEL.cancelado_na_agenda}`;
+
 // Helper: Determinar cor da timeline baseado na action
 function getTimelineColor(action: string): string {
   if (action.includes('ERROR')) return 'red';
@@ -152,6 +177,7 @@ const ACAO_LABELS: Record<string, string> = {
 const CANCELADO_NA_AGENDA_POR_RESULTADO: Record<string, string> = {
   ja_marcado: 'Cancelado na agenda (o título já tinha a marca)',
   ja_saiu: 'Cancelado na agenda (o evento já tinha saído do Google)',
+  nao_achado: 'Cancelado na agenda (o evento não foi achado no Google)',
 };
 
 function rotuloDoRegistro(log: { action: string; details?: Record<string, unknown> | null }): string {
@@ -425,6 +451,9 @@ export default function GCalDashboardPage(): JSX.Element {
     }
   };
 
+  // CON-08: o evento cancelado na agenda não se atualiza nem se reenvia (o servidor recusa).
+  const canceladoNaAgenda = eventDetail?.cancelado_na_agenda === true;
+
   // Menu items para dropdown de Export (memoized §16 Epic #459)
   const exportMenuItems: MenuProps['items'] = useMemo(() => [
     {
@@ -462,10 +491,8 @@ export default function GCalDashboardPage(): JSX.Element {
       dataIndex: 'gcal_status',
       key: 'gcal_status',
       width: 140,
-      render: (status: GCalStatus) => (
-        <Tag color={STATUS_COLORS[status]} icon={STATUS_ICONS[status]}>
-          {STATUS_LABELS[status]}
-        </Tag>
+      render: (status: GCalStatus, record: EventRecord) => (
+        <StatusGcalTag status={status} canceladoNaAgenda={record.cancelado_na_agenda} />
       ),
     },
     {
@@ -800,13 +827,14 @@ export default function GCalDashboardPage(): JSX.Element {
         open={drawerOpen}
         extra={
           <Space>
-            <Tooltip title="Manda o evento de novo ao Google, como está no sistema">
-              <Button icon={<EyeOutlined />} onClick={handleReapply}>
+            {/* CON-08: o servidor recusa os dois na linha cancelada na agenda; a etiqueta do detalhe diz o porquê. */}
+            <Tooltip title={canceladoNaAgenda ? SEM_REENVIO : 'Manda o evento de novo ao Google, como está no sistema'}>
+              <Button icon={<EyeOutlined />} onClick={handleReapply} disabled={canceladoNaAgenda}>
                 Atualizar no Google
               </Button>
             </Tooltip>
-            <Tooltip title="Refaz a publicação do evento no Google desde o começo">
-              <Button icon={<RedoOutlined />} onClick={handleResync} type="primary">
+            <Tooltip title={canceladoNaAgenda ? SEM_REENVIO : 'Refaz a publicação do evento no Google desde o começo'}>
+              <Button icon={<RedoOutlined />} onClick={handleResync} type="primary" disabled={canceladoNaAgenda}>
                 Reenviar
               </Button>
             </Tooltip>
@@ -837,9 +865,7 @@ export default function GCalDashboardPage(): JSX.Element {
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="Status GCal">
-                <Tag color={STATUS_COLORS[eventDetail.gcal_status]} icon={STATUS_ICONS[eventDetail.gcal_status]}>
-                  {STATUS_LABELS[eventDetail.gcal_status]}
-                </Tag>
+                <StatusGcalTag status={eventDetail.gcal_status} canceladoNaAgenda={eventDetail.cancelado_na_agenda} />
               </Descriptions.Item>
               <Descriptions.Item label="Código no Google">{eventDetail.external_event_id || '-'}</Descriptions.Item>
               <Descriptions.Item label="Última Sincronização">

@@ -106,10 +106,40 @@ _MSG_NAO_E_EVENTO_DE_FORMACAO = (
 )
 
 
+_MSG_JA_CANCELADO_NA_AGENDA = (
+    "Este evento já foi cancelado na agenda: o título no Google já tem (CANCELADO) e não há o que refazer."
+)
+
+
 def excluir_marca_cancelado(s: Solicitacao) -> bool:
     """O Excluir desta linha, que está no Google, marca o título com "(CANCELADO) " em vez de tirar o evento
     de lá? Sim para evento de formação e para a linha já cancelada na agenda (decisão do dono, 23/11/2026)."""
     return s.cancelado_na_agenda or eh_evento_de_formacao(s)
+
+
+# Desfechos de um Cancelar que terminou (`task_cancelar_na_agenda`, ou o remover do Excluir que não apagou a linha).
+_CANCELAR_TERMINOU = ("marcado", "ja_marcado", "ja_saiu")
+
+
+def cancelamento_confirmado(s: Solicitacao) -> bool:
+    """O Cancelar desta linha já terminou no Google (o "(CANCELADO) " foi para lá, ou o evento já tinha saído)?
+
+    A marca `cancelado_na_agenda` é gravada no pedido, antes do Google, então sozinha não diz isso: a linha ERROR
+    marcada pode ser um Cancelar que falhou antes do Google (sem acesso, 5xx). Confirmado = linha PUBLISHED com a
+    marca (só a tarefa que terminou a deixa assim) ou um `CANCELAR_NA_AGENDA` com desfecho de quem terminou. Decide
+    o que fazer com o id adotado que o Google não acha (P5, revisão da rodada 5): confirmado, o evento sumiu depois
+    de cancelado e a linha conclui; sem confirmação, o id pode estar errado (o evento lá com outro id, sem a
+    marca), e o Excluir recusa e a tarefa desfaz a marca."""
+    if not s.cancelado_na_agenda:
+        return False
+    if s.gcal_status == Solicitacao.GCalStatus.PUBLISHED:
+        return True
+    return AuditLog.objects.filter(
+        action=AuditLog.Action.CANCELAR_NA_AGENDA,
+        model_name="Solicitacao",
+        details__solicitacao_id=s.pk,
+        details__resultado__in=_CANCELAR_TERMINOU,
+    ).exists()
 
 
 OperacaoGcal = Literal["publicar", "reenviar", "reaplicar", "cancelar", "cancelar_na_agenda"]
@@ -130,7 +160,8 @@ def pedir_operacao_gcal(solicitacao_id: int, operacao: OperacaoGcal) -> str:
     Cancelar na agenda (CON-08) aceita o que o cancelar aceita, só em evento de formação ou na linha já marcada
     (o refazer do Cancelar que falhou, mesmo com o tipo renomeado: `excluir_marca_cancelado`), e grava a marca
     `cancelado_na_agenda` aqui, no pedido: já no PENDING a linha não se publica, não se reenvia e não se tira
-    do Google (o cancelar recusa a linha marcada). Não há desfazer.
+    do Google (o cancelar recusa a linha marcada). Não há desfazer. A linha marcada só se pede de novo em PENDING
+    ou ERROR (o refazer); fora deles o Cancelar já terminou (409 `ja_cancelado_na_agenda`).
 
     Reaplicar sobre linha em PENDING é recusado: outra operação está em andamento, e o pedido novo zeraria o
     hash (UPDATE sem mudança no Google, com e-mail aos convidados) ou desfaria um "Tirar do Google".
@@ -156,6 +187,14 @@ def pedir_operacao_gcal(solicitacao_id: int, operacao: OperacaoGcal) -> str:
     # A linha já marcada refaz o Cancelar mesmo com o tipo renomeado (a mesma regra do Excluir).
     if operacao == "cancelar_na_agenda" and not excluir_marca_cancelado(s):
         raise ConflictError(message=_MSG_NAO_E_EVENTO_DE_FORMACAO, details={"code": "nao_e_evento_de_formacao"})
+    # Linha marcada fora de PENDING e de ERROR: o Cancelar já terminou (revisão da rodada 5). Refeito, ele só
+    # poderia tirar a marca confirmada (id adotado que sumiu do Google depois).
+    if (
+        operacao == "cancelar_na_agenda"
+        and s.cancelado_na_agenda
+        and s.gcal_status not in (Solicitacao.GCalStatus.PENDING, Solicitacao.GCalStatus.ERROR)
+    ):
+        raise ConflictError(message=_MSG_JA_CANCELADO_NA_AGENDA, details={"code": "ja_cancelado_na_agenda"})
     if operacao == "cancelar" and s.cancelado_na_agenda:
         raise ConflictError(message=_MSG_CANCELADO_NA_AGENDA_NAO_TIRA, details={"code": "cancelado_na_agenda"})
 
@@ -660,7 +699,7 @@ def cancelar_na_agenda(
 
     Raises:
         APIError 403 `google_not_connected`, 409 `google_calendar_not_configured`: modo OAuth sem como escrever.
-        ConflictError 409 `nao_e_evento_de_formacao`, `not_published`, `linha_ocupada`.
+        ConflictError 409 `nao_e_evento_de_formacao`, `ja_cancelado_na_agenda`, `not_published`, `linha_ocupada`.
     """
     from apps.core.tasks import task_cancelar_na_agenda
 
@@ -743,11 +782,12 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> tuple[st
     lá, cancelado, e quem chama apaga a linha (decisão do dono, 23/11/2026). O AuditLog é `CANCELAR_NA_AGENDA`,
     gravado antes do Google e completado, no mesmo atomic, com o desfecho (`action` e `resultado`). Se o Google
     falha, o rollback desfaz a marca. Id adotado que o Google não acha (P5, decisão do dono de 24/11): na linha
-    não marcada, recusa (o id pode estar errado); na já marcada, conclui e avisa (`nao_achado`).
+    cujo Cancelar já terminou (`cancelamento_confirmado`), conclui e avisa (`nao_achado`); nas outras, inclusive a
+    marcada em ERROR cujo Cancelar falhou antes do Google, recusa (o id pode estar errado).
 
     Returns:
         O `external_event_id` que estava (ou podia estar) no Google, e o desfecho da marca: `marcado`,
-        `ja_marcado`, `ja_saiu` ou `nao_achado` (id adotado da linha já marcada, 404 ou 410); None quando o
+        `ja_marcado`, `ja_saiu` ou `nao_achado` (id adotado da linha já cancelada, 404 ou 410); None quando o
         evento foi tirado do Google (tipo que não é de formação).
 
     Raises:
@@ -793,7 +833,7 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> tuple[st
             resultado: str | None = None
             marca = excluir_marca_cancelado(s)  # sobre a linha travada; o de fora do try serve aos textos de erro
             if marca:
-                ja_marcada = s.cancelado_na_agenda
+                ja_cancelada = cancelamento_confirmado(s)  # lido antes de gravar a marca e do registro abaixo
                 s.cancelado_na_agenda = True
                 s.save(update_fields=["cancelado_na_agenda"])
                 registro = AuditLog.objects.create(
@@ -811,10 +851,11 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> tuple[st
                     outcome = marcar_cancelado_no_google(s, client=client)
                     acao, resultado = outcome.action, outcome.summary
                 except EventoAdotadoNaoAchado:
-                    # P5 (decisão do dono, 24/11/2026): na linha já marcada o (CANCELADO) já foi para o Google;
-                    # o evento sumiu de lá depois. Sem saída por outro botão, a exclusão conclui com aviso. Na
-                    # linha não marcada o id pode estar errado (o evento lá com outro id): recusa, abaixo.
-                    if not ja_marcada:
+                    # P5 (decisão do dono, 24/11/2026): na linha cujo Cancelar já terminou o (CANCELADO) já foi
+                    # para o Google; o evento sumiu de lá depois. Sem saída por outro botão, a exclusão conclui com
+                    # aviso. Sem o Cancelar confirmado (linha não marcada, ou marcada em ERROR com o Cancelar que
+                    # falhou antes do Google) o id pode estar errado, o evento lá com outro id: recusa, abaixo.
+                    if not ja_cancelada:
                         raise
                     acao, resultado = "SKIP", "nao_achado"
                 # O registro diz o que de fato aconteceu: "UPDATE" só quando o título ganhou a marca agora.

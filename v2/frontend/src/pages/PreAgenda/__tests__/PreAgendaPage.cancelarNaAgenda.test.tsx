@@ -143,6 +143,31 @@ describe('PreAgendaPage — Cancelar evento de formação (CON-08)', { timeout: 
     expect(within(russas).queryByLabelText(REMOVER)).not.toBeInTheDocument();
   });
 
+  test('Cancelar que não achou o evento (ERROR sem a marca, com id): o Remover que o erro manda usar está lá, também no evento que já terminou', async () => {
+    const erro =
+      'O evento não foi achado no Google pelo Event ID guardado (pode ter sido apagado de vez ou estar em outro ' +
+      'calendário). Nada foi marcado e o evento não foi cancelado na agenda. Confira no Google Agenda; se ele não ' +
+      'existe mais, use Tirar só do Google (na Pré-agenda, o botão Remover do Google Agenda).';
+    mockRows([
+      row({ id: 9, municipio_nome: 'Crateús', gcal_status: 'ERROR', tipo_evento_de_formacao: true, gcal_last_error: erro }),
+      row({
+        id: 10,
+        municipio_nome: 'Jaguaribe',
+        gcal_status: 'ERROR',
+        tipo_evento_de_formacao: true,
+        gcal_last_error: erro,
+        inicio: '2020-03-10T09:00:00-03:00',
+        fim: '2020-03-10T12:00:00-03:00',
+      }),
+    ]);
+    renderComo(DAT);
+    for (const nome of ['Crateús', 'Jaguaribe']) {
+      const tr = await linha(nome);
+      expect(within(tr).getByLabelText(REMOVER)).toBeInTheDocument();
+      expect(within(tr).queryByLabelText(CANCELAR)).not.toBeInTheDocument();
+    }
+  });
+
   test('refazer o Cancelar da linha marcada não depende de o tipo ainda ser de formação (tipo renomeado)', async () => {
     mockRows([
       row({ id: 7, municipio_nome: 'Quixadá', gcal_status: 'ERROR', tipo_evento_de_formacao: false, cancelado_na_agenda: true }),

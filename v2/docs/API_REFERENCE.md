@@ -355,7 +355,7 @@ Fora da prévia (`dry_run`), os quatro (publish, resync, cancel e cancelar-na-ag
 | POST | `/api/solicitacoes/{id}/publish/` | ![Stable](https://img.shields.io/badge/-stable-green) | Publicar no Google Calendar (202) | `CanUseGcal` ou `CanPublishSetorSolicitacao` |
 | POST | `/api/solicitacoes/{id}/resync-gcal/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Resincronizar evento (202) | `CanUseGcal` ou `CanPublishSetorSolicitacao` |
 | POST | `/api/solicitacoes/{id}/cancel-gcal/` | ![Stable](https://img.shields.io/badge/-stable-green) | Cancelar evento no GCal (202) | `CanUseGcal` ou `CanPublishSetorSolicitacao` |
-| POST | `/api/solicitacoes/{id}/cancelar-na-agenda/` | ![Stable](https://img.shields.io/badge/-stable-green) | Evento de formação: título no Google ganha "(CANCELADO) " e a linha não se publica mais (202; CON-08) | `CanUseGcal` ou `CanPublishSetorSolicitacao` |
+| POST | `/api/solicitacoes/{id}/cancelar-na-agenda/` | ![Stable](https://img.shields.io/badge/-stable-green) | Evento de formação: título no Google ganha "(CANCELADO) " e a linha não se publica mais (202; CON-08; 409 `ja_cancelado_na_agenda` na linha já cancelada) | `CanUseGcal` ou `CanPublishSetorSolicitacao` |
 | POST | `/api/gcal/publish-batch/` | ![Stable](https://img.shields.io/badge/-stable-green) | Publicar múltiplas solicitações (202) | `IsAuthenticated` + `CanUseGcal` |
 
 `POST /api/gcal/publish-batch/` espera **`solicitacao_ids`** (não `ids`), máx. 500;

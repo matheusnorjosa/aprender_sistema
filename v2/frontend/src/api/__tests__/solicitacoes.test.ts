@@ -271,6 +271,15 @@ describe('solicitacoes API (MSW)', () => {
     expect(requests[0].body).toEqual({});
   });
 
+  test('cancelarNaAgenda avisa a Grade Mensal aberta em outra aba: a marca libera o dia e tira a CH (P6/P7)', async () => {
+    server.use(capturePost('/solicitacoes/22/cancelar-na-agenda/', { detail: 'ok', solicitacao_id: 22 }, requests));
+    publishMock.mockClear();
+
+    await cancelarNaAgenda(22);
+
+    expect(publishMock).toHaveBeenCalledWith('availability', { action: 'changed' });
+  });
+
   test('approveSolicitacoesBatch posta em batch-approve/ com ids', async () => {
     server.use(capturePost('/solicitacoes/batch-approve/', { approved: 2, errors: [] }, requests));
 

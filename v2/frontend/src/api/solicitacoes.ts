@@ -270,6 +270,8 @@ export async function cancelarNaAgenda(id: ID): Promise<PublishResult> {
   });
   syncChannel.publish('preagenda', { action: 'cancelled' });
   syncChannel.publish('solicitacoes', { action: 'updated' });
+  // A marca libera o dia do formador e tira a CH (P6/P7): a Grade Mensal aberta em outra aba recarrega.
+  syncChannel.publish('availability', { action: 'changed' });
   return result;
 }
 

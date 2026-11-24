@@ -1312,8 +1312,14 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
           sem id conta: a publicação que falhou pode ter criado o evento com o id determinístico. O
           Google vem primeiro e síncrono; se falhar, nada é apagado. Quem não pode recebe 400 e o
           Google não é chamado. Todas as recusas abaixo vêm antes.
+        - Evento de formação no Google, ou linha já cancelada na agenda (CON-08, decisão do dono de 23/11):
+          o evento não sai de lá. `remover_do_google_agora` põe "(CANCELADO) " no título e grava
+          `cancelado_na_agenda`; o evento fica no Google, cancelado, e a linha sai daqui. Id adotado que o
+          Google não acha (P5): com o Cancelar já concluído, a linha sai e o DELETE responde 200 com
+          `aviso`; sem ele, 400 e nada é excluído.
         - O delete relê a linha com lock: se uma publicação ou reenvio concorrente a pôs (de volta)
-          no Google, recusa em vez de deixar o evento órfão lá.
+          no Google, recusa em vez de deixar o evento órfão lá. A linha marcada passa só quando o
+          remover rodou nesta requisição (ela guarda o id de propósito).
         - No Google pela planilha sem adoção (`publicado_fora_do_sistema`): não se exclui (não há id
           para apagar lá, e o evento ficaria no Google).
 

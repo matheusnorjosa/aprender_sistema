@@ -226,6 +226,21 @@ class TestPedido:
         assert erro.value.details["code"] == "not_published"
         assert _linha(s) == antes
 
+    def test_linha_ja_cancelada_na_agenda_recusa_o_cancelar_de_novo(self):
+        """Revisão da rodada 5: a linha PUBLISHED marcada já teve o Cancelar concluído; não há o que refazer. Aceito
+        (uma tela velha, a API), o pedido seguinte que não achasse o id adotado tiraria a marca confirmada, e o
+        evento cancelado voltaria a ocupar a agenda e a ser publicável."""
+        from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+
+        s = _formacao(cancelado_na_agenda=True, external_event_id=_ADOTADO)
+        antes = _linha(s)
+
+        with pytest.raises(ConflictError) as erro:
+            pedir_operacao_gcal(s.pk, "cancelar_na_agenda")
+
+        assert erro.value.details["code"] == "ja_cancelado_na_agenda"
+        assert _linha(s) == antes
+
     def test_tirar_do_google_recusa_linha_marcada(self):
         from apps.core.services.solicitacao_publish import pedir_operacao_gcal
 
@@ -700,9 +715,12 @@ def test_tarefa_id_adotado_nao_achado_desfaz_a_marca_e_o_tirar_conclui(google, m
         False,
         _ADOTADO,
     )
-    assert "Tirar só do Google" in (Solicitacao.objects.get(pk=s.pk).gcal_last_error or "")
+    texto = Solicitacao.objects.get(pk=s.pk).gcal_last_error or ""
+    assert "Tirar só do Google" in texto
+    assert "Remover do Google Agenda" in texto, "o nome do botão na Pré-agenda (revisão da rodada 5)"
     erro = AuditLog.objects.get(action="PUBLISH_GCAL_ERROR", details__solicitacao_id=s.pk)
     assert (erro.details["operation"], erro.details["cancelado_na_agenda_desfeito"]) == ("cancelar_na_agenda", True)
+    assert "conflito_ao_desfazer" not in erro.details, "ninguém ocupou o horário"
     assert not AuditLog.objects.filter(action="CANCELAR_NA_AGENDA", details__solicitacao_id=s.pk).exists()
 
     with transaction.atomic():
@@ -730,6 +748,94 @@ def test_tarefa_erro_de_outro_tipo_nao_desfaz_a_marca(google):
     assert (linha["gcal_status"], linha["cancelado_na_agenda"]) == ("ERROR", True)
     erro = AuditLog.objects.get(action="PUBLISH_GCAL_ERROR", details__solicitacao_id=s.pk)
     assert "cancelado_na_agenda_desfeito" not in erro.details
+
+
+def _cancelar_confirmado(s: Solicitacao, resultado: str = "marcado") -> None:
+    """Registro de um Cancelar anterior que terminou: o (CANCELADO) foi para o Google (`task_cancelar_na_agenda`)."""
+    AuditLog.objects.create(
+        usuario=None,
+        action=AuditLog.Action.CANCELAR_NA_AGENDA,
+        model_name="Solicitacao",
+        details={"solicitacao_id": s.pk, "action": "UPDATE", "resultado": resultado, "pedido": "anterior"},
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("modo_google")
+def test_refazer_de_cancelar_ja_confirmado_com_id_sumido_nao_desfaz_a_marca(google, monkeypatch):
+    """Revisão da rodada 5: o Cancelar já tinha dado certo (o registro diz `marcado`), a linha foi para ERROR por
+    outro caminho e o evento sumiu do Google pelo id adotado. Refazer não tira a marca confirmada (o evento
+    cancelado não volta a ocupar a agenda nem a ser publicável): conclui como o Excluir da P5, `nao_achado`."""
+    from apps.core.tasks import task_cancelar_na_agenda
+
+    s = _formacao(external_event_id=_ADOTADO, gcal_status="ERROR", cancelado_na_agenda=True)
+    _cancelar_confirmado(s)
+    contador = _Contador(google)
+    monkeypatch.setattr(_FABRICA, lambda: (contador, CAL))
+    pedido = _pedir(s)
+
+    resultado = task_cancelar_na_agenda(s.pk, pedido=pedido)
+
+    assert (resultado["action"], resultado["summary"]) == ("SKIP", "nao_achado")
+    assert contador.chamadas == [], "nada foi escrito no Google"
+    linha = _linha(s)
+    assert (linha["gcal_status"], linha["cancelado_na_agenda"], linha["external_event_id"]) == (
+        "PUBLISHED",
+        True,
+        _ADOTADO,
+    )
+    registro = AuditLog.objects.get(action="CANCELAR_NA_AGENDA", details__pedido=pedido)
+    assert (registro.details["action"], registro.details["resultado"]) == ("SKIP", "nao_achado")
+    assert not AuditLog.objects.filter(action="PUBLISH_GCAL_ERROR", details__solicitacao_id=s.pk).exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("modo_google")
+def test_refazer_de_cancelar_que_nunca_chegou_ao_google_com_id_sumido_desfaz_a_marca(google):
+    """A linha ERROR marcada sem Cancelar confirmado (o anterior falhou antes do Google: 5xx, sem acesso): o id
+    adotado pode estar errado, então a marca sai, como no primeiro Cancelar."""
+    from apps.core.tasks import task_cancelar_na_agenda
+
+    s = _formacao(external_event_id=_ADOTADO, gcal_status="ERROR", cancelado_na_agenda=True)
+    pedido = _pedir(s)
+
+    task_cancelar_na_agenda(s.pk, pedido=pedido)
+
+    linha = _linha(s)
+    assert (linha["gcal_status"], linha["cancelado_na_agenda"]) == ("ERROR", False)
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("modo_google")
+def test_desfazer_a_marca_avisa_quando_o_horario_ja_foi_ocupado(google):
+    """Revisão da rodada 5: a marca do pedido libera a agenda na hora (P6). Se outro evento do mesmo formador foi
+    aprovado no horário enquanto a tarefa esperava na fila, o desfaz devolve a sobreposição: a tela e o registro
+    avisam, com o mesmo motor de conflito da aprovação."""
+    from apps.core.models import Participation
+    from apps.core.tasks import task_cancelar_na_agenda
+
+    formador = UsuarioFactory(username="formador_desfaz_conflito", cpf="64000000020")
+    s = _formacao(external_event_id=_ADOTADO)
+    Participation.objects.create(solicitacao=s, usuario=formador, role=Participation.Role.FORMADOR)
+    pedido = _pedir(s)
+    outro = SolicitacaoFactory(
+        status="aprovado",
+        tipo_evento=TipoEventoFactory(nome="Presencial"),
+        municipio=s.municipio,
+        inicio=s.inicio,
+        fim=s.fim,
+    )
+    Participation.objects.create(solicitacao=outro, usuario=formador, role=Participation.Role.FORMADOR)
+
+    task_cancelar_na_agenda(s.pk, pedido=pedido)
+
+    linha = _linha(s)
+    assert (linha["gcal_status"], linha["cancelado_na_agenda"]) == ("ERROR", False)
+    erro = AuditLog.objects.get(action="PUBLISH_GCAL_ERROR", details__solicitacao_id=s.pk)
+    assert erro.details["conflito_ao_desfazer"] == [formador.pk]
+    texto = Solicitacao.objects.get(pk=s.pk).gcal_last_error or ""
+    assert "voltou a ocupar a agenda" in texto
+    assert "Remover do Google Agenda" in texto, "o aviso não corta a orientação"
 
 
 @pytest.mark.django_db
@@ -1149,14 +1255,17 @@ class TestExcluir:
         assert _linha(s)["cancelado_na_agenda"] is False
         assert _acoes(s.pk) == []
 
-    @pytest.mark.parametrize("gcal_status", ["PUBLISHED", "ERROR"])
+    @pytest.mark.parametrize(("gcal_status", "confirmado"), [("PUBLISHED", False), ("ERROR", True)])
     def test_linha_ja_marcada_com_id_adotado_nao_achado_apaga_e_avisa(
-        self, apoio, gerencia, google, monkeypatch, gcal_status
+        self, apoio, gerencia, google, monkeypatch, gcal_status, confirmado
     ):
         """P5 (decisão do dono, 24/11/2026), linha JÁ marcada: o (CANCELADO) já foi para o Google e depois o evento
         sumiu de lá pelo id adotado (purgado, movido). Antes a linha ficava presa (o Excluir dava
         `EventoAdotadoNaoAchado`; o Tirar e a edição recusam a linha marcada). Agora o Excluir apaga a linha e
-        devolve o aviso; o AuditLog do DELETE registra que o evento não foi achado. Nada é escrito no Google."""
+        devolve o aviso; o AuditLog do DELETE registra que o evento não foi achado. Nada é escrito no Google.
+
+        "O (CANCELADO) já foi para o Google" quer dizer o Cancelar concluído: a linha PUBLISHED, ou em ERROR com o
+        registro de um Cancelar que terminou (revisão da rodada 5)."""
         s = _da_gerencia(
             gerencia,
             usuario=UsuarioFactory(),
@@ -1164,6 +1273,8 @@ class TestExcluir:
             cancelado_na_agenda=True,
             external_event_id=_ADOTADO,
         )
+        if confirmado:
+            _cancelar_confirmado(s)
         sol_id = s.pk
         contador = _Contador(google)
         monkeypatch.setattr(_FABRICA, lambda: (contador, CAL))
@@ -1179,8 +1290,40 @@ class TestExcluir:
         assert delete.details["evento_nao_achado_no_google"] is True
         assert (delete.details["cancelado_na_agenda"], delete.details["external_event_id"]) == (True, _ADOTADO)
         assert delete.details["resultado"] == "nao_achado"
-        marca = AuditLog.objects.get(action="CANCELAR_NA_AGENDA", details__solicitacao_id=sol_id)
+        marca = AuditLog.objects.get(
+            action="CANCELAR_NA_AGENDA", details__solicitacao_id=sol_id, details__origem="exclusao"
+        )
         assert (marca.details["action"], marca.details["resultado"]) == ("SKIP", "nao_achado")
+
+    def test_linha_marcada_em_error_sem_cancelar_confirmado_com_id_adotado_nao_achado_recusa(
+        self, apoio, gerencia, google, monkeypatch
+    ):
+        """Revisão da rodada 5: a linha ERROR marcada cujo Cancelar falhou antes do Google (sem acesso, 5xx) não
+        tem o (CANCELADO) lá. Com o id adotado não achado, o id pode estar errado e o evento estar no Google com
+        outro id, sem a marca: recusa como na linha não marcada, e a linha fica. É o que o Cancelar refeito faz
+        (desfaz a marca), então o desfecho não depende do botão."""
+        s = _da_gerencia(
+            gerencia,
+            usuario=UsuarioFactory(),
+            gcal_status="ERROR",
+            cancelado_na_agenda=True,
+            external_event_id=_ADOTADO,
+        )
+        contador = _Contador(google)
+        monkeypatch.setattr(_FABRICA, lambda: (contador, CAL))
+
+        resposta = _api(apoio).delete(f"/api/solicitacoes/{s.pk}/")
+
+        assert resposta.status_code == 400, resposta.data
+        assert "Nada foi excluído" in str(resposta.data["detail"])
+        assert contador.chamadas == []
+        linha = _linha(s)
+        assert (linha["gcal_status"], linha["cancelado_na_agenda"], linha["external_event_id"]) == (
+            "ERROR",
+            True,
+            _ADOTADO,
+        )
+        assert _acoes(s.pk) == []
 
     def test_excluir_que_acha_o_evento_segue_sem_corpo(self, apoio, gerencia, google):
         """O 204 sem corpo continua sendo a resposta de toda exclusão sem aviso."""
@@ -1290,6 +1433,22 @@ def test_o_campo_vem_na_lista():
     por_id = {item["id"]: item for item in itens}
     assert por_id[marcada.pk]["cancelado_na_agenda"] is True
     assert por_id[normal.pk]["cancelado_na_agenda"] is False
+
+
+@pytest.mark.django_db
+def test_o_campo_vem_no_painel_do_gcal():
+    """Revisão da rodada 5: a lista e o detalhe do painel do GCal trazem a marca, para a tela não dizer "Publicado"
+    nem oferecer Atualizar e Reenviar, que o servidor recusa na linha marcada."""
+    marcada = _formacao(cancelado_na_agenda=True)
+
+    lista = _api().get("/api/gcal/dashboard/events/", {"page_size": 100})
+    detalhe = _api().get(f"/api/gcal/dashboard/events/{marcada.pk}/detail/")
+
+    assert lista.status_code == 200, lista.data
+    itens = lista.data["results"] if isinstance(lista.data, dict) else lista.data
+    assert {item["id"]: item for item in itens}[marcada.pk]["cancelado_na_agenda"] is True
+    assert detalhe.status_code == 200, detalhe.data
+    assert detalhe.data["cancelado_na_agenda"] is True
 
 
 @pytest.mark.django_db
@@ -1442,9 +1601,8 @@ def test_cancelar_primeiro_e_publicar_recusado(monkeypatch):
 @pytest.mark.usefixtures("modo_google")
 def test_corrida_excluir_e_cancelar_marca_uma_vez_e_a_linha_some(monkeypatch):
     """O Excluir segura a linha enquanto marca o título; o pedido de Cancelar espera e entra entre o remover e o
-    delete. O delete aceita a linha marcada, e a tarefa do Cancelar acha a linha apagada: título marcado uma vez."""
-    from apps.core.tasks import task_cancelar_na_agenda
-
+    delete. Ele acha a linha PUBLISHED já marcada e é recusado (409 `ja_cancelado_na_agenda`, revisão da rodada 5;
+    antes entrava em PENDING e a tarefa achava a linha apagada). O delete segue: título marcado uma vez."""
     fake = FakeCalendarClient()
     monkeypatch.setattr(_FABRICA, lambda: (fake, CAL))
     monkeypatch.setattr("apps.core.services.gcal.sync._retry_with_circuit_breaker", lambda f, **_: f())
@@ -1488,10 +1646,9 @@ def test_corrida_excluir_e_cancelar_marca_uma_vez_e_a_linha_some(monkeypatch):
         cancelou = futuro_cancelar.result(timeout=30)
 
     assert excluiu.status_code == 204, excluiu.data
-    assert cancelou.status_code == 202, cancelou.data
-    pedido = delay.call_args.kwargs["pedido"]
-    resultado = task_cancelar_na_agenda(s.pk, pedido=pedido)
-    assert resultado["error"] == "DoesNotExist"
+    assert cancelou.status_code == 409, cancelou.data
+    assert cancelou.data["errors"]["code"] == "ja_cancelado_na_agenda"
+    delay.assert_not_called()
     assert not Solicitacao.objects.filter(pk=s.pk).exists()
     assert _titulo(fake, s) == _MARCADO
 

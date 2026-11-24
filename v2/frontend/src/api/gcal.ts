@@ -107,6 +107,8 @@ export interface GCalDashboardEventRecord {
   gcal_status: 'NONE' | 'PENDING' | 'PUBLISHED' | 'ERROR';
   gcal_last_sync_at: string | null;
   gcal_last_error: string | null;
+  /** CON-08: evento de formação cancelado na agenda (segue PUBLISHED, com "(CANCELADO) " no título lá). */
+  cancelado_na_agenda?: boolean;
 }
 
 /**
@@ -199,6 +201,8 @@ export interface GCalDashboardEventDetail {
   meet_link: string | null;
   gcal_payload_hash: string | null;
   gcal_last_error: string | null;
+  /** CON-08: evento de formação cancelado na agenda; Atualizar no Google e Reenviar não valem para ele. */
+  cancelado_na_agenda?: boolean;
   updated_at: string | null;
   participations: Participation[];
   timeline: GCalEventTimelineItem[];

@@ -128,7 +128,9 @@ death between the Google write and the commit finds the row still `PENDING` with
      mark is already gone, and redoing cancelar-na-agenda would fail the same way: check Google for the event under
      another id or calendar and, if it no longer exists, use Tirar só do Google (404 and 410 count as success).
      A row still marked whose adopted event no longer exists in Google (it was marked, then purged or moved) is
-     not stuck either: Excluir deletes it and answers 200 with a warning (owner's decision P5, 24/11/2026);
+     not stuck either: Excluir deletes it and answers 200 with a warning (owner's decision P5, 24/11/2026), as long
+     as its cancel finished (`PUBLISHED`, or a `CANCELAR_NA_AGENDA` with `resultado`); otherwise Excluir refuses
+     and redoing the cancel drops the mark;
    - `CANCEL_GCAL_REQUESTED`: a stuck cancel, from any version. **Never** resend or reapply. That undoes the
      removal and may bring back an event Google already deleted (the Google delete is a soft delete, and the
      UPDATE sends `status: confirmed`). Waiting only helps while the message is still in `unacked` or in the

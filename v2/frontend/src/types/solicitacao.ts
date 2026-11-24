@@ -126,7 +126,10 @@ export interface Solicitacao {
    * lá. Sem volta: não se publica, não se reenvia, não se tira do Google e não se edita.
    */
   cancelado_na_agenda?: boolean;
-  /** Quem lê pode tirar este evento do Google (`can_publish_solicitacao`): Excluir tira de lá também. */
+  /**
+   * Quem lê pode tirar este evento do Google (`can_publish_solicitacao`): Excluir tira de lá também, ou marca
+   * (CANCELADO) no título do evento de formação, que fica lá (CON-08).
+   */
   pode_tirar_do_google?: boolean;
   /**
    * Quem lê pode excluir esta linha (a regra do DELETE: quem exclui e as recusas que se sabem sem o

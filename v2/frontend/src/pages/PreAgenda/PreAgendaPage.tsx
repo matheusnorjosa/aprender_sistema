@@ -756,8 +756,10 @@ export default function PreAgendaPage(): JSX.Element {
         // Reenviar: PUBLISHED ou ERROR, e só o que o backend aceita reenviar (D64: não o que já terminou).
         const showResync = (isPublished || hasError) && motivoNaoPublicavel(record, { reenvio: true }) === null;
 
-        // Cancel: mostrar apenas quando PUBLISHED e tem event_id (e não na linha cancelada na agenda, CON-08)
-        const showCancel = isPublished && hasEventId && !record.cancelado_na_agenda;
+        // Cancel: PUBLISHED ou ERROR com event_id, como em Publicar na agenda (e não na linha cancelada na agenda,
+        // CON-08). No ERROR é a saída que o Cancelar de id adotado não achado manda usar, inclusive no evento que já
+        // terminou, que Publicar na agenda não lista.
+        const showCancel = (isPublished || hasError) && hasEventId && !record.cancelado_na_agenda;
 
         // CON-08: Cancelar evento de formação publicado; na linha cancelada, só no erro (refazer o que falhou:
         // Publicar na agenda só lista de hoje em diante).

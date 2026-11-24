@@ -645,7 +645,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
     - Dados do evento: id, municipio_nome, projeto_nome, tipo_evento_nome,
       inicio, fim, usuario_nome, coordenador_nome, fluxo (nomes; nunca o login, que é o CPF)
     - Dados GCal: gcal_status, external_event_id, gcal_last_sync_at,
-      gcal_last_error, meet_link, updated_at
+      gcal_last_error, meet_link, cancelado_na_agenda, updated_at
     - participations: Lista de participantes (read-only)
     - timeline: Últimos 20 AuditLog relacionados (actions GCal), ordenado desc
 
@@ -687,6 +687,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
             "gcal_last_error",
             "meet_link",
             # gcal_payload_hash removed: internal implementation detail
+            "cancelado_na_agenda",  # CON-08: a tela não diz "Publicado" nem oferece Atualizar e Reenviar
             "updated_at",
             "participations",
             "timeline",

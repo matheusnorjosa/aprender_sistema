@@ -152,11 +152,35 @@ describe('gcalRowActions — cancelar evento de formação', () => {
     ['PENDING', 'asv27', 'Cancelando…', []],
   ])('chave desligada: linha marcada %s com id=%s → "%s" %j', (gcal_status, external_event_id, label, actions) => {
     const result = gcalRowActions(
-      { gcal_status, external_event_id, cancelado_na_agenda: true, exclui_marcando_cancelado: false },
+      {
+        gcal_status,
+        external_event_id,
+        cancelado_na_agenda: true,
+        exclui_marcando_cancelado: false,
+        cancelar_na_agenda_ligado: false,
+      },
       { ready: true },
     );
     expect(result.tag.label).toBe(label);
     expect(result.actions).toEqual(actions);
+  });
+
+  // Triagem dos baixos: a linha marcada em ERROR cujo Cancelar já terminou (o servidor manda
+  // `exclui_marcando_cancelado: true`, a decisão dele). Com a chave desligada, o servidor recusa o Tirar e o
+  // Cancelar de novo: a tela não oferece nenhum.
+  test('chave desligada: linha marcada em erro com o Cancelar confirmado não oferece Tirar nem Cancelar', () => {
+    const result = gcalRowActions(
+      {
+        gcal_status: 'ERROR',
+        external_event_id: 'asv27',
+        cancelado_na_agenda: true,
+        exclui_marcando_cancelado: true,
+        cancelar_na_agenda_ligado: false,
+      },
+      { ready: true },
+    );
+    expect(result.tag.label).toBe('Erro ao cancelar');
+    expect(result.actions).toEqual([]);
   });
 
   test.each<[GCalStatus, string | null, string, string, GcalRowAction[]]>([
@@ -167,7 +191,13 @@ describe('gcalRowActions — cancelar evento de formação', () => {
     ['ERROR', null, 'Erro ao cancelar', 'error', []],
   ])('linha cancelada na agenda %s com id=%s → "%s"', (gcal_status, external_event_id, label, color, actions) => {
     const result = gcalRowActions(
-      { gcal_status, external_event_id, exclui_marcando_cancelado: true, cancelado_na_agenda: true },
+      {
+        gcal_status,
+        external_event_id,
+        exclui_marcando_cancelado: true,
+        cancelado_na_agenda: true,
+        cancelar_na_agenda_ligado: true,
+      },
       { ready: true },
     );
     expect(result.tag).toEqual({ label, color });
@@ -213,7 +243,8 @@ describe('gcalRowActions — cancelar evento de formação', () => {
     expect(confirmacaoDeExcluirNoGoogle(evento).content).toBe(
       '10/10/2099 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e do Google Agenda. Não dá para desfazer.',
     );
-    const marcada = { ...evento, cancelado_na_agenda: true };
+    // A linha marcada cujo Cancelar terminou: o servidor manda `exclui_marcando_cancelado: true` nos dois estados.
+    const marcada = { ...evento, cancelado_na_agenda: true, exclui_marcando_cancelado: true };
     expect(excluirMarcaCancelado(marcada)).toBe(true);
     expect(confirmacaoDeExcluirNoGoogle(marcada).content).toBe(
       '10/10/2099 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e fica no Google Agenda com (CANCELADO) no título. Não dá para desfazer.',
@@ -235,8 +266,13 @@ describe('gcalRowActions — cancelar evento de formação', () => {
     expect(confirmacaoDeExcluirNoGoogle(marcadaEmErro).content).toBe(
       '10/10/2099 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e do Google Agenda, se estiver lá. Não dá para desfazer.',
     );
-    // Com a chave ligada, a mesma linha segue marcando (o Excluir põe a marca que faltou).
+    // Com a chave ligada (ou com o Cancelar confirmado), a mesma linha segue marcando: a decisão é a do servidor.
     expect(excluirMarcaCancelado({ ...marcadaEmErro, exclui_marcando_cancelado: true })).toBe(true);
+  });
+
+  test('chave desligada: a linha marcada na fila, sem Cancelar confirmado, segue a decisão do servidor', () => {
+    const naFila = { gcal_status: 'PENDING' as const, cancelado_na_agenda: true, exclui_marcando_cancelado: false };
+    expect(excluirMarcaCancelado(naFila)).toBe(false);
   });
 
   test('formação em ERROR sem id: a confirmação não promete que o evento está no Google', () => {

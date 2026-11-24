@@ -19,10 +19,11 @@
  * não oferece ação nenhuma: publicar criaria um segundo evento, e o backend recusa.
  *
  * Evento de formação no Google ganha `cancelar` ("Cancelar evento", CON-08: o título lá ganha "(CANCELADO) "), ao
- * lado de `remover`, só com a chave CON08_CANCELAR_NA_AGENDA ligada no servidor: a linha diz isso em
- * `exclui_marcando_cancelado`. A linha já cancelada na agenda só mostra o estado ("Cancelado na agenda",
- * "Cancelando…" ou "Erro ao cancelar"); no erro com id e com a chave ligada, oferece cancelar de novo. Com a chave
- * desligada, o erro com id oferece `remover` (`cancelarFalhouComChaveDesligada`).
+ * lado de `remover`, só com a chave CON08_CANCELAR_NA_AGENDA ligada no servidor: na linha não marcada,
+ * `exclui_marcando_cancelado` já diz isso. A linha já cancelada na agenda só mostra o estado ("Cancelado na agenda",
+ * "Cancelando…" ou "Erro ao cancelar"); no erro com id e com a chave ligada (`cancelar_na_agenda_ligado`), oferece
+ * cancelar de novo. Com a chave desligada, o erro com id cujo Cancelar não terminou oferece `remover`
+ * (`cancelarFalhouComChaveDesligada`); o que terminou não oferece nada, porque o servidor recusa os dois.
  */
 import type { GCalStatus, Solicitacao } from '../types';
 import { formatFortaleza } from './datetime';
@@ -72,7 +73,12 @@ const TAGS_CANCELADO: Record<GCalStatus, GcalRowTag> = {
 
 export function gcalRowActions(
   row: Pick<Solicitacao, 'gcal_status' | 'external_event_id'> &
-    Partial<Pick<Solicitacao, 'publicado_fora_do_sistema' | 'exclui_marcando_cancelado' | 'cancelado_na_agenda'>>,
+    Partial<
+      Pick<
+        Solicitacao,
+        'publicado_fora_do_sistema' | 'exclui_marcando_cancelado' | 'cancelado_na_agenda' | 'cancelar_na_agenda_ligado'
+      >
+    >,
   { ready }: { ready: boolean },
 ): GcalRowActionsResult {
   if (row.publicado_fora_do_sistema) {
@@ -83,8 +89,8 @@ export function gcalRowActions(
     return { tag: TAGS_CANCELADO.ERROR, actions: row.external_event_id ? ['remover'] : [], disabled: !ready };
   }
   if (row.cancelado_na_agenda) {
-    // Na linha marcada, `exclui_marcando_cancelado` é a chave do servidor: desligada, ele recusa o Cancelar.
-    const refazer = row.gcal_status === 'ERROR' && !!row.external_event_id && !!row.exclui_marcando_cancelado;
+    // Com a chave desligada, o servidor recusa o Cancelar de novo.
+    const refazer = row.gcal_status === 'ERROR' && !!row.external_event_id && row.cancelar_na_agenda_ligado === true;
     return { tag: TAGS_CANCELADO[row.gcal_status], actions: refazer ? ['cancelar'] : [], disabled: !ready };
   }
   const actions = actionsFor(row.gcal_status, !!row.external_event_id);
@@ -151,11 +157,11 @@ export function estaNoGoogle(row: Pick<Solicitacao, 'gcal_status' | 'external_ev
 }
 
 /**
- * Linha marcada cujo Cancelar falhou antes do Google, com a chave CON08_CANCELAR_NA_AGENDA desligada (na linha
- * marcada, `exclui_marcando_cancelado: false` é a chave desligada). O título lá não tem "(CANCELADO)", e o servidor
- * a trata como não cancelada: o Excluir e o Tirar só do Google tiram o evento de lá, e a marca sai com ele
- * (revisão da rodada 1 da chave). O servidor pede o Cancelar confirmado; aqui vale o ERROR, porque a tarefa que
- * confirma volta a linha a PUBLISHED (a mesma regra das etiquetas "Erro ao cancelar" e "Cancelado na agenda").
+ * Linha marcada em ERROR cujo Cancelar não terminou, com a chave CON08_CANCELAR_NA_AGENDA desligada: na linha
+ * marcada, `exclui_marcando_cancelado: false` é a decisão do servidor de que o Excluir não marca (chave desligada e
+ * sem Cancelar confirmado). O título lá pode não ter "(CANCELADO)", e o servidor a trata como não cancelada: o
+ * Excluir e o Tirar só do Google tiram o evento de lá, e a marca sai com ele (revisão da rodada 1 da chave). A linha
+ * marcada em ERROR com o Cancelar confirmado vem com o campo verdadeiro e fica de fora (triagem dos baixos).
  */
 export function cancelarFalhouComChaveDesligada(
   row: Partial<Pick<Solicitacao, 'gcal_status' | 'exclui_marcando_cancelado' | 'cancelado_na_agenda'>>,
@@ -164,16 +170,13 @@ export function cancelarFalhouComChaveDesligada(
 }
 
 /**
- * Espelho do `excluir_marca_cancelado` do backend: o Excluir de um evento que está no Google marca o título
- * com "(CANCELADO) " em vez de tirá-lo de lá. Vale para a linha já cancelada na agenda (com a chave desligada,
- * salvo a de `cancelarFalhouComChaveDesligada`) e, com a chave CON08_CANCELAR_NA_AGENDA ligada, para o evento de
- * formação (`exclui_marcando_cancelado`, do servidor).
+ * O `excluir_marca_cancelado` do backend, que a linha traz em `exclui_marcando_cancelado`: o Excluir de um evento
+ * que está no Google marca o título com "(CANCELADO) " em vez de tirá-lo de lá. Vale, com a chave
+ * CON08_CANCELAR_NA_AGENDA ligada, para o evento de formação e a linha já cancelada na agenda; com ela desligada,
+ * só para a linha cujo Cancelar terminou.
  */
-export function excluirMarcaCancelado(
-  row: Partial<Pick<Solicitacao, 'gcal_status' | 'exclui_marcando_cancelado' | 'cancelado_na_agenda'>>,
-): boolean {
-  if (row.exclui_marcando_cancelado) return true;
-  return row.cancelado_na_agenda === true && !cancelarFalhouComChaveDesligada(row);
+export function excluirMarcaCancelado(row: Partial<Pick<Solicitacao, 'exclui_marcando_cancelado'>>): boolean {
+  return row.exclui_marcando_cancelado === true;
 }
 
 type EventoDaExclusao = Pick<Solicitacao, 'inicio' | 'municipio_nome' | 'projeto_nome'>;

@@ -678,7 +678,9 @@ describe('MySolicitacoesPage — evento cancelado na agenda', { timeout: 20000 }
     deleteSolicitacaoMock.mockReset();
   });
 
-  // A etiqueta segue o estado, como em Publicar na agenda: só diz "Cancelado" quando o Google confirmou.
+  // A etiqueta segue o estado, como em Publicar na agenda: só diz "Cancelado" quando o Google confirmou. O servidor
+  // manda `exclui_marcando_cancelado: true` na linha marcada com a chave ligada, e também com ela desligada quando o
+  // Cancelar terminou (inclusive a linha em ERROR, triagem dos baixos).
   test.each([
     ['PUBLISHED', 'Cancelado na agenda'],
     ['ERROR', 'Erro ao cancelar'],
@@ -698,6 +700,7 @@ describe('MySolicitacoesPage — evento cancelado na agenda', { timeout: 20000 }
             external_event_id: 'asv29',
             tipo_evento_de_formacao: true,
             cancelado_na_agenda: true,
+            exclui_marcando_cancelado: true,
             inicio: '2099-05-10T13:00:00Z',
             fim: '2099-05-10T17:00:00Z',
           }),
@@ -735,6 +738,7 @@ describe('MySolicitacoesPage — evento cancelado na agenda', { timeout: 20000 }
           external_event_id: 'asv29',
           tipo_evento_de_formacao: true,
           cancelado_na_agenda: true,
+          exclui_marcando_cancelado: true,
           inicio: '2099-05-10T13:00:00Z',
           fim: '2099-05-10T17:00:00Z',
         }),
@@ -760,6 +764,7 @@ describe('MySolicitacoesPage — evento cancelado na agenda', { timeout: 20000 }
           external_event_id: 'asv29',
           tipo_evento_de_formacao: true,
           cancelado_na_agenda: true,
+          exclui_marcando_cancelado: true,
           inicio: '2020-05-10T13:00:00Z',
           fim: '2020-05-10T17:00:00Z',
         }),

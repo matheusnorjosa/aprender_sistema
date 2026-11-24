@@ -187,17 +187,26 @@ o reavanço. Para listá-las antes de promover: `Solicitacao.objects.filter(canc
 de versão. Desligada, a produção faz o que fazia antes do #2255: o Excluir de evento de formação tira o evento do
 Google, e a tela não oferece "Cancelar evento". A ação `cancelar-na-agenda` recusa com 409
 `cancelar_na_agenda_desligado`. Se uma mensagem de `task_cancelar_na_agenda` ainda estiver na fila, ela não escreve
-no Google: a linha vai para `ERROR`, com aviso, e a marca do pedido sai. Ligada (`1`), vale o CON-08 B inteiro
+no Google: a linha vai para `ERROR`, com aviso, e a marca do pedido sai. A marca fica quando a linha já tinha um
+Cancelar anterior: confirmado (`cancelamento_confirmado`), que falhou ou sem desfecho (`cancelar_anterior_registrado`),
+porque o "(CANCELADO)" está ou pode estar no Google. Ligada (`1`), vale o CON-08 B inteiro
 ([`gcal.spec.md`](../backend/gcal.spec.md)).
+
+Duas mudanças do #2255 ficam nos dois estados, porque não dependem do Cancelar evento: a Pré-agenda oferece o
+"Remover do Google Agenda" também na linha `ERROR` com id (antes, só em `PUBLISHED`; o servidor já aceitava esse
+`cancel-gcal`), e o motivo de Minhas Solicitações manda pedir ao Controle, na Pré-agenda, a saída dessa linha.
 
 Nos dois estados, a linha já marcada (`cancelado_na_agenda=True`) continua protegida. Ela não se publica, não se
 reenvia e não se edita. Se o Cancelar dela terminou no Google, ela também não se tira de lá, e o Excluir continua
-marcando, sem apagar do Google. Por isso, desligar a chave não exige limpar marcas.
+no caminho da marca, sem apagar do Google: o título lá já tem "(CANCELADO)", e o Excluir não escreve de novo.
+Por isso, desligar a chave não exige limpar marcas.
 
-A exceção é a linha marcada em `ERROR` cujo Cancelar falhou antes do Google (o título lá sem a marca). Com a chave
-desligada, ela sai como antes do CON-08 B: o Excluir tira o evento do Google, sem pôr a marca, e o Tirar só do
-Google a aceita e tira a marca junto com o evento. Com a chave desligada, só a linha cujo Cancelar terminou segue
-a marca.
+A exceção é a linha marcada em `ERROR` sem Cancelar confirmado (o Cancelar falhou antes do Google, ou a tarefa
+desligada manteve a marca de um Cancelar anterior sem desfecho). Com a chave desligada, ela sai como antes do
+CON-08 B: o Excluir tira o evento do Google, sem pôr a marca, e o Tirar só do Google a aceita e tira a marca junto
+com o evento. Com a chave desligada, só a linha cujo Cancelar terminou segue a marca. A lista diz qual é qual:
+`exclui_marcando_cancelado` é a decisão do servidor (`excluir_marca_cancelado`), e a tela oferece o Tirar só onde
+ela é falsa.
 
 - **Ligar ou desligar.** No Portainer, abra a stack e, em *Environment variables* (a `stack.env`), crie ou mude
   `CON08_CANCELAR_NA_AGENDA` para `1` ou `0`. Depois, *Update the stack* sem *re-pull*. O `web` e o `worker`
@@ -205,14 +214,20 @@ a marca.
   discordam. Não edite o compose: os serviços de backend já carregam a `stack.env` pelo `env_file`. Variável
   ausente ou vazia vale `0`.
 - **Conferir.** Em Publicar na agenda, um evento de formação publicado mostra "Cancelar evento" só com a chave
-  ligada. Pela API, a lista `GET /api/solicitacoes/` traz `exclui_marcando_cancelado: true` nesse evento só com a
+  ligada. Pela API, a lista `GET /api/solicitacoes/` traz `cancelar_na_agenda_ligado: true` em toda linha só com a
   chave ligada.
-- **Antes de desligar** com Cancelar em andamento: as linhas `PENDING` cujo último registro é
-  `CANCELAR_NA_AGENDA_REQUESTED` terminam em `ERROR` quando a tarefa rodar. Isso é seguro, porque nada vai ao
-  Google, mas elas precisam ser resolvidas depois (Tirar só do Google ou Excluir). As linhas que já estão em
-  `ERROR` com a marca (`Solicitacao.objects.filter(cancelado_na_agenda=True, gcal_status="ERROR")`) também: com a
-  chave desligada, o Excluir e o Tirar só do Google tiram o evento do Google em vez de marcá-lo. Quem quiser o
-  "(CANCELADO)" nelas refaz o Cancelar antes de desligar.
+- **Antes de desligar** com Cancelar em andamento, liste as linhas marcadas fora de `PUBLISHED`:
+  `Solicitacao.objects.filter(cancelado_na_agenda=True).exclude(gcal_status="PUBLISHED").values_list("id",
+  "gcal_status")`. As `PENDING` terminam em `ERROR` quando a tarefa rodar, sem nada ir ao Google; as `ERROR` já
+  estão lá. Depois de desligar, cada uma cai num de dois casos:
+  - **Perdeu a marca** (era o primeiro Cancelar dela): é uma linha comum, que sai pelo Tirar só do Google ou pelo
+    Excluir, os dois tirando o evento do Google.
+  - **Manteve a marca:** com Cancelar confirmado, sai só pelo Excluir, que não apaga do Google (o título lá já tem
+    "(CANCELADO)"), ou religando a chave. Sem Cancelar confirmado, sai pelo Tirar só do Google ou pelo Excluir,
+    que tiram o evento do Google sem pôr a marca.
+
+  A tela mostra o caso de cada linha: o Tirar só do Google (o Remover, na Pré-agenda) aparece só onde o servidor o
+  aceita. Quem quiser o "(CANCELADO)" numa linha sem Cancelar confirmado refaz o Cancelar antes de desligar.
 
 **Docs de topologia reconciliados (Fase 2 concluída):** `v2/infra/ENVIRONMENTS.md`, `v2/infra/README.md` e
 `.claude/CLAUDE.md` (tabela prod) descrevem o Redis como **container interno na VM01** (serviço `redis`),

@@ -72,9 +72,9 @@ const CANCELAR = /^Cancelar evento:/;
 const REMOVER = /^Remover do Google Agenda:/;
 const PUBLICAR = /^Publicar evento no Google Calendar/;
 /** Evento de formação com a chave ligada no servidor: o Excluir dele marca (CANCELADO). */
-const LIGADA = { tipo_evento_de_formacao: true, exclui_marcando_cancelado: true };
+const LIGADA = { tipo_evento_de_formacao: true, exclui_marcando_cancelado: true, cancelar_na_agenda_ligado: true };
 /** O mesmo evento com a chave desligada. */
-const DESLIGADA = { tipo_evento_de_formacao: true, exclui_marcando_cancelado: false };
+const DESLIGADA = { tipo_evento_de_formacao: true, exclui_marcando_cancelado: false, cancelar_na_agenda_ligado: false };
 
 const row = (overrides: Record<string, unknown> = {}) => ({
   id: 1,
@@ -193,6 +193,7 @@ describe('PreAgendaPage — Cancelar evento de formação (CON-08)', { timeout: 
         gcal_status: 'ERROR',
         tipo_evento_de_formacao: false,
         exclui_marcando_cancelado: true,
+        cancelar_na_agenda_ligado: true,
         cancelado_na_agenda: true,
       }),
     ]);
@@ -258,19 +259,24 @@ describe('PreAgendaPage — chave do CON-08 B desligada', { timeout: 20000 }, ()
   });
 
   // Revisão da rodada 1 da chave: o Cancelar falhou antes do Google; o servidor aceita o Remover (a marca sai com o
-  // evento) e recusa o Cancelar de novo. A linha marcada já confirmada (PUBLISHED) segue sem os dois.
+  // evento) e recusa o Cancelar de novo. A linha marcada já confirmada (PUBLISHED, ou ERROR com o Cancelar que
+  // terminou, da triagem dos baixos) segue sem os dois: o servidor manda `exclui_marcando_cancelado: true` nela.
   test('linha marcada em erro: Remover, sem Cancelar evento para refazer (o servidor recusa)', async () => {
+    const confirmada = { ...DESLIGADA, exclui_marcando_cancelado: true, cancelado_na_agenda: true };
     mockRows([
       row({ id: 13, municipio_nome: 'Russas', gcal_status: 'ERROR', ...DESLIGADA, cancelado_na_agenda: true }),
-      row({ id: 15, municipio_nome: 'Crato', ...DESLIGADA, cancelado_na_agenda: true }),
+      row({ id: 15, municipio_nome: 'Crato', ...confirmada }),
+      row({ id: 16, municipio_nome: 'Juazeiro', gcal_status: 'ERROR', ...confirmada }),
     ]);
     renderComo(DAT);
     const russas = await linha('Russas');
     expect(within(russas).queryByLabelText(CANCELAR)).not.toBeInTheDocument();
     expect(within(russas).getByLabelText(REMOVER)).toBeInTheDocument();
-    const crato = await linha('Crato');
-    expect(within(crato).queryByLabelText(CANCELAR)).not.toBeInTheDocument();
-    expect(within(crato).queryByLabelText(REMOVER)).not.toBeInTheDocument();
+    for (const municipio of ['Crato', 'Juazeiro']) {
+      const confirmadaNaTela = await linha(municipio);
+      expect(within(confirmadaNaTela).queryByLabelText(CANCELAR)).not.toBeInTheDocument();
+      expect(within(confirmadaNaTela).queryByLabelText(REMOVER)).not.toBeInTheDocument();
+    }
   });
 
   test('Excluir de formação: a confirmação e o aviso dizem que ele sai dos dois lados, como antes', async () => {

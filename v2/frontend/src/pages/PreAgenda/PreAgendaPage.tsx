@@ -760,7 +760,7 @@ export default function PreAgendaPage(): JSX.Element {
         // Cancel: PUBLISHED ou ERROR com event_id, como em Publicar na agenda (e não na linha cancelada na agenda,
         // CON-08). No ERROR é a saída que o Cancelar de id adotado não achado manda usar, inclusive no evento que já
         // terminou, que Publicar na agenda não lista. Com a chave do CON-08 B desligada, a linha marcada cujo Cancelar
-        // falhou tem o Remover de volta (o servidor aceita, e a marca sai com o evento).
+        // não terminou tem o Remover de volta (o servidor aceita, e a marca sai com o evento).
         const showCancel =
           (isPublished || hasError) &&
           hasEventId &&
@@ -770,10 +770,11 @@ export default function PreAgendaPage(): JSX.Element {
         // Publicar na agenda; revisão da rodada 6); na linha cancelada, só no erro (refazer o que falhou: Publicar
         // na agenda só lista de hoje em diante).
         // O refazer não exige o tipo ainda de formação (tipo renomeado), como o servidor e Publicar na agenda.
-        // Os dois só com a chave CON08_CANCELAR_NA_AGENDA ligada no servidor (`exclui_marcando_cancelado`).
+        // Os dois só com a chave CON08_CANCELAR_NA_AGENDA ligada no servidor (`cancelar_na_agenda_ligado`).
         const showCancelar =
-          record.exclui_marcando_cancelado === true &&
-          (showCancel || (hasError && hasEventId && record.cancelado_na_agenda === true));
+          record.cancelar_na_agenda_ligado === true &&
+          ((showCancel && record.exclui_marcando_cancelado === true) ||
+            (hasError && hasEventId && record.cancelado_na_agenda === true));
 
         // Virada: evento que já terminou, ou que está no Google pela planilha, não se publica
         // (o backend recusa com o mesmo motivo). O motivo vai no nome acessível do botão.

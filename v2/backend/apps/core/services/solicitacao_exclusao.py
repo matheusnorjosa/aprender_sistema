@@ -109,8 +109,9 @@ def motivo_que_impede_excluir(sol: Any, *, ja_decidida: bool, pode_tirar_do_goog
             )
         return f"Esta solicitação já foi aprovada e não pode ser excluída. {saida}"
     if esta_no_google(sol) and not pode_tirar_do_google:
-        # D25: o Apoio, em Publicar na agenda, exclui o evento ou o tira só do Google. O de formação (CON-08)
-        # não sai do Google: o Excluir marca "(CANCELADO) " no título dele.
+        # D25: o Apoio, em Publicar na agenda, exclui o evento ou o tira só do Google. Com a chave
+        # CON08_CANCELAR_NA_AGENDA ligada, o de formação (CON-08) não sai do Google: o Excluir marca "(CANCELADO) " no
+        # título dele. Quem decide é `excluir_marca_cancelado` (gcal.spec, "A chave").
         efeito = (
             "excluir aqui também o marcaria como cancelado lá, com (CANCELADO) no título"
             if excluir_marca_cancelado(sol)

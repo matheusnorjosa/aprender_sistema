@@ -16,6 +16,7 @@ from uuid import uuid4
 
 from django.conf import settings
 from django.db import OperationalError, connection, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from kombu.exceptions import OperationalError as FilaForaDoAr
@@ -168,6 +169,25 @@ def cancelamento_confirmado(s: Solicitacao) -> bool:
         details__solicitacao_id=s.pk,
         details__resultado__in=_CANCELAR_TERMINOU,
     ).exists()
+
+
+def cancelar_anterior_registrado(s: Solicitacao, pedido: str | None) -> bool:
+    """Outro pedido de Cancelar desta linha veio antes de `pedido`?
+
+    Conta o pedido registrado (`CANCELAR_NA_AGENDA_REQUESTED`) e a tentativa que falhou (`PUBLISH_GCAL_ERROR` com
+    `operation=cancelar_na_agenda`). Qualquer um deles pode ter posto o "(CANCELADO)" no Google sem deixar o registro
+    de que terminou (o PATCH chegou e a resposta se perdeu). A tarefa com a chave desligada só tira a marca sem ele
+    (`_cancelar_na_agenda_desligado`)."""
+    pedidos = (
+        AuditLog.objects.filter(model_name="Solicitacao", details__solicitacao_id=s.pk)
+        .filter(
+            Q(action=AuditLog.Action.CANCELAR_NA_AGENDA_REQUESTED)
+            | Q(action=AuditLog.Action.PUBLISH_GCAL_ERROR, details__operation="cancelar_na_agenda")
+        )
+        .values_list("details__pedido", flat=True)
+    )
+    # Comparado aqui, e não no `exclude`: o registro sem a chave `pedido` sumiria da consulta (NULL no NOT).
+    return any(anterior != pedido for anterior in pedidos)
 
 
 OperacaoGcal = Literal["publicar", "reenviar", "reaplicar", "cancelar", "cancelar_na_agenda"]

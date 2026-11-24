@@ -712,14 +712,17 @@ _MSG_CANCELAR_NA_AGENDA_DESLIGADO_NA_FILA = (
 def _cancelar_na_agenda_desligado(solicitation_id: int, pedido: str | None) -> dict[str, Any]:
     """`task_cancelar_na_agenda` com a chave do CON-08 B desligada: ERROR sem chamar o Google.
 
-    A marca do pedido sai (`desfaz_cancelado_na_agenda`), salvo quando um Cancelar anterior já terminou
-    (`cancelamento_confirmado`): aí o título lá já tem "(CANCELADO)", e sem a marca a linha voltaria a ser publicável.
+    A marca do pedido sai (`desfaz_cancelado_na_agenda`) só quando foi este pedido que a pôs: nenhum Cancelar
+    anterior desta linha (`cancelar_anterior_registrado`). Com um Cancelar anterior confirmado
+    (`cancelamento_confirmado`), o título lá já tem "(CANCELADO)"; com um que falhou ou ficou sem desfecho, pode ter
+    (o PATCH chegou e a resposta se perdeu). Sem a marca, a linha voltaria a ser publicável e o Reenviar tiraria o
+    "(CANCELADO)" do título; na dúvida, a marca fica (triagem dos baixos da revisão da chave).
     O pedido superado (ou a mensagem entregue de novo) não grava nada: a guarda está aqui e no `_mark_gcal_error`.
     """
     from django.db import transaction
 
     from apps.core.models import Solicitacao
-    from apps.core.services.solicitacao_publish import cancelamento_confirmado
+    from apps.core.services.solicitacao_publish import cancelamento_confirmado, cancelar_anterior_registrado
 
     with transaction.atomic():
         s = Solicitacao.objects.select_for_update().filter(id=solicitation_id).first()
@@ -731,7 +734,7 @@ def _cancelar_na_agenda_desligado(solicitation_id: int, pedido: str | None) -> d
                 "summary": "cancelar na agenda desligado; pedido superado ou linha apagada, nada a fazer",
                 "error": None,
             }
-        desfaz = not cancelamento_confirmado(s)
+        desfaz = not cancelamento_confirmado(s) and not cancelar_anterior_registrado(s, pedido)
     _mark_gcal_error(
         solicitation_id,
         _MSG_CANCELAR_NA_AGENDA_DESLIGADO_NA_FILA,
@@ -780,7 +783,8 @@ def task_cancelar_na_agenda(
 
     Chave do CON-08 B desligada (`CON08_CANCELAR_NA_AGENDA`): a mensagem que ficou na fila não fala com o Google.
     Sob a guarda do pedido, a linha vai para ERROR com o aviso e a marca do pedido sai, porque nada foi escrito lá.
-    Exceção: com um Cancelar anterior confirmado o "(CANCELADO)" já está no Google, e a marca fica.
+    Exceção: com um Cancelar anterior da linha (confirmado, que falhou ou sem desfecho) o "(CANCELADO)" está ou pode
+    estar no Google, e a marca fica.
     """
     from django.conf import settings
     from django.db import transaction

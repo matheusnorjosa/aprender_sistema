@@ -892,9 +892,14 @@ describe('PublicacaoSetorPage — excluir evento que está no Google (decisão d
   });
 
   test('a explicação do topo diz a diferença entre tirar só do Google e excluir', async () => {
-    // Chave do CON-08 B ligada: a linha de formação vem com `exclui_marcando_cancelado`.
+    // Chave do CON-08 B ligada: a linha diz isso em `cancelar_na_agenda_ligado`.
     listResponse = pageOf([
-      makeSolic({ gcal_status: 'PUBLISHED', external_event_id: 'asv27', exclui_marcando_cancelado: true }),
+      makeSolic({
+        gcal_status: 'PUBLISHED',
+        external_event_id: 'asv27',
+        exclui_marcando_cancelado: true,
+        cancelar_na_agenda_ligado: true,
+      }),
     ]);
     renderPage();
     await screen.findByLabelText(/^Cancelar evento: Vidas Em Rede/);
@@ -914,6 +919,7 @@ describe('PublicacaoSetorPage — excluir evento que está no Google (decisão d
         external_event_id: 'asv27',
         tipo_evento_de_formacao: true,
         exclui_marcando_cancelado: false,
+        cancelar_na_agenda_ligado: false,
       }),
     ]);
     renderPage();
@@ -924,6 +930,49 @@ describe('PublicacaoSetorPage — excluir evento que está no Google (decisão d
     );
     expect(topo).not.toHaveTextContent('(CANCELADO)');
     expect(topo).not.toHaveTextContent('Cancelar evento');
+  });
+
+  // Triagem dos baixos: o topo segue a chave (`cancelar_na_agenda_ligado`) e o Excluir de cada linha
+  // (`exclui_marcando_cancelado`), não só a formação que estiver na página.
+  test('chave desligada com linha já cancelada na agenda: o topo diz que o Excluir dela não tira do Google', async () => {
+    listResponse = pageOf([
+      makeSolic({
+        gcal_status: 'PUBLISHED',
+        external_event_id: 'asv27',
+        tipo_evento_de_formacao: true,
+        cancelado_na_agenda: true,
+        exclui_marcando_cancelado: true,
+        cancelar_na_agenda_ligado: false,
+      }),
+    ]);
+    renderPage();
+    expect(await screen.findByText('Cancelado na agenda')).toBeInTheDocument();
+    const topo = screen.getByText('Publicar na agenda do Google').closest('header') as HTMLElement;
+    expect(topo).toHaveTextContent(
+      'Tirar só do Google deixa o evento no sistema; Excluir tira dos dois lados, menos o evento já cancelado na ' +
+        'agenda, que sai do sistema e fica no Google Agenda com (CANCELADO) no título.',
+    );
+    expect(topo).not.toHaveTextContent('Cancelar evento');
+  });
+
+  test('chave ligada sem evento de formação na página: o topo é o mesmo da página com formação', async () => {
+    listResponse = pageOf([
+      makeSolic({
+        gcal_status: 'PUBLISHED',
+        external_event_id: 'asv27',
+        tipo_evento_de_formacao: false,
+        exclui_marcando_cancelado: false,
+        cancelar_na_agenda_ligado: true,
+      }),
+    ]);
+    renderPage();
+    await screen.findByLabelText(/^Tirar só do Google: Vidas Em Rede/);
+    const topo = screen.getByText('Publicar na agenda do Google').closest('header') as HTMLElement;
+    expect(topo).toHaveTextContent(
+      'Tirar só do Google deixa o evento no sistema; Excluir tira dos dois lados, menos o evento de formação, que ' +
+        'sai do sistema e fica no Google Agenda com (CANCELADO) no título. Cancelar evento, só no evento de ' +
+        'formação, põe (CANCELADO) no título lá e deixa o evento nos dois lados.',
+    );
   });
 });
 
@@ -1092,7 +1141,8 @@ describe('PublicacaoSetorPage — cancelar evento de formação', { timeout: 200
     external_event_id: 'asv27',
     tipo_evento_nome: 'Presencial',
     tipo_evento_de_formacao: true,
-    exclui_marcando_cancelado: true, // a chave do CON-08 B ligada no servidor
+    exclui_marcando_cancelado: true,
+    cancelar_na_agenda_ligado: true, // a chave do CON-08 B ligada no servidor
   };
 
   test('o botão fica ao lado do Tirar, confirma num diálogo e faz UM POST em /cancelar-na-agenda/', async () => {
@@ -1204,10 +1254,12 @@ describe('PublicacaoSetorPage — cancelar evento de formação', { timeout: 200
     ['PUBLISHED', { gcal_status: 'PUBLISHED' as const }],
     ['ERROR com id (o Cancelar falhou)', { gcal_status: 'ERROR' as const, gcal_last_error: 'Google fora' }],
     ['marcada sem a flag de formação', { gcal_status: 'PUBLISHED' as const, tipo_evento_de_formacao: false }],
-    // Marcada quando a chave esteve ligada; desligada depois, o Excluir dela segue marcando (o servidor também).
+    // Marcada quando a chave esteve ligada; desligada depois, o Excluir dela segue marcando: o Cancelar terminou, e o
+    // servidor manda `exclui_marcando_cancelado: true`, também em ERROR (triagem dos baixos).
+    ['marcada com a chave desligada', { gcal_status: 'PUBLISHED' as const, cancelar_na_agenda_ligado: false }],
     [
-      'marcada com a chave desligada',
-      { gcal_status: 'PUBLISHED' as const, exclui_marcando_cancelado: false },
+      'marcada em ERROR com o Cancelar confirmado e a chave desligada',
+      { gcal_status: 'ERROR' as const, gcal_last_error: 'x', cancelar_na_agenda_ligado: false },
     ],
   ])('Excluir de linha já cancelada na agenda (%s): fica no Google com (CANCELADO)', async (_caso, extra) => {
     listResponse = pageOf([makeSolic({ ...FORMACAO, ...extra, cancelado_na_agenda: true, pode_excluir: true })]);
@@ -1284,6 +1336,7 @@ describe('PublicacaoSetorPage — chave do CON-08 B desligada', { timeout: 20000
     tipo_evento_nome: 'Presencial',
     tipo_evento_de_formacao: true,
     exclui_marcando_cancelado: false,
+    cancelar_na_agenda_ligado: false,
   };
 
   test('formação no Google: Tirar só do Google, sem Cancelar evento', async () => {

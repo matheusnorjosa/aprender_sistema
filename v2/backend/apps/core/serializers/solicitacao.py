@@ -123,10 +123,14 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
     # Quem lê pode tirar este evento do Google (`can_publish_solicitacao`)? Minhas Solicitações só
     # mostra Excluir de evento no Google a quem pode as duas coisas (a exclusão tira de lá também).
     pode_tirar_do_google = serializers.SerializerMethodField()
-    # CON-08 B: a chave `CON08_CANCELAR_NA_AGENDA` está ligada e o Excluir desta linha, no Google, marca o título
-    # com "(CANCELADO) " (`excluir_marca_cancelado`). As telas oferecem "Cancelar evento" e os textos da marca só
-    # com ele; a linha já marcada é tratada à parte por `cancelado_na_agenda`.
+    # CON-08 B: o Excluir desta linha, no Google, marca o título com "(CANCELADO) " em vez de tirá-la de lá
+    # (`excluir_marca_cancelado`, a decisão do servidor nos dois estados da chave). Na linha não marcada, só com a
+    # chave ligada; na marcada, com a chave ligada ou com o Cancelar confirmado. Falso na linha marcada é a que o
+    # Tirar só do Google aceita. As telas usam ele para os textos do Excluir e para o "Cancelar evento".
     exclui_marcando_cancelado = serializers.SerializerMethodField()
+    # A chave `CON08_CANCELAR_NA_AGENDA` (igual em toda linha): só com ela o servidor aceita o Cancelar evento e o
+    # refazer da linha "Erro ao cancelar". Publicar na agenda também a usa no texto do topo.
+    cancelar_na_agenda_ligado = serializers.SerializerMethodField()
     # Quem lê pode excluir esta linha? A regra do DELETE: quem (`PodeExcluirSolicitacao`, com a Apoio no
     # evento de outra pessoa que está no Google) e as recusas que se sabem sem o Google
     # (`motivo_que_impede_excluir`). Publicar na agenda só mostra Excluir com ele.
@@ -170,6 +174,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "decisao_impedida",
             "pode_tirar_do_google",
             "exclui_marcando_cancelado",
+            "cancelar_na_agenda_ligado",
             "pode_excluir",
             "motivo_de_nao_excluir",
             "sem_compra",
@@ -403,7 +408,10 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         return calculados[obj.pk]
 
     def get_exclui_marcando_cancelado(self, obj: Solicitacao) -> bool:
-        return cancelar_na_agenda_ligado() and excluir_marca_cancelado(obj)
+        return excluir_marca_cancelado(obj)
+
+    def get_cancelar_na_agenda_ligado(self, obj: Solicitacao) -> bool:
+        return cancelar_na_agenda_ligado()
 
     def get_tipo_evento_de_formacao(self, obj: Solicitacao) -> bool:
         return eh_evento_de_formacao(obj)

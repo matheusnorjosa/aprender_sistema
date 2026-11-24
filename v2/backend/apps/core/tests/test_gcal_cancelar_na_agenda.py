@@ -1771,23 +1771,30 @@ def test_excluir_marca_cancelado_so_na_linha_ja_marcada_com_a_chave_desligada(se
 
 
 @pytest.mark.django_db
-def test_o_campo_exclui_marcando_cancelado_segue_a_chave(settings):
-    """A tela sabe da chave por este campo: chave ligada E a regra do Excluir que marca."""
+def test_os_campos_da_chave_e_do_excluir_que_marca(settings):
+    """A tela recebe a decisão do servidor (`exclui_marcando_cancelado` = `excluir_marca_cancelado`) e a chave à parte
+    (`cancelar_na_agenda_ligado`), que só ela diz se o Cancelar e o refazer valem (triagem dos baixos: a linha ERROR
+    marcada com Cancelar confirmado não pode virar "Cancelar que falhou" na tela com a chave desligada)."""
     formacao = _formacao()
     marcada = _formacao(cancelado_na_agenda=True)
     outro = _formacao(tipo="Reunião de Alinhamento")
+    erro_sem_confirmar = _formacao(gcal_status="ERROR", cancelado_na_agenda=True)
+    erro_confirmado = _formacao(gcal_status="ERROR", cancelado_na_agenda=True)
+    _cancelar_confirmado(erro_confirmado)
+    linhas = (formacao, marcada, outro, erro_sem_confirmar, erro_confirmado)
 
-    def _campo() -> dict[int, bool]:
+    def _campos(nome: str) -> list[bool]:
         resposta = _api().get("/api/solicitacoes/", {"page_size": 100})
         assert resposta.status_code == 200, resposta.data
         itens = resposta.data["results"] if isinstance(resposta.data, dict) else resposta.data
-        return {item["id"]: item["exclui_marcando_cancelado"] for item in itens}
+        por_id = {item["id"]: item[nome] for item in itens}
+        return [por_id[s.pk] for s in linhas]
 
-    ligada = _campo()
-    assert (ligada[formacao.pk], ligada[marcada.pk], ligada[outro.pk]) == (True, True, False)
+    assert _campos("exclui_marcando_cancelado") == [True, True, False, True, True]
+    assert _campos("cancelar_na_agenda_ligado") == [True] * 5
     settings.CON08_CANCELAR_NA_AGENDA = False
-    desligada = _campo()
-    assert (desligada[formacao.pk], desligada[marcada.pk], desligada[outro.pk]) == (False, False, False)
+    assert _campos("exclui_marcando_cancelado") == [False, True, False, False, True]
+    assert _campos("cancelar_na_agenda_ligado") == [False] * 5
 
 
 @pytest.mark.django_db
@@ -1812,10 +1819,16 @@ class TestChaveDesligada:
         assert delete.details["removido_do_google"] is True
         assert "cancelado_na_agenda" not in delete.details
 
-    def test_linha_ja_marcada_o_excluir_nao_apaga_do_google(self, apoio, gerencia, google, monkeypatch):
+    @pytest.mark.parametrize("gcal_status", ["PUBLISHED", "ERROR"])
+    def test_linha_ja_marcada_o_excluir_nao_apaga_do_google(self, apoio, gerencia, google, monkeypatch, gcal_status):
         """Marcada enquanto a chave esteve ligada: o título lá já tem "(CANCELADO)". O Excluir segue o caminho da
-        marca (SKIP `ja_marcado`): o evento fica no Google, cancelado, e a linha sai daqui."""
-        s = _da_gerencia(gerencia, usuario=UsuarioFactory(), cancelado_na_agenda=True)
+        marca (SKIP `ja_marcado`): o evento fica no Google, cancelado, e a linha sai daqui. Em ERROR, com o Cancelar
+        confirmado (a linha que a tarefa desligada deixa em ERROR com a marca, triagem dos baixos)."""
+        s = _da_gerencia(gerencia, usuario=UsuarioFactory(), cancelado_na_agenda=True, gcal_status=gcal_status)
+        anteriores = []
+        if gcal_status == "ERROR":
+            _cancelar_confirmado(s)
+            anteriores = ["CANCELAR_NA_AGENDA"]
         _no_google(google, s, _MARCADO)
         sol_id, eid = s.pk, s.external_event_id
         contador = _Contador(google)
@@ -1828,7 +1841,7 @@ class TestChaveDesligada:
         evento = google.get(CAL, eid)
         assert (evento["summary"], evento["status"]) == (_MARCADO, "confirmed")
         assert contador.chamadas == []
-        assert _acoes(sol_id) == ["CANCELAR_NA_AGENDA", "DELETE"]
+        assert _acoes(sol_id) == [*anteriores, "CANCELAR_NA_AGENDA", "DELETE"]
 
     def test_linha_error_marcada_sem_cancelar_confirmado_o_excluir_tira_do_google(
         self, apoio, gerencia, google, monkeypatch
@@ -1975,6 +1988,51 @@ class TestChaveDesligada:
         assert erro.details["pedido"] == pedido
         assert not AuditLog.objects.filter(action="CANCELAR_NA_AGENDA", details__solicitacao_id=s.pk).exists()
 
+        # A mesma mensagem entregue de novo: SKIP pela guarda do pedido, sem outro registro.
+        reentrega = task_cancelar_na_agenda(s.pk, pedido=pedido)
+
+        assert reentrega["action"] == "SKIP"
+        assert reentrega["summary"].startswith("cancelar na agenda desligado")
+        assert AuditLog.objects.filter(action="PUBLISH_GCAL_ERROR", details__solicitacao_id=s.pk).count() == 1
+        assert _linha(s)["cancelado_na_agenda"] is False
+
+    @pytest.mark.parametrize(
+        "registro_anterior",
+        [
+            {"action": "PUBLISH_GCAL_ERROR", "details": {"operation": "cancelar_na_agenda"}},
+            {"action": "CANCELAR_NA_AGENDA_REQUESTED", "details": {}},
+        ],
+        ids=["tentativa_que_falhou", "pedido_anterior"],
+    )
+    def test_tarefa_ja_na_fila_do_refazer_mantem_a_marca(self, google, settings, monkeypatch, registro_anterior):
+        """Triagem dos baixos: o refazer de uma linha ERROR marcada sem Cancelar confirmado. A tentativa anterior pode
+        ter posto o "(CANCELADO)" no Google sem que a resposta voltasse. Sem a marca, o Reenviar tiraria esse
+        "(CANCELADO)" do título, e o evento renasceria para o DFF. Na dúvida a marca fica; com a chave desligada, a
+        linha sai pelo Tirar só do Google ou pelo Excluir."""
+        from apps.core.tasks import task_cancelar_na_agenda
+
+        s = _formacao(gcal_status="ERROR", cancelado_na_agenda=True)
+        _no_google(google, s, _MARCADO)
+        AuditLog.objects.create(
+            usuario=None,
+            action=registro_anterior["action"],
+            model_name="Solicitacao",
+            details={"solicitacao_id": s.pk, "pedido": "anterior", **registro_anterior["details"]},
+        )
+        settings.CON08_CANCELAR_NA_AGENDA = True
+        pedido = _pedir(s)
+        settings.CON08_CANCELAR_NA_AGENDA = False
+        contador = _Contador(google)
+        monkeypatch.setattr(_FABRICA, lambda: (contador, CAL))
+
+        task_cancelar_na_agenda(s.pk, pedido=pedido)
+
+        assert contador.chamadas == []
+        linha = _linha(s)
+        assert (linha["gcal_status"], linha["cancelado_na_agenda"]) == ("ERROR", True)
+        erro = AuditLog.objects.get(action="PUBLISH_GCAL_ERROR", details__pedido=pedido)
+        assert "cancelado_na_agenda_desfeito" not in erro.details
+
     def test_tarefa_ja_na_fila_de_cancelar_ja_confirmado_mantem_a_marca(self, google, settings, monkeypatch):
         """O refazer de uma linha cujo Cancelar já terminou: o "(CANCELADO)" já está no Google. Desfazer a marca
         deixaria a linha publicável, e o Reenviar tiraria o "(CANCELADO)" do título; a marca fica."""
@@ -2006,8 +2064,11 @@ class TestChaveDesligada:
         contador = _Contador(google)
         monkeypatch.setattr(_FABRICA, lambda: (contador, CAL))
 
-        task_cancelar_na_agenda(s.pk, pedido="pedido-velho")
+        resultado = task_cancelar_na_agenda(s.pk, pedido="pedido-velho")
 
+        # Passou pelo ramo desligado: o ligado também dá SKIP aqui, com outro resumo.
+        assert resultado["action"] == "SKIP"
+        assert resultado["summary"].startswith("cancelar na agenda desligado")
         assert contador.chamadas == []
         assert _linha(s) == antes
         assert not AuditLog.objects.filter(details__solicitacao_id=s.pk).exists()

@@ -3,9 +3,10 @@
 Evento de formação é o de tipo Presencial, Online ou Workshop, pelo nome sem acento e sem maiúscula. É a
 definição única: nenhum outro lugar decide se o tipo é de formação. O nome do tipo é lido em outros pontos, para
 outro fim: o título do Google trata "Acompanhamento" à parte (`gcal/payload.py`) e o comando de dev
-`backfill_is_online` deduz a modalidade pelo nome. Quem renomear um tipo confere os três, e sabe que muda também o
-que o Excluir faz no Google: o de evento de formação marca "(CANCELADO) " no título e deixa o evento lá; o dos outros
-tipos tira o evento de lá (CON-08). O nome conta porque é ele que vai ao título do evento no Google
+`backfill_is_online` deduz a modalidade pelo nome. Quem renomear um tipo confere os três, e sabe que, com a chave
+CON08_CANCELAR_NA_AGENDA ligada, muda também o que o Excluir faz no Google: o de evento de formação marca
+"(CANCELADO) " no título e deixa o evento lá; o dos outros tipos tira o evento de lá (CON-08; com a chave desligada,
+todos saem, `excluir_marca_cancelado`). O nome conta porque é ele que vai ao título do evento no Google
 ("EF - Presencial"), e é pelo título que o DFF lê a formação.
 
 O Nº da formação (`Solicitacao.encontro`) do evento de formação é só o número, de 1 a 999. Aceita "3º", "3°",

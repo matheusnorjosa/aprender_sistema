@@ -676,7 +676,8 @@ FEATURE_AUTO_APPLY_ENABLED = os.getenv("FEATURE_AUTO_APPLY_ENABLED", "0") == "1"
 # CON-08 B: "Cancelar evento" de formação na agenda ("(CANCELADO) " no título do Google). Padrão: desligado.
 # Desligado: o Excluir de evento de formação tira o evento do Google (como antes do #2255) e ninguém cancela na
 # agenda. A linha já cancelada na agenda segue protegida nos dois estados. Liga e desliga pelo Environment da stack
-# no Portainer, com reinício do web e do worker (deploy.spec.md, "Rollback do CON-08 B").
+# no Portainer, recriando o web e o worker juntos (Update the stack; no dev, `up -d`): deploy.spec.md, "Chave do
+# CON-08 B".
 CON08_CANCELAR_NA_AGENDA = os.getenv("CON08_CANCELAR_NA_AGENDA", "0") == "1"
 
 

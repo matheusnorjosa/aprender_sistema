@@ -18,9 +18,10 @@
  * Evento no Google pela planilha e não adotado (`publicado_fora_do_sistema`, virada de 16/10/2026)
  * não oferece ação nenhuma: publicar criaria um segundo evento, e o backend recusa.
  *
- * Evento de formação (`tipo_evento_de_formacao`, CON-08) no Google ganha `cancelar` ("Cancelar evento": o
- * título lá ganha "(CANCELADO) "), ao lado de `remover`. A linha já cancelada na agenda só mostra o estado
- * ("Cancelado na agenda", "Cancelando…" ou "Erro ao cancelar"); no erro com id, oferece cancelar de novo.
+ * Evento de formação no Google ganha `cancelar` ("Cancelar evento", CON-08: o título lá ganha "(CANCELADO) "), ao
+ * lado de `remover`, só com a chave CON08_CANCELAR_NA_AGENDA ligada no servidor: a linha diz isso em
+ * `exclui_marcando_cancelado`. A linha já cancelada na agenda só mostra o estado ("Cancelado na agenda",
+ * "Cancelando…" ou "Erro ao cancelar"); no erro com id e com a chave ligada, oferece cancelar de novo.
  */
 import type { GCalStatus, Solicitacao } from '../types';
 import { formatFortaleza } from './datetime';
@@ -70,20 +71,21 @@ const TAGS_CANCELADO: Record<GCalStatus, GcalRowTag> = {
 
 export function gcalRowActions(
   row: Pick<Solicitacao, 'gcal_status' | 'external_event_id'> &
-    Partial<Pick<Solicitacao, 'publicado_fora_do_sistema' | 'tipo_evento_de_formacao' | 'cancelado_na_agenda'>>,
+    Partial<Pick<Solicitacao, 'publicado_fora_do_sistema' | 'exclui_marcando_cancelado' | 'cancelado_na_agenda'>>,
   { ready }: { ready: boolean },
 ): GcalRowActionsResult {
   if (row.publicado_fora_do_sistema) {
     return { tag: TAG_FORA_DO_SISTEMA, actions: [], disabled: !ready };
   }
   if (row.cancelado_na_agenda) {
-    const refazer = row.gcal_status === 'ERROR' && !!row.external_event_id;
+    // Na linha marcada, `exclui_marcando_cancelado` é a chave do servidor: desligada, ele recusa o Cancelar.
+    const refazer = row.gcal_status === 'ERROR' && !!row.external_event_id && !!row.exclui_marcando_cancelado;
     return { tag: TAGS_CANCELADO[row.gcal_status], actions: refazer ? ['cancelar'] : [], disabled: !ready };
   }
   const actions = actionsFor(row.gcal_status, !!row.external_event_id);
   // Cancelar só onde há Tirar (com o id de lá), como na Pré-agenda: sem id, um Cancelar que falhasse deixaria a
   // linha em ERROR sem id, que o servidor não deixa refazer.
-  if (row.tipo_evento_de_formacao && actions.includes('remover')) actions.push('cancelar');
+  if (row.exclui_marcando_cancelado && actions.includes('remover')) actions.push('cancelar');
   return { tag: TAGS[row.gcal_status], actions, disabled: !ready };
 }
 
@@ -145,12 +147,13 @@ export function estaNoGoogle(row: Pick<Solicitacao, 'gcal_status' | 'external_ev
 
 /**
  * Espelho do `excluir_marca_cancelado` do backend: o Excluir de um evento que está no Google marca o título
- * com "(CANCELADO) " em vez de tirá-lo de lá (evento de formação ou linha já cancelada na agenda).
+ * com "(CANCELADO) " em vez de tirá-lo de lá. Vale para a linha já cancelada na agenda e, com a chave
+ * CON08_CANCELAR_NA_AGENDA ligada, para o evento de formação (`exclui_marcando_cancelado`, do servidor).
  */
 export function excluirMarcaCancelado(
-  row: Partial<Pick<Solicitacao, 'tipo_evento_de_formacao' | 'cancelado_na_agenda'>>,
+  row: Partial<Pick<Solicitacao, 'exclui_marcando_cancelado' | 'cancelado_na_agenda'>>,
 ): boolean {
-  return Boolean(row.cancelado_na_agenda || row.tipo_evento_de_formacao);
+  return Boolean(row.cancelado_na_agenda || row.exclui_marcando_cancelado);
 }
 
 type EventoDaExclusao = Pick<Solicitacao, 'inicio' | 'municipio_nome' | 'projeto_nome'>;
@@ -164,14 +167,14 @@ export function resumoDoEvento(row: EventoDaExclusao): string {
 /**
  * Confirmação de excluir evento que está no Google (`estaNoGoogle`): sai dos dois lados. A mesma em
  * Minhas Solicitações e em Publicar na agenda. Em ERROR o evento pode não ter chegado ao Google; o
- * Meet só é citado quando existe. Evento de formação (CON-08, decisão do dono de 23/11) não sai do
- * Google: o título lá ganha "(CANCELADO) ". Em ERROR sem id ele pode nunca ter chegado lá, e o texto
- * não promete que está.
+ * Meet só é citado quando existe. O que `excluirMarcaCancelado` aceita (CON-08, decisão do dono de 23/11)
+ * não sai do Google: o título lá ganha "(CANCELADO) ". Em ERROR sem id ele pode nunca ter chegado lá, e o
+ * texto não promete que está.
  */
 export function confirmacaoDeExcluirNoGoogle(
   row: EventoDaExclusao &
     Pick<Solicitacao, 'gcal_status' | 'meet_link'> &
-    Partial<Pick<Solicitacao, 'tipo_evento_de_formacao' | 'cancelado_na_agenda' | 'external_event_id'>>,
+    Partial<Pick<Solicitacao, 'exclui_marcando_cancelado' | 'cancelado_na_agenda' | 'external_event_id'>>,
 ): { title: string; content: string } {
   if (excluirMarcaCancelado(row)) {
     const fica =

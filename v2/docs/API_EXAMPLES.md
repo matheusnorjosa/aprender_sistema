@@ -376,7 +376,8 @@ Relacionadas, mesmo contrato 202:
 `POST /api/solicitacoes/{id}/resync-gcal/`,
 `POST /api/solicitacoes/{id}/cancel-gcal/` e
 `POST /api/solicitacoes/{id}/cancelar-na-agenda/` (so evento de formacao: o titulo no Google ganha
-`(CANCELADO) `; 409 `nao_e_evento_de_formacao`).
+`(CANCELADO) `; 409 `nao_e_evento_de_formacao`; 409 `cancelar_na_agenda_desligado` com a chave
+`CON08_CANCELAR_NA_AGENDA` desligada, o padrao).
 
 ### Publicar em Lote
 

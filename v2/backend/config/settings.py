@@ -673,6 +673,12 @@ CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60
 # Fase 3 - Governança GCal: única via de criação é /pre-agenda (individual + massa)
 FEATURE_AUTO_APPLY_ENABLED = os.getenv("FEATURE_AUTO_APPLY_ENABLED", "0") == "1"
 
+# CON-08 B: "Cancelar evento" de formação na agenda ("(CANCELADO) " no título do Google). Padrão: desligado.
+# Desligado: o Excluir de evento de formação tira o evento do Google (como antes do #2255) e ninguém cancela na
+# agenda. A linha já cancelada na agenda segue protegida nos dois estados. Liga e desliga pelo Environment da stack
+# no Portainer, com reinício do web e do worker (deploy.spec.md, "Rollback do CON-08 B").
+CON08_CANCELAR_NA_AGENDA = os.getenv("CON08_CANCELAR_NA_AGENDA", "0") == "1"
+
 
 def ler_rbac_fonte(valor: str | None) -> str:
     """Fonte do poder (PR 12 das permissões, ADR-020). Vazio ou ausente = "lotacao"; inválido derruba a subida.

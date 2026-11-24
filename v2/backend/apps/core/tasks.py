@@ -703,6 +703,53 @@ def task_cancel_solicitacao_from_gcal(
         }
 
 
+_MSG_CANCELAR_NA_AGENDA_DESLIGADO_NA_FILA = (
+    "O Cancelar evento foi desligado no sistema antes de chegar ao Google Agenda. Nada foi escrito lá: o evento "
+    "continua como estava."
+)
+
+
+def _cancelar_na_agenda_desligado(solicitation_id: int, pedido: str | None) -> dict[str, Any]:
+    """`task_cancelar_na_agenda` com a chave do CON-08 B desligada: ERROR sem chamar o Google.
+
+    A marca do pedido sai (`desfaz_cancelado_na_agenda`), salvo quando um Cancelar anterior já terminou
+    (`cancelamento_confirmado`): aí o título lá já tem "(CANCELADO)", e sem a marca a linha voltaria a ser publicável.
+    O pedido superado (ou a mensagem entregue de novo) não grava nada: a guarda está aqui e no `_mark_gcal_error`.
+    """
+    from django.db import transaction
+
+    from apps.core.models import Solicitacao
+    from apps.core.services.solicitacao_publish import cancelamento_confirmado
+
+    with transaction.atomic():
+        s = Solicitacao.objects.select_for_update().filter(id=solicitation_id).first()
+        if s is None or not _pedido_ainda_vale(s, pedido, Solicitacao.GCalStatus.PENDING):
+            return {
+                "action": "SKIP",
+                "solicitation_id": solicitation_id,
+                "external_event_id": None,
+                "summary": "cancelar na agenda desligado; pedido superado ou linha apagada, nada a fazer",
+                "error": None,
+            }
+        desfaz = not cancelamento_confirmado(s)
+    _mark_gcal_error(
+        solicitation_id,
+        _MSG_CANCELAR_NA_AGENDA_DESLIGADO_NA_FILA,
+        raw_error="CON08_CANCELAR_NA_AGENDA desligada",
+        operation="cancelar_na_agenda",
+        dry_run=False,
+        pedido=pedido,
+        desfaz_cancelado_na_agenda=desfaz,
+    )
+    return {
+        "action": "ERROR",
+        "solicitation_id": solicitation_id,
+        "external_event_id": None,
+        "summary": "cancelar na agenda desligado: nada foi escrito no Google",
+        "error": "CON08_CANCELAR_NA_AGENDA desligada",
+    }
+
+
 @shared_task(
     name="apps.core.tasks.task_cancelar_na_agenda",
     autoretry_for=_FALHAS_DE_BANCO_QUE_REPETEM,
@@ -730,6 +777,10 @@ def task_cancelar_na_agenda(
     a PUBLISHED com `resultado=nao_achado`, como o Excluir da P5 (revisão da rodada 5).
 
     Entregue de novo depois de uma queda entre o PATCH e o commit, relê o título, acha o marcador e não repete.
+
+    Chave do CON-08 B desligada (`CON08_CANCELAR_NA_AGENDA`): a mensagem que ficou na fila não fala com o Google.
+    Sob a guarda do pedido, a linha vai para ERROR com o aviso e a marca do pedido sai, porque nada foi escrito lá.
+    Exceção: com um Cancelar anterior confirmado o "(CANCELADO)" já está no Google, e a marca fica.
     """
     from django.conf import settings
     from django.db import transaction
@@ -738,7 +789,10 @@ def task_cancelar_na_agenda(
     from apps.core.services.gcal.sync import EventoAdotadoNaoAchado
     from apps.core.services.gcal.types import SyncOutcome
     from apps.core.services.gcal_sync_service import marcar_cancelado_no_google
-    from apps.core.services.solicitacao_publish import cancelamento_confirmado
+    from apps.core.services.solicitacao_publish import cancelamento_confirmado, cancelar_na_agenda_ligado
+
+    if not cancelar_na_agenda_ligado():
+        return _cancelar_na_agenda_desligado(solicitation_id, pedido)
 
     client = None
     operator = None

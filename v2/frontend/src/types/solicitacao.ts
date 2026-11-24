@@ -133,6 +133,12 @@ export interface Solicitacao {
    */
   pode_tirar_do_google?: boolean;
   /**
+   * CON-08 B: a chave CON08_CANCELAR_NA_AGENDA está ligada no servidor e o Excluir desta linha, no Google, marca o
+   * título com (CANCELADO) em vez de tirá-la de lá. Sem ele a tela não oferece "Cancelar evento"; a linha já
+   * cancelada na agenda (`cancelado_na_agenda`) segue com o Excluir que marca nos dois estados da chave.
+   */
+  exclui_marcando_cancelado?: boolean;
+  /**
    * Quem lê pode excluir esta linha (a regra do DELETE: quem exclui e as recusas que se sabem sem o
    * Google). A Apoio exclui o evento de outra pessoa da gerência dela só quando ele está no Google.
    */

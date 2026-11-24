@@ -183,6 +183,29 @@ as linhas com `cancelado_na_agenda=True` não se publicam, reenviam, reaplicam, 
 o reavanço. Para listá-las antes de promover: `Solicitacao.objects.filter(cancelado_na_agenda=True)
 .values_list("id", "gcal_status")` no shell (só ids e estado, sem título).
 
+**Chave do CON-08 B: `CON08_CANCELAR_NA_AGENDA`** (padrão `0`, desligada; `settings.py`). É o rollback sem trocar
+de versão. Desligada, a produção faz o que fazia antes do #2255: o Excluir de evento de formação tira o evento do
+Google, e a tela não oferece "Cancelar evento". A ação `cancelar-na-agenda` recusa com 409
+`cancelar_na_agenda_desligado`. Se uma mensagem de `task_cancelar_na_agenda` ainda estiver na fila, ela não escreve
+no Google: a linha vai para `ERROR`, com aviso, e a marca do pedido sai. Ligada (`1`), vale o CON-08 B inteiro
+([`gcal.spec.md`](../backend/gcal.spec.md)).
+
+Nos dois estados, a linha já marcada (`cancelado_na_agenda=True`) continua protegida. Ela não se publica, não se
+reenvia, não se tira do Google e não se edita. O Excluir dela continua marcando, sem apagar do Google. Por isso,
+desligar a chave não exige limpar marcas.
+
+- **Ligar ou desligar.** No Portainer, abra a stack e, em *Environment variables* (a `stack.env`), crie ou mude
+  `CON08_CANCELAR_NA_AGENDA` para `1` ou `0`. Depois, *Update the stack* sem *re-pull*. O `web` e o `worker`
+  leem a variável só na subida e precisam ser recriados juntos: com só um deles recriado, a tela e a tarefa
+  discordam. Não edite o compose: os serviços de backend já carregam a `stack.env` pelo `env_file`. Variável
+  ausente ou vazia vale `0`.
+- **Conferir.** Em Publicar na agenda, um evento de formação publicado mostra "Cancelar evento" só com a chave
+  ligada. Pela API, a lista `GET /api/solicitacoes/` traz `exclui_marcando_cancelado: true` nesse evento só com a
+  chave ligada.
+- **Antes de desligar** com Cancelar em andamento: as linhas `PENDING` cujo último registro é
+  `CANCELAR_NA_AGENDA_REQUESTED` terminam em `ERROR` quando a tarefa rodar. Isso é seguro, porque nada vai ao
+  Google, mas elas precisam ser resolvidas depois (Tirar só do Google ou Excluir).
+
 **Docs de topologia reconciliados (Fase 2 concluída):** `v2/infra/ENVIRONMENTS.md`, `v2/infra/README.md` e
 `.claude/CLAUDE.md` (tabela prod) descrevem o Redis como **container interno na VM01** (serviço `redis`),
 alinhados ao compose — não mais como "VM03_Red" dedicada.
@@ -204,7 +227,9 @@ passo a passo na seção 8 do `GUIDE_GCAL.md`, FER-59). Fica ausente fora da tro
 restauração de um backup anterior a ela; nesses casos só sai quando o `rotate_gcal_encryption_key` mandar.
 
 **Ausentes (significativo):** `SENTRY_DSN` (→ Sentry off), `BACKUP_DIR` (→ default `/backups`, que hoje **é**
-gravável no `worker` graças ao bind-mount do #1455), `INCLUDE_DEV_TOOLS`/`INCLUDE_ETL` (→ defaults off, correto).
+gravável no `worker` graças ao bind-mount do #1455), `INCLUDE_DEV_TOOLS`/`INCLUDE_ETL` (→ defaults off, correto),
+`CON08_CANCELAR_NA_AGENDA` (→ `0`, o CON-08 B desligado; a chave e como ligá-la estão acima, depois da volta para
+antes do CON-08 B).
 
 > **Snapshot datado (2026-06-19), não reverificado.** Esta lista veio de uma leitura das *Environment variables*
 > no Portainer em 2026-06-19 e **não** foi reconferida desde então. A auditoria M00–M28 tem 18 achados cuja

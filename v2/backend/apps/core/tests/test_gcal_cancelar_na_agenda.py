@@ -128,6 +128,18 @@ def _calendario_dos_testes(settings):
     settings.GCAL_CALENDAR_ID = CAL
 
 
+@pytest.fixture(autouse=True)
+def _chave_ligada(settings):
+    """Os testes deste arquivo descrevem o CON-08 B ligado (`CON08_CANCELAR_NA_AGENDA`, desligada por padrão). O
+    estado desligado está na seção 26, que desliga a chave de novo (`chave_desligada`)."""
+    settings.CON08_CANCELAR_NA_AGENDA = True
+
+
+@pytest.fixture
+def chave_desligada(settings):
+    settings.CON08_CANCELAR_NA_AGENDA = False
+
+
 @pytest.fixture
 def google(monkeypatch) -> Iterator[FakeCalendarClient]:
     """Fake na fábrica do service account e disjuntor transparente."""
@@ -1715,3 +1727,239 @@ def test_servico_de_entrada_recusa_sem_formacao_antes_de_enfileirar():
         cancelar_na_agenda(s, UsuarioFactory(), RequestFactory().post("/x/"))
 
     delay.assert_not_called()
+
+
+# =============================================================================
+# 26. A chave CON08_CANCELAR_NA_AGENDA desligada (o padrão): como antes do CON-08 B
+# =============================================================================
+#
+# Desligada, o Excluir de evento de formação volta a tirar o evento do Google, e ninguém cancela na agenda (a ação, o
+# serviço, o pedido e a tarefa recusam). A linha já marcada, de quando a chave esteve ligada, continua protegida: não
+# se publica, não se reenvia, não se tira do Google nem se edita, e o Excluir dela segue o caminho que não apaga do
+# Google um evento cujo título já tem "(CANCELADO)".
+
+
+def test_a_chave_vem_desligada_sem_a_variavel_de_ambiente():
+    """O módulo de configuração lê a variável na subida; a CI não a define. O `settings` dos testes é outro objeto,
+    que a fixture `_chave_ligada` troca."""
+    import importlib
+    import os
+
+    assert "CON08_CANCELAR_NA_AGENDA" not in os.environ
+    modulo = importlib.import_module(os.environ["DJANGO_SETTINGS_MODULE"])
+    assert modulo.CON08_CANCELAR_NA_AGENDA is False
+
+
+@pytest.mark.django_db
+def test_excluir_marca_cancelado_so_na_linha_ja_marcada_com_a_chave_desligada(settings):
+    from apps.core.services.solicitacao_publish import excluir_marca_cancelado
+
+    formacao = _formacao()
+    marcada = _formacao(cancelado_na_agenda=True)
+    outro = _formacao(tipo="Reunião de Alinhamento")
+
+    assert [excluir_marca_cancelado(s) for s in (formacao, marcada, outro)] == [True, True, False]
+    settings.CON08_CANCELAR_NA_AGENDA = False
+    assert [excluir_marca_cancelado(s) for s in (formacao, marcada, outro)] == [False, True, False]
+
+
+@pytest.mark.django_db
+def test_o_campo_exclui_marcando_cancelado_segue_a_chave(settings):
+    """A tela sabe da chave por este campo: chave ligada E a regra do Excluir que marca."""
+    formacao = _formacao()
+    marcada = _formacao(cancelado_na_agenda=True)
+    outro = _formacao(tipo="Reunião de Alinhamento")
+
+    def _campo() -> dict[int, bool]:
+        resposta = _api().get("/api/solicitacoes/", {"page_size": 100})
+        assert resposta.status_code == 200, resposta.data
+        itens = resposta.data["results"] if isinstance(resposta.data, dict) else resposta.data
+        return {item["id"]: item["exclui_marcando_cancelado"] for item in itens}
+
+    ligada = _campo()
+    assert (ligada[formacao.pk], ligada[marcada.pk], ligada[outro.pk]) == (True, True, False)
+    settings.CON08_CANCELAR_NA_AGENDA = False
+    desligada = _campo()
+    assert (desligada[formacao.pk], desligada[marcada.pk], desligada[outro.pk]) == (False, False, False)
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("modo_google", "chave_desligada")
+class TestChaveDesligada:
+    def test_excluir_de_formacao_no_google_tira_de_la_como_antes(self, apoio, gerencia, google, monkeypatch):
+        s = _da_gerencia(gerencia, usuario=apoio)
+        _no_google(google, s)
+        sol_id, eid = s.pk, s.external_event_id
+        contador = _Contador(google)
+        monkeypatch.setattr(_FABRICA, lambda: (contador, CAL))
+
+        resposta = _api(apoio).delete(f"/api/solicitacoes/{sol_id}/")
+
+        assert resposta.status_code == 204, resposta.data
+        assert not Solicitacao.objects.filter(pk=sol_id).exists()
+        evento = google.get(CAL, eid)
+        assert (evento["summary"], evento["status"]) == (_TITULO, "cancelled"), "saiu do Google, sem marca"
+        assert "patch_titulo" not in contador.chamadas
+        assert _acoes(sol_id) == ["CANCEL_GCAL", "DELETE"]
+        delete = AuditLog.objects.get(action="DELETE", details__solicitacao_data__id=sol_id)
+        assert delete.details["removido_do_google"] is True
+        assert "cancelado_na_agenda" not in delete.details
+
+    def test_linha_ja_marcada_o_excluir_nao_apaga_do_google(self, apoio, gerencia, google, monkeypatch):
+        """Marcada enquanto a chave esteve ligada: o título lá já tem "(CANCELADO)". O Excluir segue o caminho da
+        marca (SKIP `ja_marcado`): o evento fica no Google, cancelado, e a linha sai daqui."""
+        s = _da_gerencia(gerencia, usuario=UsuarioFactory(), cancelado_na_agenda=True)
+        _no_google(google, s, _MARCADO)
+        sol_id, eid = s.pk, s.external_event_id
+        contador = _Contador(google)
+        monkeypatch.setattr(_FABRICA, lambda: (contador, CAL))
+
+        resposta = _api(apoio).delete(f"/api/solicitacoes/{sol_id}/")
+
+        assert resposta.status_code == 204, resposta.data
+        assert not Solicitacao.objects.filter(pk=sol_id).exists()
+        evento = google.get(CAL, eid)
+        assert (evento["summary"], evento["status"]) == (_MARCADO, "confirmed")
+        assert contador.chamadas == []
+        assert _acoes(sol_id) == ["CANCELAR_NA_AGENDA", "DELETE"]
+
+    def test_a_acao_cancelar_na_agenda_recusa(self, apoio, gerencia):
+        s = _da_gerencia(gerencia, usuario=UsuarioFactory())
+        antes = _linha(s)
+
+        with patch(_DELAY_CANCELAR_NA_AGENDA) as delay:
+            resposta = _api(apoio).post(f"/api/solicitacoes/{s.pk}/cancelar-na-agenda/", {}, format="json")
+
+        assert resposta.status_code == 409, resposta.data
+        assert resposta.data["errors"]["code"] == "cancelar_na_agenda_desligado"
+        delay.assert_not_called()
+        assert _linha(s) == antes
+        assert not AuditLog.objects.filter(action="CANCELAR_NA_AGENDA_REQUESTED").exists()
+
+    def test_o_servico_recusa_antes_da_conta_google(self, settings):
+        """Desligada, a recusa vem antes de tudo: nem o modo OAuth sem conta muda a resposta."""
+        from apps.core.services.solicitacao_publish import cancelar_na_agenda
+
+        settings.GCAL_AUTH_MODE = "oauth"
+        s = _formacao()
+
+        with patch(_DELAY_CANCELAR_NA_AGENDA) as delay, pytest.raises(ConflictError) as erro:
+            cancelar_na_agenda(s, UsuarioFactory(), RequestFactory().post("/x/"))
+
+        assert erro.value.details["code"] == "cancelar_na_agenda_desligado"
+        delay.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "extra",
+        [{}, {"gcal_status": "ERROR", "cancelado_na_agenda": True}],
+        ids=["formacao", "refazer_da_marcada"],
+    )
+    def test_o_pedido_recusa(self, extra):
+        from apps.core.services.solicitacao_publish import pedir_operacao_gcal
+
+        s = _formacao(**extra)
+        antes = _linha(s)
+
+        with transaction.atomic(), pytest.raises(ConflictError) as erro:
+            pedir_operacao_gcal(s.pk, "cancelar_na_agenda")
+
+        assert erro.value.details["code"] == "cancelar_na_agenda_desligado"
+        assert _linha(s) == antes
+
+    def test_tarefa_ja_na_fila_nao_escreve_no_google_e_desfaz_a_marca(self, google, settings, monkeypatch):
+        """Pedido feito com a chave ligada, tarefa rodando depois de desligar: nada vai ao Google. A marca do pedido
+        sai (o título lá não a tem) e a linha fica em ERROR, com o texto do que aconteceu."""
+        from apps.core.tasks import task_cancelar_na_agenda
+
+        s = _formacao()
+        _no_google(google, s)
+        settings.CON08_CANCELAR_NA_AGENDA = True
+        pedido = _pedir(s)
+        settings.CON08_CANCELAR_NA_AGENDA = False
+        contador = _Contador(google)
+        monkeypatch.setattr(_FABRICA, lambda: (contador, CAL))
+
+        resultado = task_cancelar_na_agenda(s.pk, pedido=pedido)
+
+        assert resultado["action"] == "ERROR"
+        assert contador.chamadas == []
+        assert _titulo(google, s) == _TITULO
+        linha = _linha(s)
+        assert (linha["gcal_status"], linha["cancelado_na_agenda"]) == ("ERROR", False)
+        assert "desligado" in (Solicitacao.objects.get(pk=s.pk).gcal_last_error or "")
+        erro = AuditLog.objects.get(action="PUBLISH_GCAL_ERROR", details__solicitacao_id=s.pk)
+        assert erro.details["cancelado_na_agenda_desfeito"] is True
+        assert erro.details["pedido"] == pedido
+        assert not AuditLog.objects.filter(action="CANCELAR_NA_AGENDA", details__solicitacao_id=s.pk).exists()
+
+    def test_tarefa_ja_na_fila_de_cancelar_ja_confirmado_mantem_a_marca(self, google, settings, monkeypatch):
+        """O refazer de uma linha cujo Cancelar já terminou: o "(CANCELADO)" já está no Google. Desfazer a marca
+        deixaria a linha publicável, e o Reenviar tiraria o "(CANCELADO)" do título; a marca fica."""
+        from apps.core.tasks import task_cancelar_na_agenda
+
+        s = _formacao(gcal_status="ERROR", cancelado_na_agenda=True)
+        _no_google(google, s, _MARCADO)
+        _cancelar_confirmado(s)
+        settings.CON08_CANCELAR_NA_AGENDA = True
+        pedido = _pedir(s)
+        settings.CON08_CANCELAR_NA_AGENDA = False
+        contador = _Contador(google)
+        monkeypatch.setattr(_FABRICA, lambda: (contador, CAL))
+
+        task_cancelar_na_agenda(s.pk, pedido=pedido)
+
+        assert contador.chamadas == []
+        linha = _linha(s)
+        assert (linha["gcal_status"], linha["cancelado_na_agenda"]) == ("ERROR", True)
+        erro = AuditLog.objects.get(action="PUBLISH_GCAL_ERROR", details__solicitacao_id=s.pk)
+        assert "cancelado_na_agenda_desfeito" not in erro.details
+
+    def test_tarefa_de_pedido_superado_nao_faz_nada(self, google, monkeypatch):
+        from apps.core.tasks import task_cancelar_na_agenda
+
+        s = _formacao()
+        _no_google(google, s)
+        antes = _linha(s)
+        contador = _Contador(google)
+        monkeypatch.setattr(_FABRICA, lambda: (contador, CAL))
+
+        task_cancelar_na_agenda(s.pk, pedido="pedido-velho")
+
+        assert contador.chamadas == []
+        assert _linha(s) == antes
+        assert not AuditLog.objects.filter(details__solicitacao_id=s.pk).exists()
+
+    @pytest.mark.parametrize("gcal_status", ["PUBLISHED", "ERROR"])
+    def test_a_linha_ja_marcada_segue_protegida(self, google, gcal_status):
+        """Publicar, reenviar, tirar do Google, o sync e a edição recusam a linha marcada nos dois estados da chave:
+        sem isso, publicar de novo tiraria o "(CANCELADO)" do título no Google."""
+        from apps.core.services.gcal.sync import CriacaoRecusada, upsert_one
+
+        s = _formacao(cancelado_na_agenda=True, gcal_status=gcal_status)
+        _no_google(google, s, _MARCADO)
+        api = _api()
+
+        with patch(_DELAY_PUBLICAR) as publicar_delay, patch(_DELAY_TIRAR) as tirar_delay:
+            publicar = api.post(f"/api/solicitacoes/{s.pk}/publish/", {}, format="json")
+            reenviar = api.post(f"/api/solicitacoes/{s.pk}/resync-gcal/", {}, format="json")
+            tirar = api.post(f"/api/solicitacoes/{s.pk}/cancel-gcal/", {}, format="json")
+        editar = api.patch(f"/api/solicitacoes/{s.pk}/", {"observacoes": "mudou"}, format="json")
+
+        assert (publicar.status_code, publicar.data["code"]) == (400, "cancelado_na_agenda")
+        assert (reenviar.status_code, reenviar.data["code"]) == (400, "cancelado_na_agenda")
+        assert (tirar.status_code, tirar.data["errors"]["code"]) == (409, "cancelado_na_agenda")
+        assert editar.status_code == 400, editar.data
+        publicar_delay.assert_not_called()
+        tirar_delay.assert_not_called()
+        with pytest.raises(CriacaoRecusada):
+            upsert_one(client=google, calendar_id=CAL, s=s)
+        evento = google.get(CAL, s.external_event_id)
+        assert (evento["summary"], evento["status"]) == (_MARCADO, "confirmed")
+
+    def test_texto_do_motivo_que_impede_excluir_volta_ao_antigo(self):
+        from apps.core.services.solicitacao_exclusao import motivo_que_impede_excluir
+
+        texto = motivo_que_impede_excluir(_formacao(), ja_decidida=False, pode_tirar_do_google=False)
+
+        assert texto is not None
+        assert "tiraria de lá" in texto and "(CANCELADO)" not in texto

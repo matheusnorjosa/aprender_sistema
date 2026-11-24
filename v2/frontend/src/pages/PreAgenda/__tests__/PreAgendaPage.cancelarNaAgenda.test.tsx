@@ -4,6 +4,9 @@
  * O título do evento no Google ganha "(CANCELADO) " e a linha nunca mais se publica. Na linha marcada,
  * Publicar fica desabilitado com o motivo, Remover some e o Cancelar só volta no erro (para refazer: Publicar
  * na agenda só lista de hoje em diante). O Excluir de formação diz que o evento fica no Google cancelado.
+ *
+ * Tudo isso com a chave CON08_CANCELAR_NA_AGENDA ligada no servidor (`exclui_marcando_cancelado` na linha). O fim
+ * do arquivo cobre a chave desligada: sem Cancelar evento, e o Excluir de formação tira do Google, como antes.
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { Modal, message } from 'antd';
@@ -68,6 +71,10 @@ const EXCLUIR = /^Excluir evento:/;
 const CANCELAR = /^Cancelar evento:/;
 const REMOVER = /^Remover do Google Agenda:/;
 const PUBLICAR = /^Publicar evento no Google Calendar/;
+/** Evento de formação com a chave ligada no servidor: o Excluir dele marca (CANCELADO). */
+const LIGADA = { tipo_evento_de_formacao: true, exclui_marcando_cancelado: true };
+/** O mesmo evento com a chave desligada. */
+const DESLIGADA = { tipo_evento_de_formacao: true, exclui_marcando_cancelado: false };
 
 const row = (overrides: Record<string, unknown> = {}) => ({
   id: 1,
@@ -111,7 +118,7 @@ beforeEach(() => {
 describe('PreAgendaPage — Cancelar evento de formação (CON-08)', { timeout: 20000 }, () => {
   test('formação publicada: Cancelar evento ao lado do Remover; outro tipo não tem', async () => {
     mockRows([
-      row({ id: 1, municipio_nome: 'Sobral', tipo_evento_de_formacao: true }),
+      row({ id: 1, municipio_nome: 'Sobral', ...LIGADA }),
       row({ id: 2, municipio_nome: 'Crato', tipo_evento_de_formacao: false }),
     ]);
     renderComo(DAT);
@@ -122,7 +129,7 @@ describe('PreAgendaPage — Cancelar evento de formação (CON-08)', { timeout: 
   });
 
   test('linha cancelada: Publicar desabilitado com o motivo, Remover e Cancelar escondidos', async () => {
-    mockRows([row({ id: 3, municipio_nome: 'Iguatu', tipo_evento_de_formacao: true, cancelado_na_agenda: true })]);
+    mockRows([row({ id: 3, municipio_nome: 'Iguatu', ...LIGADA, cancelado_na_agenda: true })]);
     renderComo(DAT);
     const iguatu = await linha('Iguatu');
     const publicar = within(iguatu).getByLabelText(PUBLICAR);
@@ -135,7 +142,7 @@ describe('PreAgendaPage — Cancelar evento de formação (CON-08)', { timeout: 
 
   test('cancelamento que falhou (ERROR marcado): o Cancelar volta, para refazer', async () => {
     mockRows([
-      row({ id: 4, municipio_nome: 'Russas', gcal_status: 'ERROR', tipo_evento_de_formacao: true, cancelado_na_agenda: true }),
+      row({ id: 4, municipio_nome: 'Russas', gcal_status: 'ERROR', ...LIGADA, cancelado_na_agenda: true }),
     ]);
     renderComo(DAT);
     const russas = await linha('Russas');
@@ -151,12 +158,12 @@ describe('PreAgendaPage — Cancelar evento de formação (CON-08)', { timeout: 
       'calendário). Nada foi marcado e o evento não foi cancelado na agenda. Confira no Google Agenda; se ele não ' +
       'existe mais, use Tirar só do Google (na Pré-agenda, o botão Remover do Google Agenda).';
     mockRows([
-      row({ id: 9, municipio_nome: 'Crateús', gcal_status: 'ERROR', tipo_evento_de_formacao: true, gcal_last_error: erro }),
+      row({ id: 9, municipio_nome: 'Crateús', gcal_status: 'ERROR', ...LIGADA, gcal_last_error: erro }),
       row({
         id: 10,
         municipio_nome: 'Jaguaribe',
         gcal_status: 'ERROR',
-        tipo_evento_de_formacao: true,
+        ...LIGADA,
         gcal_last_error: erro,
         inicio: '2020-03-10T09:00:00-03:00',
         fim: '2020-03-10T12:00:00-03:00',
@@ -180,14 +187,21 @@ describe('PreAgendaPage — Cancelar evento de formação (CON-08)', { timeout: 
 
   test('refazer o Cancelar da linha marcada não depende de o tipo ainda ser de formação (tipo renomeado)', async () => {
     mockRows([
-      row({ id: 7, municipio_nome: 'Quixadá', gcal_status: 'ERROR', tipo_evento_de_formacao: false, cancelado_na_agenda: true }),
+      row({
+        id: 7,
+        municipio_nome: 'Quixadá',
+        gcal_status: 'ERROR',
+        tipo_evento_de_formacao: false,
+        exclui_marcando_cancelado: true,
+        cancelado_na_agenda: true,
+      }),
     ]);
     renderComo(DAT);
     expect(within(await linha('Quixadá')).getByLabelText(CANCELAR)).toBeInTheDocument();
   });
 
   test('os dois botões vermelhos de ícone dizem o que fazem ao passar o mouse', async () => {
-    mockRows([row({ id: 8, municipio_nome: 'Tauá', tipo_evento_de_formacao: true })]);
+    mockRows([row({ id: 8, municipio_nome: 'Tauá', ...LIGADA })]);
     renderComo(DAT);
     const taua = await linha('Tauá');
     expect(within(taua).getByLabelText(CANCELAR)).toHaveAttribute('title', 'Cancelar evento');
@@ -196,7 +210,7 @@ describe('PreAgendaPage — Cancelar evento de formação (CON-08)', { timeout: 
 
   test('a confirmação cita o evento, explica o (CANCELADO) e chama o endpoint novo', async () => {
     const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
-    mockRows([row({ id: 5, municipio_nome: 'Aracati', tipo_evento_de_formacao: true })]);
+    mockRows([row({ id: 5, municipio_nome: 'Aracati', ...LIGADA })]);
     renderComo(DAT);
     fireEvent.click(within(await linha('Aracati')).getByLabelText(CANCELAR));
     const config = confirmar.mock.calls[0]![0];
@@ -218,7 +232,7 @@ describe('PreAgendaPage — Cancelar evento de formação (CON-08)', { timeout: 
 
   test('Excluir de formação: a confirmação e o aviso dizem que ele fica no Google com (CANCELADO)', async () => {
     const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
-    mockRows([row({ id: 6, municipio_nome: 'Icó', tipo_evento_de_formacao: true })]);
+    mockRows([row({ id: 6, municipio_nome: 'Icó', ...LIGADA })]);
     renderComo(DAT);
     fireEvent.click(within(await linha('Icó')).getByLabelText(EXCLUIR));
     const config = confirmar.mock.calls[0]![0];
@@ -231,5 +245,40 @@ describe('PreAgendaPage — Cancelar evento de formação (CON-08)', { timeout: 
     expect(sucesso).toHaveBeenCalledWith('Evento excluído do sistema; no Google Agenda ele fica com (CANCELADO) no título.');
     sucesso.mockRestore();
     await waitFor(() => expect(deleteSolicitacaoMock).toHaveBeenCalledWith(6));
+  });
+});
+
+describe('PreAgendaPage — chave do CON-08 B desligada', { timeout: 20000 }, () => {
+  test('formação publicada: só o Remover, sem Cancelar evento', async () => {
+    mockRows([row({ id: 12, municipio_nome: 'Sobral', ...DESLIGADA })]);
+    renderComo(DAT);
+    const sobral = await linha('Sobral');
+    expect(within(sobral).getByLabelText(REMOVER)).toBeInTheDocument();
+    expect(within(sobral).queryByLabelText(CANCELAR)).not.toBeInTheDocument();
+  });
+
+  test('linha marcada em erro: sem Cancelar evento para refazer (o servidor recusa)', async () => {
+    mockRows([row({ id: 13, municipio_nome: 'Russas', gcal_status: 'ERROR', ...DESLIGADA, cancelado_na_agenda: true })]);
+    renderComo(DAT);
+    const russas = await linha('Russas');
+    expect(within(russas).queryByLabelText(CANCELAR)).not.toBeInTheDocument();
+    expect(within(russas).queryByLabelText(REMOVER)).not.toBeInTheDocument();
+  });
+
+  test('Excluir de formação: a confirmação e o aviso dizem que ele sai dos dois lados, como antes', async () => {
+    const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
+    mockRows([row({ id: 14, municipio_nome: 'Icó', ...DESLIGADA })]);
+    renderComo(DAT);
+    fireEvent.click(within(await linha('Icó')).getByLabelText(EXCLUIR));
+    const config = confirmar.mock.calls[0]![0];
+    confirmar.mockRestore();
+    expect(config.content).toBe(
+      '05/11/2099 09:00 · Icó · Projeto. Ele sai do sistema e do Google Agenda. Não dá para desfazer.',
+    );
+    const sucesso = vi.spyOn(message, 'success');
+    await config.onOk!();
+    expect(sucesso).toHaveBeenCalledWith('Evento excluído do sistema e do Google Agenda.');
+    sucesso.mockRestore();
+    await waitFor(() => expect(deleteSolicitacaoMock).toHaveBeenCalledWith(14));
   });
 });

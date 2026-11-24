@@ -801,6 +801,7 @@ describe('MySolicitacoesPage — evento cancelado na agenda', { timeout: 20000 }
           gcal_status,
           external_event_id: 'asv29',
           tipo_evento_de_formacao: true,
+          exclui_marcando_cancelado: true, // a chave do CON-08 B ligada no servidor
           pode_tirar_do_google: false,
           inicio: '2099-05-10T13:00:00Z',
           fim: '2099-05-10T17:00:00Z',
@@ -812,6 +813,46 @@ describe('MySolicitacoesPage — evento cancelado na agenda', { timeout: 20000 }
     const texto = String(informar.mock.calls[0]![0].content);
     expect(texto).toContain(novo);
     expect(texto).not.toContain(antigo);
+    informar.mockRestore();
+  });
+
+  // Chave do CON-08 B desligada no servidor: o Excluir de formação volta a tirar do Google, e o motivo diz isso.
+  test.each([
+    {
+      gcal_status: 'PUBLISHED' as const,
+      botao: 'Por que não dá para editar nem excluir: 10/05/2099 · Crato',
+      antigo: 'exclui o evento em Publicar na agenda (ele sai do Google e do sistema)',
+    },
+    {
+      gcal_status: 'ERROR' as const,
+      botao: 'Por que não dá para excluir: 10/05/2099 · Crato',
+      antigo: 'Este evento pode estar no Google Agenda, e excluir aqui também o tiraria de lá.',
+    },
+  ])('chave desligada: formação $gcal_status sem poder tirar do Google, o motivo de antes', async ({ gcal_status, botao, antigo }) => {
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 9,
+          municipio_nome: 'Crato',
+          status: 'aprovado',
+          gcal_status,
+          external_event_id: 'asv29',
+          tipo_evento_de_formacao: true,
+          exclui_marcando_cancelado: false,
+          pode_tirar_do_google: false,
+          inicio: '2099-05-10T13:00:00Z',
+          fim: '2099-05-10T17:00:00Z',
+        }),
+      ])
+    );
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: botao }));
+    const texto = String(informar.mock.calls[0]![0].content);
+    expect(texto).toContain(antigo);
+    expect(texto).not.toContain('(CANCELADO)');
     informar.mockRestore();
   });
 });

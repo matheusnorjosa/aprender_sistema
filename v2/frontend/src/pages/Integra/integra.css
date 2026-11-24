@@ -8,7 +8,7 @@
  * 0,2,1 e vence. Uma regra só, em vez de uma classe em cada Link.
  */
 .integra a:focus-visible {
-  outline: 2px solid #004b3d;
+  outline: 2px solid var(--as-primary-dark);
   outline-offset: 2px;
 }
 

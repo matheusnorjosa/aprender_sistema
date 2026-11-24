@@ -30,7 +30,7 @@ const ID_AVISO = 'ica-sim-aviso';
 const ID_JUSTIFICATIVA = 'ica-sim-justificativa';
 const ID_ERROS_PROPOSTA = 'ica-sim-erros-proposta';
 const ERRO_JUSTIFICATIVA = 'Escreva a justificativa do remanejamento.';
-const CLASSE_FOCO = 'focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[#004B3D]';
+const CLASSE_FOCO = 'focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-primary-dark';
 const LISTA = new Intl.ListFormat('pt-BR', { type: 'conjunction' });
 
 const chaveDoMovimento = (m: Movimento): string => `${m.municipioId}-${m.deCoordenadorId}`;
@@ -293,7 +293,7 @@ export default function Simulador(): JSX.Element {
                       <label className="flex items-center gap-2">
                         <input
                           type="checkbox"
-                          className="h-4 w-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#004B3D]"
+                          className="h-4 w-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-dark"
                           checked={marcados.includes(l.municipio.id)}
                           onChange={(e) =>
                             setMarcados((atuais) =>

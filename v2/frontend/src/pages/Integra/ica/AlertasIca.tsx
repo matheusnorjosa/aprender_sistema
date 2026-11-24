@@ -58,7 +58,7 @@ export default function AlertasIca(): JSX.Element {
       <Title level={1} id="integra-titulo-tela" style={{ fontSize: 26, marginBottom: 8 }}>
         Alertas
       </Title>
-      <p className="mb-4 rounded border-l-4 border-[#004B3D] bg-[#EEF5F3] p-3">
+      <p className="mb-4 rounded border-l-4 border-primary-dark bg-[#EEF5F3] p-3">
         <strong>Nada é enviado.</strong> No protótipo, os alertas só aparecem nesta tela. Na versão real, cada um iria
         para as pessoas em &ldquo;Seria enviado para&rdquo;. Eles mudam sozinhos quando a carteira ou os pesos mudam
         nesta demonstração.

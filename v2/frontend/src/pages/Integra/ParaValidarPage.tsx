@@ -14,6 +14,7 @@
 import type { JSX } from 'react';
 import { Link } from 'react-router';
 import { Typography } from 'antd';
+import { BRAND_COLORS } from '../../contexts/ThemeContext';
 
 const { Title } = Typography;
 
@@ -237,7 +238,7 @@ const TEMAS: Tema[] = [
 type Onde = 'aprender' | 'dff' | 'logistica' | 'falta';
 
 const ONDE: Record<Onde, { nome: string; fundo: string; texto: string }> = {
-  aprender: { nome: 'Aprender Sistema', fundo: '#E3F0EC', texto: '#004B3D' },
+  aprender: { nome: 'Aprender Sistema', fundo: '#E3F0EC', texto: BRAND_COLORS.primaryDark },
   dff: { nome: 'DFF', fundo: '#EDE7F6', texto: '#4A2A7A' },
   logistica: { nome: 'Logística e FRV, quando migrarem', fundo: '#DCEBFA', texto: '#0B4A80' },
   falta: { nome: 'Não existe ainda: precisa ser cadastrado', fundo: '#FFF0C2', texto: '#6B4A00' },

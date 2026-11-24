@@ -57,7 +57,7 @@ const ID_SOMA = 'ica-pesos-soma';
 const ID_JUSTIFICATIVA = 'ica-pesos-justificativa';
 const ID_ERROS = 'ica-pesos-erros';
 const ERRO_JUSTIFICATIVA = 'Escreva a justificativa da mudança.';
-const CLASSE_FOCO = 'focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[#004B3D]';
+const CLASSE_FOCO = 'focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-primary-dark';
 
 /** Peso fora de 0 a 100 (ou vazio). */
 const pesoInvalido = (p: number): boolean => !Number.isFinite(p) || p < 0 || p > 100;

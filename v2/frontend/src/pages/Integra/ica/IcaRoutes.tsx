@@ -46,10 +46,10 @@ function MolduraIca(): JSX.Element {
                 className={({ isActive }) =>
                   [
                     'inline-block rounded border px-3 py-1 text-sm no-underline',
-                    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#004B3D]',
+                    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-dark',
                     isActive
-                      ? 'border-[#004B3D] bg-[#004B3D] font-semibold text-white'
-                      : 'border-[#8c8c8c] bg-white text-[#1f1f1f] hover:border-[#004B3D]',
+                      ? 'border-primary-dark bg-primary-dark font-semibold text-white'
+                      : 'border-[#8c8c8c] bg-white text-[#1f1f1f] hover:border-primary-dark',
                   ].join(' ')
                 }
               >

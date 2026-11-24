@@ -42,7 +42,7 @@ export const COR_COMPONENTE: Record<Componente, string> = {
 /** Campo de formulário nativo com foco visível na cor da marca. */
 export const CLASSE_CAMPO = [
   'w-full rounded border border-[#8c8c8c] bg-white px-2 py-1 text-sm text-[#1f1f1f]',
-  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#004B3D]',
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-dark',
 ].join(' ');
 
 /** Rótulo de campo. */

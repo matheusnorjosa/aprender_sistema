@@ -25,7 +25,7 @@ const COR_TEXTO_APOIO = '#595959';
 
 /** Contorno de foco visível nos cartões que são link (WCAG 2.4.7). */
 const CLASSE_FOCO =
-  'block h-full rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#004B3D]';
+  'block h-full rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-dark';
 
 type Destino = { tipo: 'interno'; para: string } | { tipo: 'externo'; href: string } | { tipo: 'em-breve' };
 

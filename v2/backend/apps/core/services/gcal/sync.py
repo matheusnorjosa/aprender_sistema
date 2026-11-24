@@ -599,8 +599,10 @@ def cancel_solicitacao(
 
     desvincular_do_google(s)
     if s.cancelado_na_agenda:
-        # Só chega aqui a linha marcada cujo Cancelar não terminou, com a chave do CON-08 B desligada
-        # (`excluir_marca_cancelado`): o evento saiu do Google, e a marca não tem mais o que proteger.
+        # A linha marcada chega aqui pelo Tirar ou pelo Excluir aceitos com a chave do CON-08 B desligada e o Cancelar
+        # sem terminar (`excluir_marca_cancelado`): o evento saiu do Google, e a marca não tem mais o que proteger. A
+        # tarefa não confere a chave de novo: o Tirar pedido com ela desligada tira daqui também se ela voltou a ligar
+        # antes de ele rodar (deploy.spec, «Limites conhecidos (ligar e depois desligar)»).
         s.cancelado_na_agenda = False
         s.save(update_fields=["cancelado_na_agenda"])
 

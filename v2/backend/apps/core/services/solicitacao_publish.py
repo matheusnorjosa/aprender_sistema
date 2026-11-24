@@ -210,11 +210,11 @@ def pedir_operacao_gcal(solicitacao_id: int, operacao: OperacaoGcal) -> str:
     (o refazer do Cancelar que falhou, mesmo com o tipo renomeado: `excluir_marca_cancelado`), e grava a marca
     `cancelado_na_agenda` aqui, no pedido: já no PENDING a linha não se publica, não se reenvia e não se tira
     do Google (o cancelar recusa a linha marcada; com a chave desligada, só a de Cancelar confirmado, e a marca da
-    outra sai com o evento em `cancel_solicitacao`). Pela tela não há desfazer; só a tarefa do Cancelar tira a marca,
-    quando o Event ID adotado não é achado e nenhum Cancelar anterior terminou (gcal.spec, "A tarefa"). A marca
-    sozinha não libera a agenda: só com a linha de volta a PUBLISHED pela tarefa (`cancelado_confirmado_q`). A
-    linha marcada só se pede de novo em PENDING ou ERROR (o refazer); fora deles o Cancelar já terminou (409
-    `ja_cancelado_na_agenda`).
+    outra sai com o evento em `cancel_solicitacao`). Pela tela não há desfazer; com a chave ligada, só a tarefa do
+    Cancelar tira a marca, quando o Event ID adotado não é achado e nenhum Cancelar anterior terminou (gcal.spec,
+    "A tarefa"). A marca sozinha não libera a agenda: só com a linha de volta a PUBLISHED pela tarefa
+    (`cancelado_confirmado_q`). A linha marcada só se pede de novo em PENDING ou ERROR (o refazer); fora deles o
+    Cancelar já terminou (409 `ja_cancelado_na_agenda`).
 
     Reaplicar sobre linha em PENDING é recusado: outra operação está em andamento, e o pedido novo zeraria o
     hash (UPDATE sem mudança no Google, com e-mail aos convidados) ou desfaria um "Tirar do Google".

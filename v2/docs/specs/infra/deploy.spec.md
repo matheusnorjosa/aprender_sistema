@@ -192,14 +192,17 @@ Cancelar anterior: confirmado (`cancelamento_confirmado`), que falhou ou sem des
 porque o "(CANCELADO)" está ou pode estar no Google. Ligada (`1`), vale o CON-08 B inteiro
 ([`gcal.spec.md`](../backend/gcal.spec.md)).
 
-Duas mudanças do #2255 ficam nos dois estados, porque não dependem do Cancelar evento: a Pré-agenda oferece o
+Algumas mudanças do #2255 ficam nos dois estados, porque não dependem do Cancelar evento: a Pré-agenda oferece o
 "Remover do Google Agenda" também na linha `ERROR` com id (antes, só em `PUBLISHED`; o servidor já aceitava esse
-`cancel-gcal`), e o motivo de Minhas Solicitações manda pedir ao Controle, na Pré-agenda, a saída dessa linha.
+`cancel-gcal`), e o ícone ganhou o `title` "Remover do Google Agenda"; o motivo de Minhas Solicitações manda pedir
+ao Controle, na Pré-agenda, a saída dessa linha; e a exportação CSV do painel do GCal ganhou, no fim, a coluna
+`cancelado_na_agenda` (`sim`/`não`) em toda linha, o que muda o formato do arquivo para quem o consome.
 
 Nos dois estados, a linha já marcada (`cancelado_na_agenda=True`) continua protegida. Ela não se publica, não se
 reenvia e não se edita. Se o Cancelar dela terminou no Google, ela também não se tira de lá, e o Excluir continua
-no caminho da marca, sem apagar do Google: o título lá já tem "(CANCELADO)", e o Excluir não escreve de novo.
-Por isso, desligar a chave não exige limpar marcas.
+no caminho da marca, sem apagar do Google: o título lá já tem "(CANCELADO)", e o Excluir só escreve de novo (o
+PATCH que põe a marca) se alguém a tirou do título direto no Google. Por isso, desligar a chave não exige limpar
+marcas.
 
 A exceção é a linha marcada em `ERROR` sem Cancelar confirmado (o Cancelar falhou antes do Google, ou a tarefa
 desligada manteve a marca de um Cancelar anterior sem desfecho). Com a chave desligada, ela sai como antes do
@@ -228,6 +231,29 @@ ela é falsa.
 
   A tela mostra o caso de cada linha: o Tirar só do Google (o Remover, na Pré-agenda) aparece só onde o servidor o
   aceita. Quem quiser o "(CANCELADO)" numa linha sem Cancelar confirmado refaz o Cancelar antes de desligar.
+
+**Limites conhecidos (ligar e depois desligar).** Só aparecem quando a chave já foi ligada e há, na hora da troca,
+linha marcada fora de `PUBLISHED` ou tarefa na fila. Até 24/11/2026 a chave nunca foi ligada em produção, e
+nenhuma linha estava marcada. O comportamento ficou assim por corte de escopo (revisão da chave, 24/11/2026):
+
+- A tarefa da fila que roda com a chave desligada conta como Cancelar anterior também o pedido que terminou sem
+  escrever no Google (o `PUBLISH_GCAL_ERROR` com `cancelado_na_agenda_desfeito`, inclusive o da própria tarefa
+  desligada, quando a chave foi ligada e desligada duas vezes). A linha fica marcada em `ERROR`, sem "(CANCELADO)"
+  no título lá, e só sai pelo Tirar só do Google ou pelo Excluir, que apagam o evento do Google.
+- Na linha marcada sem Cancelar confirmado, com a chave desligada, a edição e Minhas Solicitações dizem que o
+  evento "foi cancelado na agenda" e não se publica de novo, e a recusa do Publicar e do Reenviar diz que ele fica
+  no Google com "(CANCELADO)". O título lá não tem a marca, e depois do Tirar a linha volta a ser editável e
+  publicável.
+- O Tirar só do Google nessa linha aparece como "Cancelando…" enquanto está em `PENDING` e, se falha, como "Erro
+  ao cancelar" (a etiqueta é a da marca, e não a da remoção).
+- O Tirar só do Google pedido com a chave desligada que roda depois de ela voltar a ligar ainda apaga do Google o
+  evento da linha marcada e tira a marca: a tarefa não confere a chave de novo. Só importa se o título lá tinha
+  ganhado o "(CANCELADO)" (o PATCH chegou e a resposta se perdeu).
+
+Procedimento seguro: trocar a chave, nos dois sentidos, só com a fila vazia (nenhuma `Solicitacao` em `PENDING`).
+Antes de desligar, ainda com ela ligada, rodar a consulta de **Antes de desligar** e resolver cada linha: refazer o
+Cancelar até ela voltar a `PUBLISHED` (cancelada) ou perder a marca (Event ID adotado não achado), ou excluí-la.
+Com a lista vazia, nenhum dos casos acima acontece.
 
 **Docs de topologia reconciliados (Fase 2 concluída):** `v2/infra/ENVIRONMENTS.md`, `v2/infra/README.md` e
 `.claude/CLAUDE.md` (tabela prod) descrevem o Redis como **container interno na VM01** (serviço `redis`),

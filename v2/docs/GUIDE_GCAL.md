@@ -569,7 +569,7 @@ curl -X POST http://localhost:8002/api/solicitacoes/123/cancel-gcal/ \
 
 #### POST /api/solicitacoes/{id}/cancelar-na-agenda/
 
-**Descrição** (CON-08 B, 23/11/2026): cancelar na agenda um evento de formação (Presencial, Online ou Workshop). O título no Google ganha `(CANCELADO) ` na frente e nada mais muda; o evento fica lá, sem e-mail aos convidados (`sendUpdates="none"`). A linha passa a `cancelado_na_agenda` já no pedido e, com a marca, não se publica, reenvia, tira do Google nem edita. Pela tela não há desfazer; só a tarefa tira a marca, quando o Event ID adotado não é achado e nenhum Cancelar anterior terminou (ver o fluxo abaixo e o item "A tarefa" da [`gcal.spec.md`](specs/backend/gcal.spec.md)).
+**Descrição** (CON-08 B, 23/11/2026): cancelar na agenda um evento de formação (Presencial, Online ou Workshop). O título no Google ganha `(CANCELADO) ` na frente e nada mais muda; o evento fica lá, sem e-mail aos convidados (`sendUpdates="none"`). A linha passa a `cancelado_na_agenda` já no pedido e, com a marca, não se publica, reenvia, tira do Google nem edita. Pela tela não há desfazer; com a chave ligada, só a tarefa tira a marca, quando o Event ID adotado não é achado e nenhum Cancelar anterior terminou (ver o fluxo abaixo e o item "A tarefa" da [`gcal.spec.md`](specs/backend/gcal.spec.md)). Com a chave desligada, a linha marcada sem Cancelar confirmado sai do Google pelo Tirar ou pelo Excluir, e a marca sai junto (item "A chave" da mesma spec).
 
 **Permissão**: a mesma do `cancel-gcal` (`CanUseGcal` ou `CanPublishSetorSolicitacao`, com a guarda de objeto por gerência).
 

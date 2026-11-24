@@ -1737,8 +1737,9 @@ def test_servico_de_entrada_recusa_sem_formacao_antes_de_enfileirar():
 #
 # Desligada, o Excluir de evento de formação volta a tirar o evento do Google, e ninguém cancela na agenda (a ação, o
 # serviço, o pedido e a tarefa recusam). A linha já marcada, de quando a chave esteve ligada, continua protegida: não
-# se publica, não se reenvia, não se tira do Google nem se edita, e o Excluir dela segue o caminho que não apaga do
-# Google um evento cujo título já tem "(CANCELADO)".
+# se publica, não se reenvia nem se edita. A de Cancelar confirmado também não se tira do Google, e o Excluir dela
+# segue o caminho que não apaga do Google um evento cujo título já tem "(CANCELADO)"; a marcada sem Cancelar
+# confirmado sai do Google pelo Tirar ou pelo Excluir, como antes do CON-08 B.
 
 
 @pytest.mark.parametrize(("valor", "esperado"), [(None, False), ("", False), ("0", False), ("1", True)])
@@ -2009,10 +2010,13 @@ class TestChaveDesligada:
     @pytest.mark.parametrize(
         "registro_anterior",
         [
+            {"action": "PUBLISH_GCAL_ERROR", "details": {"pedido": "anterior", "operation": "cancelar_na_agenda"}},
+            {"action": "CANCELAR_NA_AGENDA_REQUESTED", "details": {"pedido": "anterior"}},
+            # Registro sem a chave `pedido`: some de um `.exclude(details__pedido=...)` (NULL no NOT), e por isso
+            # `cancelar_anterior_registrado` compara em Python.
             {"action": "PUBLISH_GCAL_ERROR", "details": {"operation": "cancelar_na_agenda"}},
-            {"action": "CANCELAR_NA_AGENDA_REQUESTED", "details": {}},
         ],
-        ids=["tentativa_que_falhou", "pedido_anterior"],
+        ids=["tentativa_que_falhou", "pedido_anterior", "registro_sem_pedido"],
     )
     def test_tarefa_ja_na_fila_do_refazer_mantem_a_marca(self, google, settings, monkeypatch, registro_anterior):
         """Triagem dos baixos: o refazer de uma linha ERROR marcada sem Cancelar confirmado. A tentativa anterior pode
@@ -2027,7 +2031,7 @@ class TestChaveDesligada:
             usuario=None,
             action=registro_anterior["action"],
             model_name="Solicitacao",
-            details={"solicitacao_id": s.pk, "pedido": "anterior", **registro_anterior["details"]},
+            details={"solicitacao_id": s.pk, **registro_anterior["details"]},
         )
         settings.CON08_CANCELAR_NA_AGENDA = True
         pedido = _pedir(s)

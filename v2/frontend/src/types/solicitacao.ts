@@ -125,6 +125,8 @@ export interface Solicitacao {
    * Evento de formação cancelado na agenda (CON-08): o título no Google ganha "(CANCELADO) " e o evento fica lá.
    * Com a marca, não se publica, não se reenvia, não se tira do Google e não se edita. Pela tela não há desfazer; só a
    * tarefa do Cancelar tira a marca, quando o Event ID adotado não é achado e nenhum Cancelar anterior terminou.
+   * Exceção, com a chave CON08_CANCELAR_NA_AGENDA desligada: a linha sem Cancelar confirmado
+   * (`exclui_marcando_cancelado: false`) sai do Google pelo Tirar, e a marca sai junto.
    */
   cancelado_na_agenda?: boolean;
   /**

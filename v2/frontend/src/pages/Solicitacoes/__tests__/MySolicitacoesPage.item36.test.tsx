@@ -516,28 +516,34 @@ describe('MySolicitacoesPage — Excluir sai do sistema e do Google', { timeout:
     informar.mockRestore();
   });
 
-  // A saída indicada tem de existir: "Tirar só do Google" (Publicar na agenda) só aparece em ERROR com id
-  // e só lista evento de hoje em diante; nas outras, nenhuma tela tira o evento do Google.
+  // A saída indicada tem de existir. Com id, aprovado: "Tirar só do Google" (Publicar na agenda, de hoje em diante,
+  // da gerência da Apoio) e "Remover do Google Agenda" (Pré-agenda, do Controle, em ERROR também e no evento que já
+  // terminou, desde a revisão da rodada 5). Sem id, nenhuma tela tira o evento do Google.
   test.each([
     {
       caso: 'com id, evento futuro',
       external_event_id: 'evt-1',
       fim: '2099-05-10T17:00:00Z',
-      saida: 'Para excluir, peça ao Apoio de Coordenação da sua gerência que tire o evento só do Google, na tela Publicar na agenda',
+      saida:
+        'Para excluir, peça ao Apoio de Coordenação da sua gerência, na tela Publicar na agenda, ou ao Controle, na Pré-agenda, que tire o evento só do Google; depois disso, você consegue excluir aqui.',
+      controle: true,
     },
     {
       caso: 'com id, evento que já terminou',
       external_event_id: 'evt-1',
       fim: '2026-05-10T17:00:00Z',
-      saida: 'Para excluir, fale com a administração do sistema.',
+      saida:
+        'Para excluir, peça ao Controle, na Pré-agenda, que remova o evento do Google Agenda; depois disso, você consegue excluir aqui. Se lá também não der, fale com a administração do sistema.',
+      controle: true,
     },
     {
       caso: 'sem id',
       external_event_id: null,
       fim: '2099-05-10T17:00:00Z',
       saida: 'Para excluir, fale com a administração do sistema.',
+      controle: false,
     },
-  ])('erro $caso, para quem não pode tirar do Google: sem Excluir, e o motivo dá uma saída que existe', async ({ external_event_id, fim, saida }) => {
+  ])('erro $caso, para quem não pode tirar do Google: sem Excluir, e o motivo dá uma saída que existe', async ({ external_event_id, fim, saida, controle }) => {
     listSolicitacoesMock.mockResolvedValue(
       pagina([
         makeSolic({
@@ -563,8 +569,8 @@ describe('MySolicitacoesPage — Excluir sai do sistema e do Google', { timeout:
     const texto = String(informar.mock.calls[0]![0].content);
     expect(texto).toContain('Este evento pode estar no Google Agenda, e excluir aqui também o tiraria de lá.');
     expect(texto).toContain(saida);
-    // O Controle não tem "tirar do Google" para evento em ERROR (a Pré-agenda só cancela o publicado).
-    expect(texto).not.toContain('Controle');
+    // Sem id, a Pré-agenda também não tem o Remover: o Controle não entra no texto.
+    if (!controle) expect(texto).not.toContain('Controle');
     expect(texto).not.toContain('editar');
     informar.mockRestore();
   });
@@ -699,6 +705,9 @@ describe('MySolicitacoesPage — evento cancelado na agenda', { timeout: 20000 }
       );
       renderPage();
       expect(await screen.findByText(etiqueta)).toBeInTheDocument();
+      // Revisão da rodada 6: a coluna Status tem 104 px e a Tag do AntD não quebra linha (nowrap); sem isto a etiqueta
+      // fica por baixo dos botões de Ações. O jsdom não mede, então o teste confere o estilo que quebra.
+      expect(screen.getByText(etiqueta).closest('.ant-tag')).toHaveStyle({ whiteSpace: 'normal' });
       if (gcal_status === 'ERROR') expect(screen.queryByText('Cancelado na agenda')).not.toBeInTheDocument();
       expect(screen.queryByText('Na agenda')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /^Editar:/ })).not.toBeInTheDocument();

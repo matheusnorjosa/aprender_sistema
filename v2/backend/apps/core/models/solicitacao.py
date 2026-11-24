@@ -308,8 +308,10 @@ class Solicitacao(models.Model):
         editable=False,
         verbose_name="Cancelado na agenda",
         help_text=(
-            "Evento de formação cancelado (CON-08): o título no Google ganhou '(CANCELADO) ' e o evento ficou lá. "
-            "Gravado no pedido e sem volta: a linha nunca mais é publicada, reenviada nem tirada do Google."
+            "Evento de formação cancelado na agenda (CON-08): o título no Google ganha '(CANCELADO) ' e o evento fica "
+            "lá. Gravado no pedido; com a marca, a linha não é publicada, reenviada nem tirada do Google. Pela tela "
+            "não há desfazer: só a tarefa do Cancelar tira a marca, quando o Event ID adotado não é achado no Google "
+            "e nenhum Cancelar anterior terminou."
         ),
     )
     is_online = models.BooleanField(

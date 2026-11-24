@@ -248,8 +248,8 @@ describe('MeusEventosPage', () => {
   test('evento cancelado na agenda mostra a etiqueta, também no celular', async () => {
     getMyEventsMock.mockResolvedValueOnce(
       makePage([
-        makeEvent({ id: 100, municipio_nome: 'Crato', cancelado_na_agenda: true }),
-        makeEvent({ id: 101, municipio_nome: 'Sobral', cancelado_na_agenda: false }),
+        makeEvent({ id: 100, municipio_nome: 'Crato', cancelado_na_agenda: true, gcal_status: 'PUBLISHED' }),
+        makeEvent({ id: 101, municipio_nome: 'Sobral', cancelado_na_agenda: false, gcal_status: 'PUBLISHED' }),
       ])
     );
     renderPage();
@@ -259,5 +259,24 @@ describe('MeusEventosPage', () => {
     const linhaNormal = screen.getByText('Sobral').closest('tr');
     expect(linhaCancelada).toHaveTextContent('Cancelado na agenda');
     expect(linhaNormal).not.toHaveTextContent('Cancelado na agenda');
+    // Revisão da rodada 6: a coluna da data tem largura fixa e a Tag do AntD não quebra linha (nowrap); sem isto a
+    // etiqueta passa por cima do município no celular. O jsdom não mede, então o teste confere o estilo que quebra.
+    expect(screen.getByText('Cancelado na agenda').closest('.ant-tag')).toHaveStyle({ whiteSpace: 'normal' });
+  });
+
+  // Revisão da rodada 6: a marca vem do pedido, antes do Google. Na fila ou no Cancelar que falhou, o evento segue
+  // ativo lá, e a etiqueta não pode dizer "Cancelado na agenda".
+  test.each([
+    ['PENDING', 'Cancelando…'],
+    ['ERROR', 'Erro ao cancelar'],
+  ] as const)('evento marcado em %s mostra "%s", não "Cancelado na agenda"', async (gcal_status, etiqueta) => {
+    getMyEventsMock.mockResolvedValueOnce(
+      makePage([makeEvent({ id: 102, municipio_nome: 'Iguatu', cancelado_na_agenda: true, gcal_status })])
+    );
+    renderPage();
+    await screen.findByText('Iguatu');
+    const linha = screen.getByText('Iguatu').closest('tr');
+    expect(linha).toHaveTextContent(etiqueta);
+    expect(linha).not.toHaveTextContent('Cancelado na agenda');
   });
 });

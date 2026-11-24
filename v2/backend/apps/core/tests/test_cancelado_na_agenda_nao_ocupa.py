@@ -1,6 +1,7 @@
 """CON-08 B, decisões do dono de 24/11/2026 (P6 e P7): o evento cancelado na agenda não vai acontecer.
 
-A linha segue `aprovado` com `cancelado_na_agenda=True` (o título no Google tem "(CANCELADO)"). Desde 24/11 ela:
+A linha segue `aprovado` com `cancelado_na_agenda=True` (o título no Google tem "(CANCELADO)"). Desde 24/11, com o
+Cancelar confirmado (a linha marcada e `PUBLISHED`, revisão da rodada 6), ela:
 
 - libera a agenda do formador e do coordenador que acompanha (motor de conflito, consultivo e de enforcement);
 - sai das horas de formação (CH do painel de Equipe e ranking de formadores) e da Grade Mensal;
@@ -9,6 +10,9 @@ A linha segue `aprovado` com `cancelado_na_agenda=True` (o título no Google tem
 
 Continua nas listas, com a etiqueta "Cancelado na agenda" (Meus Eventos, Pré-agenda, Publicar na agenda).
 Cada teste põe, ao lado da linha marcada, uma igual sem a marca: o que muda é só a marca.
+
+A marca vem do pedido, antes do Google: marcada em `PENDING` (o Cancelar na fila) ou em `ERROR` (o Cancelar que
+falhou, sem nada escrito no Google), a linha segue ocupando tudo, porque o evento continua ativo lá.
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportOptionalMemberAccess=false, reportIndexIssue=false, reportCallIssue=false
@@ -74,7 +78,9 @@ def _evento(
     municipio=None,
     coordenador=None,
     acompanha: bool = False,
+    gcal_status: str | None = None,
 ) -> Solicitacao:
+    """`cancelado=True` sem `gcal_status`: o Cancelar confirmado (a linha marcada volta a PUBLISHED)."""
     n = next(_SEQ)
     criador = coordenador or UsuarioFactory(username=f"criador_cancelado_{n}", email=f"criador_c_{n}@example.invalid")
     s = SolicitacaoFactory(
@@ -88,6 +94,7 @@ def _evento(
         fim=fim,
         status="aprovado",
         cancelado_na_agenda=cancelado,
+        gcal_status=gcal_status or ("PUBLISHED" if cancelado else "NONE"),
     )
     if formador is not None:
         Participation.objects.create(solicitacao=s, usuario=formador, role=Participation.Role.FORMADOR)
@@ -146,7 +153,7 @@ class TestDisponibilidade:
     def test_checagem_com_cache_ve_a_marca_na_hora(self, formador):
         """A tela consulta a versão com cache: marcar a linha (sem mexer na participação) libera já na consulta
         seguinte, e tirar a marca (o Cancelar que não achou o evento) ocupa de novo."""
-        s = _evento(_local(DIA, 8), _local(DIA, 12), formador=formador, cancelado=False)
+        s = _evento(_local(DIA, 8), _local(DIA, 12), formador=formador, cancelado=False, gcal_status="PUBLISHED")
         janela = {"usuario": formador, "inicio": _local(DIA, 9), "fim": _local(DIA, 11)}
         assert not check_conflicts(**janela).ok
 
@@ -157,6 +164,80 @@ class TestDisponibilidade:
         s.cancelado_na_agenda = False
         s.save(update_fields=["cancelado_na_agenda"])
         assert not check_conflicts(**janela).ok
+
+    def test_checagem_com_cache_libera_so_quando_o_google_confirma(self, formador):
+        """Revisão da rodada 6: o pedido marca e põe PENDING (ainda ocupa); a tarefa que termina volta a linha a
+        PUBLISHED pelo `mark_gcal`, sem mexer na marca, e só então a consulta com cache vê a agenda livre."""
+        s = _evento(_local(DIA, 8), _local(DIA, 12), formador=formador, cancelado=False, gcal_status="PUBLISHED")
+        janela = {"usuario": formador, "inicio": _local(DIA, 9), "fim": _local(DIA, 11)}
+        assert not check_conflicts(**janela).ok
+
+        s.cancelado_na_agenda = True
+        s.save(update_fields=["cancelado_na_agenda"])
+        s.mark_gcal(status=Solicitacao.GCalStatus.PENDING, payload_hash=s.gcal_payload_hash, error="")
+        assert not check_conflicts(**janela).ok, "na fila, o evento segue ativo no Google"
+
+        s.mark_gcal(status=Solicitacao.GCalStatus.PUBLISHED, payload_hash=s.gcal_payload_hash, error="")
+        assert check_conflicts(**janela).ok
+
+
+# =============================================================================
+# Revisão da rodada 6: a marca sem o Cancelar confirmado não libera nada
+# =============================================================================
+
+_SEM_CONFIRMACAO = pytest.mark.parametrize("gcal_status", ["PENDING", "ERROR"])
+
+
+class TestMarcaSemConfirmacaoSegueOcupando:
+    """O pedido grava a marca antes do Google. Em PENDING (na fila) ou ERROR (o Cancelar falhou antes de escrever:
+    disjuntor, 5xx, sem acesso, credencial), o evento segue ativo no Google e no DFF: ocupa a agenda e conta na CH,
+    na Grade e nos eventos futuros, como o sem marca."""
+
+    @_SEM_CONFIRMACAO
+    def test_conflita(self, formador, gcal_status):
+        marcado = _evento(_local(DIA, 8), _local(DIA, 12), formador=formador, cancelado=True, gcal_status=gcal_status)
+
+        resultado = check_conflicts_uncached(usuario=formador, inicio=_local(DIA, 9), fim=_local(DIA, 11))
+
+        assert [(c.code, c.ref_id) for c in resultado.conflicts] == [("X", marcado.pk)]
+
+    @_SEM_CONFIRMACAO
+    def test_lote_tambem_conflita(self, formador, gcal_status):
+        _evento(_local(DIA, 8), _local(DIA, 12), formador=formador, cancelado=True, gcal_status=gcal_status)
+        irmao = _evento(_local(DIA, 15), _local(DIA, 16), formador=formador, cancelado=False)
+
+        resultado = check_conflicts_uncached(
+            usuario=formador, inicio=_local(DIA, 9), fim=_local(DIA, 11), lote={irmao.pk: 2}
+        )
+
+        assert not resultado.ok
+
+    @_SEM_CONFIRMACAO
+    def test_conta_na_ch_e_na_grade(self, formador, gcal_status):
+        projeto_super = ProjetoFactory(nome=f"Projeto Grade {gcal_status}", fluxo="SUPER")
+        marcado = _evento(
+            _local(DIA, 8),
+            _local(DIA, 12),
+            formador=formador,
+            projeto=projeto_super,
+            cancelado=True,
+            gcal_status=gcal_status,
+        )
+
+        assert (formador.id, marcado.pk) in ocupacoes_aprovadas(de=DIA, ate=DIA)
+        grade = build_monthly_grid(year=2026, month=3, role="FORMADOR")
+        linha = {p["id"]: i for i, p in enumerate(grade["people"])}[formador.id]
+        assert grade["cells"][linha][DIA.day - 1] == "E"
+        assert grade["people"][linha]["ch_month"] == 4.0
+
+    @_SEM_CONFIRMACAO
+    def test_conta_nos_eventos_futuros(self, gcal_status):
+        _futuro(cancelado=True, gcal_status=gcal_status)
+
+        resposta = _superusuario().get("/api/stats/home/")
+
+        assert resposta.status_code == 200, resposta.data
+        assert resposta.json()["upcoming_events"] == 1
 
 
 # =============================================================================
@@ -206,10 +287,14 @@ class TestHorasEGrade:
 # =============================================================================
 
 
-def _futuro(*, cancelado: bool) -> Solicitacao:
+def _futuro(*, cancelado: bool, gcal_status: str | None = None) -> Solicitacao:
     inicio = timezone.now() + timedelta(days=5)
     return SolicitacaoFactory(
-        status="aprovado", inicio=inicio, fim=inicio + timedelta(hours=2), cancelado_na_agenda=cancelado
+        status="aprovado",
+        inicio=inicio,
+        fim=inicio + timedelta(hours=2),
+        cancelado_na_agenda=cancelado,
+        gcal_status=gcal_status or ("PUBLISHED" if cancelado else "NONE"),
     )
 
 
@@ -251,6 +336,7 @@ def test_auditoria_rd02_nao_conta_o_cancelado_no_bloqueio_total(cancelado, viola
         inicio=inicio + timedelta(hours=1),
         fim=inicio + timedelta(hours=2),
         cancelado_na_agenda=cancelado,
+        gcal_status="PUBLISHED",
     )
 
     saida = StringIO()

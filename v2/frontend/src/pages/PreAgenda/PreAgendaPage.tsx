@@ -761,13 +761,13 @@ export default function PreAgendaPage(): JSX.Element {
         // terminou, que Publicar na agenda não lista.
         const showCancel = (isPublished || hasError) && hasEventId && !record.cancelado_na_agenda;
 
-        // CON-08: Cancelar evento de formação publicado; na linha cancelada, só no erro (refazer o que falhou:
-        // Publicar na agenda só lista de hoje em diante).
+        // CON-08: Cancelar evento de formação ao lado do Remover (PUBLISHED ou ERROR com id, como gcalRowActions em
+        // Publicar na agenda; revisão da rodada 6); na linha cancelada, só no erro (refazer o que falhou: Publicar
+        // na agenda só lista de hoje em diante).
         // O refazer não exige o tipo ainda de formação (tipo renomeado), como o servidor e Publicar na agenda.
         const showCancelar =
-          hasEventId &&
-          ((isPublished && record.tipo_evento_de_formacao === true && !record.cancelado_na_agenda) ||
-            (hasError && record.cancelado_na_agenda === true));
+          (showCancel && record.tipo_evento_de_formacao === true) ||
+          (hasError && hasEventId && record.cancelado_na_agenda === true);
 
         // Virada: evento que já terminou, ou que está no Google pela planilha, não se publica
         // (o backend recusa com o mesmo motivo). O motivo vai no nome acessível do botão.

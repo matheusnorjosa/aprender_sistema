@@ -44,6 +44,26 @@ from apps.core.utils.cache_utils import cache_availability_check
 ENFORCED_ROLES: tuple[str, ...] = (Participation.Role.FORMADOR.value, Participation.Role.COORD_ACOMPANHA.value)
 
 
+def cancelado_confirmado_q(prefixo: str = "") -> Q:
+    """Evento cancelado na agenda com o Cancelar confirmado: não vai acontecer (CON-08 B, P6 e P7 do dono, 24/11/2026).
+
+    Os leitores de ocupação (conflito, CH, Grade, eventos futuros, RD-02, compras do DAT) usam `.exclude(...)` com
+    ele. A marca `cancelado_na_agenda` é gravada no pedido, antes do Google, e só a tarefa que termina volta a linha
+    marcada a PUBLISHED. Marcada em PENDING (na fila) ou em ERROR (o Cancelar falhou antes de escrever: disjuntor,
+    5xx, sem acesso, credencial), o evento segue ativo no Google e no DFF, então ocupa e conta como o sem marca
+    (revisão da rodada 6). A linha ERROR marcada cujo Cancelar terminou antes (`cancelamento_confirmado` acha o
+    registro) também ocupa: é rara, e o erro fica do lado seguro.
+
+    `prefixo`: o caminho até a Solicitacao (por exemplo, `"solicitacao__"` a partir de Participation).
+    """
+    return Q(**{f"{prefixo}cancelado_na_agenda": True, f"{prefixo}gcal_status": Solicitacao.GCalStatus.PUBLISHED})
+
+
+def cancelado_confirmado(solicitacao: Solicitacao) -> bool:
+    """O mesmo de `cancelado_confirmado_q`, para uma linha já lida."""
+    return solicitacao.cancelado_na_agenda and solicitacao.gcal_status == Solicitacao.GCalStatus.PUBLISHED
+
+
 def ocupa_agenda_q(usuario: Usuario | int) -> Q:
     """Eventos (Solicitacao) que ocupam a agenda de `usuario` — SSOT do lado "evento existente".
 
@@ -223,9 +243,11 @@ def _check_conflicts_impl(
     # ocupa por ter criado: `ocupa_agenda_q` (formador, ou responsável que acompanha). O
     # filtro vai na ORIGEM da query (events_qs), não em Python depois.
     # O evento cancelado na agenda (CON-08 B) segue aprovado, mas não vai acontecer: libera a agenda (decisão do
-    # dono, 24/11/2026).
-    aprovados_qs = Solicitacao.objects.filter(status=Solicitacao.Status.APROVADO, cancelado_na_agenda=False).filter(
-        ocupa_agenda_q(usuario)
+    # dono, 24/11/2026), com o Cancelar confirmado (`cancelado_confirmado_q`).
+    aprovados_qs = (
+        Solicitacao.objects.filter(status=Solicitacao.Status.APROVADO)
+        .exclude(cancelado_confirmado_q())
+        .filter(ocupa_agenda_q(usuario))
     )
     if exclude_solicitacao_id is not None:
         aprovados_qs = aprovados_qs.exclude(pk=exclude_solicitacao_id)
@@ -233,7 +255,7 @@ def _check_conflicts_impl(
     events_qs = aprovados_qs
     if lote:
         events_qs = Solicitacao.objects.filter(Q(status=Solicitacao.Status.APROVADO) | Q(pk__in=list(lote)))
-        events_qs = events_qs.filter(cancelado_na_agenda=False).filter(ocupa_agenda_q(usuario))
+        events_qs = events_qs.exclude(cancelado_confirmado_q()).filter(ocupa_agenda_q(usuario))
         if exclude_solicitacao_id is not None:
             events_qs = events_qs.exclude(pk=exclude_solicitacao_id)
 

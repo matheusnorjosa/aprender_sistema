@@ -717,7 +717,8 @@ class DATCompraAPITests(DATModuleAPITestCase):
         self._dat_compra(self.municipio2, self.projeto)
         cancelado = self._evento(self.municipio, self.projeto, status_evento="aprovado")
         cancelado.cancelado_na_agenda = True
-        cancelado.save(update_fields=["cancelado_na_agenda"])
+        cancelado.gcal_status = "PUBLISHED"  # o Cancelar confirmado (revisão da rodada 6)
+        cancelado.save(update_fields=["cancelado_na_agenda", "gcal_status"])
         self._evento(self.municipio2, self.projeto, status_evento="aprovado")
 
         data = self._pendencias()

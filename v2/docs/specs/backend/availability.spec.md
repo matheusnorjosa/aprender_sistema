@@ -46,7 +46,7 @@ O coração é um **serviço puro, sem efeitos colaterais** (`check_conflicts`):
 
 ## Contratos e invariantes
 
-- **RD-01 (X)** — sobreposição com evento aprovado (o cancelado na agenda, `cancelado_na_agenda=True` do CON-08 B, não conta: decisão do dono de 24/11/2026; vale também para o RD-04 e para o lote): overlap `inicio__lt=fim & fim__gt=inicio` ≥ 1 min gera conflito; intervalos **adjacentes** (`fim == inicio`) **não** conflitam.
+- **RD-01 (X)** — sobreposição com evento aprovado (o cancelado na agenda com o Cancelar confirmado, `cancelado_na_agenda=True` e `gcal_status=PUBLISHED` do CON-08 B, não conta: decisão do dono de 24/11/2026, `cancelado_confirmado_q`; marcado em `PENDING` ou `ERROR`, o evento segue ativo no Google e conta, revisão da rodada 6; vale também para o RD-04 e para o lote): overlap `inicio__lt=fim & fim__gt=inicio` ≥ 1 min gera conflito; intervalos **adjacentes** (`fim == inicio`) **não** conflitam.
 - **RD-02 (T)** — bloqueio total aprovado que intersecta o intervalo impede qualquer evento.
 - **RD-03 (P)** — bloqueio parcial aprovado impede só dentro do subintervalo.
 - **RD-04 (D)** — buffer de deslocamento entre municípios distintos: exige `>= TRAVEL_BUFFER_MINUTES` (default 120). `municipio=None` é tratado como **cidade diferente** (fix #588) → exige buffer. Buffer **exato** (`== buffer`) passa; só `< buffer` conflita.

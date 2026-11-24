@@ -98,6 +98,20 @@ describe('GCalDashboardPage — evento cancelado na agenda', { timeout: 20000 },
     expect(within(linha).getByText(etiqueta)).toBeInTheDocument();
   });
 
+  // Revisão da rodada 6: a coluna tem largura fixa e a Tag do AntD não quebra linha (nowrap); "Cancelado na agenda"
+  // com o ícone passa da coluna e invade a vizinha. O jsdom não mede, então o teste confere o estilo que quebra.
+  test.each([
+    ['PUBLISHED', 'Cancelado na agenda'],
+    ['PENDING', 'Cancelando…'],
+    ['ERROR', 'Erro ao cancelar'],
+  ])('na lista, a etiqueta %s quebra linha em vez de passar da coluna', async (gcal_status, etiqueta) => {
+    listar(evento({ gcal_status }));
+    render(<GCalDashboardPage />);
+
+    const linha = (await screen.findByText('Formação em Sobral')).closest('tr') as HTMLElement;
+    expect(within(linha).getByText(etiqueta).closest('.ant-tag')).toHaveStyle({ whiteSpace: 'normal' });
+  });
+
   test('o detalhe mostra a etiqueta e não oferece Atualizar no Google nem Reenviar', async () => {
     const painel = await abrirDetalhe();
 

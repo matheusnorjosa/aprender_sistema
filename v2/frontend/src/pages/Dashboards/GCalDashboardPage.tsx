@@ -132,8 +132,13 @@ function StatusGcalTag({ status, canceladoNaAgenda }: { status: GCalStatus; canc
       { gcal_status: status, external_event_id: null, cancelado_na_agenda: true },
       { ready: true },
     );
+    // A coluna tem largura fixa: a etiqueta (com o ícone) quebra linha em vez de invadir a vizinha (revisão da rodada 6).
     return (
-      <Tag color={tag.color} icon={STATUS_ICONS[status === 'PUBLISHED' ? 'NONE' : status]}>
+      <Tag
+        color={tag.color}
+        icon={STATUS_ICONS[status === 'PUBLISHED' ? 'NONE' : status]}
+        style={{ whiteSpace: 'normal', marginInlineEnd: 0 }}
+      >
         {tag.label}
       </Tag>
     );
@@ -181,6 +186,12 @@ const CANCELADO_NA_AGENDA_POR_RESULTADO: Record<string, string> = {
 };
 
 function rotuloDoRegistro(log: { action: string; details?: Record<string, unknown> | null }): string {
+  // O erro do Cancelar evento grava PUBLISH_GCAL_ERROR com operation=cancelar_na_agenda: ninguém tentou publicar.
+  if (log.action === 'PUBLISH_GCAL_ERROR' && log.details?.['operation'] === 'cancelar_na_agenda') {
+    return log.details['cancelado_na_agenda_desfeito'] === true
+      ? 'Erro ao cancelar na agenda (o cancelamento foi desfeito)'
+      : 'Erro ao cancelar na agenda';
+  }
   if (log.action === 'CANCELAR_NA_AGENDA') {
     const resultado = log.details?.['resultado'];
     if (typeof resultado === 'string' && CANCELADO_NA_AGENDA_POR_RESULTADO[resultado]) {

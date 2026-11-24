@@ -237,20 +237,6 @@ def _pedido_sem_efeito(s: Any) -> dict[str, Any]:
     }
 
 
-def _conflito_ao_desfazer(s: Any) -> list[Any]:
-    """Participantes em conflito depois que a marca `cancelado_na_agenda` sai (revisão da rodada 5).
-
-    A marca do pedido liberou a agenda na hora (P6); enquanto a tarefa esperava na fila, outro evento pode ter sido
-    aprovado no mesmo horário. Mesmo motor e mesma trava dos participantes da aprovação
-    (`check_solicitacao_availability`), sob a transação de quem chama. Só avisa: a linha já estava aprovada, e o
-    desfaz não é uma escolha de quem pediu. Evento fora de `aprovado` não ocupa a agenda."""
-    if s.status != "aprovado":
-        return []
-    from apps.core.services.solicitacao_availability import check_solicitacao_availability
-
-    return list(check_solicitacao_availability(s).blocked)
-
-
 def _mark_gcal_error(
     solicitation_id: int,
     message: str,
@@ -266,9 +252,9 @@ def _mark_gcal_error(
     """Tira a linha de PENDING: marca ERROR com `message` e audita o erro cru.
 
     `desfaz_cancelado_na_agenda` (CON-08): o Cancelar não escreveu nada no Google, então a marca gravada no pedido
-    sai junto, sob a mesma trava e a mesma guarda do pedido (`details.cancelado_na_agenda_desfeito`). A marca
-    liberava a agenda dos participantes desde o pedido (P6); se outro evento ocupou o horário nesse meio-tempo, a
-    sobreposição volta: o erro diz com quem, e o registro leva `details.conflito_ao_desfazer` (revisão da rodada 5).
+    sai junto, sob a mesma trava e a mesma guarda do pedido (`details.cancelado_na_agenda_desfeito`). A ocupação da
+    agenda não muda: a marca sem o Cancelar confirmado nunca a liberou (`cancelado_confirmado_q`, revisão da
+    rodada 6).
 
     publish/resync/cancel marcam PENDING antes de enfileirar; se a task sai sem marcar, a linha
     fica PENDING para sempre (publicar some da tela e a edição fica bloqueada). `mark_gcal` não
@@ -308,13 +294,6 @@ def _mark_gcal_error(
             s.cancelado_na_agenda = False
             s.save(update_fields=["cancelado_na_agenda"])
             details["cancelado_na_agenda_desfeito"] = True
-            bloqueados = _conflito_ao_desfazer(s)
-            if bloqueados:
-                details["conflito_ao_desfazer"] = [p.usuario_id for p in bloqueados]
-                nomes = ", ".join(p.usuario_nome for p in bloqueados)
-                message = (
-                    f"{message} Atenção: o evento voltou a ocupar a agenda e agora conflita com a agenda de {nomes}."
-                )
         s.mark_gcal(status=Solicitacao.GCalStatus.ERROR, payload_hash=None, error=message)
         AuditLog.objects.create(
             usuario=operator,
@@ -746,8 +725,7 @@ def task_cancelar_na_agenda(
     Falha: ERROR pela `_mark_gcal_error` (`operation="cancelar_na_agenda"`), com a marca. Nunca enfileira o
     `queue_gcal_sync_retry`, que publica: refazer é pedir o Cancelar de novo. Exceção: o id adotado que o Google
     não acha (`EventoAdotadoNaoAchado`). Nada foi escrito lá e refazer daria o mesmo erro, então a marca sai junto
-    com o ERROR, e o Tirar só do Google volta a ser a saída (revisão da rodada 4). Se o horário foi ocupado por
-    outro evento enquanto a marca o liberava, o erro avisa (`_mark_gcal_error`). Mas, se um Cancelar anterior da
+    com o ERROR, e o Tirar só do Google volta a ser a saída (revisão da rodada 4). Mas, se um Cancelar anterior da
     linha já terminou (`cancelamento_confirmado`), o evento sumiu depois de cancelado: a marca fica e a linha volta
     a PUBLISHED com `resultado=nao_achado`, como o Excluir da P5 (revisão da rodada 5).
 

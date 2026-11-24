@@ -122,8 +122,9 @@ export interface Solicitacao {
   /** No Google Agenda pela planilha e não adotado (virada): o sistema não publica. */
   publicado_fora_do_sistema?: boolean;
   /**
-   * Evento de formação cancelado na agenda (CON-08): o título no Google ganhou "(CANCELADO) " e o evento ficou
-   * lá. Sem volta: não se publica, não se reenvia, não se tira do Google e não se edita.
+   * Evento de formação cancelado na agenda (CON-08): o título no Google ganha "(CANCELADO) " e o evento fica lá.
+   * Com a marca, não se publica, não se reenvia, não se tira do Google e não se edita. Pela tela não há desfazer; só a
+   * tarefa do Cancelar tira a marca, quando o Event ID adotado não é achado e nenhum Cancelar anterior terminou.
    */
   cancelado_na_agenda?: boolean;
   /**

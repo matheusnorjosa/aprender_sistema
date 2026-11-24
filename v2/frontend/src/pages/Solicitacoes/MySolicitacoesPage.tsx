@@ -58,7 +58,8 @@ function EtiquetaDoCancelado({ record }: { record: Solicitacao }): JSX.Element {
   const { tag } = gcalRowActions(record, { ready: true });
   const cor = COR_DO_CANCELADO[tag.color];
   return (
-    <Tag {...(cor ? { color: cor } : {})} style={{ marginInlineEnd: 0 }}>
+    // A coluna Status tem largura fixa: a etiqueta quebra linha em vez de passar por baixo de Ações (revisão da rodada 6).
+    <Tag {...(cor ? { color: cor } : {})} style={{ whiteSpace: 'normal', marginInlineEnd: 0 }}>
       {tag.label}
     </Tag>
   );
@@ -191,17 +192,17 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
   } else if (noGoogle && !podeTirarDoGoogle && !superForaDePendente) {
     // ERROR: a publicação deu erro, mas o evento pode estar no Google; excluir aqui o tiraria de lá (o de
     // formação ficaria lá com "(CANCELADO) ").
-    // Só a Apoio, em Publicar na agenda, tira do Google um ERROR, e só aprovado, com id e de hoje em
-    // diante (a tela lista só 'aprovado'; gcalRowActions; a Pré-agenda só cancela o publicado). Fora
-    // disso, nenhuma tela tira. A SUPER fora de pendente não chega aqui: tirar do Google não devolve
-    // a exclusão a ela, e o motivo dela (abaixo) já dá a saída.
-    const apoioConsegueTirar =
-      record.status === 'aprovado' &&
-      Boolean(record.external_event_id) &&
-      motivoNaoPublicavel(record) !== 'evento_passado';
+    // Tiram do Google um ERROR com id e aprovado (as duas telas só listam 'aprovado'): a Apoio, em Publicar na
+    // agenda, de hoje em diante (gcalRowActions), e o Controle, na Pré-agenda, também o que já terminou ("Remover do
+    // Google Agenda", desde a revisão da rodada 5). Sem id, nenhuma tela tira. A SUPER fora de pendente não chega
+    // aqui: tirar do Google não devolve a exclusão a ela, e o motivo dela (abaixo) já dá a saída.
+    const controleConsegueTirar = record.status === 'aprovado' && Boolean(record.external_event_id);
+    const apoioConsegueTirar = controleConsegueTirar && motivoNaoPublicavel(record) !== 'evento_passado';
     const saida = apoioConsegueTirar
-      ? 'Para excluir, peça ao Apoio de Coordenação da sua gerência que tire o evento só do Google, na tela Publicar na agenda; depois disso, você consegue excluir aqui.'
-      : 'Para excluir, fale com a administração do sistema.';
+      ? 'Para excluir, peça ao Apoio de Coordenação da sua gerência, na tela Publicar na agenda, ou ao Controle, na Pré-agenda, que tire o evento só do Google; depois disso, você consegue excluir aqui.'
+      : controleConsegueTirar
+        ? 'Para excluir, peça ao Controle, na Pré-agenda, que remova o evento do Google Agenda; depois disso, você consegue excluir aqui. Se lá também não der, fale com a administração do sistema.'
+        : 'Para excluir, fale com a administração do sistema.';
     const efeito = marcaCancelado
       ? 'excluir aqui também o marcaria como cancelado lá, com (CANCELADO) no título'
       : 'excluir aqui também o tiraria de lá';

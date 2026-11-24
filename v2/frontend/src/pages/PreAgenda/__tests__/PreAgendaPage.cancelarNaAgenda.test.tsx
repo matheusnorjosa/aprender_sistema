@@ -143,7 +143,9 @@ describe('PreAgendaPage — Cancelar evento de formação (CON-08)', { timeout: 
     expect(within(russas).queryByLabelText(REMOVER)).not.toBeInTheDocument();
   });
 
-  test('Cancelar que não achou o evento (ERROR sem a marca, com id): o Remover que o erro manda usar está lá, também no evento que já terminou', async () => {
+  // Revisão da rodada 6: a mesma regra de Publicar na agenda (gcalRowActions): formação em ERROR com id, sem a marca,
+  // tem Remover e Cancelar evento. O Remover é o que o erro do Cancelar de id não achado manda usar.
+  test('formação em ERROR com id, sem a marca: Remover e Cancelar evento, como em Publicar na agenda, também no evento que já terminou', async () => {
     const erro =
       'O evento não foi achado no Google pelo Event ID guardado (pode ter sido apagado de vez ou estar em outro ' +
       'calendário). Nada foi marcado e o evento não foi cancelado na agenda. Confira no Google Agenda; se ele não ' +
@@ -164,8 +166,16 @@ describe('PreAgendaPage — Cancelar evento de formação (CON-08)', { timeout: 
     for (const nome of ['Crateús', 'Jaguaribe']) {
       const tr = await linha(nome);
       expect(within(tr).getByLabelText(REMOVER)).toBeInTheDocument();
-      expect(within(tr).queryByLabelText(CANCELAR)).not.toBeInTheDocument();
+      expect(within(tr).getByLabelText(CANCELAR)).toBeInTheDocument();
     }
+  });
+
+  test('ERROR com id de outro tipo, sem a marca: só o Remover', async () => {
+    mockRows([row({ id: 11, municipio_nome: 'Crato', gcal_status: 'ERROR', tipo_evento_de_formacao: false })]);
+    renderComo(DAT);
+    const crato = await linha('Crato');
+    expect(within(crato).getByLabelText(REMOVER)).toBeInTheDocument();
+    expect(within(crato).queryByLabelText(CANCELAR)).not.toBeInTheDocument();
   });
 
   test('refazer o Cancelar da linha marcada não depende de o tipo ainda ser de formação (tipo renomeado)', async () => {

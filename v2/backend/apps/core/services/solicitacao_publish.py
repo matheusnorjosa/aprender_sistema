@@ -22,6 +22,7 @@ from kombu.exceptions import OperationalError as FilaForaDoAr
 
 from apps.core.exceptions import APIError, ConflictError, ValidationAPIError
 from apps.core.models import AuditLog, GoogleOAuthCredential, Solicitacao, Usuario
+from apps.core.services.availability_service import cancelado_confirmado
 from apps.core.services.db_retry import _extract_pgcode  # pyright: ignore[reportPrivateUsage]
 from apps.core.services.evento_de_formacao import eh_evento_de_formacao, falta_numero_da_formacao
 from apps.core.utils.net import get_client_ip
@@ -132,7 +133,7 @@ def cancelamento_confirmado(s: Solicitacao) -> bool:
     marca), e o Excluir recusa e a tarefa desfaz a marca."""
     if not s.cancelado_na_agenda:
         return False
-    if s.gcal_status == Solicitacao.GCalStatus.PUBLISHED:
+    if cancelado_confirmado(s):
         return True
     return AuditLog.objects.filter(
         action=AuditLog.Action.CANCELAR_NA_AGENDA,
@@ -160,8 +161,11 @@ def pedir_operacao_gcal(solicitacao_id: int, operacao: OperacaoGcal) -> str:
     Cancelar na agenda (CON-08) aceita o que o cancelar aceita, só em evento de formação ou na linha já marcada
     (o refazer do Cancelar que falhou, mesmo com o tipo renomeado: `excluir_marca_cancelado`), e grava a marca
     `cancelado_na_agenda` aqui, no pedido: já no PENDING a linha não se publica, não se reenvia e não se tira
-    do Google (o cancelar recusa a linha marcada). Não há desfazer. A linha marcada só se pede de novo em PENDING
-    ou ERROR (o refazer); fora deles o Cancelar já terminou (409 `ja_cancelado_na_agenda`).
+    do Google (o cancelar recusa a linha marcada). Pela tela não há desfazer; só a tarefa do Cancelar tira a marca,
+    quando o Event ID adotado não é achado e nenhum Cancelar anterior terminou (gcal.spec, "A tarefa"). A marca
+    sozinha não libera a agenda: só com a linha de volta a PUBLISHED pela tarefa (`cancelado_confirmado_q`). A
+    linha marcada só se pede de novo em PENDING ou ERROR (o refazer); fora deles o Cancelar já terminou (409
+    `ja_cancelado_na_agenda`).
 
     Reaplicar sobre linha em PENDING é recusado: outra operação está em andamento, e o pedido novo zeraria o
     hash (UPDATE sem mudança no Google, com e-mail aos convidados) ou desfaria um "Tirar do Google".
@@ -229,7 +233,7 @@ def pedir_operacao_gcal(solicitacao_id: int, operacao: OperacaoGcal) -> str:
     campos = ["gcal_pedido"]
     if operacao == "cancelar_na_agenda":
         s.cancelado_na_agenda = True
-        campos.append("cancelado_na_agenda")  # o signal libera a agenda dos participantes no cache
+        campos.append("cancelado_na_agenda")
     s.save(update_fields=campos)
     s.mark_gcal(
         status=Solicitacao.GCalStatus.PENDING,

@@ -56,6 +56,7 @@ from apps.core.serializers import (
     DATCoordenadorOptionSerializer,
     DATCoordenadorSerializer,
 )
+from apps.core.services.availability_service import cancelado_confirmado_q
 from apps.core.services.compra_elegibilidade import COMBOS
 from apps.core.services.dat_codigos import recompute_registros
 from apps.core.services.solicitacao_projetos import q_tem_projeto
@@ -670,8 +671,7 @@ class DATCompraViewSet(LockOnWriteMixin, viewsets.ModelViewSet):
         solicitacoes_ativas = Solicitacao.objects.filter(
             municipio_id=OuterRef("municipio_id"),
             status__in=["pendente", "aprovado"],
-            cancelado_na_agenda=False,
-        )
+        ).exclude(cancelado_confirmado_q())
         # O evento de dois projetos atende pelos dois (#2036): cada termo olha as duas vagas.
         atendida = (
             Exists(solicitacoes_ativas.filter(q_tem_projeto(pk=OuterRef("projeto_id"))))

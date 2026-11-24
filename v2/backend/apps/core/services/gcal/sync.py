@@ -9,6 +9,7 @@ Core synchronization operations for Google Calendar.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, cast
 
 from django.conf import settings
@@ -606,11 +607,19 @@ def cancel_solicitacao(
 MARCADOR_CANCELADO = "(CANCELADO)"
 # Teto do título no payload (`payload.py`): o Google recusa título longo demais.
 _TITULO_MAX = 1000
+# As formas que o `lerTitulo` do DFF lê como cancelada (`lib/agenda.ts`, CANCELADO_NO_COMECO e CANCELADO_NO_FIM;
+# resposta de 24/11/2026): no começo ou no fim, com ou sem parênteses ou colchetes, CANCELADO ou CANCELADA, no
+# plural também. Sem quantificador aninhado (ReDoS).
+_CANCELADO_NO_COMECO = re.compile(r"^\s*[(\[{]?\s*CANCELAD[OA]S?", re.IGNORECASE)
+_CANCELADO_NO_FIM = re.compile(r"CANCELAD[OA]S?\s*[)\]}]?\s*$", re.IGNORECASE)
 
 
 def titulo_ja_marcado(titulo: str | None) -> bool:
-    """O título já começa com o marcador, ignorando maiúscula e espaço à esquerda (digitado à mão inclusive)."""
-    return (titulo or "").lstrip().upper().startswith(MARCADOR_CANCELADO)
+    """O título já tem uma marca de cancelado que o DFF lê: a nossa ("(CANCELADO) " no começo) ou uma digitada à mão
+    antes do CON-08 ("CANCELADA - …", "… (CANCELADA)"). Ignora maiúscula e espaço. Marcado não ganha outra marca
+    (revisão da rodada 6: "(CANCELADO) CANCELADA - …" tinha duas)."""
+    texto = titulo or ""
+    return bool(_CANCELADO_NO_COMECO.match(texto) or _CANCELADO_NO_FIM.search(texto))
 
 
 def marcar_cancelado_no_google(

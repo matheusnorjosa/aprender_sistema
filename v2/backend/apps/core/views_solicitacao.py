@@ -86,6 +86,11 @@ _AVISO_EVENTO_NAO_ACHADO_NO_GOOGLE = (
     "Evento excluído do sistema, mas ele não foi achado no Google Agenda. Se ainda aparecer lá, apague-o direto no "
     "Google Agenda."
 )
+# Excluir de formação cujo evento já tinha saído do Google (ou nunca chegou lá): nada foi marcado, e a tela não pode
+# dizer que ele ficou lá com (CANCELADO) (revisão da rodada 6).
+_AVISO_EVENTO_JA_SAIU_DO_GOOGLE = (
+    "Evento excluído do sistema. Ele não estava no Google Agenda, então nada foi marcado lá."
+)
 
 
 class _ExtraParticipantsSerializer(serializers.Serializer):
@@ -415,7 +420,7 @@ curl -X POST /api/solicitacoes/ \\
         description=(
             "Remove uma solicitação. Requer ser o proprietário ou ter privilégio especial. Responde 204 sem corpo; "
             "200 com `aviso` quando a exclusão concluiu com algo a dizer (evento já cancelado na agenda que não foi "
-            "achado no Google)."
+            "achado no Google, ou evento de formação que não estava no Google e por isso não foi marcado)."
         ),
         responses={
             204: None,
@@ -1316,7 +1321,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
           o evento não sai de lá. `remover_do_google_agora` põe "(CANCELADO) " no título e grava
           `cancelado_na_agenda`; o evento fica no Google, cancelado, e a linha sai daqui. Id adotado que o
           Google não acha (P5): com o Cancelar já concluído, a linha sai e o DELETE responde 200 com
-          `aviso`; sem ele, 400 e nada é excluído.
+          `aviso`; sem ele, 400 e nada é excluído. Evento que já tinha saído do Google (ou nunca chegou
+          lá): nada é marcado, a linha sai e o DELETE responde 200 com `aviso` dizendo isso.
         - O delete relê a linha com lock: se uma publicação ou reenvio concorrente a pôs (de volta)
           no Google, recusa em vez de deixar o evento órfão lá. A linha marcada passa só quando o
           remover rodou nesta requisição (ela guarda o id de propósito).
@@ -1364,6 +1370,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 # P5 (decisão do dono, 24/11/2026): linha já cancelada na agenda cujo evento sumiu do Google.
                 removido_do_google["evento_nao_achado_no_google"] = True
                 aviso = _AVISO_EVENTO_NAO_ACHADO_NO_GOOGLE
+            elif resultado == "ja_saiu":
+                aviso = _AVISO_EVENTO_JA_SAIU_DO_GOOGLE
 
         # Capturar dados antes da exclusão para o AuditLog
         solicitacao_data = {
@@ -1428,7 +1436,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         return aviso
 
     def destroy(self, request, *args, **kwargs):
-        """204 sem corpo, como sempre; 200 com `aviso` quando a exclusão concluiu com algo a dizer (P5)."""
+        """204 sem corpo, como sempre; 200 com `aviso` quando a exclusão concluiu com algo a dizer (P5, já saiu)."""
         aviso = self.perform_destroy(self.get_object())
         if aviso:
             return Response({"aviso": aviso}, status=status.HTTP_200_OK)

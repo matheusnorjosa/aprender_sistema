@@ -172,4 +172,36 @@ describe('GCalDashboardPage — cancelamento na agenda na linha do tempo', { tim
     expect(screen.getByText(frase)).toBeInTheDocument();
     expect(screen.queryByText('Cancelado na agenda (título marcado)')).not.toBeInTheDocument();
   });
+
+  // Revisão da rodada 6: o erro do Cancelar grava PUBLISH_GCAL_ERROR com operation=cancelar_na_agenda. A etiqueta do
+  // topo diz "Erro ao cancelar"; a linha do tempo não pode dizer que alguém tentou publicar.
+  test.each([
+    [{}, 'Erro ao cancelar na agenda'],
+    [{ cancelado_na_agenda_desfeito: true }, 'Erro ao cancelar na agenda (o cancelamento foi desfeito)'],
+  ])('erro do Cancelar %o: "%s"', async (extra, frase) => {
+    getEventDetailMock.mockResolvedValue({
+      ...(await getEventDetailMock()),
+      timeline: [
+        log({
+          id: 7,
+          action: 'PUBLISH_GCAL_ERROR',
+          details: { solicitacao_id: 7, operation: 'cancelar_na_agenda', ...extra },
+        }),
+      ],
+    });
+    await abrirDetalhe();
+
+    expect(screen.getByText(frase)).toBeInTheDocument();
+    expect(screen.queryByText('Erro ao publicar no Google')).not.toBeInTheDocument();
+  });
+
+  test('o erro de publicar segue "Erro ao publicar no Google"', async () => {
+    getEventDetailMock.mockResolvedValue({
+      ...(await getEventDetailMock()),
+      timeline: [log({ id: 8, action: 'PUBLISH_GCAL_ERROR', details: { solicitacao_id: 7, operation: 'publish' } })],
+    });
+    await abrirDetalhe();
+
+    expect(screen.getByText('Erro ao publicar no Google')).toBeInTheDocument();
+  });
 });

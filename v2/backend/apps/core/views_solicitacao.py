@@ -1317,7 +1317,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
           sem id conta: a publicação que falhou pode ter criado o evento com o id determinístico. O
           Google vem primeiro e síncrono; se falhar, nada é apagado. Quem não pode recebe 400 e o
           Google não é chamado. Todas as recusas abaixo vêm antes.
-        - Evento de formação no Google, ou linha já cancelada na agenda (CON-08, decisão do dono de 23/11):
+        - Evento de formação no Google (com a chave `CON08_CANCELAR_NA_AGENDA` ligada; desligada, ele sai do
+          Google como os outros), ou linha já cancelada na agenda (CON-08, decisão do dono de 23/11; com a
+          chave desligada, só a de Cancelar confirmado, `excluir_marca_cancelado`):
           o evento não sai de lá. `remover_do_google_agora` põe "(CANCELADO) " no título e grava
           `cancelado_na_agenda`; o evento fica no Google, cancelado, e a linha sai daqui. Id adotado que o
           Google não acha (P5): com o Cancelar já concluído, a linha sai e o DELETE responde 200 com
@@ -1695,6 +1697,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         O evento fica no Google; a linha nunca mais é publicada, reenviada nem tirada de lá.
         Permissão: `use_gcal` (global) ou `publish_setor_solicitacao` (gerência do evento).
+        Com a chave `CON08_CANCELAR_NA_AGENDA` desligada (o padrão), o serviço recusa com 409
+        `cancelar_na_agenda_desligado`, sem gravar nada.
         Returns: 202 Accepted (processamento assíncrono)
         """
         solicitacao = self._get_publishable_solicitacao()

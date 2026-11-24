@@ -88,6 +88,7 @@ import { syncChannel } from '../../services/syncChannel';
 import { FORTALEZA_TZ, formatFortaleza } from '../../utils/datetime';
 import {
   MOTIVO_NAO_PUBLICAVEL,
+  cancelarFalhouComChaveDesligada,
   confirmacaoDeExcluirNoGoogle,
   estaNoGoogle,
   excluirMarcaCancelado,
@@ -758,16 +759,22 @@ export default function PreAgendaPage(): JSX.Element {
 
         // Cancel: PUBLISHED ou ERROR com event_id, como em Publicar na agenda (e não na linha cancelada na agenda,
         // CON-08). No ERROR é a saída que o Cancelar de id adotado não achado manda usar, inclusive no evento que já
-        // terminou, que Publicar na agenda não lista.
-        const showCancel = (isPublished || hasError) && hasEventId && !record.cancelado_na_agenda;
+        // terminou, que Publicar na agenda não lista. Com a chave do CON-08 B desligada, a linha marcada cujo Cancelar
+        // não terminou tem o Remover de volta (o servidor aceita, e a marca sai com o evento).
+        const showCancel =
+          (isPublished || hasError) &&
+          hasEventId &&
+          (!record.cancelado_na_agenda || cancelarFalhouComChaveDesligada(record));
 
         // CON-08: Cancelar evento de formação ao lado do Remover (PUBLISHED ou ERROR com id, como gcalRowActions em
         // Publicar na agenda; revisão da rodada 6); na linha cancelada, só no erro (refazer o que falhou: Publicar
         // na agenda só lista de hoje em diante).
         // O refazer não exige o tipo ainda de formação (tipo renomeado), como o servidor e Publicar na agenda.
+        // Os dois só com a chave CON08_CANCELAR_NA_AGENDA ligada no servidor (`cancelar_na_agenda_ligado`).
         const showCancelar =
-          (showCancel && record.tipo_evento_de_formacao === true) ||
-          (hasError && hasEventId && record.cancelado_na_agenda === true);
+          record.cancelar_na_agenda_ligado === true &&
+          ((showCancel && record.exclui_marcando_cancelado === true) ||
+            (hasError && hasEventId && record.cancelado_na_agenda === true));
 
         // Virada: evento que já terminou, ou que está no Google pela planilha, não se publica
         // (o backend recusa com o mesmo motivo). O motivo vai no nome acessível do botão.

@@ -125,6 +125,8 @@ export interface Solicitacao {
    * Evento de formação cancelado na agenda (CON-08): o título no Google ganha "(CANCELADO) " e o evento fica lá.
    * Com a marca, não se publica, não se reenvia, não se tira do Google e não se edita. Pela tela não há desfazer; só a
    * tarefa do Cancelar tira a marca, quando o Event ID adotado não é achado e nenhum Cancelar anterior terminou.
+   * Exceção, com a chave CON08_CANCELAR_NA_AGENDA desligada: a linha sem Cancelar confirmado
+   * (`exclui_marcando_cancelado: false`) sai do Google pelo Tirar, e a marca sai junto.
    */
   cancelado_na_agenda?: boolean;
   /**
@@ -132,6 +134,19 @@ export interface Solicitacao {
    * (CANCELADO) no título do evento de formação, que fica lá (CON-08).
    */
   pode_tirar_do_google?: boolean;
+  /**
+   * CON-08 B: o Excluir desta linha, no Google, marca o título com (CANCELADO) em vez de tirá-la de lá
+   * (`excluir_marca_cancelado` do servidor, a decisão dele). Na linha não marcada, só com a chave
+   * CON08_CANCELAR_NA_AGENDA ligada (o evento de formação, que ganha o "Cancelar evento"). Na linha já cancelada na
+   * agenda, com a chave ligada ou com o Cancelar confirmado; falso nela é o Cancelar que falhou com a chave
+   * desligada, que o Tirar só do Google aceita (`cancelarFalhouComChaveDesligada`).
+   */
+  exclui_marcando_cancelado?: boolean;
+  /**
+   * CON-08 B: a chave CON08_CANCELAR_NA_AGENDA no servidor (igual em toda linha). Só com ela o servidor aceita o
+   * "Cancelar evento" e o refazer da linha "Erro ao cancelar".
+   */
+  cancelar_na_agenda_ligado?: boolean;
   /**
    * Quem lê pode excluir esta linha (a regra do DELETE: quem exclui e as recusas que se sabem sem o
    * Google). A Apoio exclui o evento de outra pessoa da gerência dela só quando ele está no Google.

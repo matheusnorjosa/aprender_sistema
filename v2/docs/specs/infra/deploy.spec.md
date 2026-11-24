@@ -183,6 +183,78 @@ as linhas com `cancelado_na_agenda=True` não se publicam, reenviam, reaplicam, 
 o reavanço. Para listá-las antes de promover: `Solicitacao.objects.filter(cancelado_na_agenda=True)
 .values_list("id", "gcal_status")` no shell (só ids e estado, sem título).
 
+**Chave do CON-08 B: `CON08_CANCELAR_NA_AGENDA`** (padrão `0`, desligada; `settings.py`). É o rollback sem trocar
+de versão. Desligada, a produção faz o que fazia antes do #2255: o Excluir de evento de formação tira o evento do
+Google, e a tela não oferece "Cancelar evento". A ação `cancelar-na-agenda` recusa com 409
+`cancelar_na_agenda_desligado`. Se uma mensagem de `task_cancelar_na_agenda` ainda estiver na fila, ela não escreve
+no Google: a linha vai para `ERROR`, com aviso, e a marca do pedido sai. A marca fica quando a linha já tinha um
+Cancelar anterior: confirmado (`cancelamento_confirmado`), que falhou ou sem desfecho (`cancelar_anterior_registrado`),
+porque o "(CANCELADO)" está ou pode estar no Google. Ligada (`1`), vale o CON-08 B inteiro
+([`gcal.spec.md`](../backend/gcal.spec.md)).
+
+Algumas mudanças do #2255 ficam nos dois estados, porque não dependem do Cancelar evento: a Pré-agenda oferece o
+"Remover do Google Agenda" também na linha `ERROR` com id (antes, só em `PUBLISHED`; o servidor já aceitava esse
+`cancel-gcal`), e o ícone ganhou o `title` "Remover do Google Agenda"; o motivo de Minhas Solicitações manda pedir
+ao Controle, na Pré-agenda, a saída dessa linha; e a exportação CSV do painel do GCal ganhou, no fim, a coluna
+`cancelado_na_agenda` (`sim`/`não`) em toda linha, o que muda o formato do arquivo para quem o consome.
+
+Nos dois estados, a linha já marcada (`cancelado_na_agenda=True`) continua protegida. Ela não se publica, não se
+reenvia e não se edita. Se o Cancelar dela terminou no Google, ela também não se tira de lá, e o Excluir continua
+no caminho da marca, sem apagar do Google: o título lá já tem "(CANCELADO)", e o Excluir só escreve de novo (o
+PATCH que põe a marca) se alguém a tirou do título direto no Google. Por isso, desligar a chave não exige limpar
+marcas.
+
+A exceção é a linha marcada em `ERROR` sem Cancelar confirmado (o Cancelar falhou antes do Google, ou a tarefa
+desligada manteve a marca de um Cancelar anterior sem desfecho). Com a chave desligada, ela sai como antes do
+CON-08 B: o Excluir tira o evento do Google, sem pôr a marca, e o Tirar só do Google a aceita e tira a marca junto
+com o evento. Com a chave desligada, só a linha cujo Cancelar terminou segue a marca. A lista diz qual é qual:
+`exclui_marcando_cancelado` é a decisão do servidor (`excluir_marca_cancelado`), e a tela oferece o Tirar só onde
+ela é falsa.
+
+- **Ligar ou desligar.** No Portainer, abra a stack e, em *Environment variables* (a `stack.env`), crie ou mude
+  `CON08_CANCELAR_NA_AGENDA` para `1` ou `0`. Depois, *Update the stack* sem *re-pull*. O `web` e o `worker`
+  leem a variável só na subida e precisam ser recriados juntos: com só um deles recriado, a tela e a tarefa
+  discordam. Não edite o compose: os serviços de backend já carregam a `stack.env` pelo `env_file`. Variável
+  ausente ou vazia vale `0`.
+- **Conferir.** Em Publicar na agenda, um evento de formação publicado mostra "Cancelar evento" só com a chave
+  ligada. Pela API, a lista `GET /api/solicitacoes/` traz `cancelar_na_agenda_ligado: true` em toda linha só com a
+  chave ligada.
+- **Antes de desligar** com Cancelar em andamento, liste as linhas marcadas fora de `PUBLISHED`:
+  `Solicitacao.objects.filter(cancelado_na_agenda=True).exclude(gcal_status="PUBLISHED").values_list("id",
+  "gcal_status")`. As `PENDING` terminam em `ERROR` quando a tarefa rodar, sem nada ir ao Google; as `ERROR` já
+  estão lá. Depois de desligar, cada uma cai num de dois casos:
+  - **Perdeu a marca** (era o primeiro Cancelar dela): é uma linha comum, que sai pelo Tirar só do Google ou pelo
+    Excluir, os dois tirando o evento do Google.
+  - **Manteve a marca:** com Cancelar confirmado, sai só pelo Excluir, que não apaga do Google (o título lá já tem
+    "(CANCELADO)"), ou religando a chave. Sem Cancelar confirmado, sai pelo Tirar só do Google ou pelo Excluir,
+    que tiram o evento do Google sem pôr a marca.
+
+  A tela mostra o caso de cada linha: o Tirar só do Google (o Remover, na Pré-agenda) aparece só onde o servidor o
+  aceita. Quem quiser o "(CANCELADO)" numa linha sem Cancelar confirmado refaz o Cancelar antes de desligar.
+
+**Limites conhecidos (ligar e depois desligar).** Só aparecem quando a chave já foi ligada e há, na hora da troca,
+linha marcada fora de `PUBLISHED` ou tarefa na fila. Até 24/11/2026 a chave nunca foi ligada em produção, e
+nenhuma linha estava marcada. O comportamento ficou assim por corte de escopo (revisão da chave, 24/11/2026):
+
+- A tarefa da fila que roda com a chave desligada conta como Cancelar anterior também o pedido que terminou sem
+  escrever no Google (o `PUBLISH_GCAL_ERROR` com `cancelado_na_agenda_desfeito`, inclusive o da própria tarefa
+  desligada, quando a chave foi ligada e desligada duas vezes). A linha fica marcada em `ERROR`, sem "(CANCELADO)"
+  no título lá, e só sai pelo Tirar só do Google ou pelo Excluir, que apagam o evento do Google.
+- Na linha marcada sem Cancelar confirmado, com a chave desligada, a edição e Minhas Solicitações dizem que o
+  evento "foi cancelado na agenda" e não se publica de novo, e a recusa do Publicar e do Reenviar diz que ele fica
+  no Google com "(CANCELADO)". O título lá não tem a marca, e depois do Tirar a linha volta a ser editável e
+  publicável.
+- O Tirar só do Google nessa linha aparece como "Cancelando…" enquanto está em `PENDING` e, se falha, como "Erro
+  ao cancelar" (a etiqueta é a da marca, e não a da remoção).
+- O Tirar só do Google pedido com a chave desligada que roda depois de ela voltar a ligar ainda apaga do Google o
+  evento da linha marcada e tira a marca: a tarefa não confere a chave de novo. Só importa se o título lá tinha
+  ganhado o "(CANCELADO)" (o PATCH chegou e a resposta se perdeu).
+
+Procedimento seguro: trocar a chave, nos dois sentidos, só com a fila vazia (nenhuma `Solicitacao` em `PENDING`).
+Antes de desligar, ainda com ela ligada, rodar a consulta de **Antes de desligar** e resolver cada linha: refazer o
+Cancelar até ela voltar a `PUBLISHED` (cancelada) ou perder a marca (Event ID adotado não achado), ou excluí-la.
+Com a lista vazia, nenhum dos casos acima acontece.
+
 **Docs de topologia reconciliados (Fase 2 concluída):** `v2/infra/ENVIRONMENTS.md`, `v2/infra/README.md` e
 `.claude/CLAUDE.md` (tabela prod) descrevem o Redis como **container interno na VM01** (serviço `redis`),
 alinhados ao compose — não mais como "VM03_Red" dedicada.
@@ -204,7 +276,9 @@ passo a passo na seção 8 do `GUIDE_GCAL.md`, FER-59). Fica ausente fora da tro
 restauração de um backup anterior a ela; nesses casos só sai quando o `rotate_gcal_encryption_key` mandar.
 
 **Ausentes (significativo):** `SENTRY_DSN` (→ Sentry off), `BACKUP_DIR` (→ default `/backups`, que hoje **é**
-gravável no `worker` graças ao bind-mount do #1455), `INCLUDE_DEV_TOOLS`/`INCLUDE_ETL` (→ defaults off, correto).
+gravável no `worker` graças ao bind-mount do #1455), `INCLUDE_DEV_TOOLS`/`INCLUDE_ETL` (→ defaults off, correto),
+`CON08_CANCELAR_NA_AGENDA` (→ `0`, o CON-08 B desligado; a chave e como ligá-la estão acima, depois da volta para
+antes do CON-08 B).
 
 > **Snapshot datado (2026-06-19), não reverificado.** Esta lista veio de uma leitura das *Environment variables*
 > no Portainer em 2026-06-19 e **não** foi reconferida desde então. A auditoria M00–M28 tem 18 achados cuja

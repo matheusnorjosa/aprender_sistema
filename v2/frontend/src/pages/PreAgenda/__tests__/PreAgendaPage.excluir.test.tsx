@@ -165,7 +165,16 @@ describe('PreAgendaPage — Excluir (G27)', () => {
     const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
     const aviso = 'Evento excluído do sistema, mas ele não foi achado no Google Agenda.';
     deleteSolicitacaoMock.mockResolvedValue(aviso);
-    mockRows([row({ id: 7, municipio_nome: 'Crateús', cancelado_na_agenda: true, tipo_evento_de_formacao: true })]);
+    // A decisão do servidor vem na linha: o Excluir da marcada segue marcando (`exclui_marcando_cancelado`).
+    mockRows([
+      row({
+        id: 7,
+        municipio_nome: 'Crateús',
+        cancelado_na_agenda: true,
+        tipo_evento_de_formacao: true,
+        exclui_marcando_cancelado: true,
+      }),
+    ]);
     renderComo(DAT);
     fireEvent.click(within(await linha('Crateús')).getByLabelText(EXCLUIR));
     const config = confirmar.mock.calls[0]![0];

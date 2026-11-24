@@ -18,7 +18,9 @@
  *   motivo (o servidor recusa com `evento_passado`); Tirar do Google e Cancelar evento seguem.
  * - Evento de formação no Google (CON-08, decisão do dono de 23/11): "Cancelar evento" ao lado do "Tirar só do
  *   Google" põe "(CANCELADO) " no título lá; o evento fica no Google e a linha não se publica mais. O Excluir dele
- *   também marca o título, em vez de tirar o evento de lá.
+ *   também marca o título, em vez de tirar o evento de lá. Só com a chave CON08_CANCELAR_NA_AGENDA ligada no
+ *   servidor, que a linha traz em `cancelar_na_agenda_ligado`; desligada, a tela é a de antes do CON-08 B, salvo na
+ *   linha já cancelada na agenda cujo Excluir marca (`exclui_marcando_cancelado`, a decisão do servidor).
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type JSX } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
@@ -198,6 +200,14 @@ export default function PublicacaoSetorPage(): JSX.Element {
   const { status, error: statusError, fetchStatus, disconnect } = useGoogleIntegration();
 
   const [rows, setRows] = useState<Solicitacao[]>([]);
+  // CON-08 B: a chave CON08_CANCELAR_NA_AGENDA chega por linha (`cancelar_na_agenda_ligado`). Com ela desligada,
+  // o topo só fala do Excluir que marca quando há na lista linha já cancelada na agenda cujo Excluir marca.
+  const cancelarLigado = rows.some((r) => r.cancelar_na_agenda_ligado === true);
+  const excluiMarcando = cancelarLigado
+    ? 'menos o evento de formação'
+    : rows.some(excluirMarcaCancelado)
+      ? 'menos o evento já cancelado na agenda'
+      : null;
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -553,9 +563,13 @@ export default function PublicacaoSetorPage(): JSX.Element {
             </Title>
             <Text type="secondary">
               Eventos aprovados do seu setor, a partir de hoje. Publique ou atualize cada um na agenda
-              oficial da organização. Tirar só do Google deixa o evento no sistema; Excluir tira dos dois lados,
-              menos o evento de formação, que sai do sistema e fica no Google Agenda com (CANCELADO) no título.
-              Cancelar evento, só no evento de formação, põe (CANCELADO) no título lá e deixa o evento nos dois lados.
+              oficial da organização.{' '}
+              Tirar só do Google deixa o evento no sistema; Excluir tira dos dois lados
+              {excluiMarcando
+                ? `, ${excluiMarcando}, que sai do sistema e fica no Google Agenda com (CANCELADO) no título.`
+                : '.'}
+              {cancelarLigado &&
+                ' Cancelar evento, só no evento de formação, põe (CANCELADO) no título lá e deixa o evento nos dois lados.'}
             </Text>
           </header>
         </Card>

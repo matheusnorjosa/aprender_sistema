@@ -16,6 +16,7 @@ from uuid import uuid4
 
 from django.conf import settings
 from django.db import OperationalError, connection, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from kombu.exceptions import OperationalError as FilaForaDoAr
@@ -112,10 +113,37 @@ _MSG_JA_CANCELADO_NA_AGENDA = (
 )
 
 
+_MSG_CANCELAR_NA_AGENDA_DESLIGADO = (
+    "O Cancelar evento não está disponível no sistema agora. Para tirar o evento do Google Agenda, use Tirar só do "
+    "Google ou Excluir."
+)
+
+
+def cancelar_na_agenda_ligado() -> bool:
+    """A chave do CON-08 B (`CON08_CANCELAR_NA_AGENDA`, desligada por padrão)."""
+    return bool(getattr(settings, "CON08_CANCELAR_NA_AGENDA", False))
+
+
+def _recusar_se_desligado() -> None:
+    """Com a chave desligada, ninguém cancela na agenda (409 `cancelar_na_agenda_desligado`)."""
+    if not cancelar_na_agenda_ligado():
+        raise ConflictError(message=_MSG_CANCELAR_NA_AGENDA_DESLIGADO, details={"code": "cancelar_na_agenda_desligado"})
+
+
 def excluir_marca_cancelado(s: Solicitacao) -> bool:
     """O Excluir desta linha, que está no Google, marca o título com "(CANCELADO) " em vez de tirar o evento
-    de lá? Sim para evento de formação e para a linha já cancelada na agenda (decisão do dono, 23/11/2026)."""
-    return s.cancelado_na_agenda or eh_evento_de_formacao(s)
+    de lá? Sim para evento de formação e para a linha já cancelada na agenda (decisão do dono, 23/11/2026).
+
+    Com a chave do CON-08 B desligada, só a linha cujo Cancelar terminou no Google (`cancelamento_confirmado`,
+    marcada quando a chave esteve ligada): o título dela lá já tem o "(CANCELADO)", e apagar o evento desfaria o
+    cancelamento que o DFF já leu. O evento de formação não marcado volta a sair do Google, como antes do #2255. A
+    linha marcada sem Cancelar confirmado (ERROR: o Cancelar falhou antes do Google) também: marcar o título agora
+    seria um cancelamento novo com a chave desligada (revisão da rodada 1 da chave). É o mesmo critério da tarefa
+    que fica na fila (`_cancelar_na_agenda_desligado`), e o Tirar só do Google também a aceita (`pedir_operacao_gcal`).
+    """
+    if s.cancelado_na_agenda:
+        return cancelar_na_agenda_ligado() or cancelamento_confirmado(s)
+    return cancelar_na_agenda_ligado() and eh_evento_de_formacao(s)
 
 
 # Desfechos de um Cancelar que terminou (`task_cancelar_na_agenda`, ou o remover do Excluir que não apagou a linha).
@@ -143,6 +171,25 @@ def cancelamento_confirmado(s: Solicitacao) -> bool:
     ).exists()
 
 
+def cancelar_anterior_registrado(s: Solicitacao, pedido: str | None) -> bool:
+    """Outro pedido de Cancelar desta linha veio antes de `pedido`?
+
+    Conta o pedido registrado (`CANCELAR_NA_AGENDA_REQUESTED`) e a tentativa que falhou (`PUBLISH_GCAL_ERROR` com
+    `operation=cancelar_na_agenda`). Qualquer um deles pode ter posto o "(CANCELADO)" no Google sem deixar o registro
+    de que terminou (o PATCH chegou e a resposta se perdeu). A tarefa com a chave desligada só tira a marca sem ele
+    (`_cancelar_na_agenda_desligado`)."""
+    pedidos = (
+        AuditLog.objects.filter(model_name="Solicitacao", details__solicitacao_id=s.pk)
+        .filter(
+            Q(action=AuditLog.Action.CANCELAR_NA_AGENDA_REQUESTED)
+            | Q(action=AuditLog.Action.PUBLISH_GCAL_ERROR, details__operation="cancelar_na_agenda")
+        )
+        .values_list("details__pedido", flat=True)
+    )
+    # Comparado aqui, e não no `exclude`: o registro sem a chave `pedido` sumiria da consulta (NULL no NOT).
+    return any(anterior != pedido for anterior in pedidos)
+
+
 OperacaoGcal = Literal["publicar", "reenviar", "reaplicar", "cancelar", "cancelar_na_agenda"]
 
 
@@ -158,14 +205,16 @@ def pedir_operacao_gcal(solicitacao_id: int, operacao: OperacaoGcal) -> str:
     Hash do payload: publicar e reenviar zeram (o envio é forçado); cancelar e cancelar na agenda mantêm;
     reaplicar mantém só o de linha PUBLISHED, para o envio sem mudança virar SKIP.
 
-    Cancelar na agenda (CON-08) aceita o que o cancelar aceita, só em evento de formação ou na linha já marcada
+    Cancelar na agenda (CON-08) só com a chave `CON08_CANCELAR_NA_AGENDA` ligada (desligada, recusa antes de travar
+    a linha). Aceita o que o cancelar aceita, só em evento de formação ou na linha já marcada
     (o refazer do Cancelar que falhou, mesmo com o tipo renomeado: `excluir_marca_cancelado`), e grava a marca
     `cancelado_na_agenda` aqui, no pedido: já no PENDING a linha não se publica, não se reenvia e não se tira
-    do Google (o cancelar recusa a linha marcada). Pela tela não há desfazer; só a tarefa do Cancelar tira a marca,
-    quando o Event ID adotado não é achado e nenhum Cancelar anterior terminou (gcal.spec, "A tarefa"). A marca
-    sozinha não libera a agenda: só com a linha de volta a PUBLISHED pela tarefa (`cancelado_confirmado_q`). A
-    linha marcada só se pede de novo em PENDING ou ERROR (o refazer); fora deles o Cancelar já terminou (409
-    `ja_cancelado_na_agenda`).
+    do Google (o cancelar recusa a linha marcada; com a chave desligada, só a de Cancelar confirmado, e a marca da
+    outra sai com o evento em `cancel_solicitacao`). Pela tela não há desfazer; com a chave ligada, só a tarefa do
+    Cancelar tira a marca, quando o Event ID adotado não é achado e nenhum Cancelar anterior terminou (gcal.spec,
+    "A tarefa"). A marca sozinha não libera a agenda: só com a linha de volta a PUBLISHED pela tarefa
+    (`cancelado_confirmado_q`). A linha marcada só se pede de novo em PENDING ou ERROR (o refazer); fora deles o
+    Cancelar já terminou (409 `ja_cancelado_na_agenda`).
 
     Reaplicar sobre linha em PENDING é recusado: outra operação está em andamento, e o pedido novo zeraria o
     hash (UPDATE sem mudança no Google, com e-mail aos convidados) ou desfaria um "Tirar do Google".
@@ -175,7 +224,10 @@ def pedir_operacao_gcal(solicitacao_id: int, operacao: OperacaoGcal) -> str:
         ConflictError `operacao_em_andamento`: reaplicar sobre linha em PENDING.
         ValidationAPIError, ConflictError: as recusas das entradas, agora sobre a linha travada.
         Solicitacao.DoesNotExist: a linha foi apagada depois da leitura de quem chama.
+        ConflictError `cancelar_na_agenda_desligado`: cancelar na agenda com a chave do CON-08 B desligada.
     """
+    if operacao == "cancelar_na_agenda":
+        _recusar_se_desligado()
     with connection.cursor() as cursor:
         cursor.execute("SELECT set_config('lock_timeout', %s, true)", [_PEDIDO_LOCK_TIMEOUT])
     try:
@@ -199,7 +251,9 @@ def pedir_operacao_gcal(solicitacao_id: int, operacao: OperacaoGcal) -> str:
         and s.gcal_status not in (Solicitacao.GCalStatus.PENDING, Solicitacao.GCalStatus.ERROR)
     ):
         raise ConflictError(message=_MSG_JA_CANCELADO_NA_AGENDA, details={"code": "ja_cancelado_na_agenda"})
-    if operacao == "cancelar" and s.cancelado_na_agenda:
+    # A linha marcada não se tira do Google, salvo com a chave desligada e sem Cancelar confirmado (o título lá não
+    # tem a marca): aí o Tirar é a saída dela, e a marca sai com o evento (`cancel_solicitacao`).
+    if operacao == "cancelar" and s.cancelado_na_agenda and excluir_marca_cancelado(s):
         raise ConflictError(message=_MSG_CANCELADO_NA_AGENDA_NAO_TIRA, details={"code": "cancelado_na_agenda"})
 
     if operacao in ("cancelar", "cancelar_na_agenda"):
@@ -704,9 +758,11 @@ def cancelar_na_agenda(
     Raises:
         APIError 403 `google_not_connected`, 409 `google_calendar_not_configured`: modo OAuth sem como escrever.
         ConflictError 409 `nao_e_evento_de_formacao`, `ja_cancelado_na_agenda`, `not_published`, `linha_ocupada`.
+        ConflictError 409 `cancelar_na_agenda_desligado`: a chave do CON-08 B está desligada (vem antes de tudo).
     """
     from apps.core.tasks import task_cancelar_na_agenda
 
+    _recusar_se_desligado()
     operator_user_id = _check_google_oauth(user)
 
     kwargs: dict[str, Any] = {}
@@ -781,7 +837,8 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> tuple[st
     Google. ERROR sem id (publicação que falhou) usa o id determinístico do insert, porque o evento
     pode ter sido criado lá. O AuditLog vem antes do Google: depois dele só sobra o save da linha.
 
-    Evento de formação (ou linha já cancelada na agenda, `excluir_marca_cancelado`): em vez de tirar do Google,
+    Evento de formação com a chave do CON-08 B ligada, ou linha já cancelada na agenda (`excluir_marca_cancelado`,
+    que decide a chave num lugar só; desligada, o de formação não marcado sai do Google): em vez de tirar do Google,
     marca o título com "(CANCELADO) " (`marcar_cancelado_no_google`) e grava `cancelado_na_agenda`; o evento fica
     lá, cancelado, e quem chama apaga a linha (decisão do dono, 23/11/2026). O AuditLog é `CANCELAR_NA_AGENDA`,
     gravado antes do Google e completado, no mesmo atomic, com o desfecho (`action` e `resultado`). Se o Google

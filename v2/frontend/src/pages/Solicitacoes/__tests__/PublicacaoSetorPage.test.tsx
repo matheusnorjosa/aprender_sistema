@@ -892,10 +892,82 @@ describe('PublicacaoSetorPage — excluir evento que está no Google (decisão d
   });
 
   test('a explicação do topo diz a diferença entre tirar só do Google e excluir', async () => {
+    // Chave do CON-08 B ligada: a linha diz isso em `cancelar_na_agenda_ligado`.
+    listResponse = pageOf([
+      makeSolic({
+        gcal_status: 'PUBLISHED',
+        external_event_id: 'asv27',
+        exclui_marcando_cancelado: true,
+        cancelar_na_agenda_ligado: true,
+      }),
+    ]);
     renderPage();
-    const titulo = await screen.findByText('Publicar na agenda do Google');
-    const topo = titulo.closest('header') as HTMLElement;
+    await screen.findByLabelText(/^Cancelar evento: Vidas Em Rede/);
+    const topo = screen.getByText('Publicar na agenda do Google').closest('header') as HTMLElement;
     // Revisão da rodada 2: o Excluir de formação não tira do Google (decisão P2 do dono), e o topo cita o Cancelar evento.
+    expect(topo).toHaveTextContent(
+      'Tirar só do Google deixa o evento no sistema; Excluir tira dos dois lados, menos o evento de formação, que ' +
+        'sai do sistema e fica no Google Agenda com (CANCELADO) no título. Cancelar evento, só no evento de ' +
+        'formação, põe (CANCELADO) no título lá e deixa o evento nos dois lados.',
+    );
+  });
+
+  test('chave do CON-08 B desligada: o topo volta ao texto de antes', async () => {
+    listResponse = pageOf([
+      makeSolic({
+        gcal_status: 'PUBLISHED',
+        external_event_id: 'asv27',
+        tipo_evento_de_formacao: true,
+        exclui_marcando_cancelado: false,
+        cancelar_na_agenda_ligado: false,
+      }),
+    ]);
+    renderPage();
+    await screen.findByLabelText(/^Tirar só do Google: Vidas Em Rede/);
+    const topo = screen.getByText('Publicar na agenda do Google').closest('header') as HTMLElement;
+    expect(topo).toHaveTextContent(
+      'Tirar só do Google deixa o evento no sistema; Excluir tira dos dois lados.',
+    );
+    expect(topo).not.toHaveTextContent('(CANCELADO)');
+    expect(topo).not.toHaveTextContent('Cancelar evento');
+  });
+
+  // Triagem dos baixos: o topo segue a chave (`cancelar_na_agenda_ligado`) e o Excluir de cada linha
+  // (`exclui_marcando_cancelado`), não só a formação que estiver na página.
+  test('chave desligada com linha já cancelada na agenda: o topo diz que o Excluir dela não tira do Google', async () => {
+    listResponse = pageOf([
+      makeSolic({
+        gcal_status: 'PUBLISHED',
+        external_event_id: 'asv27',
+        tipo_evento_de_formacao: true,
+        cancelado_na_agenda: true,
+        exclui_marcando_cancelado: true,
+        cancelar_na_agenda_ligado: false,
+      }),
+    ]);
+    renderPage();
+    expect(await screen.findByText('Cancelado na agenda')).toBeInTheDocument();
+    const topo = screen.getByText('Publicar na agenda do Google').closest('header') as HTMLElement;
+    expect(topo).toHaveTextContent(
+      'Tirar só do Google deixa o evento no sistema; Excluir tira dos dois lados, menos o evento já cancelado na ' +
+        'agenda, que sai do sistema e fica no Google Agenda com (CANCELADO) no título.',
+    );
+    expect(topo).not.toHaveTextContent('Cancelar evento');
+  });
+
+  test('chave ligada sem evento de formação na página: o topo é o mesmo da página com formação', async () => {
+    listResponse = pageOf([
+      makeSolic({
+        gcal_status: 'PUBLISHED',
+        external_event_id: 'asv27',
+        tipo_evento_de_formacao: false,
+        exclui_marcando_cancelado: false,
+        cancelar_na_agenda_ligado: true,
+      }),
+    ]);
+    renderPage();
+    await screen.findByLabelText(/^Tirar só do Google: Vidas Em Rede/);
+    const topo = screen.getByText('Publicar na agenda do Google').closest('header') as HTMLElement;
     expect(topo).toHaveTextContent(
       'Tirar só do Google deixa o evento no sistema; Excluir tira dos dois lados, menos o evento de formação, que ' +
         'sai do sistema e fica no Google Agenda com (CANCELADO) no título. Cancelar evento, só no evento de ' +
@@ -1069,6 +1141,8 @@ describe('PublicacaoSetorPage — cancelar evento de formação', { timeout: 200
     external_event_id: 'asv27',
     tipo_evento_nome: 'Presencial',
     tipo_evento_de_formacao: true,
+    exclui_marcando_cancelado: true,
+    cancelar_na_agenda_ligado: true, // a chave do CON-08 B ligada no servidor
   };
 
   test('o botão fica ao lado do Tirar, confirma num diálogo e faz UM POST em /cancelar-na-agenda/', async () => {
@@ -1112,7 +1186,9 @@ describe('PublicacaoSetorPage — cancelar evento de formação', { timeout: 200
   });
 
   test('evento que não é de formação não tem Cancelar evento', async () => {
-    listResponse = pageOf([makeSolic({ ...FORMACAO, tipo_evento_de_formacao: false })]);
+    listResponse = pageOf([
+      makeSolic({ ...FORMACAO, tipo_evento_de_formacao: false, exclui_marcando_cancelado: false }),
+    ]);
     renderPage();
 
     await screen.findByLabelText(/^Tirar só do Google: Vidas Em Rede/);
@@ -1178,6 +1254,13 @@ describe('PublicacaoSetorPage — cancelar evento de formação', { timeout: 200
     ['PUBLISHED', { gcal_status: 'PUBLISHED' as const }],
     ['ERROR com id (o Cancelar falhou)', { gcal_status: 'ERROR' as const, gcal_last_error: 'Google fora' }],
     ['marcada sem a flag de formação', { gcal_status: 'PUBLISHED' as const, tipo_evento_de_formacao: false }],
+    // Marcada quando a chave esteve ligada; desligada depois, o Excluir dela segue marcando: o Cancelar terminou, e o
+    // servidor manda `exclui_marcando_cancelado: true`, também em ERROR (triagem dos baixos).
+    ['marcada com a chave desligada', { gcal_status: 'PUBLISHED' as const, cancelar_na_agenda_ligado: false }],
+    [
+      'marcada em ERROR com o Cancelar confirmado e a chave desligada',
+      { gcal_status: 'ERROR' as const, gcal_last_error: 'x', cancelar_na_agenda_ligado: false },
+    ],
   ])('Excluir de linha já cancelada na agenda (%s): fica no Google com (CANCELADO)', async (_caso, extra) => {
     listResponse = pageOf([makeSolic({ ...FORMACAO, ...extra, cancelado_na_agenda: true, pode_excluir: true })]);
     deleteResult = () => {
@@ -1242,6 +1325,88 @@ describe('PublicacaoSetorPage — cancelar evento de formação', { timeout: 200
       expect(message.success).toHaveBeenCalledWith(
         'Evento excluído do sistema; se chegou ao Google Agenda, ele fica lá com (CANCELADO) no título.',
       ),
+    );
+  });
+});
+
+describe('PublicacaoSetorPage — chave do CON-08 B desligada', { timeout: 20000 }, () => {
+  const FORMACAO_DESLIGADA = {
+    gcal_status: 'PUBLISHED' as const,
+    external_event_id: 'asv27',
+    tipo_evento_nome: 'Presencial',
+    tipo_evento_de_formacao: true,
+    exclui_marcando_cancelado: false,
+    cancelar_na_agenda_ligado: false,
+  };
+
+  test('formação no Google: Tirar só do Google, sem Cancelar evento', async () => {
+    listResponse = pageOf([makeSolic(FORMACAO_DESLIGADA)]);
+    renderPage();
+
+    expect(await screen.findByLabelText(/^Tirar só do Google: Vidas Em Rede/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Cancelar evento:/)).not.toBeInTheDocument();
+  });
+
+  // Revisão da rodada 1 da chave: o Cancelar falhou antes do Google (o título lá não tem a marca). A linha não fica
+  // presa: Tirar só do Google e o Excluir tiram o evento de lá, como antes do CON-08 B.
+  test('cancelamento que falhou: a etiqueta fica, sem Cancelar evento para refazer, com Tirar só do Google', async () => {
+    listResponse = pageOf([
+      makeSolic({ ...FORMACAO_DESLIGADA, gcal_status: 'ERROR', cancelado_na_agenda: true, gcal_last_error: 'x' }),
+    ]);
+    renderPage();
+
+    expect(await screen.findByText('Erro ao cancelar')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Cancelar evento:/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^Tirar só do Google: Vidas Em Rede/)).toBeInTheDocument();
+  });
+
+  test('Excluir do cancelamento que falhou tira dos dois lados', async () => {
+    listResponse = pageOf([
+      makeSolic({
+        ...FORMACAO_DESLIGADA,
+        gcal_status: 'ERROR',
+        cancelado_na_agenda: true,
+        gcal_last_error: 'x',
+        pode_excluir: true,
+      }),
+    ]);
+    deleteResult = () => {
+      listResponse = pageOf([]);
+      return Promise.resolve(undefined);
+    };
+    renderPage();
+
+    fireEvent.click(await screen.findByLabelText(/^Excluir: Vidas Em Rede/));
+    const dialogo = await screen.findByRole('dialog');
+    expect(dialogo).toHaveTextContent(
+      '10/10/2099 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e do Google Agenda, se estiver lá. Não dá para desfazer.',
+    );
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Sim, excluir' }));
+
+    await waitFor(() => expect(deleteCalls()).toHaveLength(1));
+    await waitFor(() =>
+      expect(message.success).toHaveBeenCalledWith('Evento excluído do sistema e do Google Agenda.'),
+    );
+  });
+
+  test('Excluir de formação tira dos dois lados, como antes', async () => {
+    listResponse = pageOf([makeSolic({ ...FORMACAO_DESLIGADA, pode_excluir: true })]);
+    deleteResult = () => {
+      listResponse = pageOf([]);
+      return Promise.resolve(undefined);
+    };
+    renderPage();
+
+    fireEvent.click(await screen.findByLabelText(/^Excluir: Vidas Em Rede/));
+    const dialogo = await screen.findByRole('dialog');
+    expect(dialogo).toHaveTextContent(
+      '10/10/2099 09:00 · Sobral · Vidas Em Rede. Ele sai do sistema e do Google Agenda. Não dá para desfazer.',
+    );
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Sim, excluir' }));
+
+    await waitFor(() => expect(deleteCalls()).toHaveLength(1));
+    await waitFor(() =>
+      expect(message.success).toHaveBeenCalledWith('Evento excluído do sistema e do Google Agenda.'),
     );
   });
 });

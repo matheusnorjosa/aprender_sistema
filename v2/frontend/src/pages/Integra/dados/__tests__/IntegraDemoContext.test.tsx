@@ -12,6 +12,8 @@ import { gerarDadosSimulados } from '../gerador';
 const dados = gerarDadosSimulados();
 const wrapper = ({ children }: { children: ReactNode }) => <IntegraDemoProvider>{children}</IntegraDemoProvider>;
 const AUTOR = 'Você (demonstração)';
+/** Município da Lucinéia (101) que ela divide com a Rosimeire (103). */
+const PONTA_GROSSA = dados.base.municipios.find((m) => m.nome === 'Ponta Grossa')!.id;
 
 /** Um movimento válido: o primeiro município ativo da coordenadora mais carregada vai para a recém-chegada. */
 function movimentoValido() {
@@ -47,8 +49,8 @@ describe('useIntegraDemo', { timeout: 20000 }, () => {
     const { result } = renderHook(() => useIntegraDemo(), { wrapper });
     let id = '';
     act(() => {
-      // Belém-PA sai da Lucinéia (já em Sobrecarga) e vai para a Heloísa (Atenção em 2026.1).
-      const r = result.current.proporRemanejamento([{ municipioId: 1, deCoordenadorId: 101, paraCoordenadorId: 104 }], 'teste');
+      // Ponta Grossa-PR sai da Lucinéia (já em Sobrecarga) e vai para a Heloísa (Atenção no 2026.2 publicado).
+      const r = result.current.proporRemanejamento([{ municipioId: PONTA_GROSSA, deCoordenadorId: 101, paraCoordenadorId: 104 }], 'teste');
       if (r.ok) id = r.id;
     });
     act(() => result.current.aprovarRemanejamento(id));
@@ -56,18 +58,18 @@ describe('useIntegraDemo', { timeout: 20000 }, () => {
       result.current.aplicarRemanejamento(id);
     });
     const sobrecarga = result.current.alertas.filter((a) => a.tipo === 'sobrecarga');
-    expect(sobrecarga.map((a) => a.titulo)).toEqual(['Heloísa Pimentel entrou em Sobrecarga (137)']);
+    expect(sobrecarga.map((a) => a.titulo)).toEqual(['Heloísa Pimentel entrou em Sobrecarga (136)']);
     expect(sobrecarga[0]?.quemReceberia[1]).toMatch(/^Gestora técnica \(/);
   });
 
   it('depois de mudar a carteira, "entrou em Sobrecarga" compara com o último cálculo publicado (2026.2)', () => {
     const { result } = renderHook(() => useIntegraDemo(), { wrapper });
-    const manaus = dados.base.municipios.find((m) => m.nome === 'Manaus');
-    if (!manaus) throw new Error('sem Manaus');
-    // Jucélia (107): Sobrecarga em 2026.1, Atenção no 2026.2 publicado; com Manaus, volta à Sobrecarga.
+    const cianorte = dados.base.municipios.find((m) => m.nome === 'Cianorte');
+    if (!cianorte) throw new Error('sem Cianorte');
+    // Jucélia (107): Sobrecarga em 2026.1, Atenção no 2026.2 publicado; com Cianorte, volta à Sobrecarga.
     let id = '';
     act(() => {
-      const r = result.current.proporRemanejamento([{ municipioId: manaus.id, deCoordenadorId: 101, paraCoordenadorId: 107 }], 'teste');
+      const r = result.current.proporRemanejamento([{ municipioId: cianorte.id, deCoordenadorId: 101, paraCoordenadorId: 107 }], 'teste');
       if (r.ok) id = r.id;
     });
     act(() => result.current.aprovarRemanejamento(id));
@@ -150,11 +152,11 @@ describe('useIntegraDemo', { timeout: 20000 }, () => {
 
   it('proposta que ficou velha não é aplicada: nada muda e a resposta diz por quê', () => {
     const { result } = renderHook(() => useIntegraDemo(), { wrapper });
-    // Duas propostas para o mesmo município (Belém-PA, da Lucinéia): cada uma é válida quando é feita.
+    // Duas propostas para o mesmo município (Ponta Grossa-PR, da Lucinéia): cada uma é válida quando é feita.
     const ids: string[] = [];
     for (const destino of [104, 105]) {
       act(() => {
-        const r = result.current.proporRemanejamento([{ municipioId: 1, deCoordenadorId: 101, paraCoordenadorId: destino }], 'teste');
+        const r = result.current.proporRemanejamento([{ municipioId: PONTA_GROSSA, deCoordenadorId: 101, paraCoordenadorId: destino }], 'teste');
         if (r.ok) ids.push(r.id);
       });
     }
@@ -173,7 +175,7 @@ describe('useIntegraDemo', { timeout: 20000 }, () => {
     const [resposta] = respostas;
     expect(resposta?.ok).toBe(false);
     expect(resposta && !resposta.ok ? resposta.erros : []).toEqual([
-      'Esta proposta ficou velha: Belém-PA já não está com Lucinéia Barreto. Proponha de novo a partir da carteira de agora.',
+      'Esta proposta ficou velha: Ponta Grossa-PR já não está com Lucinéia Barreto. Proponha de novo a partir da carteira de agora.',
     ]);
     expect(result.current.base).toBe(baseDepoisDeA);
     expect(result.current.remanejamentos.find((r) => r.id === b)).toMatchObject({ status: 'aprovado', aplicado_em: null });
@@ -181,13 +183,13 @@ describe('useIntegraDemo', { timeout: 20000 }, () => {
 
   it('duas propostas no mesmo município em cadeia: a segunda, feita antes da primeira valer, é recusada', () => {
     const { result } = renderHook(() => useIntegraDemo(), { wrapper });
-    const recife = dados.base.municipios.find((m) => m.nome === 'Recife' && m.uf === 'PE')!.id;
+    const beloJardim = dados.base.municipios.find((m) => m.nome === 'Belo Jardim' && m.uf === 'PE')!.id;
     const ica = (id: number) => result.current.resultado.coordenadores.find((c) => c.coordenador.id === id)?.conta.icaExibido;
-    // P1: Recife de 106 para 111. P2 (com a base ainda intacta): Recife de 111 para 104.
+    // P1: Belo Jardim de 106 para 111. P2 (com a base ainda intacta): Belo Jardim de 111 para 104.
     const ids: string[] = [];
     for (const [de, para] of [[106, 111], [111, 104]] as const) {
       act(() => {
-        const r = result.current.proporRemanejamento([{ municipioId: recife, deCoordenadorId: de, paraCoordenadorId: para }], 'teste');
+        const r = result.current.proporRemanejamento([{ municipioId: beloJardim, deCoordenadorId: de, paraCoordenadorId: para }], 'teste');
         if (!r.ok) throw new Error(r.erros.join(' '));
         ids.push(r.id);
       });
@@ -207,7 +209,7 @@ describe('useIntegraDemo', { timeout: 20000 }, () => {
     });
     const [resposta] = respostas;
     expect(resposta && !resposta.ok ? resposta.erros : []).toEqual([
-      'Esta proposta ficou velha: a carteira de Socorro Bezerra Lins em Recife-PE mudou depois da proposta. Proponha de novo a partir da carteira de agora.',
+      'Esta proposta ficou velha: a carteira de Socorro Bezerra Lins em Belo Jardim-PE mudou depois da proposta. Proponha de novo a partir da carteira de agora.',
     ]);
     // Nada mudou: a P2 não levou o que a P1 acabou de entregar.
     expect(result.current.base).toBe(baseDepoisDeP1);
@@ -261,7 +263,7 @@ describe('reducerIntegraDemo', () => {
   it('aplicar proposta com movimento que já não vale devolve o estado como está', () => {
     const aprovada = (id: string, para: number) => ({
       id,
-      movimentos: [{ municipioId: 1, deCoordenadorId: 101, paraCoordenadorId: para }],
+      movimentos: [{ municipioId: PONTA_GROSSA, deCoordenadorId: 101, paraCoordenadorId: para }],
       justificativa: 'x',
       status: 'aprovado' as const,
       proposto_por: AUTOR,

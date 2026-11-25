@@ -1,0 +1,269 @@
+/**
+ * Semáforo — Indicadores da Líder do NFP: contagem por cor, por gerência, evolução dos ciclos e tarefas
+ * vencidas. Gráfico feito à mão, com a tabela ao lado. DADOS SIMULADOS.
+ */
+import { MemoryRouter } from 'react-router';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+
+import { gerarDadosSimulados } from '../../dados/gerador';
+import { calcularEquipe } from '../../ica/calculo';
+import * as exportar from '../../ica/exportar';
+import { QUEM_VE } from '../../quemVe';
+import IndicadoresLider from '../IndicadoresLider';
+import { SemaforoDemoProvider } from '../SemaforoDemoContext';
+import {
+  avaliarMunicipio,
+  gerarDadosSemaforo,
+  HISTORIAS_SEMAFORO,
+  mesesCurtosDoCiclo,
+  SEMENTE_SEMAFORO,
+  type DadosSemaforo,
+} from '../dados';
+import { estadoDaTarefa, mediaDaPesquisa, mediaNps, reuniaoEmDia, umaCasa } from '../regras';
+
+const DADOS = gerarDadosSemaforo();
+const SITUACOES = DADOS.municipios.map((m) => avaliarMunicipio(DADOS, m.id));
+/** O último ciclo fechado: a pesquisa dele já fechou. */
+const FECHADO = DADOS.ciclos.at(-2)!;
+const contar = (cor: string): number => SITUACOES.filter((s) => s.cor_vigente === cor).length;
+const ESTADOS = DADOS.tarefas.map((t) => estadoDaTarefa(t, DADOS.data_referencia));
+
+function renderizar(dados?: DadosSemaforo): void {
+  render(
+    <MemoryRouter>
+      <SemaforoDemoProvider dados={dados}>
+        <IndicadoresLider />
+      </SemaforoDemoProvider>
+    </MemoryRouter>,
+  );
+}
+
+describe('Semáforo — Indicadores da Líder', { timeout: 20000 }, () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  test('título, quem vê na versão real e a contagem por cor em vigor (nome e número)', async () => {
+    renderizar();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Indicadores da Líder do NFP' })).toBeInTheDocument();
+    expect(screen.getByText(QUEM_VE.lider.aviso)).toBeInTheDocument();
+    const lista = screen.getByRole('list', { name: 'Municípios por cor em vigor' });
+    const itens = within(lista).getAllByRole('listitem');
+    expect(itens.map((li) => li.textContent)).toEqual([
+      `Verde: ${contar('verde')} municípios`,
+      `Amarelo: ${contar('amarelo')} municípios`,
+      `Vermelho: ${contar('vermelho')} municípios`,
+    ]);
+    expect(contar('verde') + contar('amarelo') + contar('vermelho')).toBe(DADOS.municipios.length);
+  });
+
+  test('evolução dos ciclos: gráfico com texto e tabela com caption, uma linha por ciclo publicado e hoje', async () => {
+    renderizar();
+    const tabela = await screen.findByRole('table', { name: 'Cor publicada em cada ciclo' });
+    const linhas = within(tabela).getAllByRole('row').slice(1);
+    expect(linhas).toHaveLength(DADOS.ciclos.length);
+    const ultimoFechado = DADOS.ciclos.at(-2)!;
+    const i = DADOS.ciclos.indexOf(ultimoFechado);
+    const doCiclo = (cor: string) => SITUACOES.filter((s) => s.ciclos[i]?.decisao?.cor_publicada === cor).length;
+    // O ciclo vem com os meses (no ICA, o mesmo formato quer dizer semestre).
+    const rotulo = `${ultimoFechado} (${mesesCurtosDoCiclo(ultimoFechado)})`;
+    const linha = linhas.find((l) => within(l).queryByRole('rowheader', { name: rotulo }))!;
+    expect(within(linha).getAllByRole('cell').map((c) => c.textContent)).toEqual([
+      String(doCiclo('verde')),
+      String(doCiclo('amarelo')),
+      String(doCiclo('vermelho')),
+    ]);
+    expect(within(linhas.at(-1)!).getByRole('rowheader')).toHaveTextContent('Hoje (07/12/2026)');
+    // O gráfico escreve os números: a cor nunca fala sozinha.
+    const grafico = screen.getByRole('figure', { name: /Evolução das cores/ });
+    expect(grafico).toHaveTextContent(
+      `${rotulo}: Verde ${doCiclo('verde')} · Amarelo ${doCiclo('amarelo')} · Vermelho ${doCiclo('vermelho')}`,
+    );
+  });
+
+  test('barra da evolução: uma divisória branca separa as cores (os tons forte têm quase a mesma luminância)', async () => {
+    renderizar();
+    const grafico = await screen.findByRole('figure', { name: /Evolução das cores/ });
+    const barras = [...grafico.querySelectorAll('[aria-hidden="true"]')].map((b) => [...b.children] as HTMLElement[]);
+    expect(barras.some((pedacos) => pedacos.length > 1)).toBe(true);
+    for (const [primeiro, ...depois] of barras) {
+      expect(primeiro).not.toHaveStyle({ borderLeft: '2px solid #ffffff' });
+      for (const pedaco of depois) expect(pedaco).toHaveStyle({ borderLeft: '2px solid #ffffff' });
+    }
+  });
+
+  test('por gerência: as três gerências e a linha sem coordenador somam todos os municípios', async () => {
+    renderizar();
+    const tabela = await screen.findByRole('table', { name: 'Municípios por gerência, pela cor em vigor' });
+    const linhas = within(tabela).getAllByRole('row').slice(1);
+    const nomes = linhas.map((l) => within(l).getByRole('rowheader').textContent);
+    expect(nomes).toEqual(['Gerência 1', 'Gerência 2', 'Gerência 3', 'Sem coordenador']);
+    const total = linhas.reduce((s, l) => s + Number(within(l).getAllByRole('cell')[0]!.textContent), 0);
+    expect(total).toBe(DADOS.municipios.length);
+  });
+
+  test('nada rola para o lado: no celular, a tabela por gerência vira lista com as cores escritas, e a dos ciclos sai (o gráfico já escreve os números)', async () => {
+    renderizar();
+    await screen.findByRole('heading', { level: 1 });
+    expect(document.querySelector('.overflow-x-auto')).toBeNull();
+    const nome = 'Municípios por gerência, pela cor em vigor';
+    expect(screen.getByRole('table', { name: nome }).closest('.hidden.sm\\:block')).not.toBeNull();
+    const lista = screen.getByRole('list', { name: nome });
+    expect(lista).toHaveClass('sm:hidden');
+    const itens = within(lista).getAllByRole('listitem').map((li) => li.textContent);
+    expect(itens.map((t) => t?.split(':')[0])).toEqual(['Gerência 1', 'Gerência 2', 'Gerência 3', 'Sem coordenador']);
+    expect(itens[0]).toMatch(/^Gerência 1: \d+ municípios · Verde \d+ · Amarelo \d+ · Vermelho \d+$/);
+    expect(screen.getByRole('table', { name: 'Cor publicada em cada ciclo' }).closest('.hidden.sm\\:block')).not.toBeNull();
+    expect(screen.queryByRole('list', { name: 'Cor publicada em cada ciclo' })).not.toBeInTheDocument();
+  });
+
+  test('o retrato diz que as cores são as publicadas: um registro novo muda só a cor sugerida', async () => {
+    renderizar();
+    const retrato = await screen.findByText(/Retrato de hoje/);
+    expect(retrato).toHaveTextContent(/As cores desta tela são as publicadas pelo Comitê: mudam quando ele publica/);
+    expect(retrato).toHaveTextContent(/Um registro novo nesta demonstração muda só a cor sugerida/);
+    expect(retrato).not.toHaveTextContent(/Muda na hora quando algo é registrado/);
+  });
+
+  test('os indicadores da seção 7 do PDF para a Líder: resposta à pesquisa, reuniões, satisfação, plano de ação e ICA', async () => {
+    renderizar();
+    const lista = await screen.findByRole('list', { name: 'Indicadores da seção 7 do PDF' });
+    const item = (titulo: RegExp): string =>
+      within(lista)
+        .getAllByRole('listitem')
+        .find((li) => titulo.test(li.textContent ?? ''))?.textContent ?? '';
+    const pct = (n: number, total: number): string => `${Math.round((n * 100) / total)}%`;
+    const N = DADOS.municipios.length;
+
+    // Taxa de resposta (meta 80%): o último ciclo fechado, em que o prazo da pesquisa já acabou.
+    const responderam = DADOS.municipios.filter((m) =>
+      DADOS.respostas.some((r) => r.municipio === m.id && r.ciclo === FECHADO && r.no_prazo),
+    ).length;
+    expect(item(/Taxa de resposta à pesquisa/)).toContain(`${responderam} de ${N} municípios (${pct(responderam, N)})`);
+    expect(item(/Taxa de resposta à pesquisa/)).toContain('Meta: 80% ou mais');
+
+    // Reunião de escuta no período da cor em vigor (meta 100%).
+    const emDia = SITUACOES.filter((s) =>
+      reuniaoEmDia(DADOS.reunioes.filter((x) => x.municipio === s.municipio).map((x) => x.data), s.cor_vigente, DADOS.data_referencia),
+    ).length;
+    expect(item(/Reuniões de escuta no período/)).toContain(`${emDia} de ${N} municípios (${pct(emDia, N)})`);
+    expect(item(/Reuniões de escuta no período/)).toContain('Meta: 100%');
+
+    // Satisfação média e NPS de todas as respostas do ciclo fechado.
+    const doCiclo = DADOS.respostas.filter((r) => r.ciclo === FECHADO);
+    expect(item(/Satisfação média e NPS/)).toContain(`Média ${umaCasa(mediaDaPesquisa(doCiclo)!)} · NPS ${umaCasa(mediaNps(doCiclo)!)}`);
+
+    // Vermelho com o plano de ação no prazo (Horizonte-CE: publicado em 02/12, prazo 17/12).
+    const vermelhos = SITUACOES.filter((s) => s.cor_vigente === 'vermelho').length;
+    expect(item(/plano de ação no prazo/)).toContain(`${vermelhos} de ${vermelhos} municípios em vermelho`);
+
+    // Distribuição do ICA (meta entre 70 e 130), do retrato publicado do ICA.
+    const ica = gerarDadosSimulados(SEMENTE_SEMAFORO);
+    const equipe = calcularEquipe(ica.base, ica.versoes_pesos.find((v) => v.id === ica.versao_vigente)!.pesos);
+    const comCarteira = equipe.coordenadores.filter((c) => !c.semMunicipios);
+    const dentro = comCarteira.filter((c) => c.conta.dentroDaMeta).length;
+    expect(item(/Distribuição do ICA/)).toContain(`${dentro} de ${comCarteira.length} coordenadores entre 70 e 130`);
+    expect(item(/Distribuição do ICA/)).toContain('Meta: entre 70 e 130');
+  });
+
+  test('satisfação média e NPS por coordenador e por gestora de referência, no último ciclo fechado', async () => {
+    renderizar();
+    const porCoordenador = await screen.findByRole('table', { name: `Satisfação por coordenador, ciclo ${FECHADO}` });
+    const m = DADOS.municipios.find((x) => x.coordenador !== null)!;
+    const coordenador = DADOS.coordenadores.find((c) => c.id === m.coordenador)!;
+    const ids = new Set(DADOS.municipios.filter((x) => x.coordenador === coordenador.id).map((x) => x.id));
+    const respostas = DADOS.respostas.filter((r) => r.ciclo === FECHADO && ids.has(r.municipio));
+    const linha = within(porCoordenador).getByRole('rowheader', { name: coordenador.nome }).closest('tr')!;
+    expect(within(linha).getAllByRole('cell').map((c) => c.textContent)).toEqual([
+      umaCasa(mediaDaPesquisa(respostas)!),
+      umaCasa(mediaNps(respostas)!),
+    ]);
+    const porGestora = screen.getByRole('table', { name: `Satisfação por gestora de referência, ciclo ${FECHADO}` });
+    expect(within(porGestora).getAllByRole('row').slice(1)).toHaveLength(DADOS.pessoas.length);
+  });
+
+  test('o que a seção 7 pede e o protótipo ainda não mede fica escrito na tela', async () => {
+    renderizar();
+    const lista = await screen.findByRole('list', { name: 'Ainda não medidos no protótipo' });
+    expect(lista).toHaveTextContent(/Tempo médio de resposta a ocorrências/);
+    expect(lista).toHaveTextContent(/48 h ou menos/);
+    expect(lista).toHaveTextContent(/Convergência entre a pesquisa e as ocorrências/);
+    expect(lista).toHaveTextContent(/por projeto/);
+  });
+
+  test('tarefas: contagem por situação e a que vence hoje (Horizonte-CE), com quem receberia o alerta', async () => {
+    renderizar();
+    const resumo = await screen.findByRole('list', { name: 'Tarefas por situação' });
+    expect(resumo).toHaveTextContent(`Vencidas: ${ESTADOS.filter((e) => e === 'vencida').length}`);
+    expect(resumo).toHaveTextContent(`Vencem hoje: ${ESTADOS.filter((e) => e === 'vence_hoje').length}`);
+    expect(resumo).toHaveTextContent(`No prazo: ${ESTADOS.filter((e) => e === 'no_prazo').length}`);
+    expect(resumo).toHaveTextContent(`Concluídas: ${ESTADOS.filter((e) => e === 'concluida').length}`);
+
+    const { nome, uf } = HISTORIAS_SEMAFORO.vermelho_prazo_hoje;
+    const cartao = screen.getByText(`Reunião com a Secretaria · ${nome}-${uf}`).closest('li') as HTMLElement;
+    expect(cartao).toHaveTextContent('Vence hoje');
+    expect(cartao).toHaveTextContent('Prazo: 07/12/2026');
+    // Seção 8 do PDF: o alerta de prazo vai para o responsável pela tarefa (no vermelho, a gestora de referência e a
+    // gestora pedagógica) e para a SPE. A Líder do NFP não recebe este alerta.
+    const municipio = DADOS.municipios.find((m) => m.nome === nome && m.uf === uf)!;
+    const gestora = DADOS.pessoas.find((p) => p.id === municipio.gestora_referencia)!.nome;
+    expect(cartao).toHaveTextContent(`Seria enviado para: ${gestora} (gestora de referência), Gestora pedagógica, SPE`);
+    expect(cartao).not.toHaveTextContent('Líder do NFP');
+    expect(screen.getByText(/Nada é enviado/)).toBeInTheDocument();
+  });
+
+  test('tarefa que vence amanhã também aparece (seção 8: um dia antes e no vencimento), para o responsável e a SPE', async () => {
+    const m = DADOS.municipios.find((x) => x.coordenador !== null)!;
+    const gestora = DADOS.pessoas.find((p) => p.id === m.gestora_referencia)!.nome;
+    const coordenador = DADOS.coordenadores.find((c) => c.id === m.coordenador)!.nome;
+    renderizar({
+      ...DADOS,
+      tarefas: [
+        ...DADOS.tarefas,
+        {
+          chave: 'contato_articulador',
+          titulo: 'Contato com o articulador',
+          municipio: m.id,
+          cor: 'amarelo',
+          criada_em: '2026-11-24',
+          prazo_em: '2026-12-08',
+          concluida_em: null,
+        },
+      ],
+    });
+    expect(await screen.findByRole('heading', { level: 3, name: 'Vencidas e que vencem hoje ou amanhã' })).toBeInTheDocument();
+    const cartao = screen.getByText(`Contato com o articulador · ${m.nome}-${m.uf}`).closest('li') as HTMLElement;
+    expect(cartao).toHaveTextContent('Situação: Vence amanhã');
+    expect(cartao).toHaveTextContent('Prazo: 08/12/2026');
+    expect(cartao).toHaveTextContent(`Seria enviado para: ${gestora} (gestora de referência), ${coordenador} (coordenador), SPE`);
+  });
+
+  test('o ciclo aparece com os meses: no ICA, o mesmo formato quer dizer semestre', async () => {
+    renderizar();
+    expect(await screen.findByText(/com o ciclo 2026\.6 \(novembro e dezembro de 2026\) em andamento/)).toBeInTheDocument();
+    const tabela = screen.getByRole('table', { name: 'Cor publicada em cada ciclo' });
+    expect(within(tabela).getByRole('rowheader', { name: '2026.5 (set–out 2026)' })).toBeInTheDocument();
+  });
+
+  test('baixar planilha: um município por linha, com a cor de cada ciclo', async () => {
+    const baixar = vi.spyOn(exportar, 'baixarCsv').mockImplementation(() => undefined);
+    renderizar();
+    await userEvent.click(await screen.findByRole('button', { name: /Baixar planilha/ }));
+    const [nome, cabecalho, linhas] = baixar.mock.calls[0]!;
+    expect(nome).toBe('semaforo_indicadores_lider.csv');
+    const publicadas = DADOS.ciclos.slice(0, -1).map((c) => `Publicada em ${c}`);
+    expect(cabecalho).toEqual(expect.arrayContaining(['Município', 'UF', 'Gerência', 'Cor em vigor', ...publicadas]));
+    // A satisfação por município (seção 7) vai na planilha: na tela, por coordenador e por gestora.
+    expect(cabecalho).toEqual(
+      expect.arrayContaining([
+        `Média da pesquisa (${FECHADO})`,
+        `NPS (${FECHADO})`,
+        `Respondeu no prazo (${FECHADO})`,
+        'Reunião de escuta em dia',
+      ]),
+    );
+    expect(linhas).toHaveLength(DADOS.municipios.length);
+  });
+});

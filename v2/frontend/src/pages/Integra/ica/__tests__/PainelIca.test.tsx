@@ -11,6 +11,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { definirLarguraTela } from '../../../../test/larguraTela';
+import { gerarDadosSimulados } from '../../dados/gerador';
 import { IntegraDemoProvider, useIntegraDemo } from '../../dados/IntegraDemoContext';
 import { baixarCsv, imprimirPagina } from '../exportar';
 import PainelIca from '../PainelIca';
@@ -23,20 +24,22 @@ async function barras(): Promise<HTMLElement[]> {
   return within(lista).getAllByRole('listitem');
 }
 
-/** Propõe, aprova e aplica Belém-PA (1) da Lucinéia (101) para a Heloísa (104), como o Simulador faria. */
-function MoverBelem(): JSX.Element {
+const PONTA_GROSSA = gerarDadosSimulados().base.municipios.find((m) => m.nome === 'Ponta Grossa')!.id;
+
+/** Propõe, aprova e aplica Ponta Grossa-PR da Lucinéia (101) para a Heloísa (104), como o Simulador faria. */
+function MoverPontaGrossa(): JSX.Element {
   const { proporRemanejamento, aprovarRemanejamento, aplicarRemanejamento } = useIntegraDemo();
   return (
     <button
       type="button"
       onClick={() => {
-        const r = proporRemanejamento([{ municipioId: 1, deCoordenadorId: 101, paraCoordenadorId: 104 }], 'teste do painel');
+        const r = proporRemanejamento([{ municipioId: PONTA_GROSSA, deCoordenadorId: 101, paraCoordenadorId: 104 }], 'teste do painel');
         if (!r.ok) throw new Error(r.erros.join(' '));
         aprovarRemanejamento(r.id);
         aplicarRemanejamento(r.id);
       }}
     >
-      mover Belém
+      mover Ponta Grossa
     </button>
   );
 }
@@ -45,7 +48,7 @@ function renderPainelComMudanca(): void {
   render(
     <MemoryRouter initialEntries={['/integra/ica']}>
       <IntegraDemoProvider>
-        <MoverBelem />
+        <MoverPontaGrossa />
         <Routes>
           <Route path="/integra/ica" element={<PainelIca />} />
         </Routes>
@@ -82,7 +85,7 @@ describe('Painel do ICA', { timeout: 20000 }, () => {
       '5 em Capacidade disponível',
       '1 sem municípios',
       'Média: 100',
-      'Dispersão: desvio 30,8 · menor 58 · maior 169',
+      'Dispersão: desvio 30,9 · menor 58 · maior 169',
     ]);
   });
 
@@ -143,7 +146,7 @@ describe('Painel do ICA', { timeout: 20000 }, () => {
     await user.selectOptions(screen.getByLabelText('Semestre'), '2026.1');
     const itens = await barras();
     expect(itens).toHaveLength(16);
-    expect(itens[0]).toHaveTextContent('192 · Sobrecarga');
+    expect(itens[0]).toHaveTextContent('191 · Sobrecarga');
     expect(screen.getByText(/Retrato de 2026\.1, calculado em 15\/06\/2026/)).toHaveTextContent(/proposta v5/);
   });
 
@@ -264,7 +267,7 @@ describe('Painel do ICA', { timeout: 20000 }, () => {
     const user = userEvent.setup();
     renderPainelComMudanca();
     await barras();
-    await user.click(screen.getByRole('button', { name: 'mover Belém' }));
+    await user.click(screen.getByRole('button', { name: 'mover Ponta Grossa' }));
 
     const semestre = screen.getByLabelText('Semestre');
     expect(within(semestre).getAllByRole('option').map((o) => o.textContent)).toEqual([
@@ -275,8 +278,8 @@ describe('Painel do ICA', { timeout: 20000 }, () => {
     ]);
     expect(within(semestre).getByRole('option', { name: 'Agora (nesta demonstração)' })).toHaveProperty('selected', true);
     const itens = await barras();
-    expect(itemDe(itens, 'Heloísa Pimentel')).toHaveTextContent('137 · Sobrecarga');
-    expect(itemDe(itens, 'Lucinéia Barreto')).toHaveTextContent('156 · Sobrecarga');
+    expect(itemDe(itens, 'Heloísa Pimentel')).toHaveTextContent('136 · Sobrecarga');
+    expect(itemDe(itens, 'Lucinéia Barreto')).toHaveTextContent('157 · Sobrecarga');
     expect(screen.getByText(/O ICA compara a carga/)).toHaveTextContent(/nesta demonstração/);
     expect(screen.getByText(/O ICA compara a carga/)).not.toHaveTextContent(/\(atual\)/);
     expect(screen.getByText(/^Filtros:/)).toHaveTextContent('Semestre: Agora (nesta demonstração)');
@@ -284,14 +287,14 @@ describe('Painel do ICA', { timeout: 20000 }, () => {
     await user.click(screen.getByRole('button', { name: /Baixar planilha/ }));
     const [nome, , linhas] = vi.mocked(baixarCsv).mock.calls[0] as Parameters<typeof baixarCsv>;
     expect(nome).toBe('ica_painel_2026-2_nesta-demonstracao.csv');
-    expect(linhas.find((l) => l[0] === 'Heloísa Pimentel')?.[3]).toBe(137);
+    expect(linhas.find((l) => l[0] === 'Heloísa Pimentel')?.[3]).toBe(136);
   });
 
   test('depois de uma mudança na sessão, 2026.2 mostra o retrato publicado, como a Ficha e o Histórico', async () => {
     const user = userEvent.setup();
     renderPainelComMudanca();
     await barras();
-    await user.click(screen.getByRole('button', { name: 'mover Belém' }));
+    await user.click(screen.getByRole('button', { name: 'mover Ponta Grossa' }));
     await user.selectOptions(screen.getByLabelText('Semestre'), '2026.2');
 
     const itens = await barras();
@@ -307,7 +310,7 @@ describe('Painel do ICA', { timeout: 20000 }, () => {
 
     // E volta para o recálculo da sessão.
     await user.selectOptions(screen.getByLabelText('Semestre'), 'Agora (nesta demonstração)');
-    expect(itemDe(await barras(), 'Heloísa Pimentel')).toHaveTextContent('137 · Sobrecarga');
+    expect(itemDe(await barras(), 'Heloísa Pimentel')).toHaveTextContent('136 · Sobrecarga');
   });
 
   test('a 400 px a tabela manda colunas para a linha expandida (sem rolagem horizontal)', async () => {

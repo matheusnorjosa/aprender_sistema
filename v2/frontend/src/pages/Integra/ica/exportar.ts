@@ -23,7 +23,8 @@ const SEPARADOR = ';';
  * Primeira linha de todo CSV da Integra, e prefixo de todo nome de arquivo: a planilha anexada a um
  * e-mail ou aberta no Excel não pode passar por exportação real do sistema.
  */
-const AVISO_SIMULADO = 'DADOS SIMULADOS: pessoas fictícias e números gerados na tela. Nada foi gravado.';
+const AVISO_SIMULADO =
+  'DADOS SIMULADOS: pessoas fictícias e números gerados na tela, mas os municípios são reais e os tempos de deslocamento são as estimativas do relatório da Coordenação Pedagógica. Nada foi gravado.';
 const PREFIXO_ARQUIVO = 'SIMULADO_';
 
 function celula(valor: CelulaCsv): string {

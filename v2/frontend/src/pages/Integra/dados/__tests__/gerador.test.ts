@@ -12,6 +12,7 @@ import {
   compararPesos,
   medianaDeslocamento,
 } from '../../ica/calculo';
+import { DESLOCAMENTO_MUNICIPIOS, medianaIdaVolta } from '../deslocamento';
 import { carregarDadosIntegra } from '../fonte';
 import { SEMENTE_DEMO, criarPrng, gerarDadosSimulados } from '../gerador';
 import { contarNomesReais, guardaDeNomesReaisAtiva } from '../../__tests__/nomesReais';
@@ -50,23 +51,43 @@ describe('gerarDadosSimulados', () => {
     expect(referencia.size).toBeLessThanOrEqual(5);
   });
 
-  it('cerca de 60 municípios reais, únicos, com Petrolina-PE e Milagres-CE de carro', () => {
+  it('os 92 municípios do relatório de deslocamento, com o tempo real de ida e volta e o meio', () => {
     const ms = dados.base.municipios;
-    expect(ms.length).toBeGreaterThanOrEqual(55);
-    expect(ms.length).toBeLessThanOrEqual(65);
+    // 92 do relatório + o contrato sem município definido (Amigos do Bem).
+    expect(ms).toHaveLength(DESLOCAMENTO_MUNICIPIOS.length + 1);
+    expect(DESLOCAMENTO_MUNICIPIOS).toHaveLength(92);
     expect(new Set(ms.map((m) => `${m.nome}-${m.uf}`)).size).toBe(ms.length);
+    for (const real of DESLOCAMENTO_MUNICIPIOS) {
+      const m = ms.find((x) => x.nome === real.nome && x.uf === real.uf);
+      expect(m, `${real.nome}-${real.uf}`).toBeDefined();
+      // A medida do ICA é a ida e volta (a mesma das faixas do relatório), não a ida.
+      expect(m?.deslocamento_horas).toBe(real.ida_volta_horas);
+      expect(m?.deslocamento_meio).toBe(real.meio);
+    }
     expect(ms.find((m) => m.nome === 'Petrolina' && m.uf === 'PE')?.deslocamento_meio).toBe('carro');
     expect(ms.find((m) => m.nome === 'Milagres' && m.uf === 'CE')?.deslocamento_meio).toBe('carro');
   });
 
-  it('2 ou 3 suspensos; um sem localidade; mediana perto de 16 h', () => {
-    const suspensos = dados.base.municipios.filter((m) => m.status === 'suspenso');
-    expect(suspensos.length).toBeGreaterThanOrEqual(2);
-    expect(suspensos.length).toBeLessThanOrEqual(3);
-    expect(dados.base.municipios.filter((m) => m.deslocamento_horas === null)).toHaveLength(1);
+  it('as carteiras cobrem os 92 municípios do relatório', () => {
+    const atendidos = new Set(dados.base.atendimentos.map((a) => a.municipio));
+    const fora = dados.base.municipios.filter((m) => !atendidos.has(m.id)).map((m) => m.nome);
+    expect(fora).toEqual([]);
+  });
+
+  it('suspensos = os 4 com ações suspensas no relatório', () => {
+    const suspensos = dados.base.municipios.filter((m) => m.status === 'suspenso').map((m) => `${m.nome}-${m.uf}`);
+    const doRelatorio = DESLOCAMENTO_MUNICIPIOS.filter((m) => m.acoes_suspensas).map((m) => `${m.nome}-${m.uf}`);
+    expect(doRelatorio).toHaveLength(4);
+    expect(suspensos.sort()).toEqual(doRelatorio.sort());
+  });
+
+  it('um sem localidade (Amigos do Bem), que usa a mediana: a do relatório (17h45, até 5 min de arredondamento)', () => {
+    const semLocalidade = dados.base.municipios.filter((m) => m.deslocamento_horas === null);
+    expect(semLocalidade.map((m) => m.nome)).toEqual(['Amigos do Bem']);
+    expect(semLocalidade[0]?.deslocamento_meio).toBeNull();
     const mediana = medianaDeslocamento(dados.base.municipios);
-    expect(mediana).toBeGreaterThanOrEqual(15);
-    expect(mediana).toBeLessThanOrEqual(17);
+    expect(mediana).toBe(medianaIdaVolta(DESLOCAMENTO_MUNICIPIOS));
+    expect(Math.abs(mediana - 17.75)).toBeLessThanOrEqual(5 / 60);
   });
 
   it('distribuição: 3 Sobrecarga (uma perto de 170), 2 Atenção, 6 Adequada, 5 Capacidade + 1 sem municípios', () => {

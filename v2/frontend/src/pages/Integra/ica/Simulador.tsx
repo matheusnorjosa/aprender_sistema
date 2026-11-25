@@ -6,8 +6,8 @@
  * propor → aprovar → aplicar (com data de vigência) no estado da sessão (IntegraDemoContext);
  * recarregar a página volta ao original. Requisitos: Requisitos_Modulo_ICA.pdf, seções 4 e 5.
  *
- * Aprovação: o PDF diz que a Líder do NFP aprova; a ata de 23/11 diz que ela só dá parecer. A tela
- * mostra o fluxo do PDF com a nota "a validar".
+ * Aprovação: o PDF dizia que a Líder do NFP aprova; a decisão 20 do dono (`quemVe.ts`) diz que a gestora
+ * pedagógica propõe e a SPE aplica, e a Líder do NFP só consulta. A tela segue a decisão 20.
  */
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { Link } from 'react-router';
@@ -208,7 +208,7 @@ export default function Simulador(): JSX.Element {
       )}
       {r.status === 'proposto' && (
         <Button type="primary" onClick={() => aprovar(r.id)}>
-          Aprovar (Líder do NFP)
+          Aprovar (SPE)
         </Button>
       )}
       {r.status === 'aprovado' && (
@@ -442,7 +442,7 @@ export default function Simulador(): JSX.Element {
           className="mb-3"
           type="info"
           showIcon
-          message="Aprovação como no PDF: a gestora pedagógica propõe, a Líder do NFP aprova e o remanejamento é aplicado com data de vigência. A validar no dia 7: na ata, a Líder do NFP só dá parecer (papel consultivo)."
+          message="Como na decisão 20: a gestora pedagógica propõe, a SPE aprova e aplica, com data de vigência. A Líder do NFP só consulta. O PDF dizia que a Líder aprovava."
         />
         {daSessao.length === 0 ? (
           <p>

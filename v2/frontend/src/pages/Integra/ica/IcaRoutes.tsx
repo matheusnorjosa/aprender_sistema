@@ -1,13 +1,15 @@
 /**
- * ICA (Índice de Carga de Acompanhamento): sub-rotas e o menu local das telas.
+ * ICA (Índice de Carga de Acompanhamento): sub-rotas, o aviso de quem vê cada tela na versão real
+ * (`quemVe.ts`) e o menu local das telas.
  *
  * Montado em `/integra/ica/*` por `IntegraRoutes`. O menu é uma lista de links que quebra linha
  * (sem rolagem horizontal em nenhuma largura); a tela atual leva `aria-current="page"`.
  * A ficha do coordenador abre pelo painel (`coordenador/:id`), sem item no menu.
  */
 import type { JSX } from 'react';
-import { Link, Navigate, NavLink, Outlet, Route, Routes } from 'react-router';
+import { Link, Navigate, NavLink, Outlet, Route, Routes, useMatch } from 'react-router';
 
+import { QUEM_VE, type TelaQuemVe } from '../quemVe';
 import AlertasIca from './AlertasIca';
 import Comparativo from './Comparativo';
 import FichaCoordenador from './FichaCoordenador';
@@ -28,7 +30,18 @@ const TELAS_DO_ICA: readonly { para: string; rotulo: string; fim?: boolean }[] =
   { para: '/integra/ica/alertas', rotulo: 'Alertas' },
 ];
 
+/**
+ * O aviso "Na versão real, quem vê esta tela: …" da tela aberta. A chave de `quemVe.ts` é o primeiro trecho
+ * do caminho (o índice é `painel`); endereço desconhecido, que ainda vai voltar para o painel, fica sem aviso.
+ */
+function useAvisoQuemVe(): string | null {
+  const chave = useMatch('/integra/ica/:tela/*')?.params.tela ?? 'painel';
+  const tela = (QUEM_VE as Partial<Record<string, TelaQuemVe>>)[chave];
+  return tela?.modulo === 'ICA' ? tela.aviso : null;
+}
+
 function MolduraIca(): JSX.Element {
+  const aviso = useAvisoQuemVe();
   return (
     <div>
       <p className="mb-2 text-sm">
@@ -36,6 +49,11 @@ function MolduraIca(): JSX.Element {
         <span aria-hidden="true"> › </span>
         <span>ICA</span>
       </p>
+      {aviso !== null && (
+        <p role="note" className="mb-3 rounded border-l-4 border-primary-dark bg-[#EEF5F3] p-3 text-sm">
+          {aviso}
+        </p>
+      )}
       <nav aria-label="Telas do ICA" className="mb-6 print:hidden">
         <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
           {TELAS_DO_ICA.map(({ para, rotulo, fim }) => (

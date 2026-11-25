@@ -31,7 +31,7 @@ describe('Ficha do coordenador', { timeout: 20000 }, () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Lucinéia Barreto' })).toBeInTheDocument();
     const situacao = screen.getByRole('list', { name: 'Situação atual' });
     expect(situacao).toHaveTextContent('ICA atual: 169 · Sobrecarga');
-    expect(situacao).toHaveTextContent('Variação desde 2026.1: −23 (era 192 · Sobrecarga)');
+    expect(situacao).toHaveTextContent('Variação desde 2026.1: −22 (era 191 · Sobrecarga)');
     expect(situacao).toHaveTextContent('Fora da meta (70 a 130)');
   });
 
@@ -42,33 +42,40 @@ describe('Ficha do coordenador', { timeout: 20000 }, () => {
     expect(itens).toHaveLength(6);
     expect(itens[0]).toHaveTextContent(/Municípios ativos: \d+,\d pontos/);
     expect(itens[5]).toHaveTextContent('Estados (UFs): fora da conta');
-    expect(screen.getByText(/ICA: 168,5 → 169 · Sobrecarga/)).toBeInTheDocument();
+    expect(screen.getByText(/ICA: 168,9 → 169 · Sobrecarga/)).toBeInTheDocument();
   });
 
   test('carteira: municípios com coleções, turmas, professores, deslocamento e quem divide', async () => {
     await abrir(LUCINEIA);
     const linhas = linhasDaTabela('Carteira');
     expect(linhas).toHaveLength(9);
-    const parintins = linhas.find((l) => l.textContent?.includes('Parintins-AM')) as HTMLElement;
-    expect(within(parintins).getByText('Suspenso')).toBeInTheDocument();
-    const belem = linhas.find((l) => l.textContent?.includes('Belém-PA')) as HTMLElement;
-    expect(belem).toHaveTextContent('Rosimeire Cavalcante');
+    const pontaGrossa = linhas.find((l) => l.textContent?.includes('Ponta Grossa-PR')) as HTMLElement;
+    expect(pontaGrossa).toHaveTextContent('Rosimeire Cavalcante');
+    // Tempo real do relatório de deslocamento (ida e volta).
+    expect(pontaGrossa).toHaveTextContent('22h05');
+  });
+
+  test('município com ações suspensas aparece como "Suspenso" na carteira', async () => {
+    await abrir('/integra/ica/coordenador/107');
+    const capivari = linhasDaTabela('Carteira').find((l) => l.textContent?.includes('Capivari-SP')) as HTMLElement;
+    expect(within(capivari).getByText('Suspenso')).toBeInTheDocument();
   });
 
   test('município sem localidade usa a mediana e aparece como estimado; dado incompleto avisa', async () => {
     await abrir('/integra/ica/coordenador/110');
     const linhas = linhasDaTabela('Carteira');
-    const santaQuiteria = linhas.find((l) => l.textContent?.includes('Santa Quitéria-CE')) as HTMLElement;
-    expect(santaQuiteria).toHaveTextContent('16h00 (estimado)');
-    expect(screen.getByText(/Turmas não informadas em Santa Quitéria-CE/)).toBeInTheDocument();
+    const amigosDoBem = linhas.find((l) => l.textContent?.includes('Amigos do Bem-CE')) as HTMLElement;
+    // Mediana de ida e volta dos 92 municípios do relatório (17h47,5, que arredonda para 17h48; o relatório escreve 17h45).
+    expect(amigosDoBem).toHaveTextContent('17h48 (estimado)');
+    expect(screen.getByText(/Turmas não informadas em Amigos do Bem-CE/)).toBeInTheDocument();
   });
 
   test('histórico semestral do ICA, com a versão de pesos de cada semestre', async () => {
     await abrir(LUCINEIA);
     const linhas = linhasDaTabela('Histórico semestral');
     expect(linhas.map((l) => l.textContent)).toEqual([
-      expect.stringMatching(/2025\.2.*191 · Sobrecarga.*proposta v5/),
-      expect.stringMatching(/2026\.1.*192 · Sobrecarga.*proposta v5/),
+      expect.stringMatching(/2025\.2.*190 · Sobrecarga.*proposta v5/),
+      expect.stringMatching(/2026\.1.*191 · Sobrecarga.*proposta v5/),
       expect.stringMatching(/2026\.2.*169 · Sobrecarga.*revisada/),
     ]);
   });

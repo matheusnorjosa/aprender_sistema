@@ -81,32 +81,33 @@ describe('ICA — Visão por gerência', { timeout: 20000 }, () => {
   });
 
   test('singular quando é um: "1 município ativo"', async () => {
-    function MoverBelem(): JSX.Element {
+    function MoverPontaGrossa(): JSX.Element {
       const { proporRemanejamento, aprovarRemanejamento, aplicarRemanejamento } = useIntegraDemo();
       return (
         <button
           type="button"
           onClick={() => {
-            // Belém-PA (1) da Lucinéia (101) para a Priscila (117), que estava sem municípios.
-            const r = proporRemanejamento([{ municipioId: 1, deCoordenadorId: 101, paraCoordenadorId: 117 }], 'teste');
+            // Ponta Grossa-PR da Lucinéia (101) para a Priscila (117), que estava sem municípios.
+            const pontaGrossa = DADOS.base.municipios.find((m) => m.nome === 'Ponta Grossa')!.id;
+            const r = proporRemanejamento([{ municipioId: pontaGrossa, deCoordenadorId: 101, paraCoordenadorId: 117 }], 'teste');
             if (!r.ok) throw new Error(r.erros.join(' '));
             aprovarRemanejamento(r.id);
             aplicarRemanejamento(r.id);
           }}
         >
-          mover Belém
+          mover Ponta Grossa
         </button>
       );
     }
     render(
       <MemoryRouter>
         <IntegraDemoProvider dados={gerarDadosSimulados()}>
-          <MoverBelem />
+          <MoverPontaGrossa />
           <VisaoGerencia />
         </IntegraDemoProvider>
       </MemoryRouter>,
     );
-    await userEvent.click(await screen.findByRole('button', { name: 'mover Belém' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'mover Ponta Grossa' }));
     const item = screen.getByRole('link', { name: 'Priscila Vasconcelos' }).closest('li') as HTMLElement;
     expect(item).toHaveTextContent(/1 município ativo · [\d.]+ professores/);
   });

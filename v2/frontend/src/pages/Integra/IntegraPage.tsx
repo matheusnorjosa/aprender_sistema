@@ -1,7 +1,7 @@
 /**
  * Integra: a página que reúne as ferramentas do gestor pedagógico (reunião de 23/11/2026; decisão do
- * dono Q10, 24/11). Quatro cartões, no padrão do `AccessCard` da Página Inicial:
- * ICA, Semáforo, DFF (no endereço atual, em outra aba) e Avaliação do Coordenador (em breve).
+ * dono Q10, 24/11). Cinco cartões, no padrão do `AccessCard` da Página Inicial:
+ * ICA, Semáforo, Deslocamento, DFF (no endereço atual, em outra aba) e Avaliação do Coordenador (em breve).
  */
 import { useId, type JSX, type ReactNode } from 'react';
 import { Link } from 'react-router';
@@ -9,6 +9,7 @@ import { Card, Col, Row, Tag, Typography } from 'antd';
 import {
   AlertOutlined,
   AuditOutlined,
+  CarOutlined,
   CheckSquareOutlined,
   DashboardOutlined,
   ExportOutlined,
@@ -48,6 +49,12 @@ const FERRAMENTAS: readonly Ferramenta[] = [
     descricao: 'A cor de risco de cada município, para o comitê e as gestoras.',
     icone: <AlertOutlined />,
     destino: { tipo: 'interno', para: '/integra/semaforo' },
+  },
+  {
+    titulo: 'Deslocamento',
+    descricao: 'Quanto tempo leva para chegar a cada município, ida e volta, e a soma desses tempos na carteira de cada coordenador.',
+    icone: <CarOutlined />,
+    destino: { tipo: 'interno', para: '/integra/deslocamento' },
   },
   {
     titulo: 'DFF',
@@ -121,12 +128,12 @@ export default function IntegraPage(): JSX.Element {
         Integra
       </Title>
       <Paragraph style={{ color: COR_TEXTO_APOIO }}>
-        As ferramentas do gestor pedagógico num lugar só. Os números destas telas são simulados.
+        As ferramentas do gestor pedagógico num lugar só. As pessoas e os números destas telas são simulados; os municípios são reais, e os tempos de deslocamento são as estimativas do relatório da Coordenação Pedagógica.
       </Paragraph>
 
       <Row gutter={[16, 16]} className="mt-4">
         {FERRAMENTAS.map((ferramenta) => (
-          <Col key={ferramenta.titulo} xs={24} sm={12} xl={6}>
+          <Col key={ferramenta.titulo} xs={24} sm={12} lg={8}>
             <CartaoFerramenta ferramenta={ferramenta} />
           </Col>
         ))}

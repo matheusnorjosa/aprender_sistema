@@ -58,7 +58,7 @@ export default function IntegraLayout(): JSX.Element {
         >
           <ExperimentOutlined aria-hidden="true" />
           <strong>DADOS SIMULADOS</strong>
-          <span>Pessoas fictícias e números gerados na tela para a demonstração; nada é gravado.</span>
+          <span>Pessoas fictícias; municípios reais; tempos estimados pelo relatório. Nada é gravado.</span>
         </p>
         <div className="p-6">
           <IntegraRoutes />

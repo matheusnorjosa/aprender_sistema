@@ -186,9 +186,9 @@ export function variacaoDoIca(
   return atual.conta.icaExibido - anterior.conta.icaExibido;
 }
 
-/** Horas decimais → "139h00". */
+/** Horas decimais → "139h00" (minutos arredondados meio para cima, sem o ruído do ponto flutuante). */
 export function formatarHoras(horas: number): string {
-  const minutosTotais = Math.round(horas * 60);
+  const minutosTotais = arredondarIca(horas * 60);
   const h = Math.floor(minutosTotais / 60);
   const m = minutosTotais % 60;
   return `${h}h${String(m).padStart(2, '0')}`;
@@ -335,7 +335,8 @@ function valoresDaCarteira(carteira: readonly LinhaCarteira[], base: BaseIca, co
     turmas: ativas.reduce((s, l) => s + l.turmas, 0),
     professores: ativas.reduce((s, l) => s + l.professores, 0),
     deslocamento: ativas.reduce((s, l) => s + l.horas, 0),
-    estados: new Set(ativas.map((l) => l.municipio.uf)).size,
+    // Município sem localidade (deslocamento estimado) não soma estado: a UF dele é só do formato do cadastro.
+    estados: new Set(ativas.filter((l) => !l.estimado).map((l) => l.municipio.uf)).size,
   };
 }
 

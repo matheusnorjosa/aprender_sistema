@@ -7,7 +7,8 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { baixarCsv, imprimirPagina, montarCsv } from '../exportar';
 
 const BOM = '﻿';
-const AVISO = 'DADOS SIMULADOS: pessoas fictícias e números gerados na tela. Nada foi gravado.';
+const AVISO =
+  'DADOS SIMULADOS: pessoas fictícias e números gerados na tela, mas os municípios são reais e os tempos de deslocamento são as estimativas do relatório da Coordenação Pedagógica. Nada foi gravado.';
 
 /** As linhas do CSV depois do BOM e do aviso: do cabeçalho em diante. */
 const semAviso = (csv: string): string[] => csv.slice(1).split('\r\n').slice(1);

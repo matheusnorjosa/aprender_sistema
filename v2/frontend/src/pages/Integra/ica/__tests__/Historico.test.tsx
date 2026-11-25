@@ -97,9 +97,10 @@ describe('ICA — Histórico semestral', { timeout: 20000 }, () => {
     const itens = within(lista).getAllByRole('listitem').filter((li) => li.parentElement === lista);
     expect(itens).toHaveLength(2);
     expect(itens[0]).toHaveTextContent(/2026\.2/);
-    expect(itens[0]).toHaveTextContent(/Imperatriz-MA: de Lucinéia Barreto para Rogério Assunção/);
+    expect(itens[0]).toHaveTextContent(/Jataí-GO: de Lucinéia Barreto para Rogério Assunção/);
+    expect(itens[0]).toHaveTextContent(/Rondonópolis-MT: de Lucinéia Barreto para Rogério Assunção/);
     expect(itens[0]).toHaveTextContent(/Aprovado por Líder do NFP em 13\/07\/2026/);
-    expect(itens[1]).toHaveTextContent(/Campina Grande-PB: de Edvaldo Quaresma para Ivonete Sampaio/);
+    expect(itens[1]).toHaveTextContent(/Uiraúna-PB: de Edvaldo Quaresma para Ivonete Sampaio/);
   });
 
   test('remanejamento aplicado na sessão entra no registro e ganha a coluna "Agora"', async () => {

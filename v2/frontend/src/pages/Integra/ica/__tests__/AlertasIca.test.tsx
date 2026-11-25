@@ -72,10 +72,10 @@ describe('ICA — Alertas', { timeout: 20000 }, () => {
     );
   });
 
-  test('contrato sem coordenador: Rio Branco-AC, para a gestora operacional e a SPE', async () => {
+  test('contrato sem coordenador: Itaquiraí-MS, para a gestora operacional e a SPE', async () => {
     renderizar();
     // Com a coleção no título: dois contratos sem coordenador no mesmo município não ficam iguais.
-    const cartao = (await screen.findByText(/^Contrato sem coordenador em Rio Branco-AC \([A-Z ]+\)$/)).closest('li') as HTMLElement;
+    const cartao = (await screen.findByText(/^Contrato sem coordenador em Itaquiraí-MS \([A-Z ]+\)$/)).closest('li') as HTMLElement;
     expect(cartao).toHaveTextContent('Seria enviado para: Gestora operacional, SPE');
   });
 

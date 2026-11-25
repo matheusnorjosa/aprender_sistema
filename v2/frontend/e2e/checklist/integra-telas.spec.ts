@@ -3,8 +3,8 @@
  * telas filhas.
  *
  * O `ROTAS_MEDIDAS` só alcança os `path` do AppRoutes, e lá a Integra é um único `/integra/*`
- * (a página dos 4 cartões). As telas abaixo são rotas filhas (`IntegraRoutes`, `ica/IcaRoutes`)
- * e são medidas aqui, com o mesmo verificador do spec de rolagem (`medirAssentada`: página,
+ * (a página dos cartões). As telas abaixo são rotas filhas (`IntegraRoutes`, `ica/IcaRoutes`,
+ * `semaforo/SemaforoRoutes`, `deslocamento/DeslocamentoRoutes`) e são medidas aqui, com o mesmo verificador do spec de rolagem (`medirAssentada`: página,
  * rolagem interna e corte sem reticências) e o axe com as tags WCAG 2.1 AA.
  *
  * Regra do dono: nenhuma rolagem horizontal em nenhuma largura; 400 px é a largura de teste da
@@ -24,9 +24,11 @@ test.use({ serviceWorkers: 'block' });
 
 const LARGURAS_INTEGRA = [360, 400, 768] as const;
 
-/** Lucinéia Barreto (101) e Priscila Vasconcelos (117), do gerador com a semente fixa. */
+/** Ids do gerador com a semente fixa (pessoas fictícias): o 101 tem carteira cheia; o 117 está sem municípios. */
 const COORDENADORA_MAIS_CARREGADA = '101';
 const COORDENADORA_SEM_MUNICIPIOS = '117';
+/** `HISTORIAS_SEMAFORO.vermelho_prazo_hoje`: a ficha com mais linhas. O id é conferido em `semaforo/__tests__/dados.test.ts`. */
+const MUNICIPIO_VERMELHO = '5';
 
 interface TelaIntegra {
   path: string;
@@ -36,11 +38,14 @@ interface TelaIntegra {
   preparar?: (page: Page) => Promise<void>;
 }
 
-/** Simulador com um movimento: aparece "Antes e depois", a parte mais larga da tela. */
+/**
+ * Simulador com um movimento: aparece "Antes e depois", a parte mais larga da tela. Marca o primeiro município da
+ * carteira, sem depender do nome: a lista de municípios segue o relatório de deslocamento e pode mudar.
+ */
 async function montarSimulacao(page: Page): Promise<void> {
   const main = page.locator('main#main');
   await main.getByLabel('Coordenador de origem').selectOption(COORDENADORA_MAIS_CARREGADA);
-  await main.getByRole('checkbox', { name: 'Belém-PA' }).check();
+  await main.getByRole('group', { name: 'Municípios para mover' }).getByRole('checkbox').first().check();
   await main.getByLabel('Coordenador de destino').selectOption(COORDENADORA_SEM_MUNICIPIOS);
   await main.getByRole('button', { name: 'Adicionar à simulação' }).click();
   await expect(main.getByRole('heading', { level: 2, name: 'Antes e depois' })).toBeVisible();
@@ -57,6 +62,15 @@ const TELAS: readonly TelaIntegra[] = [
   { path: '/integra/ica/alertas', marco: 'Alertas' },
   { path: '/integra/para-validar', marco: 'Para validar no dia 7' },
   { path: '/integra/semaforo', marco: 'Semáforo de Risco Municipal' },
+  { path: '/integra/semaforo/comite', marco: 'Comitê de Satisfação' },
+  { path: `/integra/semaforo/municipio/${MUNICIPIO_VERMELHO}`, marco: 'Ficha do município' },
+  { path: '/integra/semaforo/gestora', marco: 'Painel da gestora de referência' },
+  { path: '/integra/semaforo/pesquisa', marco: 'Pesquisa do articulador' },
+  { path: '/integra/semaforo/lider', marco: 'Indicadores da Líder do NFP' },
+  { path: '/integra/semaforo/relatorio-mensal', marco: 'Relatório mensal e formulários' },
+  { path: '/integra/deslocamento', marco: 'Tempos de deslocamento' },
+  { path: '/integra/deslocamento/regras', marco: 'Como o tempo é calculado' },
+  { path: '/integra/deslocamento/coordenadores', marco: 'Soma por coordenador' },
 ];
 
 test.describe('Integra: foco visível nos links e aviso em toda folha impressa', () => {
@@ -80,6 +94,21 @@ test.describe('Integra: foco visível nos links e aviso em toda folha impressa',
     });
     expect(contorno.estilo).not.toBe('none');
     expect(contorno.largura).not.toBe('0px');
+  });
+
+  test('link no meio do texto é sublinhado; os botões do menu não (WCAG 1.4.1)', async ({ page, baseURL }) => {
+    const rede = vigiarRede(page, baseURL);
+    await entrar(page, 'superusuario', 1280);
+    await page.goto('/integra/semaforo/gestora');
+    expect(await verificarTela(page, { marco: 'Painel da gestora de referência' }, rede)).toEqual([]);
+    const main = page.locator('main#main');
+    // O preflight do Tailwind (`a { color: inherit; text-decoration: inherit }`) vence o reset do antd: sem regra
+    // própria, o link na frase tem a cor e a decoração do texto em volta e some no meio dele.
+    const naFrase = main.getByRole('region', { name: 'Vence hoje' }).getByRole('listitem').first().getByRole('link');
+    await expect(naFrase).toBeVisible();
+    expect(await naFrase.evaluate((el) => getComputedStyle(el).textDecorationLine)).toBe('underline');
+    const doMenu = main.getByRole('navigation', { name: 'Telas do Semáforo' }).getByRole('link').first();
+    expect(await doMenu.evaluate((el) => getComputedStyle(el).textDecorationLine)).toBe('none');
   });
 
   test('impressão: o aviso DADOS SIMULADOS vai na margem de cima de toda folha', async ({ page, baseURL }) => {

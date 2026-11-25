@@ -277,9 +277,22 @@ describe('calcularEquipe — carteiras', () => {
   it('município compartilhado: cada um soma o que é seu', () => {
     // mediana de todos os municípios com localidade: 10, 20, 40, 50 → 30
     expect(r.mediana).toBe(30);
-    expect(de(2).valores).toEqual(valores({ municipios: 2, frentes: 2, turmas: 3, professores: 120, deslocamento: 40, estados: 2 }));
+    // M3 não tem localidade: a UF dele não conta como estado (só CE, de M1).
+    expect(de(2).valores).toEqual(valores({ municipios: 2, frentes: 2, turmas: 3, professores: 120, deslocamento: 40, estados: 1 }));
     expect(de(2).deslocamentoEstimado).toBe(true);
     expect(de(1).deslocamentoEstimado).toBe(false);
+  });
+
+  it('município sem localidade (deslocamento estimado) não soma estado: a UF dele é só do formato do cadastro', () => {
+    const semLocalidade: BaseIca = {
+      coordenadores: [coordenador(1)],
+      municipios: [municipio(1, { uf: 'CE' }), municipio(2, { uf: 'MG', deslocamento_horas: null, deslocamento_meio: null })],
+      atendimentos: [atendimento(1, 1, 10), atendimento(1, 2, 10)],
+    };
+    const c = calcularEquipe(semLocalidade, PESOS_ORIGINAIS_V5).coordenadores[0];
+    expect(c?.valores.municipios).toBe(2);
+    expect(c?.valores.estados).toBe(1);
+    expect(c?.deslocamentoEstimado).toBe(true);
   });
 
   it('a média conta só quem tem município ativo; quem não tem fica com ICA 0 e "sem municípios"', () => {

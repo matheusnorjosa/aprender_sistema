@@ -187,8 +187,10 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
     expect(await item(/momento reservado/i)).toHaveTextContent(/Relatório mensal e formulários/);
     expect(await item(/10 dias/i)).toHaveTextContent(/dia 20 do segundo mês/);
     expect(await item(/5º dia útil/i)).toHaveTextContent(/sem prazo/);
-    expect(await item(/ata da reunião de escuta/i)).toHaveTextContent(/sem prazo/);
-    expect(await item(/vários articuladores/i)).toHaveTextContent(/pelo menos um articulador/);
+    // Decisão 48: marca antes, ata até 5 dias úteis depois, "ata atrasada".
+    expect(await item(/ata da reunião de escuta/i)).toHaveTextContent(/ata atrasada/);
+    // Decisão 51: a pesquisa é por projeto.
+    expect(await item(/vários articuladores/i)).toHaveTextContent(/cada projeto/);
     expect(await item(/sem dado/i)).toHaveTextContent(/não conta para a cor/);
     const semResposta = await item(/município que não responde/i);
     expect(semResposta).toHaveTextContent(/enquanto o prazo está aberto/i);
@@ -219,24 +221,27 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
     expect(craibas).toHaveTextContent(/18h00/);
     expect(craibas).toHaveTextContent(/Muito longo/);
     expect(craibas).toHaveTextContent(/Longo até 18h/);
-    // A mesma lista da tela "Como o tempo é calculado", mais o estado do Amigos do Bem.
-    // Os dois números saem da mesma tabela: a pergunta é qual coluna o ICA usa.
+    // Decisão 54: Longo, pelo limite do próprio relatório.
+    expect(craibas).toHaveTextContent(/Decidido \(decisão 54\)/);
+    // Os dois números saem da mesma tabela: a pergunta era qual coluna o ICA usa. Decisão 55: 17h45.
     const mediana = await item(/Mediana: coluna Ida \(17h45\) ou coluna Ida e volta \(17h48\)\?/);
     expect(mediana).toHaveTextContent(/O relatório calcula a mediana pela coluna Ida/);
-    expect(mediana).toHaveTextContent(/Qual coluna o ICA usa para o município sem localidade/);
+    expect(mediana).toHaveTextContent(/Decidido \(decisão 55\)/);
     expect(mediana).not.toHaveTextContent(/arredondou cada tempo para 5 minutos/);
     expect(within(mediana).getByText(/Como o protótipo resolveu/)).toBeInTheDocument();
-    const amigos = await item(/Amigos do Bem/);
-    expect(amigos).toHaveTextContent(/Amigos do Bem-CE/);
-    expect(amigos).toHaveTextContent(/estado/);
+    // Decisão 56 ganhou um 2º cartão (como o protótipo contou no ICA): o título exato separa os dois.
+    const amigos = await item(/^Amigos do Bem: em que município e estado\?$/);
+    expect(amigos).toHaveTextContent(/Decidido \(decisão 56\)/);
+    expect(amigos).toHaveTextContent(/o local é o de cada formação/);
   });
 
-  test('o que a seção 7 do PDF pede e o protótipo não mede fica registrado para o dia 7', async () => {
+  test('o que a seção 7 do PDF pedia e o protótipo não media agora está decidido e medido (decisões 49 a 51)', async () => {
     renderizar();
-    const lider = await item(/indicadores da Líder do NFP que o protótipo não mede/i);
+    const lider = await item(/indicadores da Líder do NFP que o protótipo não media/i);
     expect(lider).toHaveTextContent(/tempo médio de resposta a ocorrências/i);
     expect(lider).toHaveTextContent(/convergência entre a pesquisa e as ocorrências/i);
     expect(lider).toHaveTextContent(/por projeto/);
+    expect(lider).toHaveTextContent(/Decidido \(decisão 49\)/);
     expect(within(lider).getByText(/Como o protótipo resolveu/)).toBeInTheDocument();
     const atas = await item(/painel da gestora: atas a registrar/i);
     expect(atas).toHaveTextContent(/pesquisas sem resposta/);
@@ -264,21 +269,362 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
     expect(document.body).not.toHaveTextContent(/gestora técnica/i);
   });
 
-  test('Amigos do Bem: a UF provisória não conta como estado no ICA', async () => {
+  test('Amigos do Bem: decisão 56, o tempo é o do local de cada formação (AL, CE ou PE)', async () => {
     renderizar();
-    expect(await item(/Amigos do Bem/)).toHaveTextContent(/não conta como estado/);
+    // Os estados vão pela UF: um dos nomes por extenso também é sobrenome e a guarda de nomes reais o pega.
+    const amigos = await item(/^Amigos do Bem: em que município e estado\?$/);
+    expect(amigos).toHaveTextContent(/em AL, CE ou PE/);
+    // O protótipo mostra uma linha por local de formação, como o Aprender Sistema.
+    expect(amigos).toHaveTextContent(/Mauriti-CE, Santana do Ipanema-AL e Petrolina-PE/);
+    expect(amigos).toHaveTextContent(/Mauriti-CE não está no relatório/);
   });
 
-  test('vermelho imediato: o PDF muda a cor na hora e só permite convocar o Comitê; o protótipo espera o Comitê', async () => {
+  test('decisões 55 e 56 (rodada 3): o local conhecido que não está no relatório fica como leitura, fora do selo da 55', async () => {
+    renderizar();
+    const meio = await item(/^Mediana: coluna Ida \(17h45\) ou coluna Ida e volta \(17h48\)\?$/);
+    expect(meio).toHaveTextContent(/para o município sem localidade definida/);
+    expect(meio).not.toHaveTextContent(/local de formação que não está no relatório/);
+    const local = await leitura(/^Local de formação conhecido que não está no relatório: que tempo usar\?$/);
+    expect(local).toHaveTextContent(/Mauriti-CE/);
+    expect(local).toHaveTextContent(/17h45/);
+    // A exceção da contagem de estados (decisão 56): o CE de Mauriti não conta.
+    expect(local).toHaveTextContent(/não entra na contagem de estados/);
+    const conta = await item(/^Amigos do Bem no ICA: como o protótipo contou$/);
+    expect(conta).toHaveTextContent(/não soma estado/);
+  });
+
+  test('decisão 56: como o protótipo contou o Amigos do Bem no ICA fica como leitura para o dono validar', async () => {
+    renderizar();
+    const conta = await item(/^Amigos do Bem no ICA: como o protótipo contou$/);
+    expect(conta).toHaveTextContent(/cada local de formação conta como um município/);
+    expect(conta).toHaveTextContent(/uma ida e volta/);
+    expect(within(conta).queryByText(/^Decidido \(decisão/)).not.toBeInTheDocument();
+    expect(within(conta).getByText('Como o protótipo resolveu por enquanto')).toBeInTheDocument();
+  });
+
+  test('vermelho imediato: decisão 38, a cor em vigor muda na hora e o Comitê confirma ou desfaz depois', async () => {
     renderizar();
     const publica = await item(/quando o Comitê publica/i);
     expect(publica).toHaveTextContent(/permite convocar o Comitê em caráter extraordinário/);
     expect(publica).not.toHaveTextContent(/chama uma reunião extraordinária/);
+    expect(publica).toHaveTextContent(/data marcada pela SPE/);
     const imediato = await item(/vermelho imediato: a cor em vigor muda na hora/i);
     expect(imediato).toHaveTextContent(/O sistema muda a cor na hora/);
     expect(imediato).toHaveTextContent(/o Comitê confirma e publica/);
     expect(within(imediato).getByText(/Como o protótipo resolveu/)).toBeInTheDocument();
-    expect(imediato).toHaveTextContent(/só muda quando o Comitê publica/);
+    expect(imediato).toHaveTextContent(/A cor em vigor muda na hora/);
+    expect(imediato).toHaveTextContent(/canceladas pelo Comitê/);
+    expect(imediato).not.toHaveTextContent(/só muda quando o Comitê publica/);
+  });
+
+  /** Os cartões das perguntas que o dono respondeu em 25/11 (decisões 30 a 57). */
+  const DECIDIDOS: [RegExp, number][] = [
+    [/^Média, NPS e cronograma: a cor sai do número exato$/, 30],
+    [/^NPS: média das notas/, 31],
+    [/^Ocorrências no trimestre: que trimestre\?$/, 32],
+    [/^Prazos das tarefas/, 33],
+    [/^.No bimestre. e .no semestre./, 35],
+    [/^Quem faz cada tarefa de cada cor$/, 36],
+    [/^Vermelho imediato: a cor em vigor muda na hora/, 38],
+    [/^Três amarelos também mudam a cor na hora\?$/, 39],
+    [/^Quando o Comitê publica a cor$/, 40],
+    [/^Mesma cor confirmada de novo: as tarefas abrem de novo\?$/, 43],
+    [/^O amarelo .em recuperação. recebe as tarefas do amarelo$/, 44],
+    [/^A volta ao verde depois de um alerta$/, 45],
+    [/^Um relatório mensal por município ou por coordenador\?$/, 46],
+    [/^O .cronograma confirmado. da reunião de escuta entra na conta\?$/, 47],
+    [/^Ata da reunião de escuta em até 5 dias úteis$/, 48],
+    [/^Painel da gestora: atas a registrar$/, 48],
+    [/^Os indicadores da Líder do NFP que o protótipo não media$/, 49],
+    [/^Vários articuladores no mesmo município$/, 51],
+    [/^Aviso quando o município piora para amarelo$/, 52],
+    [/^16 ou 23 municípios só por terra\?$/, 53],
+    [/^Craíbas-AL: Longo ou Muito longo\?$/, 54],
+    [/^Mediana: coluna Ida/, 55],
+    [/^Amigos do Bem: em que município e estado\?$/, 56],
+  ];
+
+  test('decisões 30 a 57: cada pergunta respondida pelo dono aparece como decidida, com o selo e a resposta', async () => {
+    renderizar();
+    for (const [titulo, numero] of DECIDIDOS) {
+      const artigo = await item(titulo);
+      expect(within(artigo).getByText(`Decidido (decisão ${numero})`), String(titulo)).toBeInTheDocument();
+      // O par "Para decidir" vira "Decidido"; o rótulo do protótipo continua.
+      const termos = within(artigo).getAllByRole('term').map((t) => t.textContent);
+      expect(termos, String(titulo)).toEqual(['O que dizem', 'Como o protótipo resolveu', 'Decidido']);
+    }
+  });
+
+  test('decisões 30 a 57: o selo de decidido usa o verde já conferido em contraste (o mesmo de "Vê")', async () => {
+    renderizar();
+    const selo = within(await item(/^Média, NPS e cronograma: a cor sai do número exato$/)).getByText('Decidido (decisão 30)');
+    expect(selo).toHaveStyle({ background: '#E3F0EC' });
+  });
+
+  test('o que o dono ainda não decidiu continua "para decidir", e as leituras do protótipo ficam sem selo', async () => {
+    renderizar();
+    for (const titulo of [/vai dirigindo/i, /10 dias/i, /sem dado/i, /Ocorrências do ano: a partir de que dia conta/, /Convergência: quem entra na conta/]) {
+      const artigo = await item(titulo);
+      expect(within(artigo).queryByText(/^Decidido \(decisão/)).not.toBeInTheDocument();
+      expect(within(artigo).getAllByRole('term').map((t) => t.textContent)).toEqual([
+        'O que dizem',
+        'Como o protótipo resolveu por enquanto',
+        'Para decidir',
+      ]);
+    }
+  });
+
+  test('as contas que o protótipo escolheu na tela da Líder ficam como leitura para validar, sem selo de decidido', async () => {
+    renderizar();
+    const artigo = await item(/^Indicadores da Líder: como o protótipo fez as contas novas$/);
+    expect(artigo).toHaveTextContent(/pelo nome do projeto/);
+    expect(artigo).toHaveTextContent(/ocorrências do ano/);
+    expect(artigo).toHaveTextContent(/todos os projetos dele responderam/);
+    expect(within(artigo).queryByText(/^Decidido \(decisão/)).not.toBeInTheDocument();
+    expect(within(artigo).getByText('Para decidir')).toBeInTheDocument();
+  });
+
+  // Rodada 1 de revisão: as leituras do protótipo que faltavam na pauta ficam sem selo, com "Para decidir".
+  async function leitura(titulo: RegExp): Promise<HTMLElement> {
+    const artigo = await item(titulo);
+    expect(within(artigo).queryByText(/^Decidido \(decisão/)).not.toBeInTheDocument();
+    expect(within(artigo).getByText('Para decidir')).toBeInTheDocument();
+    return artigo;
+  }
+
+  test('decisões 32, 38 e 45: a régua de 1 e 2 ocorrências valendo o ano inteiro fica como leitura para o dono', async () => {
+    renderizar();
+    const regua = await leitura(/^Ocorrências do ano: a régua de 1 e 2 vale o ano inteiro\?$/);
+    expect(regua).toHaveTextContent(/uma ocorrência leve deixa o indicador amarelo até janeiro/);
+    expect(regua).toHaveTextContent(/duas no ano dão vermelho na hora/);
+    // Decisão 45: enquanto a ocorrência conta, não há "2 ciclos sem alerta".
+    expect(regua).toHaveTextContent(/não acontece enquanto a ocorrência contar/);
+    expect(regua).toHaveTextContent(/Maringá-PR/);
+    expect(regua).toHaveTextContent(/limites de 1 e 2 ocorrências continuam valendo para o ano inteiro/);
+    // Rodada 5 (decisão 39): a ocorrência de outro ciclo também entra como um dos três amarelos (Pereiro-CE).
+    expect(regua).toHaveTextContent(/três amarelos/);
+    expect(regua).toHaveTextContent(/Pereiro-CE/);
+    expect(regua).toHaveTextContent(/06\/06\/2026/);
+    expect(regua).toHaveTextContent(/conta como amarelo .no mesmo ciclo./);
+  });
+
+  test('decisões 46 e 51: a média e o NPS do município juntando os projetos é leitura do protótipo, fora do cartão decidido', async () => {
+    renderizar();
+    expect(await item(/^Vários articuladores no mesmo município$/)).not.toHaveTextContent(/juntam as respostas de todos os projetos/);
+    const media = await leitura(/^Média e NPS do município: juntar os projetos ou valer o pior\?$/);
+    expect(media).toHaveTextContent(/juntam as respostas de todos os projetos/);
+    expect(media).toHaveTextContent(/decisão 46/);
+    // Rodada 5 (decisão 51): a nota de recomendação pergunta pelo projeto, não pela parceria inteira.
+    expect(media).toHaveTextContent(/a nota de recomendação pergunta pelo projeto avaliado/);
+  });
+
+  test('decisões 46 e 52: o aviso de piora e o alerta de prazo vão para os coordenadores de todos os projetos', async () => {
+    renderizar();
+    const aviso = await leitura(/^Aviso e alerta de prazo: para qual coordenador\?$/);
+    expect(aviso).toHaveTextContent(/coordenadores de todos os projetos do município/);
+    expect(aviso).toHaveTextContent(/Por gerência/);
+    expect(await item(/^Aviso quando o município piora para amarelo$/)).toHaveTextContent(/os coordenadores dos projetos/);
+  });
+
+  test('decisão 32: no município sem formação registrada no ano (projeto sem coordenador), nenhuma ocorrência conta', async () => {
+    renderizar();
+    const sem = await leitura(/^Município sem formação registrada no ano: a reclamação não conta\?$/);
+    expect(sem).toHaveTextContent(/projeto sem coordenador/);
+    expect(sem).toHaveTextContent(/Nenhuma que conte/);
+  });
+
+  test('decisão 50: o texto do tempo médio de resposta diz o ano do calendário, como a conta (não "a mesma janela da cor")', async () => {
+    renderizar();
+    const lider = await item(/^Indicadores da Líder: como o protótipo fez as contas novas$/);
+    expect(lider).not.toHaveTextContent(/a mesma janela da cor/);
+    expect(lider).toHaveTextContent(/de 1º de janeiro até hoje/);
+    expect(lider).toHaveTextContent(/de antes da 1ª formação/);
+  });
+
+  test('decisões 39 e 45: a volta ao verde cita os três amarelos, que também valem na hora', async () => {
+    renderizar();
+    expect(await item(/^A volta ao verde depois de um alerta$/)).toHaveTextContent(/um vermelho, ou três amarelos, vale na hora/);
+  });
+
+  test('decisão 57: corrigir o relatório mensal guarda a versão anterior, e a pauta diz isso', async () => {
+    renderizar();
+    expect(await item(/^Relatório mensal de cada projeto$/)).toHaveTextContent(/a versão anterior fica guardada/);
+  });
+
+  test('de onde virá cada dado: os campos novos das decisões de 25/11 (36, 40, 41, 46, 48, 50 e 51)', async () => {
+    renderizar();
+    const pesquisa = await item(/^Pesquisa do articulador$/);
+    expect(pesquisa).toHaveTextContent(/o projeto avaliado/i);
+    expect(pesquisa).toHaveTextContent(/uma por projeto/);
+    expect(await item(/^Ocorrências$/)).toHaveTextContent(/data e hora do registro e da resposta/);
+    const reuniao = await item(/^Reunião de escuta$/);
+    expect(reuniao).toHaveTextContent(/data marcada/);
+    expect(reuniao).toHaveTextContent(/até 5 dias úteis/);
+    expect(await item(/^Relatório mensal de cada projeto$/)).toHaveTextContent(/um por projeto e mês/);
+    const comite = await item(/^Datas do Comitê$/);
+    expect(comite).toHaveTextContent(/Não existe ainda/);
+    expect(comite).toHaveTextContent(/extraordinário/);
+    expect(await item(/^Coordenador de cada projeto$/)).toHaveTextContent(/Plano Anual/);
+    const cor = await item(/^Cor do Semáforo$/);
+    expect(cor).toHaveTextContent(/gestora pedagógica/);
+    expect(cor).toHaveTextContent(/coordenadores/);
+  });
+
+  test('decisão 46: nenhum texto da página chama o projeto de contrato', async () => {
+    renderizar();
+    await screen.findByRole('heading', { level: 1 });
+    expect(document.body.textContent ?? '').not.toMatch(/contrato/i);
+  });
+
+  // Rodada 2 de revisão: leituras que faltavam na pauta (sem selo; o dono decide no dia 7).
+  test('decisões 42 a 44 e 57: ao sair do vermelho pelo ciclo, as tarefas abertas do vermelho continuam (Sobral-CE)', async () => {
+    renderizar();
+    const sair = await leitura(/^Quando o município sai do vermelho, as tarefas abertas do vermelho continuam\?$/);
+    expect(sair).toHaveTextContent(/Sobral-CE/);
+    expect(sair).toHaveTextContent(/15\/02\/2027/);
+    expect(sair).toHaveTextContent(/decisão 57/);
+  });
+
+  test('decisão 33 (rodada 3): feriado em dia de semana conta como dia útil por decisão do dono, não por falta de calendário', async () => {
+    renderizar();
+    const prazos = await item(/^Prazos das tarefas: horas, dias corridos e dias úteis$/);
+    expect(prazos).not.toHaveTextContent(/Feriados não entram na conta/);
+    expect(prazos).not.toHaveTextContent(/não tem calendário de feriados/);
+    expect(prazos).toHaveTextContent(/Feriado em dia de semana conta como dia útil/);
+    // A pergunta 29 (a) tinha a opção de descontar os feriados; o dono escolheu dias úteis de segunda a sexta.
+    const feriados = await item(/^Feriados contam como dia útil nos prazos\?$/);
+    expect(within(feriados).getByText('Decidido (decisão 33)')).toBeInTheDocument();
+    expect(feriados).not.toHaveTextContent(/sem falar de feriados/);
+    expect(feriados).toHaveTextContent(/descontando também os feriados/);
+    expect(feriados).toHaveTextContent(/Horizonte-CE/);
+    expect(feriados).toHaveTextContent(/11\/01\/2027/);
+    expect(feriados).toHaveTextContent(/25\/12 e 01\/01/);
+  });
+
+  test('decisão 51: a segunda resposta do mesmo projeto é recusada, mesmo de outra pessoa; fica como leitura', async () => {
+    renderizar();
+    const uma = await leitura(/^Uma resposta por projeto: e se outra pessoa do mesmo projeto já respondeu\?$/);
+    expect(uma).toHaveTextContent(/secretário/i);
+    expect(uma).toHaveTextContent(/recusada/);
+  });
+
+  test('decisões 34 e 50: a meta de 48 h da resposta à ocorrência conta horas corridas; fica como leitura', async () => {
+    renderizar();
+    const meta = await leitura(/^Meta de 48 h da resposta à ocorrência: horas corridas ou dias úteis\?$/);
+    expect(meta).toHaveTextContent(/66 h/);
+    expect(meta).toHaveTextContent(/2 dias úteis/);
+  });
+
+  test('decisão 36: quem faz a observação de formação do amarelo e quem recebe o alerta do prazo fica como leitura', async () => {
+    renderizar();
+    const obs = await leitura(/^Observação de formação do amarelo: quem faz e quem recebe o alerta do prazo\?$/);
+    expect(obs).toHaveTextContent(/gestora pedagógica/);
+    expect(obs).toHaveTextContent(/decisão 36/);
+  });
+
+  test('decisão 38: dado registrado com atraso; o vermelho na hora nunca fica antes da decisão em vigor', async () => {
+    renderizar();
+    const atraso = await leitura(/^Dado registrado com atraso: as tarefas contam do dia do dado ou do dia do registro\?$/);
+    expect(atraso).toHaveTextContent(/Sobral-CE/);
+    expect(atraso).toHaveTextContent(/27\/11/);
+    expect(atraso).toHaveTextContent(/decisão que estava em vigor/);
+    // Rodada 3: uma queixa leve só deixa amarelo; o exemplo do vermelho é com uma reclamação.
+    expect(atraso).toHaveTextContent(/uma reclamação no momento reservado deixa o município vermelho desde 27\/11/);
+  });
+
+  test('decisões 48 e 50 (rodada 3): a queixa do momento reservado conta o tempo de resposta do registro da ata; fica como leitura', async () => {
+    renderizar();
+    const queixa = await leitura(/^Queixa feita na reunião e registrada com a ata: de onde conta o tempo de resposta\?$/);
+    expect(queixa).toHaveTextContent(/momento reservado/);
+    expect(queixa).toHaveTextContent(/conta do dia e da hora em que a ata é registrada/);
+    expect(queixa).toHaveTextContent(/5 dias úteis/);
+  });
+
+  test('decisão 42 (rodada 3): só o vermelho desfeito pelo Comitê cancela as tarefas; as do amarelo seguem abertas', async () => {
+    renderizar();
+    const confirmar = await item(/^Confirmar o vermelho na hora não reabre as tarefas$/);
+    expect(confirmar).toHaveTextContent(/mesmo quando o Comitê muda o amarelo no mesmo ciclo/);
+    expect(confirmar).toHaveTextContent(/só as do vermelho que o Comitê desfaz ficam canceladas/);
+  });
+
+  test('decisão 49 (rodada 3): a convergência diz que as ocorrências contam o ano e a pesquisa, só o ciclo', async () => {
+    renderizar();
+    const conv = await leitura(/^Convergência: quem entra na conta e o que é "concordar"$/);
+    expect(conv).toHaveTextContent(/ocorrências do ano até o fim do ciclo \(decisão 32\)/);
+    expect(conv).toHaveTextContent(/a pesquisa é só a do ciclo/);
+  });
+
+  test('decisões 33 e 35 (rodada 3): o prazo em meses que cai no fim de semana passa para a segunda-feira; fica como leitura', async () => {
+    renderizar();
+    const fim = await leitura(/^Prazo em meses que cai no sábado ou no domingo$/);
+    expect(fim).toHaveTextContent(/31\/05\/2027/);
+    expect(fim).toHaveTextContent(/segunda-feira/);
+  });
+
+  test('decisão 35 (rodada 4): o exemplo do prazo em meses bate com a conta (31/12/2026 + 2 meses dá domingo, vence na segunda 01/03/2027)', async () => {
+    renderizar();
+    const bimestre = await item(/^"No bimestre" e "no semestre": a partir de quando\?$/);
+    expect(bimestre).toHaveTextContent(/28\/02\/2027, um domingo.*01\/03\/2027/);
+    expect(bimestre).not.toHaveTextContent(/31\/12 mais 2 meses dá 28\/02\)/);
+  });
+
+  test('decisões 46 e 51 (rodada 4): o Amigos do Bem fica fora do Semáforo; fica como leitura', async () => {
+    renderizar();
+    const fora = await leitura(/^Amigos do Bem no Semáforo: entra\?$/);
+    expect(fora).toHaveTextContent(/fica fora do Semáforo/);
+    expect(fora).toHaveTextContent(/Petrolina-PE e Santana do Ipanema-AL/);
+  });
+
+  test('decisões 46 e 47 (rodada 4): mais formações realizadas que previstas no mês; fica como leitura', async () => {
+    renderizar();
+    const mais = await leitura(/^Relatório mensal com mais formações realizadas que previstas$/);
+    expect(mais).toHaveTextContent(/aceita/);
+    expect(mais).toHaveTextContent(/pode passar de 100%/);
+  });
+
+  test('decisões 33 e 34 (rodada 4): o alerta "um dia antes" conta o dia útil; fica como leitura', async () => {
+    renderizar();
+    const antes = await leitura(/^Alerta de prazo "um dia antes": dia corrido ou dia útil\?$/);
+    expect(antes).toHaveTextContent(/na sexta-feira, avisa a tarefa que vence na segunda/);
+  });
+
+  test('rodada 5 (decisão 50): a ocorrência sem resposta passada das 48 h fica fora da conta da meta; fica como leitura', async () => {
+    renderizar();
+    const semResposta = await leitura(/^Ocorrência sem resposta há mais de 48 h: conta como fora da meta\?$/);
+    expect(semResposta).toHaveTextContent(/só as ocorrências já respondidas/);
+    expect(semResposta).toHaveTextContent(/Sem resposta/);
+  });
+
+  test('rodada 5: o relatório mensal entra só nos meses do ciclo atual; a virada do ciclo fica para o dono', async () => {
+    renderizar();
+    const relatorio = await item(/^Relatório mensal até o 5º dia útil do mês seguinte$/);
+    expect(relatorio).not.toHaveTextContent(/a qualquer momento/);
+    expect(relatorio).toHaveTextContent(/só para os meses do ciclo atual, até o mês corrente/);
+    expect(relatorio).toHaveTextContent(/até o 5º dia útil/);
+    expect(relatorio).toHaveTextContent(/antes de o mês terminar/);
+    expect(relatorio).toHaveTextContent(/ocorrência de um ciclo que já fechou/);
+  });
+
+  test('rodada 5: a reunião de escuta marcada na tela é uma por vez, a 30 dias ou mais da outra; fica como leitura', async () => {
+    renderizar();
+    const reuniao = await leitura(/^Reunião de escuta: uma por vez, a 30 dias ou mais da outra\?$/);
+    expect(reuniao).toHaveTextContent(/Jequié-BA/);
+    expect(reuniao).toHaveTextContent(/periodicidade sai da cor em vigor/);
+  });
+
+  test('rodada 5 (decisões 42, 43 e 57): desfazer o vermelho na hora devolve a tarefa que ele tinha substituído; fica como leitura', async () => {
+    renderizar();
+    const desfazer = await leitura(/^O Comitê desfaz o vermelho na hora: a tarefa que ele substituiu volta\?$/);
+    expect(desfazer).toHaveTextContent(/Sobral-CE/);
+    expect(desfazer).toHaveTextContent(/15\/02\/2027/);
+    expect(desfazer).toHaveTextContent(/volta a ficar aberta/);
+  });
+
+  test('decisão 36 (rodada 3): a reunião de escuta tem situação (a agendar e em dia); só a pesquisa e o acompanhamento são texto', async () => {
+    renderizar();
+    const quem = await item(/^Quem faz cada tarefa de cada cor$/);
+    expect(quem).not.toHaveTextContent(/sem prazo nem situação/);
+    expect(quem).toHaveTextContent(/a agendar/);
   });
 
   test('as leituras das regras do Semáforo que ficaram para validar no dia 7', async () => {
@@ -286,25 +632,37 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
     const h3 = await screen.findByRole('heading', { level: 3, name: 'Semáforo: como o protótipo leu o PDF' });
     const tema = h3.closest('section') as HTMLElement;
     const esperados: [RegExp, RegExp][] = [
-      [/número que aparece na tela/i, /3,95 aparece .4,0. e fica verde/],
+      // Decisão 30: o número exato, com 2 casas na tela.
+      [/número exato/i, /3,95 é amarelo/],
+      [/número exato/i, /89,50%/],
+      // Decisão 31: maior, menor e média; a cor sai da média.
       [/NPS: média das notas/i, /8,5 é amarelo/],
-      [/ocorrências no trimestre/i, /3 meses corridos/],
-      // Duas janelas: o ciclo fechado conta até o último dia dele; o ciclo atual, até hoje.
-      [/ocorrências no trimestre/i, /no ciclo fechado, até o último dia do ciclo; no ciclo atual, até hoje/],
-      [/prazos das tarefas/i, /29\/11/],
+      [/NPS: média das notas/i, /a maior nota, a menor e a média/],
+      // Decisão 32: desde a 1ª formação do ano; zera em janeiro; o histórico fica.
+      [/ocorrências no trimestre/i, /desde a 1ª formação do ano/],
+      [/ocorrências no trimestre/i, /fica guardado/],
+      // Decisões 33 e 34: dias úteis; publicada na sexta 04/12, o contato vence na terça 08/12.
+      [/prazos das tarefas/i, /dias úteis/],
+      [/prazos das tarefas/i, /04\/12\/2026.*08\/12\/2026.*11\/12\/2026/],
       [/no bimestre.*no semestre/i, /2 e 6 meses depois da publicação/],
-      [/três amarelos/i, /extraordinária/],
+      [/três amarelos/i, /vermelho na hora/],
+      [/três amarelos/i, /extraordinário/],
       [/volta ao verde/i, /2 ciclos seguidos sem alerta/],
       [/volta ao verde/i, /ciclo em andamento .*não soma/],
       // Seção 4: no meio do ciclo a cor só muda para piorar; um amarelo não tira o município do vermelho.
       [/volta ao verde/i, /só muda na hora para piorar.*Sair do vermelho espera o ciclo fechar/],
-      [/quem faz cada tarefa/i, /Contato com o município/],
+      // Decisões 36 e 37: as duas gestoras juntas; o contato é com o articulador municipal.
+      [/quem faz cada tarefa/i, /Contato com o articulador municipal/],
       // Escolhas que os relatórios de implementação mandaram confirmar no dia 7.
       [/quando o Comitê publica/i, /sexta-feira.*02\/12\/2026/],
-      [/tarefa só nasce quando a cor em vigor muda/i, /contato em 48 h. não volta a abrir/],
+      // Decisão 43: a mesma cor publicada de novo reabre as tarefas; as abertas de antes ficam substituídas.
+      [/mesma cor confirmada de novo/i, /reabre todas as tarefas da cor/],
       [/em recuperação. recebe as tarefas do amarelo/i, /10 dias úteis/],
-      [/um relatório mensal por município ou por coordenador/i, /primeiro contrato/],
+      // Decisão 46: cada projeto manda o seu relatório.
+      [/um relatório mensal por município ou por coordenador/i, /cada projeto/],
       [/cronograma confirmado.*reunião de escuta/i, /coleta 4/],
+      // Decisão 47: a formação adiada de comum acordo é só observação.
+      [/cronograma confirmado.*reunião de escuta/i, /só observação/],
     ];
     for (const [titulo, texto] of esperados) {
       const h = within(tema).getByRole('heading', { level: 4, name: titulo });

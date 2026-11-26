@@ -5,6 +5,7 @@
  * O teste de ouro é o exemplo da página 4 (configuração revisada): 169,8 → 170 · Sobrecarga.
  */
 import { describe, expect, it } from 'vitest';
+import { TEMPO_DO_MEIO_HORAS } from '../../dados/deslocamento';
 import type { Atendimento, BaseIca, Coordenador, MunicipioIntegra, Valores } from '../../dados/tipos';
 import {
   PESOS_ORIGINAIS_V5,
@@ -23,7 +24,6 @@ import {
   gerarAlertas,
   icaExatoComUmaCasa,
   indiceDoComponente,
-  medianaDeslocamento,
   nomeDoEstrato,
   simularRemanejamento,
   validarPesos,
@@ -234,10 +234,24 @@ describe('formatarHoras', () => {
   });
 });
 
-describe('medianaDeslocamento', () => {
-  it('mediana dos municípios com localidade (par e ímpar)', () => {
-    expect(medianaDeslocamento([municipio(1, { deslocamento_horas: 10 }), municipio(2, { deslocamento_horas: 30 }), municipio(3, { deslocamento_horas: 20 })])).toBe(20);
-    expect(medianaDeslocamento([municipio(1, { deslocamento_horas: 10 }), municipio(2, { deslocamento_horas: 20 }), municipio(3, { deslocamento_horas: null })])).toBe(15);
+describe('tempo do meio (decisão 55)', () => {
+  it('sem tempo no relatório, a conta usa 17h45 (17,75 h), o número do relatório, e não a mediana da base', () => {
+    // Antes, a conta tirava a mediana dos municípios da base (aqui, 20). Decisão 55: vale o 17h45 do relatório.
+    const base: BaseIca = {
+      coordenadores: [coordenador(1)],
+      municipios: [
+        municipio(1, { deslocamento_horas: 10 }),
+        municipio(2, { deslocamento_horas: 30 }),
+        municipio(3, { deslocamento_horas: 20 }),
+        municipio(4, { deslocamento_horas: null, deslocamento_meio: null }),
+      ],
+      atendimentos: [atendimento(1, 4, 10)],
+    };
+    const r = calcularEquipe(base, PESOS_REVISADOS);
+    expect(r.mediana).toBe(17.75);
+    expect(r.mediana).toBe(TEMPO_DO_MEIO_HORAS);
+    expect(r.coordenadores[0]?.carteira[0]).toMatchObject({ horas: 17.75, estimado: true });
+    expect(r.coordenadores[0]?.valores.deslocamento).toBe(17.75);
   });
 });
 
@@ -275,10 +289,10 @@ describe('calcularEquipe — carteiras', () => {
   });
 
   it('município compartilhado: cada um soma o que é seu', () => {
-    // mediana de todos os municípios com localidade: 10, 20, 40, 50 → 30
-    expect(r.mediana).toBe(30);
+    // Decisão 55: M3 sem tempo no relatório conta o tempo do meio do relatório (17h45), não a mediana da base (30).
+    expect(r.mediana).toBe(17.75);
     // M3 não tem localidade: a UF dele não conta como estado (só CE, de M1).
-    expect(de(2).valores).toEqual(valores({ municipios: 2, frentes: 2, turmas: 3, professores: 120, deslocamento: 40, estados: 1 }));
+    expect(de(2).valores).toEqual(valores({ municipios: 2, frentes: 2, turmas: 3, professores: 120, deslocamento: 10 + 17.75, estados: 1 }));
     expect(de(2).deslocamentoEstimado).toBe(true);
     expect(de(1).deslocamentoEstimado).toBe(false);
   });
@@ -539,10 +553,17 @@ describe('alertas (PDF, seção 6) com quem receberia', () => {
     })
       .filter((a) => a.tipo === 'contrato_sem_coordenador')
       .map((a) => a.titulo);
+    // Decisão 46: a palavra é "projeto", não "contrato".
     expect(titulos).toEqual([
-      'Contrato sem coordenador em Município 5-CE (NOVO LENDO)',
-      'Contrato sem coordenador em Município 5-CE (TEMA)',
+      'Projeto sem coordenador em Município 5-CE (NOVO LENDO)',
+      'Projeto sem coordenador em Município 5-CE (TEMA)',
     ]);
+  });
+
+  it('decisão 46: nenhum título nem detalhe de alerta diz "contrato"', () => {
+    const textos = alertas.flatMap((a) => [a.titulo, a.detalhe]);
+    expect(textos.some((t) => /contrato/i.test(t))).toBe(false);
+    expect(doTipo('contrato_sem_coordenador')[0]?.detalhe).toBe('Projeto novo sem coordenador definido.');
   });
 
   it('"entra em Sobrecarga" só para quem não estava antes, quando há o retrato anterior', () => {

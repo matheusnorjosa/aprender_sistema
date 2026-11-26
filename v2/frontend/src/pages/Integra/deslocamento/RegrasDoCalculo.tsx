@@ -1,12 +1,12 @@
 /**
  * Deslocamento — como o tempo é calculado: as regras do relatório (páginas 2 e 3), as faixas, os limites
- * e observações (seção 4) e o que o relatório ainda precisa confirmar (ele diverge de si mesmo em dois
- * pontos; ver o teste de `dados/deslocamento.ts`). Listas, não tabela: o texto é longo e cabe no celular.
+ * e observações (seção 4) e o que o dono decidiu onde o relatório se contradiz ou não diz (decisões 53 a 56,
+ * 25/11/2026). Listas, não tabela: o texto é longo e cabe no celular.
  */
 import type { JSX } from 'react';
 import { Typography } from 'antd';
 
-import { DESLOCAMENTO_MUNICIPIOS, FAIXAS_DESLOCAMENTO, medianaIdaVolta, OBSERVACOES_DESLOCAMENTO, REGRAS_DO_CALCULO } from '../dados/deslocamento';
+import { FAIXAS_DESLOCAMENTO, OBSERVACOES_DESLOCAMENTO, REGRAS_DO_CALCULO, TEMPO_DO_MEIO_HORAS } from '../dados/deslocamento';
 import { formatarHoras } from '../ica/calculo';
 import { EtiquetaFaixa } from './componentes';
 
@@ -14,11 +14,12 @@ const { Title } = Typography;
 
 const TITULO = { fontSize: 20 } as const;
 
-/** Divergências do próprio relatório, para a reunião de validação. */
-const PARA_CONFIRMAR: readonly string[] = [
-  'O relatório diz que 16 municípios vão só por terra por decisão da gestão, mas o grupo listado soma 23 (17 do Ceará, 2 da Paraíba e 4 avulsos). Aqui, os 23 aparecem marcados. Quais são os 16?',
-  'Craíbas-AL tem 18h00 de ida e volta e o relatório a põe em Muito longo. Pelo limite do próprio relatório (Longo até 18h), seria Longo, como Cairu-BA e Indianópolis-MG. Aqui vale a faixa que o relatório escreve.',
-  `O relatório calcula a mediana pela coluna Ida e dobra: dá 17h45, o número da página 1. Com a coluna Ida e volta, que o relatório arredondou à parte, a mediana dá ${formatarHoras(medianaIdaVolta(DESLOCAMENTO_MUNICIPIOS))}, e é ela que o ICA usa hoje. Qual coluna o ICA usa para o município sem localidade?`,
+/** O que o dono decidiu em 25/11/2026 onde o relatório se contradiz ou não diz. */
+const DECIDIDO_PELO_DONO: readonly string[] = [
+  'Só por terra: valem os 23 municípios do grupo que o relatório lista (17 do Ceará, 2 da Paraíba e 4 avulsos), não os 16 da página 1 (decisão 53).',
+  'Craíbas-AL (18h00 de ida e volta) fica em Longo, pelo limite do próprio relatório, e não em Muito longo, como a tabela escreve (decisão 54).',
+  `O tempo do meio é a mediana que o relatório escreve, ${formatarHoras(TEMPO_DO_MEIO_HORAS)}. O ICA usa esse tempo, marcado como estimado, para o município sem localidade definida (decisão 55). O protótipo usa o mesmo tempo para o local de formação que não está no relatório, como Mauriti-CE do Amigos do Bem (ponto em Para validar).`,
+  'Amigos do Bem não tem município fixo: o tempo é o do local de cada formação, que pode ser em AL, CE ou PE (decisão 56).',
 ];
 
 export default function RegrasDoCalculo(): JSX.Element {
@@ -68,12 +69,12 @@ export default function RegrasDoCalculo(): JSX.Element {
         </ul>
       </section>
 
-      <section aria-labelledby="deslocamento-confirmar">
-        <Title level={2} id="deslocamento-confirmar" style={TITULO}>
-          Para confirmar com quem fez o relatório
+      <section aria-labelledby="deslocamento-decidido">
+        <Title level={2} id="deslocamento-decidido" style={TITULO}>
+          O que o dono decidiu sobre o relatório
         </Title>
-        <ul aria-label="Para confirmar com quem fez o relatório" className="m-0 list-disc space-y-2 pl-5">
-          {PARA_CONFIRMAR.map((t) => (
+        <ul aria-label="O que o dono decidiu sobre o relatório" className="m-0 list-disc space-y-2 pl-5">
+          {DECIDIDO_PELO_DONO.map((t) => (
             <li key={t}>{t}</li>
           ))}
         </ul>

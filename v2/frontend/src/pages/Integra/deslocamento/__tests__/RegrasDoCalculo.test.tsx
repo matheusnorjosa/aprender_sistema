@@ -41,15 +41,18 @@ describe('Deslocamento — como o tempo é calculado', { timeout: 20000 }, () =>
     expect(lista).toHaveTextContent(/São estimativas, não horários reais/);
   });
 
-  test('o que o relatório ainda precisa confirmar (divergências dele mesmo)', async () => {
+  test('decisões 53 a 56: o que o dono decidiu onde o relatório se contradiz ou não diz', async () => {
     await abrir();
-    const lista = screen.getByRole('list', { name: 'Para confirmar com quem fez o relatório' });
-    const itens = within(lista).getAllByRole('listitem');
-    expect(itens).toHaveLength(3);
-    expect(lista).toHaveTextContent(/16 municípios.*o grupo listado soma 23/);
-    expect(lista).toHaveTextContent(/Craíbas-AL.*18h00.*Muito longo/);
-    expect(lista).toHaveTextContent(/coluna Ida.*17h45.*coluna Ida e volta.*17h48/);
-    expect(lista).toHaveTextContent(/Qual coluna o ICA usa para o município sem localidade\?/);
-    expect(lista).not.toHaveTextContent(/cada tempo foi arredondado para 5 minutos/);
+    // As três divergências do relatório foram decididas em 25/11: a seção "para confirmar" vira "o que o dono decidiu".
+    expect(screen.queryByRole('list', { name: 'Para confirmar com quem fez o relatório' })).not.toBeInTheDocument();
+    const lista = screen.getByRole('list', { name: 'O que o dono decidiu sobre o relatório' });
+    expect(within(lista).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'Só por terra: valem os 23 municípios do grupo que o relatório lista (17 do Ceará, 2 da Paraíba e 4 avulsos), não os 16 da página 1 (decisão 53).',
+      'Craíbas-AL (18h00 de ida e volta) fica em Longo, pelo limite do próprio relatório, e não em Muito longo, como a tabela escreve (decisão 54).',
+      // Rodada 3: a decisão 55 respondeu pelo município sem localidade; o local conhecido fora do relatório é leitura.
+      'O tempo do meio é a mediana que o relatório escreve, 17h45. O ICA usa esse tempo, marcado como estimado, para o município sem localidade definida (decisão 55). O protótipo usa o mesmo tempo para o local de formação que não está no relatório, como Mauriti-CE do Amigos do Bem (ponto em Para validar).',
+      'Amigos do Bem não tem município fixo: o tempo é o do local de cada formação, que pode ser em AL, CE ou PE (decisão 56).',
+    ]);
+    expect(lista).not.toHaveTextContent('17h48');
   });
 });

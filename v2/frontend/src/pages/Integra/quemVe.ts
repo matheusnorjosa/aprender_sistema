@@ -2,8 +2,8 @@
  * Quem vê cada tela da Integra na versão real: a matriz de cargos × telas.
  *
  * Fonte: o mapa dos cargos de 24/11/2026 (documentos de requisitos do ICA e do Semáforo, ata de 23/11) e
- * as decisões do dono 19 a 22 e 29. No protótipo vale outra regra (decisão Q8): quem entra na Integra vê
- * tudo. Esta matriz alimenta a seção "Quem vê o quê na versão real" da tela "Para validar no dia 7" e o
+ * as decisões do dono 19 a 22 e 29 (as de 25/11, 30 a 57, entram em `DECIDIDO`). No protótipo vale outra
+ * regra (decisão Q8): quem entra na Integra vê tudo. Esta matriz alimenta a seção "Quem vê o quê na versão real" da tela "Para validar no dia 7" e o
  * aviso que cada tela pode mostrar no topo (`QUEM_VE[tela].aviso`).
  *
  * Só papéis, nunca nomes de pessoa: a ata veio de transcrição automática e erra os nomes.
@@ -152,6 +152,60 @@ export const DECIDIDO: readonly { numero: number; texto: string }[] = [
     numero: 29,
     texto: 'Deslocamento e a tela de viagens viram um módulo só, com os tempos de referência no cadastro de municípios.',
   },
+  // Respostas do dono de 25/11/2026 às perguntas 28 a 41 do guia (`liberacao/relatorios/integra_decisoes_2026-11-24.md`).
+  { numero: 30, texto: 'A cor sai do número exato, não do arredondado: 3,95 é amarelo; 89,5% é amarelo. A tela mostra 2 casas.' },
+  { numero: 31, texto: 'Nota de recomendação (NPS): a tela mostra a maior nota, a menor e a média; a cor sai da média.' },
+  { numero: 32, texto: 'As ocorrências contam desde a 1ª formação do ano no município e zeram no ano seguinte; o histórico fica.' },
+  {
+    numero: 33,
+    texto: 'Prazos em dias úteis (segunda a sexta): reunião com a Secretaria em 5, plano de ação em 15, devolutiva em 30.',
+  },
+  { numero: 34, texto: 'O "contato em 48 h" vira 2 dias úteis.' },
+  { numero: 35, texto: '"No bimestre" e "no semestre" contam a partir da publicação da cor (2 e 6 meses).' },
+  { numero: 36, texto: 'As tarefas do vermelho ficam com as duas gestoras juntas (a de referência e a pedagógica).' },
+  { numero: 37, texto: 'O contato inicial do vermelho é com o articulador municipal.' },
+  {
+    numero: 38,
+    texto: 'Vermelho imediato muda a cor oficial na hora, e as tarefas começam; o Comitê confirma ou desfaz depois.',
+  },
+  { numero: 39, texto: 'Três amarelos no mesmo ciclo também viram vermelho na hora.' },
+  { numero: 40, texto: 'O Comitê ordinário se reúne em data marcada pela SPE a cada ciclo.' },
+  { numero: 41, texto: 'O Comitê extraordinário é convocado a critério da SPE.' },
+  {
+    numero: 42,
+    texto: 'Se o Comitê desfaz um vermelho, as tarefas abertas dele ficam "canceladas pelo Comitê"; as feitas continuam registradas.',
+  },
+  { numero: 43, texto: 'A mesma cor confirmada de novo reabre todas as tarefas da cor.' },
+  { numero: 44, texto: 'O amarelo "em recuperação" recebe as tarefas do amarelo.' },
+  { numero: 45, texto: 'Volta ao verde depois de 2 ciclos fechados seguidos sem alerta, contados da cor publicada.' },
+  {
+    numero: 46,
+    texto:
+      'A palavra certa é "projeto": cada projeto da Aprender Editora contratado pelo município tem o seu coordenador, as suas formações e o seu relatório mensal. Cada projeto tem o seu cronograma e a sua cor; na cor do município entra o pior. O critério de cada projeto o dono define depois.',
+  },
+  { numero: 47, texto: 'Formação adiada de comum acordo é só observação: não muda o número do cronograma.' },
+  {
+    numero: 48,
+    texto: 'A reunião de escuta é marcada antes, e a ata registrada até 5 dias úteis depois; passado o prazo, "ata atrasada".',
+  },
+  { numero: 49, texto: 'Medir a convergência entre a pesquisa e as ocorrências e listar os municípios em que elas divergem.' },
+  { numero: 50, texto: 'Medir o tempo de resposta às ocorrências: a ocorrência guarda quando foi respondida; a meta é 48 h.' },
+  {
+    numero: 51,
+    texto: 'A pesquisa é por projeto: cada projeto pode ter o seu articulador; se for o mesmo, ele responde uma por projeto.',
+  },
+  { numero: 52, texto: 'Manter o aviso quando o município piora para amarelo.' },
+  { numero: 53, texto: 'Valem os 23 municípios por terra da lista do relatório.' },
+  { numero: 54, texto: 'Craíbas-AL é "Longo" (18h00, pelo limite do próprio relatório).' },
+  { numero: 55, texto: 'O tempo do meio é 17h45, o número do relatório.' },
+  {
+    numero: 56,
+    texto: 'Amigos do Bem segue o sistema: o local é o de cada formação (pode ser em AL, CE ou PE).',
+  },
+  {
+    numero: 57,
+    texto: 'Zerar uma contagem nunca apaga dado: todo o histórico de todas as ferramentas e do sistema fica guardado.',
+  },
 ];
 
 // ---------------------------------------------------------------- a matriz
@@ -272,7 +326,11 @@ const LINHAS: Record<ChaveTela, Linha> = {
     modulo: 'Semáforo',
     titulo: 'Comitê',
     quem: quem({
-      spe: { faz: 'aplica', nota: 'conduz, confirma a cor e publica' },
+      spe: {
+        faz: 'aplica',
+        nota: 'conduz, confirma ou desfaz a cor e publica; marca a data do Comitê ordinário e convoca o extraordinário',
+        decisao: 41,
+      },
       operacional: { faz: 'aplica', nota: 'conduz com a SPE', decisao: 19 },
       pedagogica: { faz: 've', nota: 'participa do Comitê' },
       lider: { aberta: 'P1', nota: 'o documento não a põe neste painel' },
@@ -318,7 +376,7 @@ const LINHAS: Record<ChaveTela, Linha> = {
       coordenador: { faz: 'nada', nota: 'nunca gera o link', decisao: 21 },
       superusuario: SUPER_VE,
     }),
-    complemento: 'O articulador responde por link, sem conta.',
+    complemento: 'O articulador responde por link, sem conta, uma vez por projeto.',
   },
   lider: {
     modulo: 'Semáforo',

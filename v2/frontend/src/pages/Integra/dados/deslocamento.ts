@@ -29,7 +29,7 @@ export interface MunicipioDeslocamento {
   ida_texto: string;
   ida_volta_horas: number;
   ida_volta_texto: string;
-  /** A faixa que o PDF escreve (pode divergir dos limites; ver o teste). */
+  /** A faixa que o PDF escreve, com as correções do dono no roteiro (decisão 54: Craíbas-AL em Longo). */
   faixa: FaixaDeslocamento;
   /** O outro modal, só para comparação (ex.: "Terrestre: 27h05"). */
   alternativa: string | null;
@@ -57,6 +57,12 @@ export interface FiltroDeslocamento {
   faixa?: FaixaDeslocamento;
   meio?: MeioDeslocamento;
 }
+
+/**
+ * Decisão 55: o tempo do meio é a mediana que a página 1 do relatório escreve, 17h45 (17,75 h). O ICA usa
+ * esse tempo, marcado como estimado, para o local que não está no relatório.
+ */
+export const TEMPO_DO_MEIO_HORAS = 17.75;
 
 /** Mediana das horas de ida e volta (lista vazia = 0; lista par = média dos dois do meio). */
 export function medianaIdaVolta(municipios: readonly MunicipioDeslocamento[]): number {
@@ -679,7 +685,7 @@ export const DESLOCAMENTO_MUNICIPIOS: readonly MunicipioDeslocamento[] = [
     ida_texto: '9h00',
     ida_volta_horas: 18,
     ida_volta_texto: '18h00',
-    faixa: 'muito_longo',
+    faixa: 'longo',
     alternativa: 'Terrestre: 27h25',
     acoes_suspensas: false,
     travessia_maritima: false,

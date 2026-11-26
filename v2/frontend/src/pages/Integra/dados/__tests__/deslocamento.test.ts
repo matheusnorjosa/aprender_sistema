@@ -7,7 +7,7 @@
  * menor e maior de 0h40 a 31h35. Todos esses números descrevem a IDA E VOLTA: a página 1 diz
  * "mediana de ida e volta" e "menor e maior ida e volta"; a página 2 diz "Distribuição por faixa
  * de ida e volta: Próximo 7 · Médio 7 · Longo 34 · Muito longo 44"; a página 3 diz "A faixa
- * considera a ida e volta".
+ * considera a ida e volta". Com a correção do dono (decisão 54, Craíbas-AL em Longo), ficam 35 e 43.
  */
 import { describe, expect, it } from 'vitest';
 import { formatarHoras } from '../../ica/calculo';
@@ -18,6 +18,7 @@ import {
   FONTE_DESLOCAMENTO,
   OBSERVACOES_DESLOCAMENTO,
   REGRAS_DO_CALCULO,
+  TEMPO_DO_MEIO_HORAS,
   contarPorFaixa,
   contarPorMeio,
   faixaPelasHoras,
@@ -47,13 +48,17 @@ describe('deslocamento: números da página 1 do PDF', () => {
     const ida = todos.map((m) => ({ ida_volta_horas: 2 * m.ida_horas }) as MunicipioDeslocamento);
     expect(formatarHoras(medianaIdaVolta(ida))).toBe('17h45');
     expect(medianaIdaVolta(todos)).toBeCloseTo(17 + 47.5 / 60, 9);
+    // Decisão 55: o tempo do meio é o 17h45 do relatório (17,75 h), não o 17h48 da coluna Ida e volta.
+    expect(TEMPO_DO_MEIO_HORAS).toBe(17.75);
+    expect(TEMPO_DO_MEIO_HORAS).toBe(medianaIdaVolta(ida));
     const horas = todos.map((m) => m.ida_volta_horas);
     expect(formatarHoras(Math.min(...horas))).toBe('0h40');
     expect(formatarHoras(Math.max(...horas))).toBe('31h35');
   });
 
-  it('faixas de ida e volta: Próximo 7 · Médio 7 · Longo 34 · Muito longo 44', () => {
-    expect(contarPorFaixa(todos)).toEqual({ proximo: 7, medio: 7, longo: 34, muito_longo: 44 });
+  it('faixas de ida e volta: Próximo 7 · Médio 7 · Longo 35 · Muito longo 43 (decisão 54: Craíbas-AL vai para Longo)', () => {
+    // A página 2 diz "Longo 34 · Muito longo 44"; o dono corrigiu Craíbas-AL (18h00) para Longo.
+    expect(contarPorFaixa(todos)).toEqual({ proximo: 7, medio: 7, longo: 35, muito_longo: 43 });
   });
 
   it('municípios por estado, como nos títulos da tabela (seção 2)', () => {
@@ -102,9 +107,11 @@ describe('deslocamento: coerência de cada linha', () => {
     for (const m of todos) expect(Math.abs(m.ida_volta_horas - 2 * m.ida_horas)).toBeLessThanOrEqual(5 / 60 + 1e-9);
   });
 
-  it('a faixa do PDF segue os limites de ida e volta, exceto Craíbas-AL (18h00 marcada como Muito longo)', () => {
+  it('decisão 54: a faixa segue os limites de ida e volta em todos; Craíbas-AL (18h00) é Longo, não Muito longo', () => {
+    // O PDF marca Craíbas-AL como Muito longo; a correção do dono fica no roteiro que lê o PDF.
     const divergentes = todos.filter((m) => faixaPelasHoras(m.ida_volta_horas) !== m.faixa);
-    expect(divergentes.map((m) => `${m.nome}-${m.uf}`)).toEqual(['Craíbas-AL']);
+    expect(divergentes.map((m) => `${m.nome}-${m.uf}`)).toEqual([]);
+    expect(todos.find((m) => m.nome === 'Craíbas' && m.uf === 'AL')?.faixa).toBe('longo');
   });
 
   it('todo município tem rota e alternativa; detalhe do voo só quando vai de avião', () => {

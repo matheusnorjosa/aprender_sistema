@@ -115,7 +115,8 @@ describe('Pesos e faixas', { timeout: 20000 }, () => {
     await abrir();
     await user.click(screen.getByRole('button', { name: 'Usar a configuração original (v5)' }));
     const previa = screen.getByRole('region', { name: 'Como fica com estes pesos' });
-    expect(previa).toHaveTextContent('Socorro Bezerra Lins: 77 · Capacidade disponível → 90 · Adequada');
+    // Decisão 56: as localidades do Amigos do Bem entram na carteira do Rogério e mudam as médias da equipe (era → 90).
+    expect(previa).toHaveTextContent('Socorro Bezerra Lins: 77 · Capacidade disponível → 89 · Adequada');
     expect(previa).toHaveTextContent('Valdir Maciel: 82 · Adequada → 79 · Capacidade disponível');
     const contagem = within(previa).getByRole('list', { name: 'Quantos em cada estrato' });
     expect(within(contagem).getAllByRole('listitem').map((li) => li.textContent)).toEqual([

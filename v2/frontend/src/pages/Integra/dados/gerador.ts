@@ -11,7 +11,7 @@
  * 1 sem municípios, que fica fora dos estratos; a ata fala em 6 com capacidade: ver "Para validar").
  */
 import { PESOS_ORIGINAIS_V5, PESOS_REVISADOS } from '../ica/calculo';
-import { MUNICIPIOS_REAIS, SEM_LOCALIDADE } from './municipios';
+import { AMIGOS_DO_BEM, MUNICIPIOS_REAIS } from './municipios';
 import type {
   Atendimento,
   Atuacao,
@@ -118,8 +118,12 @@ const PERFIS: readonly Perfil[] = [
     municipios: ['União dos Palmares', 'Barra de São Miguel', 'Campo Alegre', 'Teotônio Vilela', 'Craíbas', 'Santana do Ipanema'] },
   { id: 109, nome: 'Marlene Fontenele', atuacao: 'educacao_infantil', gerencia: 2, extras: 1, carga: 1.09,
     municipios: ['Curvelo', 'Felixlândia', 'Mirabela', 'São João da Ponte', 'Rio Pardo de Minas', 'Itacarambi'] },
-  { id: 110, nome: 'Rogério Assunção', atuacao: 'alfabetizacao_ei', gerencia: 1, extras: 2, carga: 1.05,
-    municipios: ['Florestal', 'Rio Paranaíba', 'Indianópolis', 'Rondonópolis', 'Jataí', 'Amigos do Bem'] },
+  // Carga 0,2 (era 1,05): com as duas localidades novas do Amigos do Bem (decisão 56), o Rogério segue em Adequada
+  // no 2026.2 e as médias da equipe quase não mudam (a história da ata continua: 3, 2, 6 e 5 + 1). A carga vale para
+  // a carteira toda: o retrato de 2025.2 e de 2026.1, sem o Amigos do Bem, também mudou (o ICA do Rogério e as médias
+  // da equipe nesses semestres caíram um pouco).
+  { id: 110, nome: 'Rogério Assunção', atuacao: 'alfabetizacao_ei', gerencia: 1, extras: 2, carga: 0.2,
+    municipios: ['Florestal', 'Rio Paranaíba', 'Indianópolis', 'Rondonópolis', 'Jataí', 'Amigos do Bem (Mauriti)'] },
   { id: 111, nome: 'Socorro Bezerra Lins', atuacao: 'amma', gerencia: 2, extras: 2, carga: 0.72,
     municipios: ['Belo Jardim', 'Catolé do Rocha', 'União dos Palmares', 'Umbaúba', 'Laranjeiras'] },
   { id: 112, nome: 'Taciana Holanda', atuacao: 'alfabetizacao_ei', gerencia: 3, extras: 1, carga: 1.15,
@@ -146,8 +150,11 @@ const DATA_DA_SUSPENSAO: Record<string, string> = {
 
 /** Novo contrato (2026.2) ainda sem coordenador definido. */
 const CONTRATO_SEM_COORDENADOR = 'Itaquiraí';
-/** Contrato novo de 2026.2 sem município definido (turmas ainda não informadas). */
-const CONTRATO_INCOMPLETO = { municipio: SEM_LOCALIDADE.nome, coordenador: 110 };
+/**
+ * Projeto novo de 2026.2, o Amigos do Bem, com o coordenador 110 e as turmas ainda não informadas. Uma linha
+ * por localidade de formação (decisão 56); a 1ª já está na carteira do 110, as outras entram no fim.
+ */
+const CONTRATO_INCOMPLETO = { municipios: AMIGOS_DO_BEM.map((m) => m.nome), coordenador: 110 };
 /** Carteira com valor improvável (menos de 1 professor por 100 alunos). */
 const COORDENADOR_IMPROVAVEL = 112;
 /** Coordenadora que chegou em 2026.2. */
@@ -241,6 +248,18 @@ export function gerarDadosSimulados(semente: number = SEMENTE_DEMO): DadosIntegr
     deslocamento_horas: m.horas,
     deslocamento_meio: m.meio,
   }));
+  // Decisão 56: as outras localidades do Amigos do Bem vão no fim e sem sorteio (não mudam o resto da demonstração).
+  const primeiraDoAmigosDoBem = municipios[municipios.length - 1] as MunicipioIntegra;
+  for (const m of AMIGOS_DO_BEM.slice(1)) {
+    municipios.push({
+      ...primeiraDoAmigosDoBem,
+      id: municipios.length + 1,
+      nome: m.nome,
+      uf: m.uf,
+      deslocamento_horas: m.horas,
+      deslocamento_meio: m.meio,
+    });
+  }
 
   const coordenadores: Coordenador[] = PERFIS.map((p) => ({ id: p.id, nome: p.nome, atuacao: p.atuacao, gerencia: p.gerencia }));
 
@@ -261,9 +280,16 @@ export function gerarDadosSimulados(semente: number = SEMENTE_DEMO): DadosIntegr
 
   // Histórias pontuais.
   novo(idDoMunicipio(municipios, CONTRATO_SEM_COORDENADOR), 1, null, segmentos(rng, 1, 1));
-  const idIncompleto = idDoMunicipio(municipios, CONTRATO_INCOMPLETO.municipio);
+  const idsIncompletos = CONTRATO_INCOMPLETO.municipios.map((n) => idDoMunicipio(municipios, n));
+  const perfilIncompleto = PERFIS.find((p) => p.id === CONTRATO_INCOMPLETO.coordenador) as Perfil;
+  for (const id of idsIncompletos) {
+    if (!atendimentos.some((a) => a.municipio === id)) {
+      const colecao = COLECOES_DA_ATUACAO[perfilIncompleto.atuacao][0];
+      novo(id, colecao, perfilIncompleto.id, segmentos(rng, colecao, perfilIncompleto.carga));
+    }
+  }
   for (const a of atendimentos) {
-    if (a.municipio === idIncompleto && a.coordenador === CONTRATO_INCOMPLETO.coordenador) {
+    if (idsIncompletos.includes(a.municipio) && a.coordenador === CONTRATO_INCOMPLETO.coordenador) {
       for (const s of a.segmentos) s.turmas_qtde = null;
     }
   }
@@ -305,7 +331,7 @@ export function gerarDadosSimulados(semente: number = SEMENTE_DEMO): DadosIntegr
 
   // 2026.1: antes das suspensões, do contrato novo sem coordenador, do Amigos do Bem, da recém-chegada
   // e do remanejamento de 2026.2.
-  const novosDe2026_2 = new Set([idDoMunicipio(municipios, CONTRATO_SEM_COORDENADOR), idIncompleto]);
+  const novosDe2026_2 = new Set([idDoMunicipio(municipios, CONTRATO_SEM_COORDENADOR), ...idsIncompletos]);
   const base2026_1 = comProfessores(copiarBase(base), 0.96);
   base2026_1.coordenadores = base2026_1.coordenadores.filter((c) => c.id !== RECEM_CHEGADA);
   base2026_1.atendimentos = base2026_1.atendimentos.filter((a) => !novosDe2026_2.has(a.municipio));

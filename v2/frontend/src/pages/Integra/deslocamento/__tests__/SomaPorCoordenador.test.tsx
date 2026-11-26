@@ -56,11 +56,15 @@ describe('Deslocamento — soma por coordenador', { timeout: 20000 }, () => {
     expect(linha).toHaveTextContent(`Guarapuava-PR (${formatarHoras(lucineia.maior!.horas)})`);
   });
 
-  test('sem localidade entra com a mediana (estimado); suspenso fica fora, e a tela diz', async () => {
+  test('local fora do relatório entra com o tempo do meio (estimado, decisões 55 e 56); suspenso fica fora, e a tela diz', async () => {
     await abrir();
+    expect(screen.getByText(/Município com ações suspensas fica fora da soma/)).toHaveTextContent(
+      'O Amigos do Bem não tem município fixo: cada local de formação é uma linha, com o tempo do relatório. O local que não está no relatório entra com o tempo do meio (17h45), marcado como estimado.',
+    );
     const tabela = screen.getByRole('table', { name: 'Soma de ida e volta por coordenador' });
     const rogerio = within(tabela).getByRole('link', { name: 'Rogério Assunção' }).closest('tr') as HTMLElement;
-    expect(rogerio).toHaveTextContent('Amigos do Bem-CE com a mediana (estimado)');
+    expect(rogerio).toHaveTextContent('Amigos do Bem (Mauriti)-CE com o tempo do meio (estimado)');
+    expect(rogerio).not.toHaveTextContent('mediana');
     const jucelia = within(tabela).getByRole('link', { name: 'Jucélia Montenegro' }).closest('tr') as HTMLElement;
     expect(jucelia).toHaveTextContent('Fora da soma (suspenso): Capivari-SP');
   });

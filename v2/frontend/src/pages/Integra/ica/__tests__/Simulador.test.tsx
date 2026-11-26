@@ -51,7 +51,8 @@ describe('Simulador de remanejamento', { timeout: 20000 }, () => {
     expect(cartoes[0]).toHaveTextContent(origem!.mudouEstrato ? /Muda de estrato/ : /Continua em/);
     expect(cartoes[1]).toHaveTextContent(/Passa a ter carteira e entra na média da equipe/);
 
-    expect(screen.getByText(/Dispersão da equipe: desvio 30,9 →/)).toBeInTheDocument();
+    // Decisão 56: as localidades do Amigos do Bem entram na carteira do Rogério e mudam as médias da equipe (era desvio 30,9).
+    expect(screen.getByText(/Dispersão da equipe: desvio 30,8 →/)).toBeInTheDocument();
   });
 
   test('adicionar sem município avisa; tirar um movimento volta ao início', async () => {

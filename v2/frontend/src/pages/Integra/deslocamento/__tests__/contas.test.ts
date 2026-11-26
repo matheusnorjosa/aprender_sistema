@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { calcularEquipe, formatarHoras, PESOS_REVISADOS } from '../../ica/calculo';
+import { calcularEquipe, PESOS_REVISADOS } from '../../ica/calculo';
 import { DESLOCAMENTO_MUNICIPIOS } from '../../dados/deslocamento';
 import { gerarDadosSimulados } from '../../dados/gerador';
 import { faixaDoMunicipio, resumoDoRelatorio, somaPorCoordenador, ufsNaOrdemDoRelatorio } from '../contas';
@@ -13,12 +13,12 @@ const dados = gerarDadosSimulados();
 const resultado = calcularEquipe(dados.base, PESOS_REVISADOS);
 
 describe('resumoDoRelatorio', () => {
-  it('os números da página 1: 92, 23 por terra, 69 de avião (35 com conexão), faixas 7/7/34/44', () => {
+  it('os números da página 1: 92, 23 por terra, 69 de avião (35 com conexão); faixas 7/7/35/43 (decisão 54: Craíbas-AL em Longo)', () => {
     const r = resumoDoRelatorio(DESLOCAMENTO_MUNICIPIOS);
     expect(r.total).toBe(92);
     expect(r.porMeio).toEqual({ carro: 23, aviao: 69 });
     expect(r.comConexao).toBe(35);
-    expect(r.porFaixa).toEqual({ proximo: 7, medio: 7, longo: 34, muito_longo: 44 });
+    expect(r.porFaixa).toEqual({ proximo: 7, medio: 7, longo: 35, muito_longo: 43 });
   });
 
   it('menor e maior ida e volta, com o município', () => {
@@ -27,11 +27,10 @@ describe('resumoDoRelatorio', () => {
     expect(`${r.maior.nome}-${r.maior.uf} ${r.maior.ida_volta_texto}`).toBe('Filadélfia-BA 31h35');
   });
 
-  it('mediana: a que o relatório escreve (17h45) e a da conta com a tabela (17h47min30s, que arredonda para 17h48)', () => {
+  it('decisão 55: a mediana é a que o relatório escreve (17h45); a da coluna Ida e volta (17h48) sai do resumo', () => {
     const r = resumoDoRelatorio(DESLOCAMENTO_MUNICIPIOS);
     expect(r.medianaDoRelatorio).toBe('17h45');
-    // 17h35 e 18h00 no meio: 1067,5 min, que o ponto flutuante guarda como 1067,4999...; meio para cima dá 17h48.
-    expect(formatarHoras(r.medianaCalculada)).toBe('17h48');
+    expect(r).not.toHaveProperty('medianaCalculada');
   });
 });
 
@@ -48,11 +47,12 @@ describe('ufsNaOrdemDoRelatorio', () => {
 });
 
 describe('faixaDoMunicipio', () => {
-  it('a faixa que o relatório escreve; sem localidade = null', () => {
-    const craibas = dados.base.municipios.find((m) => m.nome === 'Craíbas')!;
-    expect(faixaDoMunicipio(craibas)).toBe('muito_longo');
-    const amigosDoBem = dados.base.municipios.find((m) => m.deslocamento_horas === null)!;
-    expect(faixaDoMunicipio(amigosDoBem)).toBeNull();
+  it('a faixa do relatório (com a decisão 54); a linha do Amigos do Bem usa a da localidade (56); sem tempo = null', () => {
+    const doIca = (nome: string) => dados.base.municipios.find((m) => m.nome === nome)!;
+    expect(faixaDoMunicipio(doIca('Craíbas'))).toBe('longo');
+    expect(faixaDoMunicipio(doIca('Amigos do Bem (Santana do Ipanema)'))).toBe(faixaDoMunicipio(doIca('Santana do Ipanema')));
+    expect(faixaDoMunicipio(doIca('Amigos do Bem (Petrolina)'))).toBe('muito_longo');
+    expect(faixaDoMunicipio(doIca('Amigos do Bem (Mauriti)'))).toBeNull();
   });
 });
 
@@ -83,9 +83,9 @@ describe('somaPorCoordenador', () => {
     expect(lucineia.porFaixa.muito_longo + lucineia.porFaixa.longo + lucineia.porFaixa.medio + lucineia.porFaixa.proximo).toBe(9);
   });
 
-  it('sem localidade conta a mediana e fica marcado como estimado; suspenso não entra', () => {
+  it('local fora do relatório conta o tempo do meio e fica marcado como estimado (55, 56); suspenso não entra', () => {
     const rogerio = linhas.find((l) => l.coordenador.id === 110)!;
-    expect(rogerio.estimados).toEqual(['Amigos do Bem-CE']);
+    expect(rogerio.estimados).toEqual(['Amigos do Bem (Mauriti)-CE']);
     const jucelia = linhas.find((l) => l.coordenador.id === 107)!;
     // Capivari-SP está com as ações suspensas: fica fora da soma.
     expect(jucelia.municipios).toBe(7);

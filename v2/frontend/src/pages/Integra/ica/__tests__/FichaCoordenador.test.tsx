@@ -31,7 +31,9 @@ describe('Ficha do coordenador', { timeout: 20000 }, () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Lucinéia Barreto' })).toBeInTheDocument();
     const situacao = screen.getByRole('list', { name: 'Situação atual' });
     expect(situacao).toHaveTextContent('ICA atual: 169 · Sobrecarga');
-    expect(situacao).toHaveTextContent('Variação desde 2026.1: −22 (era 191 · Sobrecarga)');
+    // Decisão 56 (rodada 4): quem muda o 2026.1 é a carga do Rogério, baixada para 0,2 (perfil 110 em dados/gerador.ts);
+    // o Amigos do Bem só entra em 2026.2 (era −22, de 191).
+    expect(situacao).toHaveTextContent('Variação desde 2026.1: −20 (era 189 · Sobrecarga)');
     expect(situacao).toHaveTextContent('Fora da meta (70 a 130)');
   });
 
@@ -61,21 +63,31 @@ describe('Ficha do coordenador', { timeout: 20000 }, () => {
     expect(within(capivari).getByText('Suspenso')).toBeInTheDocument();
   });
 
-  test('município sem localidade usa a mediana e aparece como estimado; dado incompleto avisa', async () => {
+  test('Amigos do Bem: o tempo é o do local de cada formação; fora do relatório, o tempo do meio estimado (55, 56)', async () => {
     await abrir('/integra/ica/coordenador/110');
     const linhas = linhasDaTabela('Carteira');
-    const amigosDoBem = linhas.find((l) => l.textContent?.includes('Amigos do Bem-CE')) as HTMLElement;
-    // Mediana de ida e volta dos 92 municípios do relatório (17h47,5, que arredonda para 17h48; o relatório escreve 17h45).
-    expect(amigosDoBem).toHaveTextContent('17h48 (estimado)');
-    expect(screen.getByText(/Turmas não informadas em Amigos do Bem-CE/)).toBeInTheDocument();
+    const linha = (nome: string) => linhas.find((l) => l.textContent?.includes(nome)) as HTMLElement;
+    // Mauriti-CE não está no relatório: o tempo do meio do relatório, 17h45 (antes, a mediana da tabela, 17h48).
+    expect(linha('Amigos do Bem (Mauriti)-CE')).toHaveTextContent('17h45 (estimado)');
+    // Santana do Ipanema-AL e Petrolina-PE estão no relatório: o tempo de lá, sem "estimado".
+    expect(linha('Amigos do Bem (Santana do Ipanema)-AL')).toHaveTextContent('19h00');
+    expect(linha('Amigos do Bem (Santana do Ipanema)-AL')).not.toHaveTextContent('estimado');
+    expect(linha('Amigos do Bem (Petrolina)-PE')).toHaveTextContent('25h45');
+    expect(screen.getByText(/Deslocamento estimado/)).toHaveTextContent(
+      'Deslocamento estimado: Amigos do Bem (Mauriti)-CE não está no relatório de tempos; a conta usa o tempo do meio do relatório (17h45).',
+    );
+    expect(document.body).not.toHaveTextContent('17h48');
+    expect(screen.getByText(/Turmas não informadas em Amigos do Bem \(Mauriti\)-CE/)).toBeInTheDocument();
   });
 
   test('histórico semestral do ICA, com a versão de pesos de cada semestre', async () => {
     await abrir(LUCINEIA);
     const linhas = linhasDaTabela('Histórico semestral');
     expect(linhas.map((l) => l.textContent)).toEqual([
-      expect.stringMatching(/2025\.2.*190 · Sobrecarga.*proposta v5/),
-      expect.stringMatching(/2026\.1.*191 · Sobrecarga.*proposta v5/),
+      // Decisão 56 (rodada 4): em 2025.2 e 2026.1 ainda não há Amigos do Bem; quem muda as médias da equipe é a carga
+      // do Rogério, baixada para 0,2 (perfil 110 em dados/gerador.ts). Eram 190 e 191.
+      expect.stringMatching(/2025\.2.*188 · Sobrecarga.*proposta v5/),
+      expect.stringMatching(/2026\.1.*189 · Sobrecarga.*proposta v5/),
       expect.stringMatching(/2026\.2.*169 · Sobrecarga.*revisada/),
     ]);
   });

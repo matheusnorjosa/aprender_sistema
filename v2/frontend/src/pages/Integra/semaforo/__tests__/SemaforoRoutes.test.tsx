@@ -35,6 +35,23 @@ describe('Semáforo — rotas e índice', { timeout: 20000 }, () => {
     });
   });
 
+  test('o índice diz as regras novas: o vermelho muda na hora, os projetos e a pesquisa por projeto (decisões 38, 46 e 51)', async () => {
+    renderTelaSemaforo('/integra/semaforo');
+    await screen.findByText('Semáforo de Risco Municipal');
+    const lista = screen.getByRole('list', { name: 'As 6 telas do Semáforo' });
+    expect(lista).toHaveTextContent(/o vermelho muda a cor em vigor na hora, e o Comitê confirma ou desfaz/);
+    expect(lista).toHaveTextContent(/Os projetos, os 5 indicadores/);
+    expect(lista).toHaveTextContent(/uma resposta por projeto/);
+  });
+
+  test('decisões 38 e 39: a abertura do Semáforo diz que um vermelho ou três amarelos mudam a cor na hora', async () => {
+    renderTelaSemaforo('/integra/semaforo');
+    const abertura = await screen.findByText(/Cada município ganha uma cor a cada dois meses/);
+    expect(abertura).toHaveTextContent(
+      'Um indicador em vermelho, ou três amarelos, muda a cor para vermelho na hora, e o Comitê confirma ou desfaz depois.',
+    );
+  });
+
   test('menu local do Semáforo, com a tela atual marcada', async () => {
     renderTelaSemaforo('/integra/semaforo/comite');
     await screen.findByText('Comitê de Satisfação');

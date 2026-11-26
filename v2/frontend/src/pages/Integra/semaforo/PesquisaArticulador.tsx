@@ -5,6 +5,10 @@
  * Na versão real, articuladores e secretários municipais respondem por link, sem conta. No protótipo não há link: a pesquisa é
  * respondida nesta tela, entra no ciclo atual com a data de "hoje" da demonstração e a cor sugerida do
  * município é recalculada na hora (`useSemaforoDemo`). DADOS SIMULADOS; nada é gravado.
+ *
+ * Decisão 51: a pesquisa é por projeto. Cada projeto do município pode ter o seu articulador; o mesmo
+ * articulador em dois projetos responde uma vez por projeto. A tela pede o projeto (com um projeto só, ele já
+ * vem escolhido), avisa no campo quando o projeto já respondeu no ciclo e o contexto recusa a segunda resposta.
  */
 import { useState, type FormEvent, type JSX } from 'react';
 import { Link } from 'react-router';
@@ -104,6 +108,7 @@ export default function PesquisaArticulador(): JSX.Element {
   const { dados, situacoes, registrarResposta } = useSemaforoDemo();
   const estadoDaFicha = useEstadoDaFicha();
   const [municipio, setMunicipio] = useState('');
+  const [projetoEscolhido, setProjetoEscolhido] = useState('');
   const [funcao, setFuncao] = useState<string>(FUNCOES[0]);
   const [identificacao, setIdentificacao] = useState('');
   const [itens, setItens] = useState<readonly number[]>(ITENS_VAZIOS);
@@ -111,6 +116,8 @@ export default function PesquisaArticulador(): JSX.Element {
   const [comentario, setComentario] = useState('');
   const [retorno, setRetorno] = useState<Retorno | null>(null);
   const [recusado, setRecusado] = useState(false);
+  /** "município-projeto" que acabou de responder nesta tela: o campo diz que a resposta entrou, sem o aviso vermelho. */
+  const [acabouDeResponder, setAcabouDeResponder] = useState('');
 
   const ciclo = dados.ciclo_atual;
   const periodo = periodoDoCiclo(ciclo);
@@ -118,12 +125,34 @@ export default function PesquisaArticulador(): JSX.Element {
   const escolhido = dados.municipios.find((m) => m.id === id);
   const situacao = situacoes.find((s) => s.municipio === id);
   const respostasDoCiclo = dados.respostas.filter((r) => r.ciclo === ciclo);
+  const projetos = escolhido?.projetos ?? [];
+  // Com um projeto só, ele já vem escolhido.
+  const projetoId = projetos.some((p) => String(p.id) === projetoEscolhido)
+    ? Number(projetoEscolhido)
+    : projetos.length === 1
+      ? projetos[0]!.id
+      : 0;
+  const projeto = projetos.find((p) => p.id === projetoId);
+  const respostaDoProjeto = (p: number) => respostasDoCiclo.find((r) => r.municipio === id && r.projeto === p);
+  const jaRespondeu = projeto ? respostaDoProjeto(projeto.id) : undefined;
+  const respondeuAgora = jaRespondeu !== undefined && acabouDeResponder === `${id}-${projetoId}`;
+
+  const escolherMunicipio = (valor: string): void => {
+    setMunicipio(valor);
+    setProjetoEscolhido('');
+    setAcabouDeResponder('');
+    // Rodada 5: o retorno e as marcas de erro eram do município anterior (ou de um erro que a escolha resolveu).
+    setRetorno(null);
+    setRecusado(false);
+  };
 
   const enviar = (e: FormEvent): void => {
     e.preventDefault();
     const antes = sugeridaAgora(situacoes, id);
+    const aguardandoAntes = situacoes.find((s) => s.municipio === id)?.aguardando_comite ?? false;
     const r = registrarResposta({
       municipio: id,
+      projeto: projetoId,
       funcao_respondente: funcao,
       identificacao: identificacao.trim() === '' ? null : identificacao.trim(),
       itens,
@@ -136,7 +165,14 @@ export default function PesquisaArticulador(): JSX.Element {
       return;
     }
     setRecusado(false);
-    setRetorno({ ok: true, municipio: id, titulo: `Resposta registrada para ${nomeDoMunicipio(escolhido)}.`, antes });
+    setAcabouDeResponder(`${id}-${projetoId}`);
+    setRetorno({
+      ok: true,
+      municipio: id,
+      titulo: `Resposta registrada para ${nomeDoMunicipio(escolhido)}, projeto ${projeto?.nome ?? ''}.`,
+      antes,
+      aguardandoAntes,
+    });
     setItens(ITENS_VAZIOS);
     setNps(-1);
     setComentario('');
@@ -146,10 +182,22 @@ export default function PesquisaArticulador(): JSX.Element {
     const nome = (municipioId: number) => dados.municipios.find((m) => m.id === municipioId);
     baixarCsv(
       `semaforo_pesquisa_${ciclo}.csv`,
-      ['Município', 'UF', 'Ciclo', 'Respondida em', 'No prazo', 'Função', ...ITENS.map((i, n) => `Item ${n + 1}: ${i.curto}`), 'NPS', 'O que melhorar'],
+      [
+        'Município',
+        'UF',
+        'Projeto',
+        'Ciclo',
+        'Respondida em',
+        'No prazo',
+        'Função',
+        ...ITENS.map((i, n) => `Item ${n + 1}: ${i.curto}`),
+        'NPS',
+        'O que melhorar',
+      ],
       respostasDoCiclo.map((r) => [
         nome(r.municipio)?.nome ?? '',
         nome(r.municipio)?.uf ?? '',
+        nome(r.municipio)?.projetos.find((p) => p.id === r.projeto)?.nome ?? '',
         r.ciclo,
         formatarDia(r.respondida_em),
         r.no_prazo ? 'Sim' : 'Não',
@@ -183,11 +231,50 @@ export default function PesquisaArticulador(): JSX.Element {
       </p>
 
       <form onSubmit={enviar} noValidate className="max-w-3xl rounded border border-[#8c8c8c] bg-white p-4">
+        {/* Rodada 5 (decisão 51): a pesquisa é por projeto; o título diz qual. */}
         <Title level={2} style={{ fontSize: 20 }}>
-          Pesquisa de satisfação do programa
+          {projeto ? `Pesquisa de satisfação do projeto ${projeto.nome}` : 'Pesquisa de satisfação do projeto'}
         </Title>
         <div className="mb-3 grid gap-3 md:grid-cols-2">
-          <CampoMunicipio id="pesquisa-municipio" valor={municipio} aoMudar={setMunicipio} />
+          <CampoMunicipio id="pesquisa-municipio" valor={municipio} aoMudar={escolherMunicipio} />
+          <div>
+            <label htmlFor="pesquisa-projeto" className={CLASSE_ROTULO}>
+              Projeto
+            </label>
+            <select
+              id="pesquisa-projeto"
+              className={CLASSE_CAMPO}
+              value={projetoId === 0 ? '' : String(projetoId)}
+              onChange={(e) => {
+                setProjetoEscolhido(e.target.value);
+                setAcabouDeResponder('');
+              }}
+              aria-describedby={jaRespondeu && !respondeuAgora ? 'pesquisa-projeto-aviso' : 'pesquisa-projeto-dica'}
+            >
+              <option value="">{escolhido ? 'Escolha o projeto' : 'Escolha antes o município'}</option>
+              {projetos.map((p) => (
+                <option key={p.id} value={String(p.id)}>
+                  {p.nome} · {p.articulador}
+                  {respostaDoProjeto(p.id) ? ' · já respondeu neste ciclo' : ''}
+                </option>
+              ))}
+            </select>
+            {respondeuAgora && jaRespondeu ? (
+              <p id="pesquisa-projeto-dica" className="m-0 mt-1 text-sm">
+                Resposta deste projeto registrada hoje, {formatarDia(jaRespondeu.respondida_em)}. A pesquisa é uma por
+                projeto.
+              </p>
+            ) : jaRespondeu ? (
+              <p id="pesquisa-projeto-aviso" className="m-0 mt-1 text-sm font-semibold text-[#8A1C14]">
+                Este projeto já respondeu neste ciclo, em {formatarDia(jaRespondeu.respondida_em)}. A pesquisa é uma por
+                projeto: uma segunda resposta não entra.
+              </p>
+            ) : (
+              <p id="pesquisa-projeto-dica" className="m-0 mt-1 text-sm">
+                Uma resposta por projeto no ciclo. Quem responde por dois projetos responde uma vez por projeto.
+              </p>
+            )}
+          </div>
           <div>
             <label htmlFor="pesquisa-funcao" className={CLASSE_ROTULO}>
               Sua função
@@ -205,8 +292,8 @@ export default function PesquisaArticulador(): JSX.Element {
           <p className="mb-3 text-sm">
             Agora, {nomeDoMunicipio(escolhido)} tem a cor sugerida{' '}
             <EtiquetaCor cor={situacao.ciclos.at(-1)?.resultado.cor ?? 'verde'} /> e a cor em vigor{' '}
-            <EtiquetaCor cor={situacao.cor_vigente} />. Respostas deste município no ciclo atual:{' '}
-            {respostasDoCiclo.filter((r) => r.municipio === id).length}.{' '}
+            <EtiquetaCor cor={situacao.cor_vigente} />. Projetos que já responderam no ciclo atual:{' '}
+            {projetos.filter((p) => respostaDoProjeto(p.id)).length} de {projetos.length}.{' '}
             <Link to={`/integra/semaforo/municipio/${id}`} state={estadoDaFicha}>Abrir a ficha de {nomeDoMunicipio(escolhido)}</Link>
           </p>
         )}
@@ -224,6 +311,7 @@ export default function PesquisaArticulador(): JSX.Element {
           />
         </div>
 
+        {projeto && <p className="mb-1">Responda pensando no projeto {projeto.nome}.</p>}
         <p id="pesquisa-escala" className="mb-2">
           Para cada frase, marque de 1 a 5: 1 = discordo totalmente, 5 = concordo totalmente.
         </p>
@@ -241,7 +329,7 @@ export default function PesquisaArticulador(): JSX.Element {
             />
           ))}
           <Escolha
-            legenda="7. De 0 a 10, quanto você recomendaria a parceria com a Aprender Editora?"
+            legenda={`7. De 0 a 10, quanto você recomendaria o projeto ${projeto ? projeto.nome : 'avaliado'} da Aprender Editora?`}
             nome="pesquisa-nps"
             opcoes={NOTAS_NPS}
             valor={nps}

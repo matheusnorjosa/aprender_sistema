@@ -3,7 +3,7 @@
  *
  * Tempos REAIS (relatório) sobre as carteiras FICTÍCIAS do gerador, no estado da sessão (um remanejamento
  * feito no Simulador muda a soma). É o mesmo número do componente "Tempo de deslocamento" do ICA:
- * suspenso fica fora e o município sem localidade entra com a mediana (estimado). Gráfico de barras com
+ * suspenso fica fora e o local que não está no relatório entra com o tempo do meio (estimado). Gráfico de barras com
  * o número escrito e a tabela ao lado (`ResponsiveTable`, sem rolagem horizontal).
  */
 import { useMemo, type JSX } from 'react';
@@ -31,7 +31,7 @@ function textoPorFaixa(s: SomaDoCoordenador): string {
 
 function observacoes(s: SomaDoCoordenador): string[] {
   return [
-    ...s.estimados.map((m) => `${m} com a mediana (estimado)`),
+    ...s.estimados.map((m) => `${m} com o tempo do meio (estimado)`),
     ...(s.suspensos.length > 0 ? [`Fora da soma (suspenso): ${s.suspensos.join(', ')}`] : []),
   ];
 }
@@ -90,8 +90,9 @@ export default function SomaPorCoordenador(): JSX.Element {
       </Title>
       <p className="mb-2">
         Soma do tempo de ida e volta de cada município ativo da carteira. É o mesmo número do componente “Tempo de
-        deslocamento” do ICA. Município com ações suspensas fica fora da soma; município sem localidade definida entra
-        com a mediana ({formatarHoras(resultado.mediana)}), marcado como estimado.
+        deslocamento” do ICA. Município com ações suspensas fica fora da soma. O Amigos do Bem não tem município fixo:
+        cada local de formação é uma linha, com o tempo do relatório. O local que não está no relatório entra com o tempo
+        do meio ({formatarHoras(resultado.mediana)}), marcado como estimado.
       </p>
       <p className="mb-6 text-sm">Coordenadores e carteiras fictícios; os tempos de cada município são os do relatório.</p>
 

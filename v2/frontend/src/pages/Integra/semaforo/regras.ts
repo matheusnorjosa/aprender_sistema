@@ -3,7 +3,7 @@
  * referência sempre chega como argumento (texto AAAA-MM-DD).
  *
  * Fonte: Requisitos_Modulo_Semaforo_Risco_Municipal.pdf (NFP, nov/2026).
- * - Seção 3: os 5 indicadores e seus limites; indicador sem dado fica fora da regra do pior (sugestão).
+ * - Seção 3: os 5 indicadores e seus limites; indicador sem dado fica fora da regra do pior (decisão 79).
  * - Seção 4: vale o pior; vermelho imediato; 3 amarelos valem vermelho; volta ao verde só depois de
  *   2 ciclos bimestrais seguidos sem alerta ("em recuperação"); o Comitê confirma a cor e justifica se alterar.
  * - Seção 5: tarefas e prazos por cor, contados a partir da publicação.
@@ -21,6 +21,9 @@
  * - 38 e 39: um vermelho ou três amarelos mudam a cor na hora (`vermelho_imediato`).
  * - 42 e 43: tarefa cancelada pelo Comitê ou substituída fica guardada com o estado.
  * - 48: ata da reunião de escuta até 5 dias úteis depois. 49: convergência. 50: tempo de resposta (meta 48 h).
+ *
+ * Decisões de 26/11/2026: 76, o articulador responde em até 10 dias úteis depois do envio do link; 77, o relatório
+ * mensal vence no 5º dia útil do mês seguinte; 94, a observação de formação é registrada na DFF e o sistema lê de lá.
  */
 import { formatarDia, formatarNumero } from '../ica/componentes/estilos';
 import type {
@@ -428,7 +431,8 @@ export const RESPOSTA_POR_COR: Record<Cor, RespostaDaCor> = {
     o_que_fazer: 'Conversar com o articulador, observar uma formação e acompanhar o caso no Comitê',
     tarefas: [
       tarefa('contato_articulador', 'Contato com o articulador', { tipo: 'dias_uteis', valor: 10 }, 'em até 10 dias úteis'),
-      tarefa('observacao_formacao', 'Observação de uma formação', { tipo: 'meses', valor: 2 }, 'no bimestre'),
+      // Decisão 94: a observação é registrada na DFF, junto do PDI; o sistema lê de lá.
+      tarefa('observacao_formacao', 'Observação de uma formação (lida da DFF)', { tipo: 'meses', valor: 2 }, 'no bimestre'),
     ],
     rotina: ['Reunião de escuta a cada 3 meses'],
   },
@@ -565,6 +569,16 @@ export const DIAS_ENTRE_REUNIOES = 30;
 /** O último dia para registrar a ata: 5 dias úteis depois da reunião. */
 export function prazoDaAta(dataReuniao: string): string {
   return somarDiasUteis(dataReuniao, DIAS_UTEIS_PARA_A_ATA);
+}
+
+/** Decisão 76: o último dia para o articulador responder, 10 dias úteis depois do envio do link. */
+export function prazoDaPesquisa(envio: string): string {
+  return somarDiasUteis(envio, 10);
+}
+
+/** Decisão 77: o relatório do mês (AAAA-MM) vence no 5º dia útil do mês seguinte. */
+export function prazoDoRelatorio(mes: string): string {
+  return somarDiasUteis(somarDias(somarMeses(`${mes}-01`, 1), -1), 5);
 }
 
 /**

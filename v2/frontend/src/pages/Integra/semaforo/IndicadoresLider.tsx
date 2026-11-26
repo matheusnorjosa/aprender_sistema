@@ -615,7 +615,7 @@ export default function IndicadoresLider(): JSX.Element {
         </ul>
         <p className="mb-4 rounded border-l-4 border-primary-dark bg-[#EEF5F3] p-3">
           <strong>Nada é enviado.</strong> No protótipo, os alertas de prazo só aparecem nesta tela. Na versão real, cada
-          um iria para as pessoas em &ldquo;Seria enviado para&rdquo;.
+          um chega no sistema e por e-mail institucional para as pessoas listadas em cada tarefa.
         </p>
         <Title level={3} id="lider-atrasadas" style={{ fontSize: 16 }}>
           Vencidas e que vencem hoje ou amanhã
@@ -650,7 +650,7 @@ export default function IndicadoresLider(): JSX.Element {
                       <EtiquetaCor cor={t.cor} /> · criada em {formatarDia(t.criada_em)}
                       {nasceuNaHora(t, dados.decisoes) && ', quando a cor mudou na hora'}
                     </dd>
-                    <dt className="font-semibold">Seria enviado para:{' '}</dt>
+                    <dt className="font-semibold">Seria enviado no sistema e por e-mail institucional para:{' '}</dt>
                     <dd className="m-0">
                       {destinatariosDoPrazo(t.cor, gestoraDe(t.municipio), coordenadoresDe(t.municipio)).join(', ')}
                     </dd>

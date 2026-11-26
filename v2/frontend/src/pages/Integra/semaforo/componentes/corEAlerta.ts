@@ -63,7 +63,8 @@ function quemAge(cor: Cor, gestora: string, coordenadores: readonly string[]): s
 /**
  * Para quem iria o alerta de piora. Seção 8 do PDF: "Município passa a vermelho" vai, na hora, para a gestora de
  * referência, a gestora pedagógica, a SPE e a Líder do NFP. A tabela não tem linha para "passa a amarelo": o
- * protótipo avisa quem age no amarelo e a SPE. No protótipo nada é enviado.
+ * protótipo avisa quem age no amarelo e a SPE. Na versão real, o alerta chega no sistema e por e-mail institucional
+ * (decisão 83); no protótipo nada é enviado.
  */
 export function destinatariosDaPiora(cor: Cor, gestora: string, coordenadores: readonly string[]): string[] {
   return [...quemAge(cor, gestora, coordenadores), 'SPE', ...(cor === 'vermelho' ? ['Líder do NFP'] : [])];
@@ -71,7 +72,8 @@ export function destinatariosDaPiora(cor: Cor, gestora: string, coordenadores: r
 
 /**
  * Para quem iria o alerta de prazo da tarefa. Seção 8 do PDF: "Prazo de resposta a cor vencendo ou vencido" vai
- * para o responsável pela tarefa (quem age na cor da tarefa) e a SPE, um dia antes e no vencimento.
+ * para o responsável pela tarefa (quem age na cor da tarefa) e a SPE, um dia antes e no vencimento. Na versão real,
+ * no sistema e por e-mail institucional (decisão 83).
  */
 export function destinatariosDoPrazo(cor: Cor, gestora: string, coordenadores: readonly string[]): string[] {
   return [...quemAge(cor, gestora, coordenadores), 'SPE'];

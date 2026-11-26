@@ -287,7 +287,10 @@ describe('Semáforo — Indicadores da Líder', { timeout: 20000 }, () => {
     // gestora pedagógica) e para a SPE. A Líder do NFP não recebe este alerta.
     const municipio = DADOS.municipios.find((m) => m.nome === nome && m.uf === uf)!;
     const gestora = DADOS.pessoas.find((p) => p.id === municipio.gestora_referencia)!.nome;
-    expect(cartao).toHaveTextContent(`Seria enviado para: ${gestora} (gestora de referência), Gestora pedagógica, SPE`);
+    // Decisão 83: o alerta chega no sistema e por e-mail institucional.
+    expect(cartao).toHaveTextContent(
+      `Seria enviado no sistema e por e-mail institucional para: ${gestora} (gestora de referência), Gestora pedagógica, SPE`,
+    );
     expect(cartao).not.toHaveTextContent('Líder do NFP');
     expect(screen.getByText(/Nada é enviado/)).toBeInTheDocument();
   });
@@ -320,7 +323,9 @@ describe('Semáforo — Indicadores da Líder', { timeout: 20000 }, () => {
     // Rodada 3: a cor da tarefa e quando ela nasceu, sem chamar de "publicada" o que o Comitê ainda não viu.
     expect(cartao).toHaveTextContent('Cor da tarefa: Amarelo · criada em 24/11/2026');
     expect(cartao).not.toHaveTextContent('Cor publicada');
-    expect(cartao).toHaveTextContent(`Seria enviado para: ${gestora} (gestora de referência), ${coordenador} (coordenador), SPE`);
+    expect(cartao).toHaveTextContent(
+      `Seria enviado no sistema e por e-mail institucional para: ${gestora} (gestora de referência), ${coordenador} (coordenador), SPE`,
+    );
   });
 
   test('rodada 4 (decisões 33 e 34, leitura): na sexta, a tarefa que vence na segunda aparece como "Vence no próximo dia útil"', async () => {
@@ -378,7 +383,7 @@ describe('Semáforo — Indicadores da Líder', { timeout: 20000 }, () => {
     expect(horizonte).toHaveTextContent('Cor da tarefa: Vermelho · criada em 30/11/2026, quando a cor mudou na hora');
     const cartao = screen.getByText(`Contato com o articulador · ${m.nome}-${m.uf}`).closest('li') as HTMLElement;
     expect(cartao).toHaveTextContent(
-      `Seria enviado para: ${gestora} (gestora de referência), ${nomes.map((n) => `${n} (coordenador)`).join(', ')}, SPE`,
+      `Seria enviado no sistema e por e-mail institucional para: ${gestora} (gestora de referência), ${nomes.map((n) => `${n} (coordenador)`).join(', ')}, SPE`,
     );
   });
 

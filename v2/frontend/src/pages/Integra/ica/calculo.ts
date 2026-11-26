@@ -33,7 +33,7 @@ export const COMPONENTES: readonly Componente[] = [
 
 export const ROTULO_COMPONENTE: Record<Componente, string> = {
   municipios: 'Municípios ativos',
-  frentes: 'Frentes (município × coleção)',
+  frentes: 'Frentes (cada ano de cada coleção)',
   turmas: 'Turmas de formação',
   professores: 'Professores em formação',
   deslocamento: 'Tempo de deslocamento (ida e volta)',
@@ -202,6 +202,8 @@ export interface LinhaCarteira {
   ativo: boolean;
   /** ids das coleções (`projeto_geral`) deste coordenador neste município. */
   colecoes: number[];
+  /** Decisão 59: cada ano (segmento) de cada coleção neste município. */
+  frentes: number;
   turmas: number;
   professores: number;
   /** Horas de ida e volta usadas na conta (o tempo do meio do relatório, quando sem tempo). */
@@ -259,6 +261,7 @@ export function carteiraDoCoordenador(base: BaseIca, coordenadorId: number, medi
       municipio,
       ativo: municipio.status === 'ativo',
       colecoes: [...new Set(atendimentos.map((a) => a.projeto_geral))].sort((x, y) => x - y),
+      frentes: atendimentos.reduce((s, a) => s + a.segmentos.reduce((t, seg) => t + seg.anos, 0), 0),
       turmas,
       professores,
       horas: municipio.deslocamento_horas ?? mediana,
@@ -310,17 +313,12 @@ export interface ResultadoEquipe {
   contratosSemCoordenador: Atendimento[];
 }
 
-function valoresDaCarteira(carteira: readonly LinhaCarteira[], base: BaseIca, coordenadorId: number): Valores {
+function valoresDaCarteira(carteira: readonly LinhaCarteira[]): Valores {
   const ativas = carteira.filter((l) => l.ativo);
-  const ativos = new Set(ativas.map((l) => l.municipio.id));
-  const frentes = new Set(
-    base.atendimentos
-      .filter((a) => a.coordenador === coordenadorId && ativos.has(a.municipio))
-      .map((a) => `${a.municipio}×${a.projeto_geral}`),
-  );
   return {
     municipios: ativas.length,
-    frentes: frentes.size,
+    // Decisão 59: frente = cada ano (segmento) de cada coleção no município, não município × coleção como no PDF.
+    frentes: ativas.reduce((s, l) => s + l.frentes, 0),
     turmas: ativas.reduce((s, l) => s + l.turmas, 0),
     professores: ativas.reduce((s, l) => s + l.professores, 0),
     deslocamento: ativas.reduce((s, l) => s + l.horas, 0),
@@ -358,7 +356,7 @@ export function calcularEquipe(base: BaseIca, pesos: Pesos): ResultadoEquipe {
     return {
       coordenador,
       carteira,
-      valores: valoresDaCarteira(carteira, base, coordenador.id),
+      valores: valoresDaCarteira(carteira),
       semMunicipios: ativas.length === 0,
       dadoIncompleto: motivosIncompleto.length > 0,
       motivosIncompleto,
@@ -534,8 +532,6 @@ export interface OpcoesAlertas {
   pessoas: readonly Pessoa[];
   /** Para pôr a coleção no título do "projeto sem coordenador" (dois no mesmo município não ficam iguais). */
   colecoes?: readonly Colecao[];
-  /** Retrato anterior: com ele, "entra em Sobrecarga" só para quem não estava. */
-  anterior?: ResultadoEquipe | undefined;
 }
 
 export function gerarAlertas(base: BaseIca, resultado: ResultadoEquipe, opcoes: OpcoesAlertas): Alerta[] {
@@ -543,19 +539,18 @@ export function gerarAlertas(base: BaseIca, resultado: ResultadoEquipe, opcoes: 
   const gestoraTecnica = (c: Coordenador): string => {
     const g = opcoes.gerencias.find((x) => x.id === c.gerencia);
     const p = g ? opcoes.pessoas.find((x) => x.id === g.gestora_tecnica) : undefined;
-    return p ? `Gestora técnica (${p.nome})` : 'Gestora técnica';
+    return p ? `Gestora pedagógica (${p.nome})` : 'Gestora pedagógica';
   };
-  const estavaEmSobrecarga = (id: number): boolean =>
-    opcoes.anterior?.coordenadores.find((r) => r.coordenador.id === id)?.conta.estrato === 'sobrecarga';
-
   for (const r of resultado.coordenadores) {
     const c = r.coordenador;
     const ica = r.conta.icaExibido;
-    if (r.conta.estrato === 'sobrecarga' && !estavaEmSobrecarga(c.id)) {
+    // Decisão 69: sai a cada recálculo enquanto o coordenador estiver na faixa, e no lugar do "fora da meta".
+    const emSobrecarga = r.conta.estrato === 'sobrecarga';
+    if (emSobrecarga) {
       alertas.push({
         id: `sobrecarga-${c.id}`,
         tipo: 'sobrecarga',
-        titulo: opcoes.anterior ? `${c.nome} entrou em Sobrecarga (${ica})` : `${c.nome} está em Sobrecarga (${ica})`,
+        titulo: `${c.nome} está em Sobrecarga (${ica})`,
         detalhe: 'ICA de 130 ou mais: prioridade para redistribuir ou reforçar a equipe.',
         quemReceberia: ['SPE', gestoraTecnica(c), 'Líder do NFP'],
         quando: 'No recálculo',
@@ -574,7 +569,7 @@ export function gerarAlertas(base: BaseIca, resultado: ResultadoEquipe, opcoes: 
         coordenadorId: c.id,
         municipioId: null,
       });
-    } else if (!r.conta.dentroDaMeta) {
+    } else if (!r.conta.dentroDaMeta && !emSobrecarga) {
       alertas.push({
         id: `fora-da-meta-${c.id}`,
         tipo: 'fora_da_meta',
@@ -592,7 +587,7 @@ export function gerarAlertas(base: BaseIca, resultado: ResultadoEquipe, opcoes: 
         tipo: 'dado_incompleto',
         titulo: `Dado incompleto na carteira de ${c.nome}`,
         detalhe: `${r.motivosIncompleto.join(' ')} O ICA fica subestimado.`,
-        quemReceberia: ['Gestora operacional'],
+        quemReceberia: ['Gerente Operacional'],
         quando: 'No cadastro e antes da publicação',
         coordenadorId: c.id,
         municipioId: null,
@@ -604,7 +599,7 @@ export function gerarAlertas(base: BaseIca, resultado: ResultadoEquipe, opcoes: 
         tipo: 'dado_improvavel',
         titulo: `Valor improvável na carteira de ${c.nome}`,
         detalhe: `${r.valoresImprovaveis.join(' ')} Conferir antes da publicação.`,
-        quemReceberia: ['Gestora operacional'],
+        quemReceberia: ['Gerente Operacional'],
         quando: 'No cadastro e antes da publicação',
         coordenadorId: c.id,
         municipioId: null,
@@ -620,7 +615,7 @@ export function gerarAlertas(base: BaseIca, resultado: ResultadoEquipe, opcoes: 
       tipo: 'contrato_sem_coordenador',
       titulo: `Projeto sem coordenador em ${m ? `${m.nome}-${m.uf}` : `município ${a.municipio}`} (${colecao})`,
       detalhe: 'Projeto novo sem coordenador definido.',
-      quemReceberia: ['Gestora operacional', 'SPE'],
+      quemReceberia: ['Gerente Operacional', 'SPE'],
       quando: 'No cadastro',
       coordenadorId: null,
       municipioId: a.municipio,

@@ -29,7 +29,8 @@ describe('Comitê', { timeout: 20000 }, () => {
     expect(screen.getByText(QUEM_VE.comite.aviso)).toBeInTheDocument();
     const semDado = screen.getByText(/^Sem dado:/);
     expect(semDado).toHaveTextContent(/fica fora da regra/);
-    expect(semDado).toHaveTextContent(/20\/12\/2026/);
+    // Decisão 76: a pesquisa fica aberta 10 dias úteis depois do envio do link (01/12): até 15/12.
+    expect(semDado).toHaveTextContent(/15\/12\/2026/);
     // O ciclo vem com os meses: no ICA, o mesmo formato quer dizer semestre.
     const intro = screen.getByText(/^A cor sugerida sai da regra do Semáforo/);
     expect(intro).toHaveTextContent('com os dados do ciclo 2026.6 (novembro e dezembro de 2026) até hoje');

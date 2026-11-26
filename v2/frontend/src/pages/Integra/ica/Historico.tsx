@@ -161,8 +161,10 @@ export default function Historico(): JSX.Element {
         Histórico semestral
       </Title>
       <p className="mb-4">
-        O ICA de cada semestre foi calculado com a versão de pesos que valia na época, e o resultado antigo fica
-        guardado como foi publicado.
+        O ICA de cada semestre foi calculado com a versão de pesos que valia na época. No protótipo, os semestres
+        anteriores foram refeitos com a regra de frentes da decisão 59 (cada ano de cada coleção); na versão real, o
+        resultado antigo fica guardado como foi publicado, e a SPE confere o cálculo e o ICA é publicado em até 5 dias
+        úteis depois da conferência (decisão 72).
       </p>
       <BotoesExportar aoBaixarPlanilha={baixarPlanilha} />
 
@@ -238,6 +240,7 @@ export default function Historico(): JSX.Element {
               <strong className="block">
                 {r.semestre ? `Semestre ${r.semestre}` : 'Semestre não informado'} · aplicado em{' '}
                 {formatFortaleza(r.aplicado_em, 'DD/MM/YYYY')}
+                {r.vigencia_em && ` · vale a partir de ${formatarDia(r.vigencia_em)}`}
               </strong>
               <ul className="my-1 pl-5">
                 {r.movimentos.map((m) => (

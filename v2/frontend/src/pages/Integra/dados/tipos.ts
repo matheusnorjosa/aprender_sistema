@@ -70,6 +70,8 @@ export interface Coordenador {
 /** Números de um segmento atendido (ex.: Anos Iniciais). `null` = não informado. */
 export interface SegmentoAtendimento {
   segmento: string;
+  /** FALTA NO CADASTRO REAL: quantos anos (séries) do segmento a coleção atende. Cada ano é uma frente (decisão 59). */
+  anos: number;
   /** FALTA NO CADASTRO REAL: turmas de formação. */
   turmas_qtde: number | null;
   /** `DATRegistro.professor_qtde`. */
@@ -143,6 +145,8 @@ export interface Remanejamento {
   aplicado_em: string | null;
   /** Semestre em que passou a valer (ex.: '2026.1'); `null` enquanto não aplicado. */
   semestre: string | null;
+  /** Data (AAAA-MM-DD) em que passa a valer, escolhida pela SPE ao aplicar (decisão 71); `null` enquanto não aplicado. */
+  vigencia_em: string | null;
 }
 
 /** O retrato de um semestre: a carteira daquele momento e a versão de pesos usada. */

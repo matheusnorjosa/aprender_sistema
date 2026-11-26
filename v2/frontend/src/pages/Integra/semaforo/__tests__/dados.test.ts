@@ -16,6 +16,7 @@ import {
   avaliarMunicipio,
   cicloAnterior,
   convergencia,
+  doSistema,
   gerarDadosSemaforo,
   mesesCurtosDoCiclo,
   mesesDoCiclo,
@@ -57,16 +58,20 @@ const situacoes = dados.municipios.map((m) => avaliarMunicipio(dados, m.id));
 
 describe('ciclos bimestrais', () => {
   it('período, prazo da pesquisa e ciclo anterior', () => {
+    // Decisão 76: o link sai no 1º dia útil do 2º mês, e a resposta vai até 10 dias úteis depois (não mais o dia 20).
     expect(periodoDoCiclo('2026.6')).toEqual({
       inicio: '2026-11-01',
       fim: '2026-12-31',
-      prazo_pesquisa: '2026-12-20',
+      envio_pesquisa: '2026-12-01',
+      prazo_pesquisa: '2026-12-15',
       meses: ['2026-11', '2026-12'],
     });
+    // 01/02/2026 é domingo: o link sai na segunda, 02/02.
     expect(periodoDoCiclo('2026.1')).toEqual({
       inicio: '2026-01-01',
       fim: '2026-02-28',
-      prazo_pesquisa: '2026-02-20',
+      envio_pesquisa: '2026-02-02',
+      prazo_pesquisa: '2026-02-16',
       meses: ['2026-01', '2026-02'],
     });
     expect(cicloAnterior('2026.1')).toBe('2025.6');
@@ -145,6 +150,8 @@ describe('gerarDadosSemaforo', () => {
       expect(r.itens.every((i) => Number.isInteger(i) && i >= 1 && i <= 5)).toBe(true);
       expect(Number.isInteger(r.nps) && r.nps >= 0 && r.nps <= 10).toBe(true);
       expect(r.respondida_em <= periodoDoCiclo(r.ciclo).prazo_pesquisa).toBe(r.no_prazo);
+      // Decisão 76: ninguém responde antes de a gestora mandar o link.
+      expect(r.respondida_em >= periodoDoCiclo(r.ciclo).envio_pesquisa).toBe(true);
     }
     for (const o of dados.ocorrencias) expect(o.data <= REF && DATA.test(o.data)).toBe(true);
     // A reunião agendada pode ser depois de hoje (decisão 48); a ata, nunca.
@@ -157,6 +164,18 @@ describe('gerarDadosSemaforo', () => {
       expect(r.formacoes_realizadas).toBeLessThanOrEqual(r.formacoes_previstas);
       expect(r.visitas_realizadas).toBeLessThanOrEqual(r.visitas_previstas);
     }
+  });
+
+  it('decisões 81 e 82: o sistema traz as formações e as visitas de cada projeto nos 2 meses do ciclo atual; novembro bate com o relatório entregue', () => {
+    const novembro = dados.relatorios.filter((r) => r.mes === '2026-11');
+    expect(novembro.length).toBeGreaterThan(0);
+    expect(dados.do_sistema).toHaveLength(2 * novembro.length);
+    for (const r of novembro) {
+      const { formacoes_previstas, formacoes_realizadas, visitas_previstas, visitas_realizadas } = r;
+      expect(doSistema(dados, r.projeto, '2026-11')).toMatchObject({ formacoes_previstas, formacoes_realizadas, visitas_previstas, visitas_realizadas });
+      expect(doSistema(dados, r.projeto, '2026-12')).toMatchObject({ municipio: r.municipio, projeto: r.projeto, mes: '2026-12' });
+    }
+    expect(doSistema(dados, 999999, '2026-12')).toBeUndefined();
   });
 
   it('o Comitê publicou os 6 ciclos fechados de todos; a cor sugerida guardada é a das regras', () => {
@@ -508,13 +527,15 @@ describe('a história da demonstração', () => {
     expect(c5?.decisivos).toEqual(['resposta_pesquisa']);
     expect(c5?.avaliacoes.find((a) => a.indicador === 'resposta_pesquisa')?.texto).toBe('Não respondeu em dois ciclos seguidos');
     expect(s.cor_vigente).toBe('vermelho');
+    // Decisão 76: o link de 2026.5 saiu em 01/10 (quinta) e o prazo venceu em 15/10 (10 dias úteis); o vermelho
+    // vale no dia seguinte, 16/10 (com o prazo antigo, dia 20, era 21/10).
     expect(dados.decisoes.find((d) => d.municipio === m.id && d.origem === 'vermelho_automatico')).toMatchObject({
       ciclo: '2026.5',
-      publicada_em: '2026-10-21',
+      publicada_em: '2026-10-16',
     });
   });
 
-  it('ciclo atual em andamento (pesquisa até 20/12) não conta como ciclo sem alerta', () => {
+  it('ciclo atual em andamento (pesquisa até 15/12) não conta como ciclo sem alerta', () => {
     // Sem resposta em 2026.6 até hoje: segue vermelho, não "melhorou".
     const jequie = avaliarMunicipio(dados, municipio(HISTORIAS_SEMAFORO.sem_resposta_dois_ciclos).id).ciclos.at(-1)?.resultado;
     expect(jequie).toMatchObject({ cor: 'vermelho', motivo: 'ciclo_em_andamento', em_recuperacao: false });

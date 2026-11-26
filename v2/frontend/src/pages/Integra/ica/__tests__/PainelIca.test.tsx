@@ -87,7 +87,8 @@ describe('Painel do ICA', { timeout: 20000 }, () => {
       'Média: 100',
       // Decisão 56: as localidades do Amigos do Bem e a carga do Rogério, baixada para 0,2 (perfil 110 em
       // dados/gerador.ts), mudam as médias da equipe (era desvio 30,9).
-      'Dispersão: desvio 30,8 · menor 58 · maior 169',
+      // Decisão 59 (frente = cada ano de cada coleção): era desvio 30,8 · menor 58 · maior 169.
+      'Dispersão: desvio 29,5 · menor 64 · maior 167',
     ]);
   });
 
@@ -96,7 +97,8 @@ describe('Painel do ICA', { timeout: 20000 }, () => {
     const itens = await barras();
     expect(itens).toHaveLength(17);
     expect(itens[0]).toHaveTextContent('Lucinéia Barreto');
-    expect(itens[0]).toHaveTextContent('169 · Sobrecarga');
+    // Decisão 59: era 169.
+    expect(itens[0]).toHaveTextContent('167 · Sobrecarga');
     expect(itens[16]).toHaveTextContent('Priscila Vasconcelos');
     expect(itens[16]).toHaveTextContent('0 · Sem municípios');
     expect(screen.getByText(/Linha vertical = média da equipe \(100\)/)).toBeInTheDocument();
@@ -149,8 +151,8 @@ describe('Painel do ICA', { timeout: 20000 }, () => {
     const itens = await barras();
     expect(itens).toHaveLength(16);
     // Decisão 56 (rodada 4): em 2026.1 ainda não há Amigos do Bem; quem muda as médias da equipe é a carga do Rogério,
-    // baixada para 0,2 (perfil 110 em dados/gerador.ts). Era 191.
-    expect(itens[0]).toHaveTextContent('189 · Sobrecarga');
+    // baixada para 0,2 (perfil 110 em dados/gerador.ts). Era 191. Decisão 59 (frente = cada ano de cada coleção): era 189.
+    expect(itens[0]).toHaveTextContent('187 · Sobrecarga');
     expect(screen.getByText(/Retrato de 2026\.1, calculado em 15\/06\/2026/)).toHaveTextContent(/proposta v5/);
   });
 
@@ -188,7 +190,7 @@ describe('Painel do ICA', { timeout: 20000 }, () => {
     expect(itens).toHaveLength(17);
     const primeiro = itens[0] as HTMLElement;
     expect(within(primeiro).getByText('Lucinéia Barreto')).toBeInTheDocument();
-    expect(primeiro).toHaveTextContent('169 · Sobrecarga');
+    expect(primeiro).toHaveTextContent('167 · Sobrecarga');
     const rotulos = within(primeiro)
       .getAllByRole('term')
       .map((dt) => dt.textContent);
@@ -282,8 +284,9 @@ describe('Painel do ICA', { timeout: 20000 }, () => {
     ]);
     expect(within(semestre).getByRole('option', { name: 'Agora (nesta demonstração)' })).toHaveProperty('selected', true);
     const itens = await barras();
-    expect(itemDe(itens, 'Heloísa Pimentel')).toHaveTextContent('136 · Sobrecarga');
-    expect(itemDe(itens, 'Lucinéia Barreto')).toHaveTextContent('157 · Sobrecarga');
+    // Decisão 59 (frente = cada ano de cada coleção): eram 136 e 157.
+    expect(itemDe(itens, 'Heloísa Pimentel')).toHaveTextContent('134 · Sobrecarga');
+    expect(itemDe(itens, 'Lucinéia Barreto')).toHaveTextContent('155 · Sobrecarga');
     expect(screen.getByText(/O ICA compara a carga/)).toHaveTextContent(/nesta demonstração/);
     expect(screen.getByText(/O ICA compara a carga/)).not.toHaveTextContent(/\(atual\)/);
     expect(screen.getByText(/^Filtros:/)).toHaveTextContent('Semestre: Agora (nesta demonstração)');
@@ -291,7 +294,7 @@ describe('Painel do ICA', { timeout: 20000 }, () => {
     await user.click(screen.getByRole('button', { name: /Baixar planilha/ }));
     const [nome, , linhas] = vi.mocked(baixarCsv).mock.calls[0] as Parameters<typeof baixarCsv>;
     expect(nome).toBe('ica_painel_2026-2_nesta-demonstracao.csv');
-    expect(linhas.find((l) => l[0] === 'Heloísa Pimentel')?.[3]).toBe(136);
+    expect(linhas.find((l) => l[0] === 'Heloísa Pimentel')?.[3]).toBe(134);
   });
 
   test('depois de uma mudança na sessão, 2026.2 mostra o retrato publicado, como a Ficha e o Histórico', async () => {
@@ -302,19 +305,20 @@ describe('Painel do ICA', { timeout: 20000 }, () => {
     await user.selectOptions(screen.getByLabelText('Semestre'), '2026.2');
 
     const itens = await barras();
-    expect(itemDe(itens, 'Heloísa Pimentel')).toHaveTextContent('124 · Atenção');
-    expect(itemDe(itens, 'Lucinéia Barreto')).toHaveTextContent('169 · Sobrecarga');
+    // Decisão 59 (frente = cada ano de cada coleção): eram 124 e 169.
+    expect(itemDe(itens, 'Heloísa Pimentel')).toHaveTextContent('122 · Atenção');
+    expect(itemDe(itens, 'Lucinéia Barreto')).toHaveTextContent('167 · Sobrecarga');
     expect(screen.getByText(/Retrato de 2026\.2, calculado em/)).toHaveTextContent(/Configuração revisada/);
     expect(screen.getByText(/^Filtros:/)).toHaveTextContent(/Semestre: 2026\.2$/);
 
     await user.click(screen.getByRole('button', { name: /Baixar planilha/ }));
     const [nome, , linhas] = vi.mocked(baixarCsv).mock.calls[0] as Parameters<typeof baixarCsv>;
     expect(nome).toBe('ica_painel_2026-2.csv');
-    expect(linhas.find((l) => l[0] === 'Heloísa Pimentel')?.[3]).toBe(124);
+    expect(linhas.find((l) => l[0] === 'Heloísa Pimentel')?.[3]).toBe(122);
 
     // E volta para o recálculo da sessão.
     await user.selectOptions(screen.getByLabelText('Semestre'), 'Agora (nesta demonstração)');
-    expect(itemDe(await barras(), 'Heloísa Pimentel')).toHaveTextContent('136 · Sobrecarga');
+    expect(itemDe(await barras(), 'Heloísa Pimentel')).toHaveTextContent('134 · Sobrecarga');
   });
 
   test('a 400 px a tabela manda colunas para a linha expandida (sem rolagem horizontal)', async () => {

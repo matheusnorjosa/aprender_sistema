@@ -129,9 +129,22 @@ describe('gerarDadosSimulados', () => {
     expect(atual.contratosSemCoordenador).toHaveLength(1);
   });
 
-  it('cada coleção aparece uma vez por município (frente = município × coleção)', () => {
+  it('cada coleção aparece uma vez por município', () => {
     const chaves = dados.base.atendimentos.map((a) => `${a.municipio}×${a.projeto_geral}`);
     expect(new Set(chaves).size).toBe(chaves.length);
+  });
+
+  it('decisão 59: os anos de cada coleção são fixos, como na reunião (Novo Lendo 2, Tema 2, Infantil 3)', () => {
+    const anosPorColecao = new Map<string, Set<number>>();
+    for (const a of dados.base.atendimentos) {
+      const nome = dados.colecoes.find((c) => c.id === a.projeto_geral)?.nome ?? '?';
+      const anos = anosPorColecao.get(nome) ?? new Set<number>();
+      anos.add(a.segmentos.reduce((s, seg) => s + seg.anos, 0));
+      anosPorColecao.set(nome, anos);
+    }
+    // Um número só por coleção: a tabela é fixa, sem sorteio.
+    expect([...anosPorColecao.values()].every((anos) => anos.size === 1)).toBe(true);
+    expect(['NOVO LENDO', 'TEMA', 'EI'].map((n) => [...(anosPorColecao.get(n) ?? [])])).toEqual([[2], [2], [3]]);
   });
 
   it('há municípios compartilhados entre coordenadores', () => {

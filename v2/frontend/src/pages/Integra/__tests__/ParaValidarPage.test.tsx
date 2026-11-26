@@ -54,16 +54,23 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
     expect(await item(/quem aprova o remanejamento/i)).toHaveTextContent(/consultiv/i);
   });
 
-  test('revisão: sem municípios fora dos estratos, alerta de quem entra em Sobrecarga e acesso da Diretoria', async () => {
+  test('revisão: sem municípios fora dos estratos, alerta de Sobrecarga a cada recálculo e acesso de hoje e da versão real', async () => {
     renderizar();
     const semMunicipios = await item(/sem municípios entra na conta de .Capacidade disponível/i);
     expect(semMunicipios).toHaveTextContent(/5 com capacidade disponível e 1 sem municípios/);
     expect(within(semMunicipios).getByText(/Como o protótipo resolveu/)).toBeInTheDocument();
     const alerta = await item(/alerta de Sobrecarga: só quem entra/i);
-    expect(alerta).toHaveTextContent(/semestre anterior/);
+    // Decisão 69: era "compara com o semestre anterior"; agora o alerta sai a cada recálculo.
+    expect(alerta).toHaveTextContent(/a cada recálculo/);
+    expect(alerta).not.toHaveTextContent(/semestre anterior/);
     const acesso = await item(/coordenador vê a própria ficha/i);
-    expect(acesso).toHaveTextContent(/Diretoria entra quando a gerência dela/);
+    // Decisão 67: a Diretoria não entra na Integra com login próprio; era "entra quando a gerência dela...".
+    expect(acesso).not.toHaveTextContent(/Diretoria entra quando/);
+    expect(acesso).toHaveTextContent(/a Diretoria não entra com login próprio \(decisão 67\)/);
     expect(acesso).toHaveTextContent(/Equipe ou Gerente na gerência SPE/);
+    // Decisões 87 e 68: a marca de cargo na Integra; aprovar eventos fica separado.
+    expect(acesso).toHaveTextContent(/marca de cargo na Integra/);
+    expect(acesso).toHaveTextContent(/decisão 68/);
   });
 
   test('as sugestões marcadas nos dois PDFs aparecem como sugestão', async () => {
@@ -87,12 +94,14 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
     expect(await item(/^Gestora de referência$/)).toHaveTextContent(/Não existe ainda/);
     expect(await item(/^Pesquisa do articulador$/)).toHaveTextContent(/Não existe ainda/);
     expect(await item(/^Ocorrências$/)).toHaveTextContent(/Não existe ainda/);
-    // Uma origem só na mesma página: pelo PDF do Semáforo (coleta 6), formulário novo; a DFF é o destino.
+    // Decisão 94: a observação nasce na DFF, junto do PDI; o Aprender Sistema lê de lá (era "Não existe ainda").
     const observacao = await item(/^Observação de formação$/);
-    expect(observacao).toHaveTextContent(/Não existe ainda/);
+    expect(observacao).not.toHaveTextContent(/Não existe ainda/);
+    expect(observacao).toHaveTextContent(/decisão 94/);
     expect(observacao).toHaveTextContent(/Relatório mensal e formulários/);
     expect(observacao).toHaveTextContent(/PDI do coordenador na Plataforma DFF/);
-    expect(observacao).not.toHaveTextContent(/já é feita na Plataforma DFF/);
+    expect(observacao).not.toHaveTextContent(/Formulário novo/);
+    expect(await item(/^Vínculo formador × coordenador$/)).toHaveTextContent(/decisão 93/);
     expect(await item(/^Cronograma cumprido$/)).toHaveTextContent(/Aprender Sistema/);
   });
 
@@ -105,9 +114,10 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
     }
   });
 
-  test('alerta de Sobrecarga: diz que com 130 exato não há alerta', async () => {
+  test('alerta de Sobrecarga: com 130 exato, dentro da meta, mas na faixa de Sobrecarga (decisão 69)', async () => {
     renderizar();
-    expect(await item(/alerta de Sobrecarga: só quem entra/i)).toHaveTextContent(/Com 130 exato, fica dentro da meta e sem alerta/);
+    // Era "Com 130 exato, fica dentro da meta e sem alerta".
+    expect(await item(/alerta de Sobrecarga: só quem entra/i)).toHaveTextContent(/Com 130 exato, .*recebe o alerta de Sobrecarga/);
   });
 
   test('para quem vai cada resultado: ICA, cor do Semáforo e o PDI na DFF', async () => {
@@ -115,6 +125,8 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
     expect(await item(/^ICA de cada coordenador$/)).toHaveTextContent(/Semáforo/);
     expect(await item(/^Cor do Semáforo$/)).toHaveTextContent(/Aprender Sistema/);
     expect(await item(/^Observação de formação e relatório de visita$/)).toHaveTextContent(/PDI/);
+    // Decisão 86: a Avaliação do Coordenador se chama Tríade.
+    expect(await item(/^Resposta do articulador$/)).toHaveTextContent(/Tríade/);
     const tempo = await item(/^Tempo de deslocamento de cada município$/);
     expect(tempo).toHaveTextContent(/ICA/);
     expect(tempo).toHaveTextContent(/tela de viagens/);
@@ -136,8 +148,11 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
     for (const tela of ['Painel', 'Ficha do coordenador', 'Simulador', 'Pesos e faixas', 'Por gerência', 'Comparativo', 'Histórico', 'Alertas e exportação', 'Comitê', 'Ficha do município', 'Painel da gestora', 'Pesquisa do articulador', 'Indicadores da Líder', 'Relatório mensal e formulários']) {
       const cartao = within(matriz).getByRole('heading', { level: 5, name: tela }).closest('li') as HTMLElement;
       const cargos = within(cartao).getAllByRole('term').map((dt) => dt.textContent);
-      expect(cargos).toEqual(['SPE', 'Gestão Operacional', 'Gestora pedagógica', 'Líder do NFP', 'Coordenador', 'Relacionamento e Comercial', 'Diretoria', 'Superusuário']);
+      expect(cargos).toEqual(['SPE', 'Gerente Operacional', 'Gerente Pedagógica', 'Líder do NFP', 'Coordenador', 'Relacionamento e Comercial', 'Diretoria', 'Superusuário']);
     }
+    // Decisão 87: os cargos na Integra são Gerente Operacional e Gerente Pedagógica. "Gestão Operacional" fica só
+    // como nome da gerência, no texto da decisão 19.
+    expect(matriz).not.toHaveTextContent(/Gestão Operacional|Gestora pedagógica/);
   });
 
   test('cada célula diz o que o papel faz por escrito: simulador (decisão 20) e coordenador fora do ICA (decisão 21)', async () => {
@@ -148,25 +163,47 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
       const dt = within(cartao).getAllByRole('term').find((t) => t.textContent === papel);
       return dt?.nextElementSibling as HTMLElement;
     };
-    expect(celula('Simulador', 'Gestora pedagógica')).toHaveTextContent(/Propõe/);
-    expect(celula('Simulador', 'Gestora pedagógica')).toHaveTextContent(/decisão 20/);
+    expect(celula('Simulador', 'Gerente Pedagógica')).toHaveTextContent(/Propõe/);
+    expect(celula('Simulador', 'Gerente Pedagógica')).toHaveTextContent(/decisão 20/);
     expect(celula('Simulador', 'SPE')).toHaveTextContent(/Aplica/);
     expect(celula('Simulador', 'Líder do NFP')).toHaveTextContent(/Vê/);
     expect(celula('Ficha do coordenador', 'Coordenador')).toHaveTextContent(/Nada.*nem a própria ficha/);
-    expect(celula('Painel', 'Diretoria')).toHaveTextContent(/Em aberto.*P8b/);
+    // Decisão 67: a Diretoria não entra (era "Em aberto (P8b)"). Decisão 90: a Gerente Operacional vê os painéis.
+    expect(celula('Painel', 'Diretoria')).toHaveTextContent(/Nada.*decisão 67/);
+    expect(celula('Painel', 'Gerente Operacional')).toHaveTextContent(/Vê.*decisão 90/);
+    // Decisão 78: a Líder do NFP lê o momento reservado.
+    expect(celula('Ficha do município', 'Líder do NFP')).toHaveTextContent(/Vê.*momento reservado.*decisão 78/);
   });
 
   test('o que já foi decidido aparece como decidido, e as perguntas abertas como "em aberto — decidir no dia 7"', async () => {
     renderizar();
     const decidido = (await screen.findByRole('heading', { name: 'Já decidido' })).parentElement as HTMLElement;
-    for (const n of [19, 20, 21, 22, 29]) {
+    for (const n of [19, 20, 21, 22, 29, 58, 67, 78, 87, 90, 94]) {
       expect(within(decidido).getByText(`Decidido (decisão ${n})`)).toBeInTheDocument();
     }
     const aberto = screen.getByRole('heading', { name: 'Em aberto — decidir no dia 7' }).parentElement as HTMLElement;
-    for (const p of ['P1', 'P3', 'P6', 'P8a', 'P8b', 'P9', 'P10']) {
-      expect(within(aberto).getByText(`${p}: em aberto — decidir no dia 7`)).toBeInTheDocument();
+    expect(within(aberto).getByText('P1: em aberto — decidir no dia 7')).toBeInTheDocument();
+    // Perguntas que nenhuma decisão de 26/11 respondeu: a Líder no Comitê, a gestora pedagógica no Histórico e nos
+    // Indicadores da Líder, e o superusuário diante do "ninguém mais" da decisão 78.
+    for (const [p, texto, telas] of [
+      ['P11', /A Líder do NFP vê o Comitê\?/, /Nos cartões: Comitê \(Semáforo\)\./],
+      ['P12', /vê o Histórico do ICA e os Indicadores da Líder\?/, /Nos cartões: Histórico \(ICA\), Indicadores da Líder \(Semáforo\)\./],
+      ['P13', /superusuário .*lê o momento reservado\?/, /Nos cartões: Ficha do município \(Semáforo\)\./],
+      ['P14', /Quem faz a observação de formação do amarelo/, /Nos cartões: DFF \(no link atual\) \(DFF\)\./],
+    ] as const) {
+      const cartao = within(aberto).getByText(`${p}: em aberto — decidir no dia 7`).closest('li') as HTMLElement;
+      expect(cartao, p).toHaveTextContent(texto);
+      expect(cartao, p).toHaveTextContent(telas);
     }
-    expect(aberto).toHaveTextContent(/a Diretoria entra na Integra\?/);
+    // A P1 ficou só com "quem é quem": não aponta mais para o Comitê.
+    const p1 = within(aberto).getByText('P1: em aberto — decidir no dia 7').closest('li') as HTMLElement;
+    expect(p1).not.toHaveTextContent(/Nos cartões/);
+    // Respondidas em 26/11 (decisões 61 a 68, 87, 89, 90, 92 e 93).
+    for (const p of ['P2', 'P3', 'P6', 'P8a', 'P8b', 'P9', 'P10']) {
+      expect(within(aberto).queryByText(`${p}: em aberto — decidir no dia 7`)).not.toBeInTheDocument();
+    }
+    expect(aberto).toHaveTextContent(/quem é a Líder do NFP\?/);
+    expect(aberto).not.toHaveTextContent(/a Diretoria entra na Integra\?/);
   });
 
   test('de onde virá cada dado: o Deslocamento, do relatório de hoje para o cadastro de municípios', async () => {
@@ -185,8 +222,18 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
     await screen.findByRole('heading', { level: 1 });
     expect(document.body).not.toHaveTextContent(/próxima entrega/i);
     expect(await item(/momento reservado/i)).toHaveTextContent(/Relatório mensal e formulários/);
-    expect(await item(/10 dias/i)).toHaveTextContent(/dia 20 do segundo mês/);
-    expect(await item(/5º dia útil/i)).toHaveTextContent(/sem prazo/);
+    // Decisão 76: era "até o dia 20 do segundo mês"; agora 10 dias úteis depois do envio do link.
+    const pesquisa = await item(/10 dias/i);
+    expect(pesquisa).toHaveTextContent(/10 dias úteis/);
+    // O dia do envio (e daí as datas do ciclo atual) é leitura do protótipo: fica no ponto dele, sem selo.
+    expect(await item(/^Quando a gestora manda o link da pesquisa\?$/)).toHaveTextContent(/01\/12\/2026.*15\/12\/2026/);
+    expect(pesquisa).not.toHaveTextContent(/dia 20 do segundo mês/);
+    // Decisões 77, 81 e 82: era "sem prazo"; agora vence no 5º dia útil e vem pré-preenchido.
+    const relatorio = await item(/5º dia útil/i);
+    expect(relatorio).toHaveTextContent(/07\/12\/2026/);
+    expect(relatorio).toHaveTextContent(/Atrasado/);
+    expect(relatorio).toHaveTextContent(/justificativa/);
+    expect(relatorio).not.toHaveTextContent(/sem prazo/);
     // Decisão 48: marca antes, ata até 5 dias úteis depois, "ata atrasada".
     expect(await item(/ata da reunião de escuta/i)).toHaveTextContent(/ata atrasada/);
     // Decisão 51: a pesquisa é por projeto.
@@ -195,10 +242,11 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
     const semResposta = await item(/município que não responde/i);
     expect(semResposta).toHaveTextContent(/enquanto o prazo está aberto/i);
     expect(semResposta).toHaveTextContent(/justificativa/);
-    expect(await item(/que outras ferramentas/i)).toHaveTextContent(/5 cartões: ICA, Semáforo, Deslocamento, DFF/);
+    // Decisões 84 e 86: era "5 cartões"; Formar e Avaliar viram atalhos e a Avaliação do Coordenador se chama Tríade.
+    expect(await item(/que outras ferramentas/i)).toHaveTextContent(/7 cartões: ICA, Semáforo, Deslocamento, DFF, Formar, Avaliar e Tríade/);
   });
 
-  test('observação de formação: registrada no Semáforo ou feita na DFF fica para decidir no dia 7', async () => {
+  test('observação de formação: decisão 94, registrada na DFF e lida pelo Aprender Sistema', async () => {
     renderizar();
     const h3 = await screen.findByRole('heading', { level: 3, name: 'A Integra e as outras ferramentas' });
     const tema = h3.closest('section') as HTMLElement;
@@ -208,6 +256,9 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
     expect(artigo).toHaveTextContent(/coleta 6/);
     expect(artigo).toHaveTextContent(/Relatório mensal e formulários/);
     expect(artigo).toHaveTextContent(/o Aprender Sistema lê de lá/);
+    expect(within(artigo).getByText('Decidido (decisão 94)')).toBeInTheDocument();
+    // Era "Segue o PDF: a observação é registrada na tela Relatório mensal e formulários".
+    expect(artigo).not.toHaveTextContent(/Segue o PDF/);
   });
 
   test('as duas contradições do relatório de deslocamento, para o dono decidir', async () => {
@@ -317,7 +368,7 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
     expect(imediato).not.toHaveTextContent(/só muda quando o Comitê publica/);
   });
 
-  /** Os cartões das perguntas que o dono respondeu em 25/11 (decisões 30 a 57). */
+  /** Os cartões das perguntas que o dono respondeu em 25/11 e 26/11 (decisões 30 a 94). */
   const DECIDIDOS: [RegExp, number][] = [
     [/^Média, NPS e cronograma: a cor sai do número exato$/, 30],
     [/^NPS: média das notas/, 31],
@@ -342,9 +393,25 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
     [/^Craíbas-AL: Longo ou Muito longo\?$/, 54],
     [/^Mediana: coluna Ida/, 55],
     [/^Amigos do Bem: em que município e estado\?$/, 56],
+    [/^Frente é município × coleção/, 59],
+    [/^Quem é a gestora de referência de cada município/, 61],
+    [/^A gestora com 29 municípios fica sozinha\?$/, 66],
+    [/^Alerta de Sobrecarga: só quem entra/, 69],
+    [/^Quem está sem municípios entra na conta/, 70],
+    [/^Publicação em até 5 dias úteis/, 72],
+    [/^Município que não responde à pesquisa$/, 75],
+    [/^Pesquisa respondida em até 10 dias/, 76],
+    [/^Relatório mensal até o 5º dia útil/, 77],
+    [/^Quem vê o registro do momento reservado/, 78],
+    [/^Indicador sem dado fica fora/, 79],
+    [/^Painel do coordenador no Semáforo$/, 80],
+    [/^Que outras ferramentas entram na Integra$/, 84],
+    [/^Como avaliar a parte subjetiva/, 88],
+    [/^Filtrar na DFF os formadores/, 93],
+    [/^Observação de formação: registrada no Semáforo ou feita na DFF\?$/, 94],
   ];
 
-  test('decisões 30 a 57: cada pergunta respondida pelo dono aparece como decidida, com o selo e a resposta', async () => {
+  test('decisões 30 a 94: cada pergunta respondida pelo dono aparece como decidida, com o selo e a resposta', async () => {
     renderizar();
     for (const [titulo, numero] of DECIDIDOS) {
       const artigo = await item(titulo);
@@ -363,7 +430,8 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
 
   test('o que o dono ainda não decidiu continua "para decidir", e as leituras do protótipo ficam sem selo', async () => {
     renderizar();
-    for (const titulo of [/vai dirigindo/i, /10 dias/i, /sem dado/i, /Ocorrências do ano: a partir de que dia conta/, /Convergência: quem entra na conta/]) {
+    // Decisões 76 e 79: os 10 dias e o "sem dado" saíram desta lista (agora decididos).
+    for (const titulo of [/vai dirigindo/i, /^Cronograma por projeto/, /^Relatório do último mês do ciclo/, /Ocorrências do ano: a partir de que dia conta/, /Convergência: quem entra na conta/]) {
       const artigo = await item(titulo);
       expect(within(artigo).queryByText(/^Decidido \(decisão/)).not.toBeInTheDocument();
       expect(within(artigo).getAllByRole('term').map((t) => t.textContent)).toEqual([
@@ -520,6 +588,9 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
     const obs = await leitura(/^Observação de formação do amarelo: quem faz e quem recebe o alerta do prazo\?$/);
     expect(obs).toHaveTextContent(/gestora pedagógica/);
     expect(obs).toHaveTextContent(/decisão 36/);
+    // Decisão 94: não há mais formulário da observação no Semáforo.
+    expect(obs).toHaveTextContent(/registrada na DFF \(decisão 94\)/);
+    expect(obs).not.toHaveTextContent(/o formulário da observação/);
   });
 
   test('decisão 38: dado registrado com atraso; o vermelho na hora nunca fica antes da decisão em vigor', async () => {
@@ -580,6 +651,46 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
     const mais = await leitura(/^Relatório mensal com mais formações realizadas que previstas$/);
     expect(mais).toHaveTextContent(/aceita/);
     expect(mais).toHaveTextContent(/pode passar de 100%/);
+    // Decisões 81 e 82: só as formações são digitadas, e mudar um número do sistema pede justificativa.
+    expect(mais).not.toHaveTextContent(/visitas realizadas que previstas/);
+    expect(mais).toHaveTextContent(/visitas vêm da Logística e do pedido de viagem \(FRV\)/);
+    expect(mais).toHaveTextContent(/justificativa/);
+  });
+
+  test('decisões 73 e 76: o dia em que a gestora manda o link é leitura do protótipo, fora do cartão decidido', async () => {
+    renderizar();
+    const envio = await leitura(/^Quando a gestora manda o link da pesquisa\?$/);
+    expect(envio).toHaveTextContent(/1º dia útil do segundo mês do ciclo/);
+    expect(envio).toHaveTextContent(/01\/12\/2026/);
+    expect(await item(/^Pesquisa respondida em até 10 dias após o envio$/)).not.toHaveTextContent(/1º dia útil/);
+  });
+
+  test('decisões 81 e 82: quando a justificativa é obrigatória e se a visita pode ser corrigida ficam como leitura', async () => {
+    renderizar();
+    const relatorio = await leitura(/^Relatório mensal: quando o coordenador justifica, e as visitas podem ser corrigidas\?$/);
+    expect(relatorio).toHaveTextContent(/só quando o coordenador muda um número que veio do sistema/);
+    expect(relatorio).toHaveTextContent(/visita/);
+  });
+
+  test('decisões 61 e 62: o que a gestora compartilhada faz fica como leitura; só o momento reservado foi decidido', async () => {
+    renderizar();
+    const compartilhada = await leitura(/^Gestora compartilhada: o que ela faz no município\?$/);
+    expect(compartilhada).toHaveTextContent(/decisão 62/);
+  });
+
+  test('decisões 20 e 58: quem grava na carteira o remanejamento aplicado fica como leitura', async () => {
+    renderizar();
+    const carteira = await leitura(/^Quem grava na carteira o remanejamento aplicado\?$/);
+    expect(carteira).toHaveTextContent(/decisão 58/);
+    expect(carteira).toHaveTextContent(/decisão 20/);
+    expect(await item(/^Coordenador de cada projeto$/)).toHaveTextContent(/decisão 58/);
+  });
+
+  test('"Já decidido" não promete selo nos cartões para as decisões que não têm ponto na primeira parte', async () => {
+    renderizar();
+    const secao = (await screen.findByRole('heading', { name: 'Já decidido' })).closest('section') as HTMLElement;
+    expect(secao).not.toHaveTextContent(/decisões 30 a 94\), que também aparecem nos cartões/);
+    expect(secao).toHaveTextContent(/as que respondem a um ponto da primeira parte também aparecem no cartão dele/);
   });
 
   test('decisões 33 e 34 (rodada 4): o alerta "um dia antes" conta o dia útil; fica como leitura', async () => {
@@ -603,6 +714,10 @@ describe('Para validar no dia 7', { timeout: 20000 }, () => {
     expect(relatorio).toHaveTextContent(/até o 5º dia útil/);
     expect(relatorio).toHaveTextContent(/antes de o mês terminar/);
     expect(relatorio).toHaveTextContent(/ocorrência de um ciclo que já fechou/);
+    // Decisão 77 fechou o prazo; a virada do ciclo continua como leitura num cartão à parte.
+    const virada = await leitura(/^Relatório do último mês do ciclo/);
+    expect(virada).toHaveTextContent(/começo do ciclo seguinte/);
+    expect(virada).toHaveTextContent(/ocorrência de um ciclo que já fechou/);
   });
 
   test('rodada 5: a reunião de escuta marcada na tela é uma por vez, a 30 dias ou mais da outra; fica como leitura', async () => {

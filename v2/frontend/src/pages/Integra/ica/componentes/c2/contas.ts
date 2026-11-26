@@ -84,7 +84,7 @@ export function situacaoDoAlerta(tipo: TipoAlerta): string {
 
 /** Nome do tipo de alerta, como no PDF (seção 6). */
 export const NOME_DO_ALERTA: Record<TipoAlerta, string> = {
-  sobrecarga: 'Entrou em Sobrecarga',
+  sobrecarga: 'Está em Sobrecarga',
   sem_municipios: 'Sem municípios',
   contrato_sem_coordenador: 'Projeto sem coordenador',
   dado_incompleto: 'Dado incompleto',

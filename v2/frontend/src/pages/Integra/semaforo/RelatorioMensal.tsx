@@ -1,12 +1,18 @@
 /**
  * Semáforo — Relatório mensal e formulários (coletas 2 a 5 do PDF do Semáforo): o relatório mensal do
- * coordenador, a ocorrência (Relacionamento, Comercial ou distribuidor), a reunião de escuta com o
- * momento reservado e a observação de formação.
+ * coordenador, a ocorrência (Relacionamento, Comercial ou distribuidor) e a reunião de escuta com o
+ * momento reservado. A observação de formação só é lida (decisão 94).
  *
  * O relatório, a ocorrência e a reunião entram no estado da sessão (`useSemaforoDemo`): a cor sugerida do
- * município é recalculada na hora e a ficha do município lê de lá. A observação de formação não é um dos
- * 5 indicadores e não entra nos dados: fica só na lista "Registrado nesta sessão", que o estado da sessão
- * guarda (ir à ficha e voltar não a apaga). DADOS SIMULADOS; nada é gravado.
+ * município é recalculada na hora e a ficha do município lê de lá. A lista "Registrado nesta sessão" fica no
+ * estado da sessão (ir à ficha e voltar não a apaga). DADOS SIMULADOS; nada é gravado.
+ *
+ * Decisões do dono de 26/11:
+ * - 77: o relatório vence no 5º dia útil do mês seguinte; sem o relatório depois disso, atrasado.
+ * - 81 e 82: o relatório vem pré-preenchido com as formações do sistema; o coordenador confere e, se mudar um
+ *   número, justifica. As visitas vêm da Logística e do pedido de viagem (FRV), só leitura.
+ * - 78: o momento reservado é lido pela gestora de referência principal, pela Líder do NFP e pela SPE.
+ * - 94: a observação de formação é registrada na DFF, junto do PDI; aqui ela aparece como lida de lá.
  *
  * Decisões do dono de 25/11:
  * - 46: o relatório mensal é de um projeto (cada projeto tem o seu coordenador e o seu cronograma); a tela
@@ -27,7 +33,7 @@ import { baixarCsv } from '../ica/exportar';
 import { nomeDoMunicipio, sugeridaAgora, type Retorno } from './componentes/corEAlerta';
 import { CorComNome } from './componentes/PecasDoAcompanhamento';
 import { AvisoQuemVe, CampoMunicipio, EtiquetaCor, RetornoDoRegistro } from './componentes/PecasDoRegistro';
-import { mesesDoCiclo, periodoDoCiclo, valoresPorProjeto, type ReuniaoEscuta } from './dados';
+import { doSistema, mesesDoCiclo, periodoDoCiclo, valoresPorProjeto, type ReuniaoEscuta } from './dados';
 import {
   corCronograma,
   duasCasas,
@@ -36,6 +42,7 @@ import {
   percentualCronograma,
   periodicidadeDaCor,
   prazoDaAta,
+  prazoDoRelatorio,
   ROTULO_COR,
   ROTULO_ORIGEM,
   situacaoDaReuniao,
@@ -54,10 +61,9 @@ const TIPOS: Record<TipoOcorrencia, string> = {
 };
 /** O momento reservado entra pelo formulário da ata da reunião, não por aqui. */
 const ORIGENS: readonly OrigemOcorrencia[] = ['fluxo_unico', 'reuniao_escuta'];
-const COMO_FOI = ['Boa', 'Com pontos a melhorar', 'Preocupante'] as const;
 const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-type Formulario = 'relatorio' | 'ocorrencia' | 'marcar' | 'ata' | 'observacao';
+type Formulario = 'relatorio' | 'ocorrencia' | 'marcar' | 'ata';
 
 const CLASSE_MARCA =
   'h-4 w-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-dark';
@@ -162,10 +168,8 @@ export default function RelatorioMensal(): JSX.Element {
 
   const [projetoEscolhido, setProjetoEscolhido] = useState('');
   const [mes, setMes] = useState(meses[0]!);
-  const [formacoesPrevistas, setFormacoesPrevistas] = useState('');
-  const [formacoesRealizadas, setFormacoesRealizadas] = useState('');
-  const [visitasPrevistas, setVisitasPrevistas] = useState('');
-  const [visitasRealizadas, setVisitasRealizadas] = useState('');
+  /** Decisão 81: o que o coordenador mudou no relatório do projeto e mês (`chave`); em outro, vale o do sistema. */
+  const [edicao, setEdicao] = useState<{ chave: string; previstas: string; realizadas: string; justificativa: string } | null>(null);
 
   const [tipo, setTipo] = useState<TipoOcorrencia>('leve');
   const [origem, setOrigem] = useState<OrigemOcorrencia>('fluxo_unico');
@@ -197,10 +201,6 @@ export default function RelatorioMensal(): JSX.Element {
   /** A hora em que a ata com a queixa é registrada: o tempo de resposta da queixa conta daqui (decisão 50). */
   const [horaReservado, setHoraReservado] = useState('');
 
-  const [dataObservacao, setDataObservacao] = useState(hoje);
-  const [comoFoi, setComoFoi] = useState<(typeof COMO_FOI)[number]>(COMO_FOI[0]);
-  const [observado, setObservado] = useState('');
-
   const id = Number(municipio);
   const escolhido = dados.municipios.find((m) => m.id === id);
   const nome = escolhido ? nomeDoMunicipio(escolhido) : '';
@@ -219,6 +219,26 @@ export default function RelatorioMensal(): JSX.Element {
       : 0;
   const projeto = projetos.find((p) => p.id === projetoId);
   const relatorioDoMes = dados.relatorios.find((r) => r.municipio === id && r.projeto === projetoId && r.mes === mes);
+  const prazoDoMes = prazoDoRelatorio(mes);
+  // Decisões 81 e 82: as formações vêm do sistema e o coordenador confere; as visitas, da Logística e do FRV.
+  const sistema = doSistema(dados, projetoId, mes);
+  const chave = `${projetoId}-${mes}`;
+  // Mês já entregue: o formulário parte do que foi entregue (e da justificativa), não volta aos números do sistema.
+  const base = relatorioDoMes ?? sistema;
+  const campos =
+    edicao?.chave === chave
+      ? edicao
+      : {
+          chave,
+          previstas: base ? String(base.formacoes_previstas) : '',
+          realizadas: base ? String(base.formacoes_realizadas) : '',
+          justificativa: relatorioDoMes?.justificativa ?? '',
+        };
+  const editar = (parte: Partial<typeof campos>): void => setEdicao({ ...campos, ...parte });
+  // Decisão 94: as observações de formação simuladas são as tarefas do amarelo já feitas, lidas da DFF.
+  const observacoes = dados.tarefas
+    .filter((t) => t.municipio === id && t.chave === 'observacao_formacao' && t.concluida_em !== null)
+    .sort((a, b) => (a.concluida_em ?? '').localeCompare(b.concluida_em ?? ''));
   const cronogramas = escolhido ? valoresPorProjeto(dados, id, dados.ciclo_atual, hoje) : [];
   const cronogramasComDado = cronogramas.flatMap((c) => (c.cronograma === null ? [] : [c.cronograma]));
   const cronogramaDoMunicipio = cronogramasComDado.length === 0 ? null : Math.min(...cronogramasComDado);
@@ -268,16 +288,17 @@ export default function RelatorioMensal(): JSX.Element {
           municipio: id,
           projeto: projetoId,
           mes,
-          formacoes_previstas: numero(formacoesPrevistas),
-          formacoes_realizadas: numero(formacoesRealizadas),
-          visitas_previstas: numero(visitasPrevistas),
-          visitas_realizadas: numero(visitasRealizadas),
+          formacoes_previstas: numero(campos.previstas),
+          formacoes_realizadas: numero(campos.realizadas),
+          visitas_previstas: sistema?.visitas_previstas ?? 0,
+          visitas_realizadas: sistema?.visitas_realizadas ?? 0,
+          justificativa: campos.justificativa,
         }),
       titulo,
     );
     if (!ok) return;
     anotar(`${formatarDia(hoje)} · Relatório mensal de ${mesAno(mes)} · ${nome} · projeto ${projeto?.nome ?? ''}`);
-    for (const limpar of [setFormacoesPrevistas, setFormacoesRealizadas, setVisitasPrevistas, setVisitasRealizadas]) limpar('');
+    setEdicao(null);
   };
 
   const enviarOcorrencia = (e: FormEvent): void => {
@@ -368,24 +389,6 @@ export default function RelatorioMensal(): JSX.Element {
     setHoraReservado('');
   };
 
-  const enviarObservacao = (e: FormEvent): void => {
-    e.preventDefault();
-    const erros: string[] = [];
-    if (!escolhido) erros.push('Escolha um município da lista.');
-    if (observado.trim() === '') erros.push('Escreva o que foi observado.');
-    if (dataObservacao === '' || dataObservacao > hoje) erros.push(`Informe uma data até hoje (${formatarDia(hoje)}).`);
-    else if (dataObservacao < periodo.inicio) {
-      erros.push(`A data precisa ser do ciclo atual: de ${formatarDia(periodo.inicio)} até hoje (${formatarDia(hoje)}).`);
-    }
-    if (erros.length > 0) {
-      mostrar('observacao', { ok: false, erros });
-      return;
-    }
-    setRetornos((atuais) => ({ ...atuais, observacao: null }));
-    anotar(`${formatarDia(dataObservacao)} · Observação de formação · ${nome} · ${comoFoi}: ${observado.trim()}`);
-    setObservado('');
-  };
-
   const relatoriosDoCiclo = dados.relatorios
     .filter((r) => periodo.meses.includes(r.mes))
     .sort((a, b) => a.mes.localeCompare(b.mes) || a.municipio - b.municipio || a.projeto - b.projeto);
@@ -403,6 +406,7 @@ export default function RelatorioMensal(): JSX.Element {
         'Visitas previstas',
         'Visitas realizadas',
         'Cumprido (%)',
+        'Justificativa',
       ],
       relatoriosDoCiclo.map((r) => {
         const m = dados.municipios.find((x) => x.id === r.municipio);
@@ -419,6 +423,7 @@ export default function RelatorioMensal(): JSX.Element {
           r.visitas_realizadas,
           // Decisão 30: 2 casas, como a tela.
           cumprido === null ? '' : duasCasas(cumprido),
+          r.justificativa ?? '',
         ];
       }),
     );
@@ -539,7 +544,7 @@ export default function RelatorioMensal(): JSX.Element {
       <p className="mb-4">
         Os formulários que alimentam o Semáforo. O que você registrar entra na demonstração na hora: a cor sugerida do
         município é recalculada, e o relatório, a ocorrência e a reunião aparecem na ficha do município. A observação de
-        formação fica só na lista &ldquo;Registrado nesta sessão&rdquo;. As datas ficam no ciclo atual, de{' '}
+        formação vem da DFF, só para leitura. As datas ficam no ciclo atual, de{' '}
         {formatarDia(periodo.inicio)} até hoje; só a reunião de escuta pode ser marcada para depois de hoje. Sair do Semáforo ou recarregar a página apaga tudo.
       </p>
       <BotoesExportar aoBaixarPlanilha={baixarPlanilha} />
@@ -578,7 +583,7 @@ export default function RelatorioMensal(): JSX.Element {
         <Secao
           id="form-relatorio"
           titulo="Relatório mensal do coordenador"
-          nota="Na versão real, o coordenador preenche numa tela à parte, fora da Integra. Cada projeto tem o seu relatório e o seu cronograma: formações e visitas realizadas sobre as previstas. Na cor do município entra o pior projeto. Registrar o mesmo projeto e mês de novo substitui o anterior."
+          nota="Na versão real, o coordenador preenche numa tela à parte, fora da Integra; ali ele vê também o resultado juntado da pesquisa dos projetos dele, sem o momento reservado e sem saber quem respondeu. O relatório vem pré-preenchido com as formações do sistema: o coordenador confere e, se mudar um número, escreve a justificativa. As visitas vêm da Logística e do pedido de viagem (FRV). Cada projeto tem o seu relatório e o seu cronograma: formações e visitas realizadas sobre as previstas. Na cor do município entra o pior projeto. Registrar o mesmo projeto e mês de novo substitui o anterior."
           aoEnviar={enviarRelatorio}
           botao="Registrar relatório"
           retorno={retornos.relatorio ?? null}
@@ -612,23 +617,26 @@ export default function RelatorioMensal(): JSX.Element {
               </select>
             </Campo>
           </div>
+          <p className="m-0 text-sm">
+            Prazo do relatório de {mesAno(mes)}: vence em {formatarDia(prazoDoMes)} (5º dia útil do mês seguinte).
+            {projeto && !relatorioDoMes && hoje > prazoDoMes && ' Atrasado: ainda não foi entregue.'}
+          </p>
           {relatorioDoMes && (
             <p className="m-0 text-sm">
               Já entregue para {mesAno(mes)} neste projeto: {relatorioDoMes.formacoes_realizadas} de{' '}
               {relatorioDoMes.formacoes_previstas} formações e {relatorioDoMes.visitas_realizadas} de{' '}
               {relatorioDoMes.visitas_previstas} visitas. Mandar de novo corrige o relatório: vale o novo, e o anterior fica
               guardado.
+              {relatorioDoMes.justificativa && ` Justificativa: ${relatorioDoMes.justificativa}`}
             </p>
           )}
           <div className="grid gap-3 sm:grid-cols-2">
             {(
               [
-                ['relatorio-fp', 'Formações previstas', formacoesPrevistas, setFormacoesPrevistas],
-                ['relatorio-fr', 'Formações realizadas', formacoesRealizadas, setFormacoesRealizadas],
-                ['relatorio-vp', 'Visitas previstas', visitasPrevistas, setVisitasPrevistas],
-                ['relatorio-vr', 'Visitas realizadas', visitasRealizadas, setVisitasRealizadas],
+                ['relatorio-fp', 'Formações previstas', 'previstas'],
+                ['relatorio-fr', 'Formações realizadas', 'realizadas'],
               ] as const
-            ).map(([campo, rotulo, valor, mudar]) => (
+            ).map(([campo, rotulo, parte]) => (
               <Campo key={campo} id={campo} rotulo={rotulo}>
                 <input
                   id={campo}
@@ -637,12 +645,31 @@ export default function RelatorioMensal(): JSX.Element {
                   step={1}
                   inputMode="numeric"
                   className={CLASSE_CAMPO}
-                  value={valor}
-                  onChange={(e) => mudar(e.target.value)}
+                  value={campos[parte]}
+                  onChange={(e) => editar({ [parte]: e.target.value })}
                 />
               </Campo>
             ))}
           </div>
+          <p className="m-0 text-sm">
+            Visitas, da Logística e do pedido de viagem (FRV), só leitura:{' '}
+            {sistema ? `${sistema.visitas_realizadas} de ${sistema.visitas_previstas} realizadas.` : 'sem dado para este projeto e mês.'}
+          </p>
+          <Campo id="relatorio-justificativa" rotulo="Justificativa">
+            <textarea
+              id="relatorio-justificativa"
+              rows={2}
+              aria-describedby="relatorio-justificativa-nota"
+              className={CLASSE_CAMPO}
+              value={campos.justificativa}
+              onChange={(e) => editar({ justificativa: e.target.value })}
+            />
+            <span id="relatorio-justificativa-nota" className="mt-1 block text-sm">
+              {sistema
+                ? `Veio do sistema: ${sistema.formacoes_previstas} formações previstas e ${sistema.formacoes_realizadas} realizadas. A justificativa é obrigatória só se você mudar um número que veio do sistema.`
+                : 'A justificativa é obrigatória só se você mudar um número que veio do sistema.'}
+            </span>
+          </Campo>
         </Secao>
 
         <Secao
@@ -805,9 +832,8 @@ export default function RelatorioMensal(): JSX.Element {
           <fieldset className="m-0 rounded border border-[#d9d9d9] p-3">
             <legend className="px-1 font-semibold">Momento reservado</legend>
             <p className="mb-2 mt-0 text-sm">
-              Na versão real, o momento reservado é confidencial: os coordenadores dos projetos do município e a Gestão
-              Operacional nunca veem o que for registrado aqui. Quem vê está em &ldquo;Quem vê o quê&rdquo;, na página Para validar no dia 7.
-              No protótipo, quem entra na Integra vê tudo.
+              Na versão real, o momento reservado é confidencial: só a gestora de referência principal do município, a Líder
+              do NFP e a SPE leem o que for registrado aqui; ninguém mais. No protótipo, quem entra na Integra vê tudo.
             </p>
             <Campo id="reuniao-reservado" rotulo="Queixa no momento reservado">
               <select
@@ -843,53 +869,22 @@ export default function RelatorioMensal(): JSX.Element {
           </fieldset>
         </Secao>
 
-        <Secao
-          id="form-observacao"
-          titulo="Observação de formação"
-          nota="A gestora observa uma formação (tarefa do amarelo). Não é um dos 5 indicadores e não muda a cor; na demonstração, fica só na lista do que foi registrado nesta sessão. Na versão real, vai para o PDI do coordenador na Plataforma DFF; se ela nasce aqui ou na DFF está em Para validar no dia 7."
-          aoEnviar={enviarObservacao}
-          botao="Registrar observação"
-          retorno={retornos.observacao ?? null}
-          para={nome}
-        >
-          <Campo id="observacao-data" rotulo="Data">
-            <input
-              id="observacao-data"
-              type="date"
-              min={periodo.inicio}
-              max={hoje}
-              className={CLASSE_CAMPO}
-              value={dataObservacao}
-              onChange={(e) => setDataObservacao(e.target.value)}
-            />
-          </Campo>
-          <fieldset className="m-0 rounded border border-[#d9d9d9] p-3">
-            <legend className="px-1 font-semibold">Como foi a formação</legend>
-            <div className="flex flex-wrap gap-x-4 gap-y-2">
-              {COMO_FOI.map((c) => (
-                <label key={c} className="flex items-center gap-1">
-                  <input
-                    type="radio"
-                    name="observacao-como-foi"
-                    className={CLASSE_MARCA}
-                    checked={comoFoi === c}
-                    onChange={() => setComoFoi(c)}
-                  />
-                  {c}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <Campo id="observacao-texto" rotulo="O que foi observado">
-            <textarea
-              id="observacao-texto"
-              rows={2}
-              className={CLASSE_CAMPO}
-              value={observado}
-              onChange={(e) => setObservado(e.target.value)}
-            />
-          </Campo>
-        </Secao>
+        <section aria-labelledby="observacao-titulo" className="rounded border border-[#8c8c8c] bg-white p-4">
+          <Title level={2} id="observacao-titulo" style={{ fontSize: 20 }}>
+            Observação de formação
+          </Title>
+          <p className="mb-3 text-sm">A observação de formação é registrada na DFF, junto do PDI; o sistema lê de lá.</p>
+          {escolhido &&
+            (observacoes.length === 0 ? (
+              <p className="m-0 text-sm">Nenhuma observação de formação de {nome} lida da DFF.</p>
+            ) : (
+              <ul aria-label={`Observações de formação de ${nome}, lidas da DFF`} className="m-0 pl-5 text-sm">
+                {observacoes.map((t) => (
+                  <li key={t.id}>Registrada na DFF em {formatarDia(t.concluida_em ?? '')} (lida da DFF)</li>
+                ))}
+              </ul>
+            ))}
+        </section>
       </div>
 
       <section aria-labelledby="relatorio-sessao" className="mt-8">

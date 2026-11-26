@@ -1,7 +1,8 @@
 /**
  * Integra: a página que reúne as ferramentas do gestor pedagógico (reunião de 23/11/2026; decisão do
- * dono Q10, 24/11). Cinco cartões, no padrão do `AccessCard` da Página Inicial:
- * ICA, Semáforo, Deslocamento, DFF (no endereço atual, em outra aba) e Avaliação do Coordenador (em breve).
+ * dono Q10, 24/11). Sete cartões, no padrão do `AccessCard` da Página Inicial: ICA, Semáforo, Deslocamento,
+ * os atalhos DFF, Formar e Avaliar (no endereço de cada plataforma, em outra aba; decisão 84) e Tríade (em breve;
+ * decisão 86, o nome da Avaliação do Coordenador).
  */
 import { useId, type JSX, type ReactNode } from 'react';
 import { Link } from 'react-router';
@@ -9,6 +10,8 @@ import { Card, Col, Row, Tag, Typography } from 'antd';
 import {
   AlertOutlined,
   AuditOutlined,
+  BarChartOutlined,
+  BookOutlined,
   CarOutlined,
   CheckSquareOutlined,
   DashboardOutlined,
@@ -58,13 +61,25 @@ const FERRAMENTAS: readonly Ferramenta[] = [
   },
   {
     titulo: 'DFF',
-    descricao: 'Observação de formação e PDI, no endereço de sempre.',
+    descricao: 'Observação de formação e PDI, no endereço de sempre. Na versão real, o sistema lê a observação de lá (decisão 94).',
     icone: <ReadOutlined />,
     destino: { tipo: 'externo', href: EXTERNAL_URLS.DFF_PLATFORM },
   },
   {
-    titulo: 'Avaliação do Coordenador',
-    descricao: 'O nome ainda vai ser escolhido.',
+    titulo: 'Formar',
+    descricao: 'A plataforma Formar, no endereço de sempre.',
+    icone: <BookOutlined />,
+    destino: { tipo: 'externo', href: EXTERNAL_URLS.FORMAR_PLATFORM },
+  },
+  {
+    titulo: 'Avaliar',
+    descricao: 'A plataforma Avaliar, no endereço de sempre.',
+    icone: <BarChartOutlined />,
+    destino: { tipo: 'externo', href: EXTERNAL_URLS.AVALIAR_PLATFORM },
+  },
+  {
+    titulo: 'Tríade',
+    descricao: 'A avaliação do coordenador.',
     icone: <AuditOutlined />,
     destino: { tipo: 'em-breve' },
   },

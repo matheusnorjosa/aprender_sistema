@@ -59,7 +59,10 @@ describe('Semáforo — Pesquisa do articulador', { timeout: 20000 }, () => {
     renderizar();
     expect(await screen.findByRole('heading', { level: 1, name: 'Pesquisa do articulador' })).toBeInTheDocument();
     expect(screen.getByText(QUEM_VE.pesquisa.aviso)).toBeInTheDocument();
-    expect(screen.getByText(/Ciclo 2026\.6/)).toHaveTextContent('prazo para responder: 20/12/2026');
+    // Decisão 76: o link sai em 01/12 (1º dia útil do 2º mês) e a resposta vai até 10 dias úteis depois.
+    expect(screen.getByText(/Ciclo 2026\.6/)).toHaveTextContent(
+      'link enviado pela gestora de referência em 01/12/2026 · prazo para responder: 15/12/2026 (10 dias úteis)',
+    );
     expect(screen.getByText(/sem link/)).toBeInTheDocument();
   });
 
@@ -67,7 +70,11 @@ describe('Semáforo — Pesquisa do articulador', { timeout: 20000 }, () => {
     renderizar();
     const explicacao = await screen.findByText(/sem link/);
     expect(explicacao).toHaveTextContent(/como o articulador ou o secretário municipal veria/);
-    expect(explicacao).toHaveTextContent(/articuladores e secretários municipais recebem um link/);
+    // Decisões 73 e 74: a gestora de referência manda o link, sem o coordenador; a identificação é opcional.
+    expect(explicacao).toHaveTextContent(
+      /a gestora de referência manda o link a articuladores e secretários municipais, sem passar pelo coordenador/,
+    );
+    expect(explicacao).toHaveTextContent(/Dizer o nome é opcional/);
     expect(explicacao).not.toHaveTextContent(/o articulador recebe um link/);
   });
 
@@ -86,7 +93,7 @@ describe('Semáforo — Pesquisa do articulador', { timeout: 20000 }, () => {
     // Seção 8 do PDF: "Município passa a vermelho" vai para a gestora de referência, a gestora pedagógica, a SPE e a
     // Líder do NFP (a lista inteira, com o ponto final).
     expect(resultado).toHaveTextContent(
-      `Seria enviado para: ${GESTORA} (gestora de referência), Gestora pedagógica, SPE, Líder do NFP.`,
+      `Seria enviado no sistema e por e-mail institucional para: ${GESTORA} (gestora de referência), Gestora pedagógica, SPE, Líder do NFP.`,
     );
     // Decisões 38 e 41: a cor em vigor muda na hora, as tarefas começam; o Comitê confirma ou desfaz, e a SPE decide
     // se convoca o extraordinário. O número das decisões não aparece para quem registra (rodada 1 de revisão).
@@ -108,7 +115,7 @@ describe('Semáforo — Pesquisa do articulador', { timeout: 20000 }, () => {
     await user.click(screen.getByRole('button', { name: 'Enviar resposta' }));
     const resultado = await screen.findByRole('status');
     expect(resultado).toHaveTextContent('Antes: Verde → Agora: Verde');
-    expect(resultado).not.toHaveTextContent('Seria enviado para');
+    expect(resultado).not.toHaveTextContent('Seria enviado');
     expect(resultado).toHaveTextContent('Cor em vigor: Verde. Só o vermelho muda a cor em vigor na hora; as outras mudanças esperam o Comitê.');
   });
 

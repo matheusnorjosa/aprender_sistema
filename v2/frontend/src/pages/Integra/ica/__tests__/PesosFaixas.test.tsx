@@ -116,8 +116,9 @@ describe('Pesos e faixas', { timeout: 20000 }, () => {
     await user.click(screen.getByRole('button', { name: 'Usar a configuração original (v5)' }));
     const previa = screen.getByRole('region', { name: 'Como fica com estes pesos' });
     // Decisão 56: as localidades do Amigos do Bem entram na carteira do Rogério e mudam as médias da equipe (era → 90).
-    expect(previa).toHaveTextContent('Socorro Bezerra Lins: 77 · Capacidade disponível → 89 · Adequada');
-    expect(previa).toHaveTextContent('Valdir Maciel: 82 · Adequada → 79 · Capacidade disponível');
+    // Decisão 59 (frente = cada ano de cada coleção): eram 77 → 89 e 82 → 79.
+    expect(previa).toHaveTextContent('Socorro Bezerra Lins: 73 · Capacidade disponível → 86 · Adequada');
+    expect(previa).toHaveTextContent('Valdir Maciel: 81 · Adequada → 78 · Capacidade disponível');
     const contagem = within(previa).getByRole('list', { name: 'Quantos em cada estrato' });
     expect(within(contagem).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       'Sobrecarga: 3 → 3',
@@ -145,6 +146,8 @@ describe('Pesos e faixas', { timeout: 20000 }, () => {
   test('faixas: legenda com nome, valores e orientação', async () => {
     await abrir();
     expect(screen.getByRole('list', { name: 'Faixas do ICA' })).toBeInTheDocument();
-    expect(screen.getByText(/as faixas ficam fixas/i)).toBeInTheDocument();
+    // Decisão 65: as faixas são fixas; a tela não promete mudar faixa na versão real.
+    expect(screen.getByText(/as faixas ficam fixas/i)).toHaveTextContent(/decisão 65/);
+    expect(document.body).not.toHaveTextContent(/mudar uma faixa/i);
   });
 });

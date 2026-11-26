@@ -68,8 +68,13 @@ function atendimento(
     municipio: mun,
     projeto_geral: colecao,
     coordenador: coord,
-    segmentos: [{ segmento: 'Anos Iniciais', turmas_qtde: turmas, professor_qtde: professores, aluno_qtde: alunos }],
+    segmentos: [{ segmento: 'Anos Iniciais', anos: 1, turmas_qtde: turmas, professor_qtde: professores, aluno_qtde: alunos }],
   };
+}
+
+/** O mesmo atendimento, com o segmento atendendo `anos` anos (séries). */
+function comAnos(a: Atendimento, anos: number): Atendimento {
+  return { ...a, segmentos: a.segmentos.map((s) => ({ ...s, anos })) };
 }
 
 describe('calcularIca — teste de ouro do PDF (página 4)', () => {
@@ -284,8 +289,37 @@ describe('calcularEquipe — carteiras', () => {
     return c;
   };
 
-  it('soma só os municípios ativos; frentes = município × coleção distintos', () => {
+  it('soma só os municípios ativos; com 1 ano por segmento, cada coleção em cada município é 1 frente', () => {
     expect(de(1).valores).toEqual(valores({ municipios: 2, frentes: 3, turmas: 6, professores: 180, deslocamento: 30, estados: 2 }));
+  });
+
+  it('decisão 59: frente = cada ano de cada coleção no município (Novo Lendo 2 + Tema 2 + Infantil 3 = 7)', () => {
+    const umMunicipio: BaseIca = {
+      coordenadores: [coordenador(1)],
+      municipios: [municipio(1)],
+      atendimentos: [comAnos(atendimento(1, 1, 1), 2), comAnos(atendimento(1, 1, 2), 2), comAnos(atendimento(1, 1, 5), 3)],
+    };
+    expect(calcularEquipe(umMunicipio, PESOS_REVISADOS).coordenadores[0]?.valores.frentes).toBe(7);
+  });
+
+  it('decisão 59: os anos do município suspenso não contam', () => {
+    const comSuspenso: BaseIca = {
+      coordenadores: [coordenador(1)],
+      municipios: [municipio(1), municipio(2, { status: 'suspenso' })],
+      atendimentos: [comAnos(atendimento(1, 1, 1), 2), comAnos(atendimento(1, 2, 5), 3)],
+    };
+    expect(calcularEquipe(comSuspenso, PESOS_REVISADOS).coordenadores[0]?.valores.frentes).toBe(2);
+  });
+
+  it('decisão 59: a carteira mostra as frentes de cada município, e a soma dos ativos é o valor da conta', () => {
+    const comSuspenso: BaseIca = {
+      coordenadores: [coordenador(1)],
+      municipios: [municipio(1), municipio(2, { status: 'suspenso' })],
+      atendimentos: [comAnos(atendimento(1, 1, 1), 2), comAnos(atendimento(1, 1, 2), 2), comAnos(atendimento(1, 2, 5), 3)],
+    };
+    const c = calcularEquipe(comSuspenso, PESOS_REVISADOS).coordenadores[0]!;
+    expect(c.carteira.map((l) => [l.municipio.id, l.frentes])).toEqual([[1, 4], [2, 3]]);
+    expect(c.carteira.filter((l) => l.ativo).reduce((s, l) => s + l.frentes, 0)).toBe(c.valores.frentes);
   });
 
   it('município compartilhado: cada um soma o que é seu', () => {
@@ -508,28 +542,30 @@ describe('alertas (PDF, seção 6) com quem receberia', () => {
   const alertas = gerarAlertas(base, r, { gerencias, pessoas });
   const doTipo = (t: string) => alertas.filter((a) => a.tipo === t);
 
-  it('Sobrecarga vai para SPE, gestora técnica e Líder do NFP', () => {
+  it('Sobrecarga vai para SPE, gestora pedagógica e Líder do NFP', () => {
     const [a] = doTipo('sobrecarga');
     expect(a?.coordenadorId).toBe(1);
-    expect(a?.quemReceberia).toEqual(['SPE', 'Gestora técnica (Gestora Fictícia)', 'Líder do NFP']);
+    expect(a?.quemReceberia).toEqual(['SPE', 'Gestora pedagógica (Gestora Fictícia)', 'Líder do NFP']);
   });
 
-  it('fora da meta vai para a SPE', () => {
+  it('fora da meta vai para a SPE; quem está em Sobrecarga não recebe também esse alerta (decisão 69)', () => {
     const fora = doTipo('fora_da_meta');
-    expect(fora.map((a) => a.coordenadorId)).toContain(1);
+    expect(fora.length).toBeGreaterThan(0);
+    expect(fora.map((a) => a.coordenadorId)).not.toContain(1);
     expect(fora.every((a) => a.quemReceberia.join() === 'SPE')).toBe(true);
   });
 
-  it('contrato sem coordenador vai para gestora operacional e SPE', () => {
+  it('projeto sem coordenador vai para a Gerente Operacional e a SPE', () => {
     const [a] = doTipo('contrato_sem_coordenador');
     expect(a?.municipioId).toBe(5);
-    expect(a?.quemReceberia).toEqual(['Gestora operacional', 'SPE']);
+    expect(a?.quemReceberia).toEqual(['Gerente Operacional', 'SPE']);
   });
 
-  it('dado incompleto e improvável vão para a gestora operacional', () => {
+  it('dado incompleto e improvável vão para a Gerente Operacional', () => {
     expect(doTipo('dado_incompleto')[0]?.coordenadorId).toBe(2);
     expect(doTipo('dado_improvavel')[0]?.coordenadorId).toBe(4);
-    expect(doTipo('dado_incompleto')[0]?.quemReceberia).toEqual(['Gestora operacional']);
+    expect(doTipo('dado_incompleto')[0]?.quemReceberia).toEqual(['Gerente Operacional']);
+    expect(doTipo('dado_improvavel')[0]?.quemReceberia).toEqual(['Gerente Operacional']);
   });
 
   it('coordenador sem municípios vai para SPE e Líder do NFP', () => {
@@ -566,8 +602,11 @@ describe('alertas (PDF, seção 6) com quem receberia', () => {
     expect(doTipo('contrato_sem_coordenador')[0]?.detalhe).toBe('Projeto novo sem coordenador definido.');
   });
 
-  it('"entra em Sobrecarga" só para quem não estava antes, quando há o retrato anterior', () => {
-    const repetido = gerarAlertas(base, r, { gerencias, pessoas, anterior: r });
-    expect(repetido.filter((a) => a.tipo === 'sobrecarga')).toHaveLength(0);
+  it('decisão 69: o título é "está em Sobrecarga" e não depende de cálculo anterior', () => {
+    // Quem continua na faixa recebe o alerta de novo: a prova, contra o semestre anterior, está no IntegraDemoContext.test.
+    const titulos = [gerarAlertas(base, r, { gerencias, pessoas }), gerarAlertas(base, calcularEquipe(base, PESOS_REVISADOS), { gerencias, pessoas })]
+      .map((lista) => lista.filter((a) => a.tipo === 'sobrecarga').map((a) => a.titulo));
+    expect(titulos[0]).toEqual([`Ana está em Sobrecarga (${r.coordenadores[0]?.conta.icaExibido})`]);
+    expect(titulos[1]).toEqual(titulos[0]);
   });
 });

@@ -2,7 +2,9 @@
  * Semáforo — Pesquisa do articulador (coleta 1 do PDF do Semáforo): os 6 itens de 1 a 5, a nota de
  * recomendação de 0 a 10 e o campo aberto, como o articulador ou o secretário municipal veria.
  *
- * Na versão real, articuladores e secretários municipais respondem por link, sem conta. No protótipo não há link: a pesquisa é
+ * Na versão real, a gestora de referência manda o link, sem o coordenador (decisão 73), e articuladores e
+ * secretários municipais respondem sem conta; dizer o nome é opcional (decisão 74). O link sai no 1º dia útil do
+ * 2º mês do ciclo e a resposta vai até 10 dias úteis depois (decisão 76). No protótipo não há link: a pesquisa é
  * respondida nesta tela, entra no ciclo atual com a data de "hoje" da demonstração e a cor sugerida do
  * município é recalculada na hora (`useSemaforoDemo`). DADOS SIMULADOS; nada é gravado.
  *
@@ -217,12 +219,14 @@ export default function PesquisaArticulador(): JSX.Element {
       <AvisoQuemVe tela="pesquisa" />
       <p className="mb-2">
         Na demonstração, sem link: você responde nesta mesma tela, como o articulador ou o secretário municipal veria,
-        e a cor do município é recalculada na hora. Na versão real, articuladores e secretários municipais recebem um
-        link e respondem sem conta.
+        e a cor do município é recalculada na hora. Na versão real, a gestora de referência manda o link a
+        articuladores e secretários municipais, sem passar pelo coordenador, e eles respondem sem conta. Dizer o nome é
+        opcional.
       </p>
       <p className="mb-4 text-sm">
-        Ciclo {ciclo} ({nomeDoMes(periodo.meses[0])} e {nomeDoMes(periodo.meses[1])}) · prazo para responder:{' '}
-        {formatarDia(periodo.prazo_pesquisa)} · hoje: {formatarDia(dados.data_referencia)}
+        Ciclo {ciclo} ({nomeDoMes(periodo.meses[0])} e {nomeDoMes(periodo.meses[1])}) · link enviado pela gestora de
+        referência em {formatarDia(periodo.envio_pesquisa)} · prazo para responder: {formatarDia(periodo.prazo_pesquisa)} (10
+        dias úteis) · hoje: {formatarDia(dados.data_referencia)}
       </p>
       <BotoesExportar aoBaixarPlanilha={baixarPlanilha} />
       <p className="mb-4 text-sm">

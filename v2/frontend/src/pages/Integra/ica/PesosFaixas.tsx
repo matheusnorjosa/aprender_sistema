@@ -4,7 +4,7 @@
  * Editar os pesos (a soma tem de dar 100%) com justificativa obrigatória: cada mudança cria uma versão
  * nova (data, autor e justificativa), que passa a valer na sessão. O resultado é recalculado ao vivo
  * enquanto se edita, e a configuração original (proposta v5) fica ao lado para comparar.
- * As faixas ficam fixas no protótipo. Requisitos: Requisitos_Modulo_ICA.pdf, seções 3 e 4.
+ * As faixas ficam fixas, também na versão real (decisão 65). Requisitos: Requisitos_Modulo_ICA.pdf, seções 3 e 4.
  */
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { Alert, Button, Typography } from 'antd';
@@ -321,7 +321,7 @@ export default function PesosFaixas(): JSX.Element {
         </Title>
         <FaixasLegenda />
         <p className="mt-2 text-sm">
-          No protótipo as faixas ficam fixas. Na versão real, mudar uma faixa também cria uma versão nova (PDF, seção 4).
+          Como no protótipo, as faixas ficam fixas também na versão real (decisão 65). Só os pesos mudam.
         </p>
       </section>
     </section>

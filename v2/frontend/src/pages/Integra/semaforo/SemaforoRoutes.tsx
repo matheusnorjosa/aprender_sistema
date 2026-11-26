@@ -116,7 +116,7 @@ function IndiceSemaforo(): JSX.Element {
       para: `${RAIZ}/relatorio-mensal`,
       titulo: 'Relatório mensal e formulários',
       texto:
-        'O relatório mensal do coordenador e os registros de ocorrência, de reunião de escuta e de observação de formação.',
+        'O relatório mensal do coordenador, os registros de ocorrência e de reunião de escuta, e a observação de formação lida da DFF.',
     },
   ];
   return (

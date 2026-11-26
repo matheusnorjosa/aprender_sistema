@@ -9,7 +9,8 @@
  * `gerarDadosSemaforo`). Os articuladores não têm nome ("Articulador(a) A").
  *
  * "Hoje" da demonstração: segunda-feira, 07/12/2026 (`DATA_REFERENCIA_SEMAFORO`), dia da reunião de
- * validação, no meio do ciclo 2026.6 (nov–dez), com a pesquisa ainda no prazo (até 20/12). O histórico tem
+ * validação, no meio do ciclo 2026.6 (nov–dez), com a pesquisa ainda no prazo (link enviado em 01/12, resposta até
+ * 15/12: decisão 76). O histórico tem
  * 6 ciclos bimestrais fechados (2025.6 a 2026.5), cada um publicado pelo Comitê ordinário numa sexta-feira,
  * na data marcada pela SPE (decisão 40).
  *
@@ -39,6 +40,7 @@ import {
   percentualCronograma,
   periodicidadeDaCor,
   piorCor,
+  prazoDaPesquisa,
   respondeuNoPrazo,
   somarDias,
   somarDiasUteis,
@@ -94,7 +96,7 @@ export interface MunicipioSemaforo {
    * cada projeto, use `projetos`.
    */
   coordenador: number | null;
-  /** id da gestora de referência (`Pessoa`). */
+  /** id da gestora de referência (`Pessoa`); é ela quem manda o link da pesquisa, sem o coordenador (decisão 73). */
   gestora_referencia: number;
   /** Os projetos do município (pelo menos um). */
   projetos: ProjetoMunicipio[];
@@ -155,6 +157,11 @@ export interface DadosSemaforo {
    * guardadas e fora das contas, que leem só `relatorios`.
    */
   relatorios_corrigidos: RelatorioCorrigido[];
+  /**
+   * Decisões 81 e 82: o que o sistema sabe de cada projeto em cada mês do ciclo atual, e que o relatório mensal traz
+   * pré-preenchido: as formações (do Aprender Sistema) e as visitas (da Logística e do pedido de viagem, FRV).
+   */
+  do_sistema: NumerosDoMes[];
   ocorrencias: Ocorrencia[];
   reunioes: ReuniaoEscuta[];
   /** As reuniões do Comitê marcadas ou convocadas pela SPE. */
@@ -166,6 +173,14 @@ export interface DadosSemaforo {
   decisoes: DecisaoComite[];
   /** Todas as tarefas, inclusive as concluídas, canceladas e substituídas (decisão 57: nada some). */
   tarefas: TarefaResposta[];
+}
+
+/** Os números de um projeto num mês, sem o coordenador: o que o sistema traz para o relatório mensal. */
+export type NumerosDoMes = Omit<RelatorioMensal, 'id' | 'coordenador' | 'justificativa'>;
+
+/** Decisões 81 e 82: os números do sistema para o relatório do projeto no mês (AAAA-MM); sem dado, `undefined`. */
+export function doSistema(dados: Pick<DadosSemaforo, 'do_sistema'>, projeto: number, mes: string): NumerosDoMes | undefined {
+  return dados.do_sistema.find((x) => x.projeto === projeto && x.mes === mes);
 }
 
 /** Os municípios da história pronta da demonstração. */
@@ -195,7 +210,9 @@ export const HISTORIAS_SEMAFORO = {
 export interface PeriodoCiclo {
   inicio: string;
   fim: string;
-  /** Último dia para responder a pesquisa no prazo: dia 20 do segundo mês. */
+  /** Decisões 73 e 76: a gestora de referência manda o link no 1º dia útil do segundo mês. */
+  envio_pesquisa: string;
+  /** Decisão 76: último dia para responder a pesquisa no prazo, 10 dias úteis depois do envio do link. */
   prazo_pesquisa: string;
   /** Os dois meses (AAAA-MM) do ciclo. */
   meses: [string, string];
@@ -205,10 +222,12 @@ export function periodoDoCiclo(ciclo: Ciclo): PeriodoCiclo {
   const [ano, n] = ciclo.split('.').map(Number) as [number, number];
   const mes = (m: number) => `${ano}-${String(m).padStart(2, '0')}`;
   const meses: [string, string] = [mes(2 * n - 1), mes(2 * n)];
+  const envio = emDiaUtil(`${meses[1]}-01`);
   return {
     inicio: `${meses[0]}-01`,
     fim: somarDias(somarMeses(`${meses[1]}-01`, 1), -1),
-    prazo_pesquisa: `${meses[1]}-20`,
+    envio_pesquisa: envio,
+    prazo_pesquisa: prazoDaPesquisa(envio),
     meses,
   };
 }
@@ -715,7 +734,9 @@ export function gerarDadosSemaforo(semente: number = SEMENTE_SEMAFORO): DadosSem
       }
       semRespostaAntes = plano.resposta_pesquisa !== undefined;
 
-      if (!semRespostaAntes) responder(m, ciclo, () => dia(meses[1], inteiro(3, 18)), plano);
+      // Decisão 76: a resposta fica entre o envio do link (no máximo dia 3) e o prazo (no mínimo dia 15). O dia
+      // sorteado depois do 14 fica no 14: o sorteio não muda, e as datas da história ficam as mesmas.
+      if (!semRespostaAntes) responder(m, ciclo, () => dia(meses[1], Math.min(inteiro(3, 18), 14)), plano);
       relatar(
         m,
         plano,
@@ -737,7 +758,7 @@ export function gerarDadosSemaforo(semente: number = SEMENTE_SEMAFORO): DadosSem
       }
     }
 
-    // Ciclo atual (nov–dez/2026): relatório de novembro entregue; a pesquisa está aberta até 20/12.
+    // Ciclo atual (nov–dez/2026): relatório de novembro entregue; a pesquisa está aberta até 15/12 (decisão 76).
     relatar(m, {}, ['2026-11']);
     const sem_resposta = `${m.nome}-${m.uf}` === chave(H.sem_resposta_dois_ciclos);
     if (!sem_resposta && rng() < 0.5) responder(m, CICLO_ATUAL_SEMAFORO, () => dia('2026-12', inteiro(1, 7)), {});
@@ -777,6 +798,22 @@ export function gerarDadosSemaforo(semente: number = SEMENTE_SEMAFORO): DadosSem
   tirar(respostas, (r) => r.ciclo < entradaDoProjeto(r.projeto));
   tirar(relatorios, (r) => `${r.mes}-01` < inicioDe(entradaDoProjeto(r.projeto)));
   tirar(reunioes, (r) => r.data < inicioDe(entradaDoMunicipio(r.municipio)));
+
+  // Decisões 81 e 82: o que o sistema traz para o relatório de cada projeto no ciclo atual. Novembro é o que foi
+  // entregue; dezembro segue o ritmo de novembro (sem sorteio, para não mudar o resto dos dados da semente).
+  const do_sistema: NumerosDoMes[] = relatorios
+    .filter((r) => r.mes === periodoDoCiclo(CICLO_ATUAL_SEMAFORO).meses[0])
+    .flatMap((r) =>
+      periodoDoCiclo(CICLO_ATUAL_SEMAFORO).meses.map((mes) => ({
+        municipio: r.municipio,
+        projeto: r.projeto,
+        mes,
+        formacoes_previstas: r.formacoes_previstas,
+        formacoes_realizadas: r.formacoes_realizadas,
+        visitas_previstas: r.visitas_previstas,
+        visitas_realizadas: r.visitas_realizadas,
+      })),
+    );
 
   // 2. A cor oficial de cada ciclo: o vermelho na hora, na data do dado, e o Comitê ordinário no fim do ciclo.
   const coletas: ColetasSemaforo = { ciclos: [...CICLOS_FECHADOS, CICLO_ATUAL_SEMAFORO], municipios, respostas, relatorios, ocorrencias };
@@ -955,6 +992,7 @@ export function gerarDadosSemaforo(semente: number = SEMENTE_SEMAFORO): DadosSem
     respostas,
     relatorios,
     relatorios_corrigidos: [],
+    do_sistema,
     ocorrencias,
     reunioes,
     comites,

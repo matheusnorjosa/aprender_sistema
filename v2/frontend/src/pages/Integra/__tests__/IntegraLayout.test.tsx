@@ -1,5 +1,5 @@
 /**
- * Integra (protótipo para a validação de 07/12/2026): moldura, página com os 5 cartões e rotas.
+ * Integra (protótipo para a validação de 07/12/2026): moldura, página com os 7 cartões e rotas.
  *
  * A rota `/integra/*` é aberta pelo AppRoutes só com a policy `access_integra` (o gate está em
  * `AppRoutes.access-by-profile.test.tsx`); aqui a moldura é montada direto.
@@ -58,7 +58,7 @@ describe('Integra — moldura e página', { timeout: 20000 }, () => {
     ).toBeInTheDocument();
   });
 
-  test('os 5 cartões: ICA, Semáforo, Deslocamento, DFF e Avaliação do Coordenador', async () => {
+  test('os 7 cartões: ICA, Semáforo, Deslocamento, DFF, Formar, Avaliar e Tríade (decisões 84 e 86)', async () => {
     renderIntegra('/integra');
     expect(await screen.findByText('ICA')).toBeInTheDocument();
     const ica = screen.getByRole('link', { name: /ICA/ });
@@ -69,26 +69,39 @@ describe('Integra — moldura e página', { timeout: 20000 }, () => {
     expect(screen.getByRole('link', { name: /Deslocamento/ })).toHaveTextContent(/ida e volta/);
     expect(screen.getByRole('link', { name: /Deslocamento/ })).not.toHaveTextContent(/viagens/);
     expect(screen.getByRole('link', { name: /DFF/ })).toBeInTheDocument();
-    expect(screen.getByText('Avaliação do Coordenador')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /DFF/ })).toHaveTextContent(/Observação de formação e PDI/);
+    // Decisão 94: a observação de formação fica na DFF, e o sistema lê de lá.
+    expect(screen.getByRole('link', { name: /DFF/ })).toHaveTextContent(/o sistema lê a observação de lá \(decisão 94\)/);
+    expect(screen.getByRole('link', { name: /^Formar/ })).toHaveAttribute('href', EXTERNAL_URLS.FORMAR_PLATFORM);
+    expect(screen.getByRole('link', { name: /^Avaliar/ })).toHaveAttribute('href', EXTERNAL_URLS.AVALIAR_PLATFORM);
+    // Decisão 86: era "Avaliação do Coordenador".
+    expect(screen.getByText('Tríade')).toBeInTheDocument();
+    expect(screen.queryByText('Avaliação do Coordenador')).not.toBeInTheDocument();
     expect(screen.queryByText(/chega na próxima entrega/i)).not.toBeInTheDocument();
+    const titulos = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    expect(titulos).toEqual(['ICA', 'Semáforo de Risco Municipal', 'Deslocamento', 'DFF', 'Formar', 'Avaliar', 'Tríade']);
   });
 
-  test('DFF abre em outra aba, com aviso no nome do link e sem passar a janela de origem', async () => {
+  test.each([
+    ['DFF', EXTERNAL_URLS.DFF_PLATFORM],
+    ['Formar', EXTERNAL_URLS.FORMAR_PLATFORM],
+    ['Avaliar', EXTERNAL_URLS.AVALIAR_PLATFORM],
+  ])('%s abre em outra aba, com aviso no nome do link e sem passar a janela de origem', async (nome, href) => {
     renderIntegra('/integra');
-    const dff = await screen.findByRole('link', { name: /DFF.*abre em outra aba/i });
-    expect(dff).toHaveAttribute('href', EXTERNAL_URLS.DFF_PLATFORM);
-    expect(dff).toHaveAttribute('target', '_blank');
-    expect(dff.getAttribute('rel')?.split(' ').sort()).toEqual(['noopener', 'noreferrer']);
+    const link = await screen.findByRole('link', { name: new RegExp(`^${nome}.*abre em outra aba`, 'i') });
+    expect(link).toHaveAttribute('href', href);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link.getAttribute('rel')?.split(' ').sort()).toEqual(['noopener', 'noreferrer']);
   });
 
-  test('Avaliação do Coordenador está desativada e avisa "em breve"', async () => {
+  test('Tríade (a Avaliação do Coordenador, decisão 86) está desativada e avisa "em breve"', async () => {
     renderIntegra('/integra');
-    const titulo = await screen.findByText('Avaliação do Coordenador');
+    const titulo = await screen.findByText('Tríade');
     const cartao = titulo.closest('[aria-disabled]');
     expect(cartao).not.toBeNull();
     expect(cartao).toHaveAttribute('aria-disabled', 'true');
     expect(within(cartao as HTMLElement).getByText(/em breve/i)).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Avaliação do Coordenador/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Tríade/ })).not.toBeInTheDocument();
   });
 
   test('link para a tela "Para validar no dia 7"', async () => {
@@ -113,7 +126,7 @@ describe('Integra — moldura e página', { timeout: 20000 }, () => {
 
   test('endereço desconhecido dentro da Integra volta para a página da Integra', async () => {
     renderIntegra('/integra/nao-existe');
-    expect(await screen.findByText('Avaliação do Coordenador')).toBeInTheDocument();
+    expect(await screen.findByText('Tríade')).toBeInTheDocument();
   });
 });
 

@@ -14,13 +14,13 @@ import { Link } from 'react-router';
 import { Alert, Button, Typography } from 'antd';
 
 import { formatFortaleza } from '../../../utils/datetime';
-import { useIntegraDemo } from '../dados/IntegraDemoContext';
+import { hojeEmFortaleza, useIntegraDemo } from '../dados/IntegraDemoContext';
 import type { Movimento, Remanejamento, StatusRemanejamento } from '../dados/tipos';
 import { arredondarIca, nomeDoEstrato, simularRemanejamento, type ComparacaoCoordenador, type ResultadoCoordenador } from './calculo';
 import { BarraIca, escalaDoGrafico } from './componentes/BarraIca';
 import { textoDoEstrato } from './componentes/EtiquetaEstrato';
 import { FaixasLegendaCurta } from './componentes/FaixasLegenda';
-import { CLASSE_CAMPO, CLASSE_ROTULO, formatarNumero, formatarVariacao } from './componentes/estilos';
+import { CLASSE_CAMPO, CLASSE_ROTULO, formatarDia, formatarNumero, formatarVariacao } from './componentes/estilos';
 
 const { Title } = Typography;
 
@@ -38,6 +38,10 @@ const idDoTirar = (m: Movimento): string => `ica-sim-tirar-${chaveDoMovimento(m)
 const idDaProposta = (id: string): string => `ica-sim-proposta-${id}`;
 const idDoAplicar = (id: string): string => `ica-sim-aplicar-${id}`;
 const idDoErroAplicar = (id: string): string => `ica-sim-erro-aplicar-${id}`;
+const idDaVigencia = (id: string): string => `ica-sim-vigencia-${id}`;
+const idDaDicaVigencia = (id: string): string => `ica-sim-vigencia-dica-${id}`;
+/** Mesmo texto do IntegraDemoContext, para saber quando o erro é da data. */
+const ERRO_VIGENCIA = 'Escolha a data em que passa a valer: hoje ou depois.';
 
 const ROTULO_STATUS: Record<StatusRemanejamento, string> = {
   proposto: 'Proposta',
@@ -75,7 +79,9 @@ export default function Simulador(): JSX.Element {
   const [erros, setErros] = useState<string[]>([]);
   const [errosProposta, setErrosProposta] = useState<string[]>([]);
   const [aviso, setAviso] = useState('');
-  const [erroAplicar, setErroAplicar] = useState<{ id: string; texto: string } | null>(null);
+  const [erroAplicar, setErroAplicar] = useState<{ id: string; texto: string; naData: boolean } | null>(null);
+  /** Data escolhida em cada proposta aprovada (AAAA-MM-DD); sem escolha, hoje. */
+  const [vigencias, setVigencias] = useState<Record<string, string>>({});
   // O botão clicado pode sair da tela (Propor, Aprovar, Aplicar, Tirar): depois do render, o foco vai
   // para onde a pessoa continua (WCAG 2.4.3), em vez de cair no começo da página.
   const focarDepois = useRef<string | null>(null);
@@ -168,16 +174,18 @@ export default function Simulador(): JSX.Element {
 
   const aprovar = (id: string): void => {
     aprovarRemanejamento(id);
-    setAviso('Proposta aprovada. Falta aplicar.');
-    focarDepois.current = idDoAplicar(id);
+    setAviso('Proposta aprovada. Escolha a data em que passa a valer e aplique.');
+    // Decisão 71: a data vem antes do botão Aplicar; o foco não pode pulá-la.
+    focarDepois.current = idDaVigencia(id);
   };
 
   const aplicar = (id: string): void => {
-    const r = aplicarRemanejamento(id);
+    const r = aplicarRemanejamento(id, vigencias[id]);
     if (!r.ok) {
-      setErroAplicar({ id, texto: r.erros.join(' ') });
+      const naData = r.erros.includes(ERRO_VIGENCIA);
+      setErroAplicar({ id, texto: r.erros.join(' '), naData });
       setAviso('');
-      focarDepois.current = idDoErroAplicar(id);
+      focarDepois.current = naData ? idDaVigencia(id) : idDoErroAplicar(id);
       return;
     }
     setErroAplicar(null);
@@ -185,7 +193,7 @@ export default function Simulador(): JSX.Element {
     focarDepois.current = idDaProposta(id);
   };
 
-  const hoje = formatFortaleza(new Date(), 'DD/MM/YYYY');
+  const hoje = hojeEmFortaleza();
 
   const renderProposta = (r: Remanejamento): JSX.Element => (
     <li key={r.id} id={idDaProposta(r.id)} tabIndex={-1} className={`mb-3 rounded border border-[#d9d9d9] bg-white p-3 ${CLASSE_FOCO}`}>
@@ -213,9 +221,29 @@ export default function Simulador(): JSX.Element {
       )}
       {r.status === 'aprovado' && (
         <>
-          <p className="mb-2">
-            Data de vigência: semestre {dados.semestre_atual}, a partir da aplicação (hoje, {hoje}).
-          </p>
+          {/* Decisão 71: a SPE escolhe a data em que passa a valer (começa em hoje). */}
+          <div className="mb-2 max-w-xs">
+            <label htmlFor={idDaVigencia(r.id)} className={CLASSE_ROTULO}>
+              Data em que passa a valer
+            </label>
+            <input
+              id={idDaVigencia(r.id)}
+              type="date"
+              className={CLASSE_CAMPO}
+              min={hoje}
+              value={vigencias[r.id] ?? hoje}
+              aria-invalid={(erroAplicar?.id === r.id && erroAplicar.naData) || undefined}
+              aria-describedby={
+                erroAplicar?.id === r.id && erroAplicar.naData
+                  ? `${idDaDicaVigencia(r.id)} ${idDoErroAplicar(r.id)}`
+                  : idDaDicaVigencia(r.id)
+              }
+              onChange={(e) => setVigencias((atuais) => ({ ...atuais, [r.id]: e.target.value }))}
+            />
+            <span id={idDaDicaVigencia(r.id)} className="text-sm">
+              Hoje ou depois.
+            </span>
+          </div>
           <Button id={idDoAplicar(r.id)} type="primary" onClick={() => aplicar(r.id)}>
             Aplicar
           </Button>
@@ -228,8 +256,9 @@ export default function Simulador(): JSX.Element {
       )}
       {r.status === 'aplicado' && r.aplicado_em && (
         <p className="m-0">
-          Aplicada em {formatFortaleza(r.aplicado_em)} · vale a partir do semestre {r.semestre}. O ICA da equipe já foi
-          recalculado.
+          Aplicada em {formatFortaleza(r.aplicado_em)}
+          {r.vigencia_em && ` · vale a partir de ${formatarDia(r.vigencia_em)}`}. No protótipo, a carteira já mudou e o
+          ICA da equipe foi recalculado; na versão real, ela muda na data escolhida.
         </p>
       )}
     </li>

@@ -1,7 +1,7 @@
 /**
- * Semáforo — Relatório mensal e formulários (ocorrência, reunião de escuta com o momento reservado,
- * observação de formação). O que é registrado entra no estado da sessão e muda a cor sugerida na hora.
- * DADOS SIMULADOS.
+ * Semáforo — Relatório mensal e formulários (ocorrência, reunião de escuta com o momento reservado) e a
+ * observação de formação, lida da DFF (decisão 94). O que é registrado entra no estado da sessão e muda a cor
+ * sugerida na hora. DADOS SIMULADOS.
  */
 import { MemoryRouter } from 'react-router';
 import { render, screen, within } from '@testing-library/react';
@@ -12,7 +12,7 @@ import * as exportar from '../../ica/exportar';
 import { QUEM_VE } from '../../quemVe';
 import RelatorioMensal from '../RelatorioMensal';
 import { SemaforoDemoProvider } from '../SemaforoDemoContext';
-import { avaliarMunicipio, gerarDadosSemaforo } from '../dados';
+import { avaliarMunicipio, doSistema, gerarDadosSemaforo } from '../dados';
 import { renderTelaSemaforo } from './telaSemaforo';
 
 const DADOS = gerarDadosSemaforo();
@@ -53,6 +53,13 @@ async function informarHora(user: UserEvent, form: HTMLElement, hora = '10:00', 
   await user.type(campo, hora);
 }
 
+/** Decisão 81: o número vem preenchido do sistema; o coordenador apaga e escreve outro. */
+async function trocarNumero(user: UserEvent, form: HTMLElement, rotulo: string, valor: string): Promise<void> {
+  const campo = within(form).getByLabelText(rotulo);
+  await user.clear(campo);
+  await user.type(campo, valor);
+}
+
 describe('Semáforo — Relatório mensal e formulários', { timeout: 20000 }, () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -63,11 +70,11 @@ describe('Semáforo — Relatório mensal e formulários', { timeout: 20000 }, (
     renderizar();
     expect(await screen.findByRole('heading', { level: 1, name: 'Relatório mensal e formulários' })).toBeInTheDocument();
     expect(screen.getByText(QUEM_VE['relatorio-mensal'].aviso)).toBeInTheDocument();
-    // O momento reservado: os coordenadores também nunca veem (Para validar, matriz "Quem vê o quê"). Decisão 46: cada
-    // projeto tem o seu coordenador, então o texto fala dos coordenadores dos projetos do município.
+    // Decisão 78: o momento reservado é lido só pela gestora de referência principal, pela Líder do NFP e pela SPE.
     const reservado = screen.getByText(/o momento reservado é confidencial/);
-    expect(reservado).toHaveTextContent(/os coordenadores dos projetos do município e a Gestão Operacional nunca veem/);
-    expect(reservado).toHaveTextContent(/Quem vê o quê/);
+    expect(reservado).toHaveTextContent(
+      /só a gestora de referência principal do município, a Líder do NFP e a SPE leem o que for registrado aqui; ninguém mais/,
+    );
     await escolher(user, VERDE.id);
     const coordenador = DADOS.coordenadores.find((c) => c.id === VERDE.coordenador)!.nome;
     // Decisão 46: o coordenador é do projeto.
@@ -82,7 +89,8 @@ describe('Semáforo — Relatório mensal e formulários', { timeout: 20000 }, (
     renderizar();
     const abertura = await screen.findByText(/Os formulários que alimentam o Semáforo/);
     expect(abertura).toHaveTextContent(/o relatório, a ocorrência e a reunião aparecem na ficha do município/);
-    expect(abertura).toHaveTextContent(/A observação de formação fica só na lista .Registrado nesta sessão./);
+    // Decisão 94: a observação de formação não é registrada aqui; vem da DFF.
+    expect(abertura).toHaveTextContent(/A observação de formação vem da DFF, só para leitura/);
     expect(abertura).toHaveTextContent(/Sair do Semáforo ou recarregar a página apaga tudo/);
     // Decisão 48: a reunião de escuta é marcada antes, então é a única data que pode passar de hoje.
     expect(abertura).toHaveTextContent(/até hoje; só a reunião de escuta pode ser marcada para depois de hoje/);
@@ -91,7 +99,8 @@ describe('Semáforo — Relatório mensal e formulários', { timeout: 20000 }, (
   test('cada formulário diz para qual município vai registrar, ou leva ao campo do município', async () => {
     const user = userEvent.setup();
     renderizar();
-    const formularios = ['Relatório mensal do coordenador', 'Ocorrência', 'Marcar a reunião de escuta', 'Ata da reunião de escuta', 'Observação de formação'];
+    // Decisão 94: são 4 formulários; a observação de formação vem da DFF.
+    const formularios = ['Relatório mensal do coordenador', 'Ocorrência', 'Marcar a reunião de escuta', 'Ata da reunião de escuta'];
     await screen.findByRole('region', { name: formularios[0] });
     for (const nome of formularios) {
       expect(within(secao(nome)).getByRole('link', { name: 'Escolha o município no topo da página' })).toHaveAttribute(
@@ -99,7 +108,7 @@ describe('Semáforo — Relatório mensal e formulários', { timeout: 20000 }, (
         '#relatorio-municipio',
       );
     }
-    await user.click(within(secao('Observação de formação')).getByRole('link', { name: 'Escolha o município no topo da página' }));
+    await user.click(within(secao('Ata da reunião de escuta')).getByRole('link', { name: 'Escolha o município no topo da página' }));
     expect(screen.getByLabelText('Município')).toHaveFocus();
 
     await escolher(user, VERDE.id);
@@ -109,11 +118,11 @@ describe('Semáforo — Relatório mensal e formulários', { timeout: 20000 }, (
     }
   });
 
-  test('a nota da observação diz que ela vai para o PDI na DFF e que a origem fica para o dia 7', async () => {
+  test('decisão 94: a observação de formação é registrada na DFF, junto do PDI; aqui ela só é lida', async () => {
     renderizar();
-    const nota = within(await screen.findByRole('region', { name: 'Observação de formação' })).getByText(/tarefa do amarelo/);
-    expect(nota).toHaveTextContent(/PDI do coordenador na Plataforma DFF/);
-    expect(nota).toHaveTextContent(/Para validar no dia 7/);
+    const observacao = await screen.findByRole('region', { name: 'Observação de formação' });
+    expect(within(observacao).getByText('A observação de formação é registrada na DFF, junto do PDI; o sistema lê de lá.')).toBeInTheDocument();
+    expect(observacao).not.toHaveTextContent(/Para validar no dia 7/);
   });
 
   test('decisões 38 e 50: a nota da ocorrência diz que a reclamação muda a cor em vigor na hora e pede a resposta', async () => {
@@ -150,19 +159,15 @@ describe('Semáforo — Relatório mensal e formulários', { timeout: 20000 }, (
     expect(within(form).getByRole('alert')).toHaveTextContent('A data precisa ser do ciclo atual: de 01/11/2026 até hoje (07/12/2026).');
   });
 
-  test('observação de formação com data antes do ciclo atual: recusa com o mesmo motivo dos outros formulários', async () => {
+  test('decisão 94: a observação de formação não tem formulário aqui (nem data, nem texto, nem botão)', async () => {
     const user = userEvent.setup();
     renderizar();
     await escolher(user, VERDE.id);
-    const form = secao('Observação de formação');
-    const data = within(form).getByLabelText('Data');
-    expect(data).toHaveAttribute('min', '2026-11-01');
-    await user.clear(data);
-    await user.type(data, '2020-01-01');
-    await user.type(within(form).getByLabelText('O que foi observado'), 'Turma participativa.');
-    await user.click(within(form).getByRole('button', { name: 'Registrar observação' }));
-    expect(within(form).getByRole('alert')).toHaveTextContent('A data precisa ser do ciclo atual: de 01/11/2026 até hoje (07/12/2026).');
-    expect(screen.queryByRole('list', { name: 'Registrado nesta sessão' })).toBeNull();
+    const observacao = secao('Observação de formação');
+    expect(within(observacao).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(within(observacao).queryByLabelText('Data')).not.toBeInTheDocument();
+    expect(within(observacao).queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Registrar observação' })).not.toBeInTheDocument();
   });
 
   test('relatório mensal com formações que não aconteceram: o cronograma cai e a cor muda na hora', async () => {
@@ -171,10 +176,10 @@ describe('Semáforo — Relatório mensal e formulários', { timeout: 20000 }, (
     await escolher(user, VERDE.id);
     const form = secao('Relatório mensal do coordenador');
     await user.selectOptions(within(form).getByLabelText('Mês'), '2026-12');
-    await user.type(within(form).getByLabelText('Formações previstas'), '6');
-    await user.type(within(form).getByLabelText('Formações realizadas'), '0');
-    await user.type(within(form).getByLabelText('Visitas previstas'), '3');
-    await user.type(within(form).getByLabelText('Visitas realizadas'), '0');
+    // Decisões 81 e 82: as formações vêm do sistema (o coordenador muda e justifica); as visitas, só leitura.
+    await trocarNumero(user, form, 'Formações previstas', '6');
+    await trocarNumero(user, form, 'Formações realizadas', '0');
+    await user.type(within(form).getByLabelText(/^Justificativa/), 'A Secretaria suspendeu as formações do mês.');
     await user.click(within(form).getByRole('button', { name: 'Registrar relatório' }));
 
     const resultado = within(form).getByRole('status');
@@ -199,7 +204,9 @@ describe('Semáforo — Relatório mensal e formulários', { timeout: 20000 }, (
     renderizar();
     await escolher(user, SEM_COORDENADOR.id);
     const form = secao('Relatório mensal do coordenador');
-    for (const rotulo of ['Formações previstas', 'Formações realizadas', 'Visitas previstas', 'Visitas realizadas']) {
+    // Sem coordenador, o sistema não traz números (decisão 81); as visitas não são digitadas (decisão 82).
+    for (const rotulo of ['Formações previstas', 'Formações realizadas']) {
+      expect(within(form).getByLabelText(rotulo)).toHaveValue(null);
       await user.type(within(form).getByLabelText(rotulo), '1');
     }
     await user.click(within(form).getByRole('button', { name: 'Registrar relatório' }));
@@ -217,7 +224,7 @@ describe('Semáforo — Relatório mensal e formulários', { timeout: 20000 }, (
     await user.click(within(form).getByRole('button', { name: 'Registrar ocorrência' }));
     const resultado = within(form).getByRole('status');
     expect(resultado).toHaveTextContent('Antes: Verde → Agora: Amarelo');
-    expect(resultado).toHaveTextContent(/Seria enviado para: .+ \(gestora de referência\), .+ \(coordenador\), SPE/);
+    expect(resultado).toHaveTextContent(/Seria enviado no sistema e por e-mail institucional para: .+ \(gestora de referência\), .+ \(coordenador\), SPE/);
   });
 
   test('decisão 46: o aviso de piora para amarelo vai para os coordenadores de todos os projetos do município', async () => {
@@ -335,9 +342,7 @@ describe('Semáforo — Relatório mensal e formulários', { timeout: 20000 }, (
     const relatorio = secao('Relatório mensal do coordenador');
     await user.selectOptions(within(relatorio).getByLabelText('Projeto'), String(maringa.projetos[0]!.id));
     await user.selectOptions(within(relatorio).getByLabelText('Mês'), '2026-12');
-    for (const rotulo of ['Formações previstas', 'Formações realizadas', 'Visitas previstas', 'Visitas realizadas']) {
-      await user.type(within(relatorio).getByLabelText(rotulo), '4');
-    }
+    // Decisão 81: o coordenador confere os números que vieram do sistema e manda sem mudar.
     await user.click(within(relatorio).getByRole('button', { name: 'Registrar relatório' }));
     expect(within(relatorio).getByRole('status')).toHaveTextContent('Relatório de 12/2026 registrado para Maringá-PR');
 
@@ -441,8 +446,9 @@ describe('Semáforo — Relatório mensal e formulários', { timeout: 20000 }, (
     expect(resultado).toHaveTextContent('Antes: Verde → Agora: Vermelho');
     // Rodada 3: a Gestão Operacional nunca esteve entre os destinatários; o que fica de fora é o conteúdo da queixa.
     expect(resultado).not.toHaveTextContent(/Gestão Operacional não recebe este alerta/);
+    // Decisão 78: só a gestora de referência principal, a Líder do NFP e a SPE leem a queixa.
     expect(resultado).toHaveTextContent(
-      'O alerta diz só a cor: o que foi dito no momento reservado não vai junto, e os coordenadores e a Gestão Operacional não veem a queixa.',
+      'O alerta diz só a cor: o que foi dito no momento reservado não vai junto; a queixa só é lida pela gestora de referência principal, pela Líder do NFP e pela SPE.',
     );
     // A reunião e a queixa entram no estado da sessão (a ficha lê de lá); a tela lista o que foi feito.
     expect(screen.getByRole('list', { name: 'Registrado nesta sessão' })).toHaveTextContent(/Ata da reunião de escuta/);
@@ -535,10 +541,9 @@ describe('Semáforo — Relatório mensal e formulários', { timeout: 20000 }, (
     expect(within(projeto).getAllByRole('option')).toHaveLength(VARIOS.projetos.length + 1);
     await user.selectOptions(projeto, String(segundo.id));
     await user.selectOptions(within(form).getByLabelText('Mês'), '2026-12');
-    await user.type(within(form).getByLabelText('Formações previstas'), '60');
-    await user.type(within(form).getByLabelText('Formações realizadas'), '0');
-    await user.type(within(form).getByLabelText('Visitas previstas'), '30');
-    await user.type(within(form).getByLabelText('Visitas realizadas'), '0');
+    await trocarNumero(user, form, 'Formações previstas', '60');
+    await trocarNumero(user, form, 'Formações realizadas', '0');
+    await user.type(within(form).getByLabelText(/^Justificativa/), 'Formações do projeto suspensas no mês.');
     await user.click(within(form).getByRole('button', { name: 'Registrar relatório' }));
     expect(within(form).getByRole('status')).toHaveTextContent(`Relatório de 12/2026 registrado para ${VARIOS.nome}-${VARIOS.uf}, projeto ${segundo.nome}`);
 
@@ -550,19 +555,20 @@ describe('Semáforo — Relatório mensal e formulários', { timeout: 20000 }, (
     expect(within(form).getByText(/^Cronograma do município \(o pior projeto\):/)).toHaveTextContent(/\d+,\d\d% · Vermelho/);
   });
 
-  test('observação de formação: valida o texto e entra na lista da sessão', async () => {
+  test('decisão 94: as observações de formação do município aparecem como lidas da DFF, só leitura', async () => {
     const user = userEvent.setup();
+    const feitas = DADOS.tarefas.filter((t) => t.chave === 'observacao_formacao' && t.concluida_em !== null);
+    const municipio = DADOS.municipios.find((m) => feitas.some((t) => t.municipio === m.id))!;
+    const nome = `${municipio.nome}-${municipio.uf}`;
     renderizar();
+    await escolher(user, municipio.id);
+    const lista = within(secao('Observação de formação')).getByRole('list', { name: `Observações de formação de ${nome}, lidas da DFF` });
+    const itens = within(lista).getAllByRole('listitem');
+    expect(itens).toHaveLength(feitas.filter((t) => t.municipio === municipio.id).length);
+    expect(itens[0]).toHaveTextContent(/^Registrada na DFF em \d\d\/\d\d\/\d{4} \(lida da DFF\)$/);
+    // Município sem observação: a tela diz que não há nenhuma.
     await escolher(user, VERDE.id);
-    const form = secao('Observação de formação');
-    await user.click(within(form).getByRole('button', { name: 'Registrar observação' }));
-    expect(within(form).getByRole('alert')).toHaveTextContent('Escreva o que foi observado.');
-    await user.click(within(form).getByLabelText('Com pontos a melhorar'));
-    await user.type(within(form).getByLabelText('O que foi observado'), 'Turma participativa; faltou material.');
-    await user.click(within(form).getByRole('button', { name: 'Registrar observação' }));
-    expect(screen.getByRole('list', { name: 'Registrado nesta sessão' })).toHaveTextContent(
-      /Observação de formação .*Com pontos a melhorar/,
-    );
+    expect(within(secao('Observação de formação')).getByText(`Nenhuma observação de formação de ${NOME} lida da DFF.`)).toBeInTheDocument();
   });
 
   test('a lista do que foi registrado continua depois de ir à ficha e voltar (fica no estado da sessão)', async () => {
@@ -571,9 +577,6 @@ describe('Semáforo — Relatório mensal e formulários', { timeout: 20000 }, (
     await escolher(user, VERDE.id);
     await informarHora(user, secao('Ocorrência'));
     await user.click(within(secao('Ocorrência')).getByRole('button', { name: 'Registrar ocorrência' }));
-    const form = secao('Observação de formação');
-    await user.type(within(form).getByLabelText('O que foi observado'), 'Turma participativa.');
-    await user.click(within(form).getByRole('button', { name: 'Registrar observação' }));
 
     await user.click(screen.getByRole('link', { name: `Abrir a ficha de ${NOME}` }));
     await screen.findByRole('heading', { level: 1, name: 'Ficha do município' });
@@ -581,7 +584,110 @@ describe('Semáforo — Relatório mensal e formulários', { timeout: 20000 }, (
 
     const lista = await screen.findByRole('list', { name: 'Registrado nesta sessão' });
     expect(lista).toHaveTextContent(/Ocorrência leve/);
-    expect(lista).toHaveTextContent(/Observação de formação .*Turma participativa\./);
+    // Decisão 94: a observação de formação não é registrada nesta tela.
+    expect(lista).not.toHaveTextContent(/Observação de formação/);
+  });
+
+  test('decisões 81 e 82: o relatório vem pré-preenchido com as formações do sistema; as visitas vêm da Logística e do FRV, só leitura', async () => {
+    const user = userEvent.setup();
+    renderizar();
+    await escolher(user, VERDE.id);
+    const form = secao('Relatório mensal do coordenador');
+    await user.selectOptions(within(form).getByLabelText('Mês'), '2026-12');
+    const sistema = doSistema(DADOS, VERDE.projetos[0]!.id, '2026-12')!;
+    expect(within(form).getByLabelText('Formações previstas')).toHaveValue(sistema.formacoes_previstas);
+    expect(within(form).getByLabelText('Formações realizadas')).toHaveValue(sistema.formacoes_realizadas);
+    expect(within(form).queryByLabelText('Visitas previstas')).not.toBeInTheDocument();
+    expect(within(form).queryByLabelText('Visitas realizadas')).not.toBeInTheDocument();
+    expect(within(form).getByText(/^Visitas, da Logística e do pedido de viagem \(FRV\), só leitura:/)).toHaveTextContent(
+      `${sistema.visitas_realizadas} de ${sistema.visitas_previstas} realizadas`,
+    );
+    // Mandar sem mudar nada não pede justificativa.
+    await user.click(within(form).getByRole('button', { name: 'Registrar relatório' }));
+    expect(within(form).getByRole('status')).toHaveTextContent(`Relatório de 12/2026 registrado para ${NOME}`);
+  });
+
+  test('decisão 81: mudar um número do sistema sem justificativa é recusado; com a justificativa, entra', async () => {
+    const user = userEvent.setup();
+    renderizar();
+    await escolher(user, VERDE.id);
+    const form = secao('Relatório mensal do coordenador');
+    await user.selectOptions(within(form).getByLabelText('Mês'), '2026-12');
+    const sistema = doSistema(DADOS, VERDE.projetos[0]!.id, '2026-12')!;
+    await trocarNumero(user, form, 'Formações realizadas', String(sistema.formacoes_realizadas - 1));
+    const justificativa = within(form).getByLabelText(/^Justificativa/);
+    expect(justificativa).toHaveAccessibleDescription(/obrigatória só se você mudar um número que veio do sistema/);
+    await user.click(within(form).getByRole('button', { name: 'Registrar relatório' }));
+    expect(within(form).getByRole('alert')).toHaveTextContent('Você mudou um número que veio do sistema: escreva a justificativa.');
+    expect(within(form).getByRole('status')).toBeEmptyDOMElement();
+
+    await user.type(justificativa, 'Uma formação foi adiada pela Secretaria.');
+    await user.click(within(form).getByRole('button', { name: 'Registrar relatório' }));
+    expect(within(form).queryByRole('alert')).not.toBeInTheDocument();
+    expect(within(form).getByRole('status')).toHaveTextContent(`Relatório de 12/2026 registrado para ${NOME}`);
+  });
+
+  test('decisão 81: o relatório corrigido mostra o que foi entregue e a justificativa, na tela e na planilha', async () => {
+    const baixar = vi.spyOn(exportar, 'baixarCsv').mockImplementation(() => undefined);
+    const user = userEvent.setup();
+    renderizar();
+    await escolher(user, VERDE.id);
+    const form = secao('Relatório mensal do coordenador');
+    await user.selectOptions(within(form).getByLabelText('Mês'), '2026-12');
+    const sistema = doSistema(DADOS, VERDE.projetos[0]!.id, '2026-12')!;
+    const entregue = sistema.formacoes_realizadas - 1;
+    const motivo = 'Uma formação foi adiada pela Secretaria.';
+    await trocarNumero(user, form, 'Formações realizadas', String(entregue));
+    await user.type(within(form).getByLabelText(/^Justificativa/), motivo);
+    await user.click(within(form).getByRole('button', { name: 'Registrar relatório' }));
+
+    expect(within(form).getByText(/^Já entregue para 12\/2026 neste projeto/)).toHaveTextContent(`Justificativa: ${motivo}`);
+    // O formulário fica com o que foi entregue: mandar de novo sem mexer não desfaz a correção sem justificativa.
+    expect(within(form).getByLabelText('Formações realizadas')).toHaveValue(entregue);
+    expect(within(form).getByLabelText(/^Justificativa/)).toHaveValue(motivo);
+
+    await user.click(screen.getByRole('button', { name: /Baixar planilha/ }));
+    const [, cabecalho, linhas] = baixar.mock.calls[0]!;
+    const coluna = cabecalho.indexOf('Justificativa');
+    expect(coluna).toBeGreaterThan(-1);
+    expect(linhas.map((l) => l[coluna])).toContain(motivo);
+  });
+
+  test('decisão 77: o relatório vence no 5º dia útil do mês seguinte', async () => {
+    const user = userEvent.setup();
+    renderizar();
+    await escolher(user, VERDE.id);
+    const form = secao('Relatório mensal do coordenador');
+    await user.selectOptions(within(form).getByLabelText('Mês'), '2026-11');
+    expect(within(form).getByText(/^Prazo do relatório de 11\/2026:/)).toHaveTextContent(
+      'Prazo do relatório de 11/2026: vence em 07/12/2026 (5º dia útil do mês seguinte).',
+    );
+    await user.selectOptions(within(form).getByLabelText('Mês'), '2026-12');
+    expect(within(form).getByText(/^Prazo do relatório de 12\/2026:/)).toHaveTextContent('vence em 07/01/2027');
+    expect(form).not.toHaveTextContent(/atrasado/i);
+  });
+
+  test('decisão 77: passado o prazo sem o relatório do mês, a tela diz que está atrasado', async () => {
+    const user = userEvent.setup();
+    const projeto = VERDE.projetos[0]!.id;
+    const ATRASADO = {
+      ...DADOS,
+      data_referencia: '2026-12-08',
+      relatorios: DADOS.relatorios.filter((r) => !(r.projeto === projeto && r.mes === '2026-11')),
+    };
+    render(
+      <MemoryRouter>
+        <SemaforoDemoProvider dados={ATRASADO}>
+          <RelatorioMensal />
+        </SemaforoDemoProvider>
+      </MemoryRouter>,
+    );
+    await escolher(user, VERDE.id);
+    const form = secao('Relatório mensal do coordenador');
+    await user.selectOptions(within(form).getByLabelText('Mês'), '2026-11');
+    expect(within(form).getByText(/^Prazo do relatório de 11\/2026:/)).toHaveTextContent(
+      'Prazo do relatório de 11/2026: vence em 07/12/2026 (5º dia útil do mês seguinte). Atrasado: ainda não foi entregue.',
+    );
   });
 
   test('baixar planilha: os relatórios mensais do ciclo atual', async () => {

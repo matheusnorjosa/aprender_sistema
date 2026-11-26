@@ -38,10 +38,13 @@ describe('ICA — Visão por gerência', { timeout: 20000 }, () => {
     expect(screen.getByText(/Configuração revisada \(nov\/2026\)/)).toBeInTheDocument();
   });
 
-  test('tabela: cada gerência com gestora técnica, coordenadores, municípios, professores e ICA médio', async () => {
+  test('tabela: cada gerência com gestora pedagógica, coordenadores, municípios, professores e ICA médio', async () => {
     renderizar();
     const tabela = await screen.findByRole('table', { name: /Resumo por gerência/i });
     const cabecalhos = within(tabela).getAllByRole('columnheader').map((h) => h.textContent);
+    // Decisões 64 e 87: o cargo tem um nome só, o mesmo dos Alertas e da página Para validar.
+    expect(cabecalhos).toContain('Gestora pedagógica');
+    expect(document.body).not.toHaveTextContent(/gestora técnica/i);
     const coluna = (titulo: string): number => {
       const i = cabecalhos.indexOf(titulo);
       expect(i).toBeGreaterThan(0);

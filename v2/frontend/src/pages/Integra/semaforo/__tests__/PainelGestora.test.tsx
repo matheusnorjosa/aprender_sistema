@@ -107,7 +107,12 @@ describe('Painel da gestora de referência', { timeout: 20000 }, () => {
       semResposta.map((m) => `${m.nome}-${m.uf}`).sort(),
     );
     expect(screen.getByRole('heading', { level: 2, name: 'Pendências da carteira' })).toBeInTheDocument();
-    expect(screen.getByText(/prazo para responder: 20\/12\/2026/)).toBeInTheDocument();
+    // Decisões 73 e 76: a gestora manda o link em 01/12, e o articulador responde em até 10 dias úteis. A SPE e a
+    // Líder também abrem o painel: o texto fala da gestora, como a tela da pesquisa, e não "você".
+    expect(screen.getByText(/prazo para responder: 15\/12\/2026/)).toHaveTextContent(
+      'link enviado pela gestora de referência em 01/12/2026 · prazo para responder: 15/12/2026 (10 dias úteis)',
+    );
+    expect(document.body).not.toHaveTextContent(/você manda/i);
 
     // Reunião a agendar: sem reunião de escuta no período da cor em vigor (6 meses no verde, 3 no amarelo e no
     // vermelho) e sem reunião já marcada (decisão 48: Jequié tem uma marcada para 10/12).

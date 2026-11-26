@@ -57,13 +57,19 @@ const COLECOES_DA_ATUACAO: Record<Atuacao, readonly [number, number]> = {
   educacao_infantil: [5, 6],
 };
 
-const SEGMENTOS_DA_COLECAO: Record<number, readonly string[]> = {
-  1: ['Anos Iniciais'],
-  2: ['Anos Iniciais', 'Anos Finais'],
-  3: ['Anos Iniciais', 'Anos Finais'],
-  4: ['Anos Finais'],
-  5: ['Educação Infantil'],
-  6: ['Educação Infantil'],
+/**
+ * [segmento, quantos anos ele atende] de cada coleção. Tabela fixa, sem sorteio (decisão 59: cada ano é uma frente).
+ * Os números da reunião de 23/11: Novo Lendo 1º e 2º ano, Tema 1º e 2º ano, Infantil 1, 2 e 3. As outras coleções
+ * não tiveram número na reunião: 1 ano por segmento (simulado). O número de segmentos de cada coleção não muda, para
+ * não mudar o sorteio do resto da demonstração.
+ */
+const SEGMENTOS_DA_COLECAO: Record<number, readonly (readonly [string, number])[]> = {
+  1: [['Anos Iniciais', 2]],
+  2: [['1º ano', 1], ['2º ano', 1]],
+  3: [['Anos Iniciais', 1], ['Anos Finais', 1]],
+  4: [['Anos Finais', 1]],
+  5: [['Educação Infantil', 3]],
+  6: [['Educação Infantil', 1]],
 };
 
 const PESSOAS: Pessoa[] = [
@@ -195,14 +201,15 @@ function embaralhar<T>(rng: () => number, lista: readonly T[]): T[] {
 }
 
 function segmentos(rng: () => number, colecao: number, carga: number): SegmentoAtendimento[] {
-  const nomes = SEGMENTOS_DA_COLECAO[colecao] ?? ['Anos Iniciais'];
-  // Carga contínua da frente; turmas arredondam (mínimo 1) e professores seguem a carga.
+  const nomes = SEGMENTOS_DA_COLECAO[colecao] ?? [['Anos Iniciais', 1]];
+  // Carga contínua da coleção no município; turmas arredondam (mínimo 1) e professores seguem a carga.
   const cargaDaFrente = (1 + rng() * 2) * carga;
-  return nomes.map((segmento) => {
+  return nomes.map(([segmento, anos]) => {
     const parte = cargaDaFrente / nomes.length;
     const professores = Math.max(1, Math.round(parte * inteiro(rng, 34, 50)));
     return {
       segmento,
+      anos,
       turmas_qtde: Math.max(1, Math.round(parte)),
       professor_qtde: professores,
       aluno_qtde: professores * inteiro(rng, 18, 26),
@@ -308,24 +315,26 @@ export function gerarDadosSimulados(semente: number = SEMENTE_DEMO): DadosIntegr
       movimentos: [{ municipioId: uirauna, deCoordenadorId: 108, paraCoordenadorId: 106 }],
       justificativa: 'Juntar Uiraúna à carteira da Paraíba.',
       status: 'aplicado',
-      proposto_por: 'Lindalva Moura (gestora técnica)',
+      proposto_por: 'Lindalva Moura (gestora pedagógica)',
       proposto_em: '2026-01-19T10:00:00-03:00',
       aprovado_por: 'Líder do NFP',
       aprovado_em: '2026-01-26T15:00:00-03:00',
       aplicado_em: '2026-02-02T08:00:00-03:00',
       semestre: '2026.1',
+      vigencia_em: '2026-02-02',
     },
     {
       id: 'rem-2026-2-01',
       movimentos: deLucineiaParaRogerio.map((municipioId) => ({ municipioId, deCoordenadorId: 101, paraCoordenadorId: 110 })),
       justificativa: 'Aliviar a carteira mais pesada da equipe, em Sobrecarga desde 2025.2.',
       status: 'aplicado',
-      proposto_por: 'Albaniza Coelho (gestora técnica)',
+      proposto_por: 'Albaniza Coelho (gestora pedagógica)',
       proposto_em: '2026-07-06T10:00:00-03:00',
       aprovado_por: 'Líder do NFP',
       aprovado_em: '2026-07-13T15:00:00-03:00',
       aplicado_em: '2026-08-03T08:00:00-03:00',
       semestre: '2026.2',
+      vigencia_em: '2026-08-03',
     },
   ];
 

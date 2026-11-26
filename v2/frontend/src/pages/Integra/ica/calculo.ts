@@ -20,6 +20,7 @@ import type {
   Pessoa,
   Valores,
 } from '../dados/tipos';
+import { TEMPO_DO_MEIO_HORAS } from '../dados/deslocamento';
 
 export const COMPONENTES: readonly Componente[] = [
   'municipios',
@@ -106,7 +107,7 @@ export const ESTRATOS: readonly InfoEstrato[] = [
   { chave: 'sobrecarga', nome: 'Sobrecarga', faixa: '130 ou mais', orientacao: 'Prioridade para redistribuir ou reforçar a equipe.' },
   { chave: 'atencao', nome: 'Atenção', faixa: '110 a 129', orientacao: 'Não receber novos municípios sem rever a carteira.' },
   { chave: 'adequada', nome: 'Adequada', faixa: '80 a 109', orientacao: 'Carga próxima da média da equipe.' },
-  { chave: 'capacidade', nome: 'Capacidade disponível', faixa: 'abaixo de 80', orientacao: 'Primeiros nomes para novos contratos ou retomadas.' },
+  { chave: 'capacidade', nome: 'Capacidade disponível', faixa: 'abaixo de 80', orientacao: 'Primeiros nomes para novos projetos ou retomadas.' },
 ];
 
 export const META_ICA = { minimo: 70, maximo: 130 } as const;
@@ -194,18 +195,6 @@ export function formatarHoras(horas: number): string {
   return `${h}h${String(m).padStart(2, '0')}`;
 }
 
-/** Mediana das horas de ida e volta de todos os municípios com localidade definida. */
-export function medianaDeslocamento(municipios: readonly MunicipioIntegra[]): number {
-  const horas = municipios
-    .map((m) => m.deslocamento_horas)
-    .filter((h): h is number => h !== null)
-    .sort((a, b) => a - b);
-  if (horas.length === 0) return 0;
-  const meio = Math.floor(horas.length / 2);
-  const centro = horas[meio] ?? 0;
-  return horas.length % 2 === 1 ? centro : ((horas[meio - 1] ?? 0) + centro) / 2;
-}
-
 // ---------------------------------------------------------------- carteira
 
 export interface LinhaCarteira {
@@ -215,7 +204,7 @@ export interface LinhaCarteira {
   colecoes: number[];
   turmas: number;
   professores: number;
-  /** Horas de ida e volta usadas na conta (a mediana, quando sem localidade). */
+  /** Horas de ida e volta usadas na conta (o tempo do meio do relatório, quando sem tempo). */
   horas: number;
   estimado: boolean;
   /** Outros coordenadores que atendem o mesmo município. */
@@ -293,7 +282,7 @@ export interface ResultadoCoordenador {
   dadoIncompleto: boolean;
   motivosIncompleto: string[];
   valoresImprovaveis: string[];
-  /** Algum município ativo usou a mediana (sem localidade). */
+  /** Algum município ativo usou o tempo do meio (sem tempo no relatório). */
   deslocamentoEstimado: boolean;
 }
 
@@ -310,7 +299,7 @@ export interface Dispersao {
 export interface ResultadoEquipe {
   coordenadores: ResultadoCoordenador[];
   medias: Valores;
-  /** Mediana de deslocamento usada para municípios sem localidade. */
+  /** Tempo do meio do relatório (17h45, decisão 55), usado para o local sem tempo no relatório. */
   mediana: number;
   dispersao: Dispersao;
   /** Só quem tem carteira: quem está sem municípios não entra em estrato nenhum (PDF, seção 3). */
@@ -335,7 +324,9 @@ function valoresDaCarteira(carteira: readonly LinhaCarteira[], base: BaseIca, co
     turmas: ativas.reduce((s, l) => s + l.turmas, 0),
     professores: ativas.reduce((s, l) => s + l.professores, 0),
     deslocamento: ativas.reduce((s, l) => s + l.horas, 0),
-    // Município sem localidade (deslocamento estimado) não soma estado: a UF dele é só do formato do cadastro.
+    // Linha sem tempo no relatório (deslocamento estimado) não soma estado: no município sem localidade definida, a UF
+    // é só do formato do cadastro. O local conhecido fora do relatório (Mauriti-CE, do Amigos do Bem) tem UF real e
+    // também fica de fora: leitura do protótipo, em Para validar.
     estados: new Set(ativas.filter((l) => !l.estimado).map((l) => l.municipio.uf)).size,
   };
 }
@@ -358,7 +349,8 @@ export function calcularDispersao(
 }
 
 export function calcularEquipe(base: BaseIca, pesos: Pesos): ResultadoEquipe {
-  const mediana = medianaDeslocamento(base.municipios);
+  // Decisão 55: o tempo do meio é o 17h45 do relatório, não a mediana dos municípios da base.
+  const mediana = TEMPO_DO_MEIO_HORAS;
   const parciais = base.coordenadores.map((coordenador) => {
     const carteira = carteiraDoCoordenador(base, coordenador.id, mediana);
     const ativas = carteira.filter((l) => l.ativo);
@@ -540,7 +532,7 @@ export interface Alerta {
 export interface OpcoesAlertas {
   gerencias: readonly Gerencia[];
   pessoas: readonly Pessoa[];
-  /** Para pôr a coleção no título do "contrato sem coordenador" (dois no mesmo município não ficam iguais). */
+  /** Para pôr a coleção no título do "projeto sem coordenador" (dois no mesmo município não ficam iguais). */
   colecoes?: readonly Colecao[];
   /** Retrato anterior: com ele, "entra em Sobrecarga" só para quem não estava. */
   anterior?: ResultadoEquipe | undefined;
@@ -626,8 +618,8 @@ export function gerarAlertas(base: BaseIca, resultado: ResultadoEquipe, opcoes: 
     alertas.push({
       id: `sem-coordenador-${a.id}`,
       tipo: 'contrato_sem_coordenador',
-      titulo: `Contrato sem coordenador em ${m ? `${m.nome}-${m.uf}` : `município ${a.municipio}`} (${colecao})`,
-      detalhe: 'Novo contrato sem coordenador definido.',
+      titulo: `Projeto sem coordenador em ${m ? `${m.nome}-${m.uf}` : `município ${a.municipio}`} (${colecao})`,
+      detalhe: 'Projeto novo sem coordenador definido.',
       quemReceberia: ['Gestora operacional', 'SPE'],
       quando: 'No cadastro',
       coordenadorId: null,

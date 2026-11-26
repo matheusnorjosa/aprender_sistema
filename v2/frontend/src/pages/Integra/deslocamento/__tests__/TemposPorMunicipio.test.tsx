@@ -15,7 +15,8 @@ async function abrir(): Promise<void> {
 }
 
 function itensDoResumo(): string[] {
-  return within(screen.getByRole('list', { name: 'Resumo do relatório' }))
+  // Rodada 5: o resumo traz as correções do dono (decisões 53 e 54), então não se chama mais "do relatório".
+  return within(screen.getByRole('list', { name: 'Resumo, com as correções do dono' }))
     .getAllByRole('listitem')
     .map((li) => li.textContent ?? '');
 }
@@ -38,10 +39,20 @@ describe('Deslocamento — tempos por município', { timeout: 20000 }, () => {
       'Menor: 0h40 (Maracanaú-CE)',
       'Maior: 31h35 (Filadélfia-BA)',
     ]);
-    // Os dois números saem da mesma tabela: o relatório usa a coluna Ida (e dobra); a coluna Ida e volta dá 17h48.
-    const mediana = screen.getByText(/O relatório calcula a mediana pela coluna Ida/);
-    expect(mediana).toHaveTextContent(/dá 17h45\. Com a coluna Ida e volta, que o relatório arredondou à parte, a mediana dá 17h48/);
-    expect(mediana).not.toHaveTextContent(/arredonda cada tempo para 5 minutos/);
+    // Decisão 55: o tempo do meio é o 17h45 do relatório; a tela não mostra mais a dupla 17h45/17h48.
+    const mediana = screen.getByText(/O tempo do meio é a mediana do relatório/);
+    expect(mediana).toHaveTextContent(
+      // Rodada 3: a decisão 55 respondeu pelo município sem localidade; o local conhecido fora do relatório é leitura.
+      'O tempo do meio é a mediana do relatório: 17h45. O ICA usa esse tempo, marcado como estimado, para o município sem localidade definida. O protótipo usa o mesmo tempo para o local de formação que não está no relatório (ponto em Para validar).',
+    );
+    expect(document.body).not.toHaveTextContent('17h48');
+  });
+
+  test('rodada 5 (decisões 53 e 54): o resumo e as faixas dizem que os números corrigidos diferem do PDF', async () => {
+    await abrir();
+    expect(screen.getByText(/^Com as correções do dono/)).toHaveTextContent(
+      'Com as correções do dono, estes números diferem do PDF: 23 municípios só por terra, e não os 16 da página 1 (decisão 53); Craíbas-AL fica em Longo, e não em Muito longo (decisão 54), o que dá Longo 35 e Muito longo 43, onde o PDF escreve 34 e 44.',
+    );
   });
 
   test('faixas com nome e número escritos, e a tabela ao lado do gráfico', async () => {
@@ -50,12 +61,14 @@ describe('Deslocamento — tempos por município', { timeout: 20000 }, () => {
     expect(within(grafico).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       'Próximo (até 3h de ida e volta): 7',
       'Médio (até 10h de ida e volta): 7',
-      'Longo (até 18h de ida e volta): 34',
-      'Muito longo (acima de 18h de ida e volta): 44',
+      // Decisão 54: Craíbas-AL passa de Muito longo para Longo.
+      'Longo (até 18h de ida e volta): 35',
+      'Muito longo (acima de 18h de ida e volta): 43',
     ]);
     const tabela = screen.getByRole('table', { name: 'Municípios por faixa' });
     expect(within(tabela).getAllByRole('columnheader').map((th) => th.textContent)).toEqual(['Faixa', 'Limite', 'Municípios']);
-    expect(within(tabela).getByRole('rowheader', { name: 'Muito longo' }).closest('tr')).toHaveTextContent('44');
+    expect(within(tabela).getByRole('rowheader', { name: 'Muito longo' }).closest('tr')).toHaveTextContent('43');
+    expect(within(tabela).getByRole('rowheader', { name: 'Longo' }).closest('tr')).toHaveTextContent('35');
   });
 
   test('a tabela mostra os 92, com ida e volta, faixa e meio', async () => {
@@ -66,6 +79,11 @@ describe('Deslocamento — tempos por município', { timeout: 20000 }, () => {
     expect(filadelfia).toHaveTextContent('31h35');
     expect(filadelfia).toHaveTextContent('Muito longo');
     expect(filadelfia).toHaveTextContent('Carro');
+    // Decisão 54: Craíbas-AL (18h00) aparece em Longo.
+    const craibas = linhas().find((l) => l.textContent?.includes('Craíbas-AL')) as HTMLElement;
+    expect(craibas).toHaveTextContent('18h00');
+    expect(craibas).toHaveTextContent('Longo');
+    expect(craibas).not.toHaveTextContent('Muito longo');
   });
 
   test('marcas do relatório: ações suspensas, travessia de barco e só por terra por decisão da gestão', async () => {

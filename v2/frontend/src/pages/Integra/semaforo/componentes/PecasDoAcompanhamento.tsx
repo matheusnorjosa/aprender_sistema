@@ -31,22 +31,38 @@ const COR_DO_ESTADO: Record<EstadoTarefa, CorIndicador> = {
   vencida: 'vermelho',
   no_prazo: 'sem_dado',
   concluida: 'verde',
+  // Decisões 42 e 43: a tarefa que deixou de valer fica com o estado, em cinza (o nome escrito diz qual).
+  cancelada_comite: 'sem_dado',
+  substituida: 'sem_dado',
 };
 
 const ROTULO_ESTADO: Record<Exclude<EstadoTarefa, 'concluida'>, string> = {
   no_prazo: 'No prazo',
   vence_hoje: 'Vence hoje',
   vencida: 'Vencida',
+  cancelada_comite: 'Cancelada pelo Comitê',
+  substituida: 'Substituída',
 };
 
-/** "No prazo", "Vence hoje", "Vencida" ou "Concluída em 03/12/2026". */
+/** O texto da etiqueta: o estado e, quando a tarefa saiu da lista de abertas, a data ("Cancelada pelo Comitê em 07/12/2026"). */
+function textoDoEstado(estado: EstadoTarefa, tarefa: TarefaResposta): string {
+  if (estado === 'concluida') return `Concluída em ${formatarDia(tarefa.concluida_em ?? '')}`;
+  // Decisões 42, 43 e 57: a tarefa que deixou de valer fica guardada, com o motivo e a data.
+  if (tarefa.encerramento !== null && estado === tarefa.encerramento.motivo) {
+    return `${ROTULO_ESTADO[estado]} em ${formatarDia(tarefa.encerramento.em)}`;
+  }
+  return ROTULO_ESTADO[estado];
+}
+
+/** "No prazo", "Vence hoje", "Vencida", "Concluída em 03/12/2026", "Cancelada pelo Comitê em …" ou "Substituída em …". */
 export function EtiquetaPrazo({ tarefa, hoje }: { tarefa: TarefaResposta; hoje: string }): JSX.Element {
   const estado = estadoDaTarefa(tarefa, hoje);
   const { fundo, texto } = COR_ETIQUETA[COR_DO_ESTADO[estado]];
   return (
-    // "Concluída em 03/12/2026" não cabe numa linha na coluna de 96 px a 360 px: aqui a etiqueta quebra a linha.
+    // "Concluída em 03/12/2026" não cabe numa linha na coluna Situação (104 px a 360 px): a etiqueta quebra a linha
+    // entre as palavras, e a palavra mais larga (a data) cabe inteira.
     <span className={`${CLASSE_ETIQUETA} !whitespace-normal`} style={{ background: fundo, color: texto, borderColor: texto }}>
-      {estado === 'concluida' ? `Concluída em ${formatarDia(tarefa.concluida_em ?? '')}` : ROTULO_ESTADO[estado]}
+      {textoDoEstado(estado, tarefa)}
     </span>
   );
 }

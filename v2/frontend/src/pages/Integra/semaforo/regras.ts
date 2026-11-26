@@ -9,15 +9,20 @@
  * - Seção 5: tarefas e prazos por cor, contados a partir da publicação.
  * - Seção 7: ▲ piorou, ▼ melhorou desde o ciclo anterior.
  *
- * Leituras escolhidas onde o PDF não fecha a conta (para validar no dia 7):
- * - A cor de média, NPS e cronograma sai do número exibido (média e NPS com uma casa, cronograma em % inteiro),
- *   como no ICA. Assim a tabela do PDF não tem buraco: 3,95 aparece "4,0" e é verde; 89,5% aparece "90%".
- * - NPS é a média das notas (decisão do PDF); a média com casa decimal fica na faixa de baixo até chegar à
- *   nota de cima: 8,5 é amarelo, 6,9 é vermelho.
- * - "Ocorrências no trimestre" = os 3 meses corridos até a data de referência.
- * - Prazos: "48 h" vira 2 dias de calendário; "5, 15, 30 dias" são dias corridos; "10 dias úteis" contam de
- *   segunda a sexta, sem feriados; "no bimestre" e "no semestre" são 2 e 6 meses depois da publicação.
+ * Decisões do dono de 25/11/2026 (números de `liberacao/relatorios/integra_decisoes_2026-11-24.md`):
+ * - 30: a cor de média, NPS e cronograma sai do número exato (3,95 é amarelo; 89,5% é amarelo); a tela mostra
+ *   2 casas, para o número que aparece ser o que deu a cor.
+ * - 31: NPS é a média das notas (decisão do PDF), e a tela mostra também a maior e a menor; 8,5 é amarelo.
+ * - 32: as ocorrências contam desde a 1ª formação do ano no município e zeram no ano seguinte; nada é apagado.
+ * - 33 e 34: os prazos do vermelho são dias úteis, de segunda a sexta (o dono escolheu essa opção, e não a que
+ *   descontava os feriados: feriado em dia de semana conta como dia útil): contato em 2, Secretaria em 5, plano em
+ *   15, devolutiva em 30. 35: "no bimestre" e "no semestre" são 2 e 6 meses depois da publicação (no sábado ou no
+ *   domingo, vale a segunda-feira seguinte; leitura em Para validar).
+ * - 38 e 39: um vermelho ou três amarelos mudam a cor na hora (`vermelho_imediato`).
+ * - 42 e 43: tarefa cancelada pelo Comitê ou substituída fica guardada com o estado.
+ * - 48: ata da reunião de escuta até 5 dias úteis depois. 49: convergência. 50: tempo de resposta (meta 48 h).
  */
+import { formatarDia, formatarNumero } from '../ica/componentes/estilos';
 import type {
   AvaliacaoIndicador,
   ChaveTarefa,
@@ -62,11 +67,14 @@ export const ROTULO_COR: Record<CorIndicador, string> = {
   sem_dado: 'Sem dado',
 };
 
-/** Os limites como o PDF escreve (seção 3), para a tela mostrar a régua de cada indicador. */
+/**
+ * Os limites da seção 3 do PDF, para a tela mostrar a régua de cada indicador. Escritos sem buraco entre as
+ * faixas, porque a cor sai do número exato (decisão 30): 3,95 fica em "3,0 a menos de 4,0".
+ */
 export const LIMITES: Record<Indicador, Record<Cor, string>> = {
-  media_pesquisa: { verde: '4,0 ou mais', amarelo: '3,0 a 3,9', vermelho: 'abaixo de 3,0' },
-  nps: { verde: '9 ou 10', amarelo: '7 ou 8', vermelho: '0 a 6' },
-  cronograma: { verde: '90% ou mais', amarelo: '70% a 89%', vermelho: 'abaixo de 70%' },
+  media_pesquisa: { verde: '4,0 ou mais', amarelo: '3,0 a menos de 4,0', vermelho: 'menos de 3,0' },
+  nps: { verde: 'média 9,0 ou mais', amarelo: 'média de 7,0 a menos de 9,0', vermelho: 'média menos de 7,0' },
+  cronograma: { verde: '90% ou mais', amarelo: '70% a menos de 90%', vermelho: 'menos de 70%' },
   ocorrencias: {
     verde: 'Nenhuma',
     amarelo: 'Uma ocorrência leve',
@@ -82,15 +90,9 @@ export const LIMITES: Record<Indicador, Record<Cor, string>> = {
 /** Ciclos bimestrais seguidos sem alerta para voltar ao verde. */
 export const CICLOS_PARA_VOLTAR_AO_VERDE = 2;
 
-/** Arredonda (meio para cima) sem cair no ruído do ponto flutuante. */
-function arredondar(valor: number, casas: number): number {
-  const fator = 10 ** casas;
-  return Math.round(Number((valor * fator).toFixed(6))) / fator;
-}
-
-/** O número com uma casa, como a tela mostra a média e o NPS ("4,5"). */
-export function umaCasa(valor: number): string {
-  return arredondar(valor, 1).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+/** O número com 2 casas, como a tela mostra a média, o NPS e o cronograma ("3,95"). Decisão 30. */
+export function duasCasas(valor: number): string {
+  return formatarNumero(valor, 2);
 }
 
 function media(numeros: readonly number[]): number | null {
@@ -104,25 +106,24 @@ export function lista(itens: readonly string[]): string {
 
 // ---------------------------------------------------------------- seção 3: cor de cada indicador
 
+// Decisão 30: as três cores abaixo saem do número exato, sem arredondar.
+
 export function corMediaPesquisa(valor: number | null): CorIndicador {
   if (valor === null) return 'sem_dado';
-  const exibido = arredondar(valor, 1);
-  return exibido >= 4 ? 'verde' : exibido >= 3 ? 'amarelo' : 'vermelho';
+  return valor >= 4 ? 'verde' : valor >= 3 ? 'amarelo' : 'vermelho';
 }
 
 export function corNps(valor: number | null): CorIndicador {
   if (valor === null) return 'sem_dado';
-  const exibido = arredondar(valor, 1);
-  return exibido >= 9 ? 'verde' : exibido >= 7 ? 'amarelo' : 'vermelho';
+  return valor >= 9 ? 'verde' : valor >= 7 ? 'amarelo' : 'vermelho';
 }
 
 export function corCronograma(percentual: number | null): CorIndicador {
   if (percentual === null) return 'sem_dado';
-  const exibido = arredondar(percentual, 0);
-  return exibido >= 90 ? 'verde' : exibido >= 70 ? 'amarelo' : 'vermelho';
+  return percentual >= 90 ? 'verde' : percentual >= 70 ? 'amarelo' : 'vermelho';
 }
 
-/** Ocorrência é contínua: nenhuma no trimestre é um dado (verde), nunca "sem dado". */
+/** Ocorrência é contínua: nenhuma no ano é um dado (verde), nunca "sem dado". */
 export function corOcorrencias({ leves, reclamacoes }: ValoresIndicadores['ocorrencias']): Cor {
   if (reclamacoes > 0 || leves >= 2) return 'vermelho';
   return leves === 1 ? 'amarelo' : 'verde';
@@ -146,9 +147,28 @@ export function mediaNps(respostas: readonly RespostaPesquisa[]): number | null 
   return media(respostas.map((r) => r.nps));
 }
 
+export interface ResumoNps {
+  maior: number;
+  menor: number;
+  /** A média, que dá a cor. */
+  media: number;
+}
+
+/** Decisão 31: a maior nota, a menor e a média do ciclo; sem resposta, `null`. */
+export function resumoNps(respostas: readonly RespostaPesquisa[]): ResumoNps | null {
+  const notas = respostas.map((r) => r.nps);
+  const m = media(notas);
+  return m === null ? null : { maior: Math.max(...notas), menor: Math.min(...notas), media: m };
+}
+
+/** "Maior 9, menor 8, média 8,50". */
+export function textoResumoNps({ maior, menor, media: m }: ResumoNps): string {
+  return `Maior ${maior}, menor ${menor}, média ${duasCasas(m)}`;
+}
+
 /**
- * O município "respondeu" quando ao menos um articulador respondeu no prazo (sugestão do PDF).
- * Com o prazo ainda aberto e ninguém no prazo, ainda não se sabe: `null` (sem dado).
+ * O projeto respondeu quando houve ao menos uma resposta dele no prazo; o município vale o pior projeto (decisão 51,
+ * em `valoresDoCiclo`). Com o prazo ainda aberto e nenhuma resposta no prazo, ainda não se sabe: `null` (sem dado).
  */
 export function respondeuNoPrazo(respostas: readonly RespostaPesquisa[], prazoEncerrado: boolean): boolean | null {
   if (respostas.some((r) => r.no_prazo)) return true;
@@ -166,10 +186,45 @@ export function percentualCronograma(relatorios: readonly RelatorioMensal[]): nu
   return previstas === 0 ? null : (realizadas / previstas) * 100;
 }
 
-/** As ocorrências dos 3 meses corridos até a data de referência (inclusive). */
-export function ocorrenciasNoTrimestre(ocorrencias: readonly Ocorrencia[], dataReferencia: string): Ocorrencia[] {
-  const inicio = somarMeses(dataReferencia, -3);
-  return ocorrencias.filter((o) => o.data > inicio && o.data <= dataReferencia);
+/**
+ * O primeiro dia do mês da 1ª formação realizada no ano, pelos relatórios mensais do município (o relatório é
+ * mensal, sem o dia da formação); `null` = nenhuma formação no ano.
+ */
+export function inicioDasFormacoesNoAno(relatorios: readonly RelatorioMensal[], ano: number): string | null {
+  const meses = relatorios
+    .filter((r) => r.mes.startsWith(`${ano}-`) && r.formacoes_realizadas > 0)
+    .map((r) => r.mes)
+    .sort();
+  return meses.length === 0 ? null : `${meses[0]}-01`;
+}
+
+/**
+ * Decisão 32: as ocorrências que contam na data de referência são as do ano dela, desde a 1ª formação do ano no
+ * município (`relatorios` são os do município) até a data (inclusive). Em janeiro a contagem zera; antes da 1ª
+ * formação do ano, nada conta. Decisão 57: só filtra, nada é apagado (o histórico continua na lista).
+ */
+export function ocorrenciasDoAno(
+  ocorrencias: readonly Ocorrencia[],
+  relatorios: readonly RelatorioMensal[],
+  dataReferencia: string,
+): Ocorrencia[] {
+  const inicio = inicioDasFormacoesNoAno(relatorios, Number(dataReferencia.slice(0, 4)));
+  if (inicio === null) return [];
+  return ocorrencias.filter((o) => o.data >= inicio && o.data <= dataReferencia);
+}
+
+/**
+ * Decisão 32: as ocorrências do ano da data de referência (até ela) que não contam na cor, por serem de antes da 1ª
+ * formação do ano no município, ou porque ainda não houve formação no ano. Ficam guardadas (decisão 57).
+ */
+export function ocorrenciasForaDaContagem(
+  ocorrencias: readonly Ocorrencia[],
+  relatorios: readonly RelatorioMensal[],
+  dataReferencia: string,
+): Ocorrencia[] {
+  const contam = new Set(ocorrenciasDoAno(ocorrencias, relatorios, dataReferencia));
+  const ano = dataReferencia.slice(0, 4);
+  return ocorrencias.filter((o) => o.data.startsWith(`${ano}-`) && o.data <= dataReferencia && !contam.has(o));
 }
 
 export function contarOcorrencias(ocorrencias: readonly Ocorrencia[]): ValoresIndicadores['ocorrencias'] {
@@ -179,11 +234,14 @@ export function contarOcorrencias(ocorrencias: readonly Ocorrencia[]): ValoresIn
 
 // ---------------------------------------------------------------- seção 3: os 5 indicadores juntos
 
-function textoOcorrencias({ leves, reclamacoes }: ValoresIndicadores['ocorrencias']): string {
+function textoOcorrencias({ leves, reclamacoes, fora_da_contagem = 0 }: ValoresIndicadores['ocorrencias']): string {
   const partes: string[] = [];
   if (reclamacoes > 0) partes.push(`${reclamacoes} ${reclamacoes === 1 ? 'reclamação' : 'reclamações'}`);
   if (leves > 0) partes.push(`${leves} ${leves === 1 ? 'leve' : 'leves'}`);
-  return partes.length === 0 ? 'Nenhuma' : lista(partes);
+  if (partes.length > 0) return lista(partes);
+  // "Nenhuma" sozinho esconderia a ocorrência guardada que não conta (decisão 32: antes da 1ª formação do ano).
+  if (fora_da_contagem === 0) return 'Nenhuma';
+  return `Nenhuma que conte (${fora_da_contagem} ${fora_da_contagem === 1 ? 'registrada' : 'registradas'} antes da 1ª formação do ano)`;
 }
 
 function textoResposta({ ciclo_atual, ciclo_anterior }: ValoresIndicadores['resposta_pesquisa']): string {
@@ -198,13 +256,13 @@ export function avaliarIndicadores(v: ValoresIndicadores): AvaliacaoIndicador[] 
     {
       indicador: 'media_pesquisa',
       cor: corMediaPesquisa(v.media_pesquisa),
-      texto: v.media_pesquisa === null ? 'Sem dado' : umaCasa(v.media_pesquisa),
+      texto: v.media_pesquisa === null ? 'Sem dado' : duasCasas(v.media_pesquisa),
     },
-    { indicador: 'nps', cor: corNps(v.nps), texto: v.nps === null ? 'Sem dado' : umaCasa(v.nps) },
+    { indicador: 'nps', cor: corNps(v.nps), texto: v.nps === null ? 'Sem dado' : duasCasas(v.nps) },
     {
       indicador: 'cronograma',
       cor: corCronograma(v.cronograma),
-      texto: v.cronograma === null ? 'Sem dado' : `${arredondar(v.cronograma, 0)}%`,
+      texto: v.cronograma === null ? 'Sem dado' : `${duasCasas(v.cronograma)}%`,
     },
     { indicador: 'ocorrencias', cor: corOcorrencias(v.ocorrencias), texto: textoOcorrencias(v.ocorrencias) },
     {
@@ -225,7 +283,8 @@ export function avaliarIndicadores(v: ValoresIndicadores): AvaliacaoIndicador[] 
  * 2 ciclos limpos seguidos; senão, verde. Indicador sem dado não conta em nenhuma regra.
  *
  * "Vermelho imediato": esta função vale a qualquer momento do ciclo, não só no fim; a tela chama de novo
- * quando chega um dado, e `vermelho_imediato` diz que a cor mudou por um indicador em vermelho.
+ * quando chega um dado, e `vermelho_imediato` diz que a cor mudou por um indicador em vermelho (decisão 38) ou
+ * por três amarelos (decisão 39). A cor oficial muda na hora (`aplicarVermelhoAutomatico`, em `dados.ts`).
  *
  * Ciclo em andamento (`cicloFechado: false`): a cor só muda na hora para piorar (um vermelho, ou um amarelo
  * sobre verde publicado); o ciclo ainda não conta como ciclo sem alerta (a pesquisa pode nem ter fechado).
@@ -248,7 +307,8 @@ export function classificar(
     for (let i = historico.length - 1; i >= 0 && historico[i]!.limpo; i--) ciclos_limpos++;
   }
 
-  const base = { avaliacoes, sem_dado: com('sem_dado'), limpo, ciclos_limpos, vermelho_imediato: vermelhos.length > 0 };
+  const vermelho_imediato = vermelhos.length > 0 || amarelos.length >= 3;
+  const base = { avaliacoes, sem_dado: com('sem_dado'), limpo, ciclos_limpos, vermelho_imediato };
   if (vermelhos.length > 0) {
     return { ...base, cor: 'vermelho', motivo: 'indicador_vermelho', decisivos: vermelhos, em_recuperacao: false };
   }
@@ -332,6 +392,15 @@ export function mudancaEntreCiclos(
   return { mudanca: 'igual', seta: '', texto: 'Sem mudança' };
 }
 
+/**
+ * O ciclo conta como "sem alerta" para a volta ao verde (decisão 45, contada da cor publicada): os dados não têm
+ * alerta e o Comitê não publicou uma cor pior que a sugerida. Com o vermelho ou o amarelo publicado sobre dados
+ * limpos, a contagem começa no ciclo seguinte.
+ */
+export function cicloSemAlerta(resultado: ResultadoCor, publicada: Cor): boolean {
+  return resultado.limpo && piorCor(publicada, resultado.cor) === resultado.cor;
+}
+
 // ---------------------------------------------------------------- seção 5: resposta a cada cor
 
 export interface RespostaDaCor {
@@ -365,13 +434,16 @@ export const RESPOSTA_POR_COR: Record<Cor, RespostaDaCor> = {
   },
   vermelho: {
     quem_age: 'Gestora de referência e gestora pedagógica',
+    // Rodada 3: na ordem das tarefas, começando pelo contato com o articulador municipal (decisões 34 e 37).
     o_que_fazer:
-      'Reunião com a Secretaria, visita técnica, plano de ação pactuado, reunião de escuta trimestral e acompanhamento até a saída do vermelho',
+      'Contato com o articulador municipal em 2 dias úteis, reunião com a Secretaria, plano de ação pactuado, devolutiva, visita técnica no semestre, reunião de escuta trimestral e acompanhamento até a saída do vermelho',
+    // Decisões 33 e 34: dias úteis; o "contato em 48 h" do PDF vira 2 dias úteis, com o articulador (decisão 37).
+    // A chave `contato_48h` é o nome interno de antes; só o texto mudou.
     tarefas: [
-      tarefa('contato_48h', 'Contato com o município', { tipo: 'horas', valor: 48 }, 'em 48 h'),
-      tarefa('reuniao_secretaria', 'Reunião com a Secretaria', { tipo: 'dias', valor: 5 }, 'em 5 dias'),
-      tarefa('plano_acao', 'Plano de ação pactuado', { tipo: 'dias', valor: 15 }, 'em 15 dias'),
-      tarefa('devolutiva', 'Devolutiva', { tipo: 'dias', valor: 30 }, 'em 30 dias'),
+      tarefa('contato_48h', 'Contato com o articulador municipal', { tipo: 'dias_uteis', valor: 2 }, 'em 2 dias úteis'),
+      tarefa('reuniao_secretaria', 'Reunião com a Secretaria', { tipo: 'dias_uteis', valor: 5 }, 'em 5 dias úteis'),
+      tarefa('plano_acao', 'Plano de ação pactuado', { tipo: 'dias_uteis', valor: 15 }, 'em 15 dias úteis'),
+      tarefa('devolutiva', 'Devolutiva', { tipo: 'dias_uteis', valor: 30 }, 'em 30 dias úteis'),
       tarefa('visita_tecnica', 'Visita técnica', { tipo: 'meses', valor: 6 }, 'no semestre'),
     ],
     rotina: ['Acompanhamento a cada 15 dias', 'Reunião de escuta a cada 3 meses'],
@@ -403,7 +475,10 @@ export function somarDias(data: string, dias: number): string {
   return paraTexto(d);
 }
 
-/** Dias úteis de segunda a sexta, sem feriados; o dia da publicação não conta. */
+/**
+ * Dias úteis de segunda a sexta; o dia da publicação não conta. O feriado em dia de semana conta como dia útil:
+ * decisão 33, o dono escolheu dias úteis de segunda a sexta, e não a opção que descontava os feriados.
+ */
 export function somarDiasUteis(data: string, dias: number): string {
   const d = paraData(data);
   let faltam = dias;
@@ -415,6 +490,11 @@ export function somarDiasUteis(data: string, dias: number): string {
   return paraTexto(d);
 }
 
+/** O próprio dia, se for de segunda a sexta; senão, a segunda-feira seguinte. */
+export function emDiaUtil(data: string): string {
+  return somarDiasUteis(somarDias(data, -1), 1);
+}
+
 /** Soma meses; o dia que não existe no mês de chegada vira o último dia dele (31/12 + 2 meses = 28/02). */
 export function somarMeses(data: string, meses: number): string {
   const [ano, mes, dia] = data.split('-').map(Number);
@@ -424,20 +504,22 @@ export function somarMeses(data: string, meses: number): string {
 
 function prazoEm(prazo: Prazo, publicadaEm: string): string {
   switch (prazo.tipo) {
-    case 'horas':
-      return somarDias(publicadaEm, Math.ceil(prazo.valor / 24));
-    case 'dias':
-      return somarDias(publicadaEm, prazo.valor);
     case 'dias_uteis':
       return somarDiasUteis(publicadaEm, prazo.valor);
     case 'meses':
-      return somarMeses(publicadaEm, prazo.valor);
+      // Rodada 3 (leitura em Para validar): como os outros prazos são em dias úteis (decisão 33), o prazo em meses
+      // que cai no sábado ou no domingo passa para a segunda-feira (30/11/2026 + 6 meses = segunda, 31/05/2027).
+      return emDiaUtil(somarMeses(publicadaEm, prazo.valor));
   }
 }
 
-/** As tarefas da resposta à cor publicada, com prazo contado a partir da data de publicação. */
-export function criarTarefas(cor: Cor, municipio: number, publicadaEm: string): TarefaResposta[] {
-  return RESPOSTA_POR_COR[cor].tarefas.map((t) => ({
+/**
+ * As tarefas da resposta à cor publicada, com prazo contado a partir da data de publicação. Os ids começam em
+ * `primeiroId` (quem guarda a lista passa o próximo id livre).
+ */
+export function criarTarefas(cor: Cor, municipio: number, publicadaEm: string, primeiroId = 1): TarefaResposta[] {
+  return RESPOSTA_POR_COR[cor].tarefas.map((t, i) => ({
+    id: primeiroId + i,
     chave: t.chave,
     titulo: t.titulo,
     municipio,
@@ -445,12 +527,130 @@ export function criarTarefas(cor: Cor, municipio: number, publicadaEm: string): 
     criada_em: publicadaEm,
     prazo_em: prazoEm(t.prazo, publicadaEm),
     concluida_em: null,
+    encerramento: null,
   }));
 }
 
-/** Situação da tarefa na data de referência: no prazo, vence hoje, vencida (ou concluída). */
+/**
+ * Situação da tarefa na data de referência: no prazo, vence hoje, vencida, concluída, ou o motivo de ter deixado
+ * de valer (cancelada pelo Comitê, substituída). A feita continua feita mesmo depois (decisão 42).
+ */
 export function estadoDaTarefa(t: TarefaResposta, dataReferencia: string): EstadoTarefa {
   if (t.concluida_em !== null) return 'concluida';
+  if (t.encerramento !== null) return t.encerramento.motivo;
   if (dataReferencia < t.prazo_em) return 'no_prazo';
   return dataReferencia === t.prazo_em ? 'vence_hoje' : 'vencida';
+}
+
+/** A tarefa ainda está para fazer: nem concluída, nem cancelada, nem substituída. */
+export function tarefaAberta(t: TarefaResposta): boolean {
+  return t.concluida_em === null && t.encerramento === null;
+}
+
+// ---------------------------------------------------------------- decisão 48: a ata da reunião de escuta
+
+/** Dias úteis para registrar a ata depois da reunião. */
+export const DIAS_UTEIS_PARA_A_ATA = 5;
+
+export type SituacaoReuniao = 'agendada' | 'ata_a_registrar' | 'ata_atrasada' | 'realizada';
+
+/** A reunião de escuta é semestral no verde e trimestral no amarelo e no vermelho (seção 5 do PDF). */
+export function periodicidadeDaCor(cor: Cor): 'semestral' | 'trimestral' {
+  return cor === 'verde' ? 'semestral' : 'trimestral';
+}
+
+/** Rodada 5: uma reunião de escuta por vez; a seguinte fica a 30 dias ou mais (leitura em Para validar). */
+export const DIAS_ENTRE_REUNIOES = 30;
+
+/** O último dia para registrar a ata: 5 dias úteis depois da reunião. */
+export function prazoDaAta(dataReuniao: string): string {
+  return somarDiasUteis(dataReuniao, DIAS_UTEIS_PARA_A_ATA);
+}
+
+/**
+ * A reunião é marcada antes e a ata registrada depois: com a ata, realizada; antes do dia, agendada; do dia da
+ * reunião até o prazo, ata a registrar; passado o prazo sem ata, ata atrasada.
+ */
+export function situacaoDaReuniao(reuniao: { data: string; ata_em: string | null }, hoje: string): SituacaoReuniao {
+  if (reuniao.ata_em !== null) return 'realizada';
+  if (hoje < reuniao.data) return 'agendada';
+  return hoje <= prazoDaAta(reuniao.data) ? 'ata_a_registrar' : 'ata_atrasada';
+}
+
+/** A situação da reunião escrita para a tela, com o prazo da ata ("Ata a registrar até 04/12/2026"). */
+export function textoDaReuniao(reuniao: { data: string; ata_em: string | null }, hoje: string): string {
+  const prazo = formatarDia(prazoDaAta(reuniao.data));
+  switch (situacaoDaReuniao(reuniao, hoje)) {
+    case 'agendada':
+      return 'Agendada';
+    case 'ata_a_registrar':
+      return `Ata a registrar até ${prazo}`;
+    case 'ata_atrasada':
+      return `Ata atrasada: o prazo era ${prazo}`;
+    case 'realizada':
+      return `Ata registrada em ${formatarDia(reuniao.ata_em ?? '')}`;
+  }
+}
+
+// ---------------------------------------------------------------- decisão 50: o tempo de resposta às ocorrências
+
+/** Meta de resposta à ocorrência, em horas. */
+export const META_RESPOSTA_HORAS = 48;
+
+/** Horas entre duas datas com hora e fuso (AAAA-MM-DDTHH:MM:SS-03:00). */
+export function horasEntre(inicio: string, fim: string): number {
+  return (Date.parse(fim) - Date.parse(inicio)) / 3_600_000;
+}
+
+export interface TempoDeResposta {
+  /** Média das horas das ocorrências respondidas; `null` = nenhuma respondida. */
+  media_horas: number | null;
+  respondidas: number;
+  sem_resposta: number;
+  /** Respondidas em até 48 h. */
+  dentro_da_meta: number;
+  fora_da_meta: number;
+}
+
+/** As horas para a tela, com o minuto arredondado: "54 h", "2 h 30 min". */
+export function textoHoras(horas: number): string {
+  const minutos = Math.round(horas * 60);
+  const resto = minutos % 60;
+  return resto === 0 ? `${minutos / 60} h` : `${Math.floor(minutos / 60)} h ${resto} min`;
+}
+
+/** "2026-11-30T10:15:00-03:00" → "30/11/2026 às 10:15" (a hora gravada já é a de Fortaleza). */
+export function textoDataHora(dataHora: string): string {
+  return `${formatarDia(dataHora.slice(0, 10))} às ${dataHora.slice(11, 16)}`;
+}
+
+export function tempoDeResposta(ocorrencias: readonly Ocorrencia[]): TempoDeResposta {
+  const horas = ocorrencias.flatMap((o) => (o.respondida_em === null ? [] : [horasEntre(o.registrada_em, o.respondida_em)]));
+  const dentro = horas.filter((h) => h <= META_RESPOSTA_HORAS).length;
+  return {
+    media_horas: media(horas),
+    respondidas: horas.length,
+    sem_resposta: ocorrencias.length - horas.length,
+    dentro_da_meta: dentro,
+    fora_da_meta: horas.length - dentro,
+  };
+}
+
+// ---------------------------------------------------------------- decisão 49: pesquisa × ocorrências
+
+const GRAVIDADE_INDICADOR: Record<CorIndicador, number> = { sem_dado: -1, ...GRAVIDADE };
+
+/** A pior de duas cores; "sem dado" perde para qualquer cor. */
+export function piorCor(a: CorIndicador, b: CorIndicador): CorIndicador {
+  return GRAVIDADE_INDICADOR[b] > GRAVIDADE_INDICADOR[a] ? b : a;
+}
+
+/** A cor da pesquisa: a pior entre a média e o NPS ("sem dado" só quando os dois não têm dado). */
+export function corDaPesquisa(media: CorIndicador, nps: CorIndicador): CorIndicador {
+  return piorCor(media, nps);
+}
+
+/** Pesquisa e ocorrências divergem quando uma está verde e a outra vermelha. */
+export function divergem(pesquisa: Cor, ocorrencias: Cor): boolean {
+  return (pesquisa === 'verde' && ocorrencias === 'vermelho') || (pesquisa === 'vermelho' && ocorrencias === 'verde');
 }

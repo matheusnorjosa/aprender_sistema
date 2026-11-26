@@ -85,7 +85,9 @@ describe('Painel do ICA', { timeout: 20000 }, () => {
       '5 em Capacidade disponível',
       '1 sem municípios',
       'Média: 100',
-      'Dispersão: desvio 30,9 · menor 58 · maior 169',
+      // Decisão 56: as localidades do Amigos do Bem e a carga do Rogério, baixada para 0,2 (perfil 110 em
+      // dados/gerador.ts), mudam as médias da equipe (era desvio 30,9).
+      'Dispersão: desvio 30,8 · menor 58 · maior 169',
     ]);
   });
 
@@ -146,7 +148,9 @@ describe('Painel do ICA', { timeout: 20000 }, () => {
     await user.selectOptions(screen.getByLabelText('Semestre'), '2026.1');
     const itens = await barras();
     expect(itens).toHaveLength(16);
-    expect(itens[0]).toHaveTextContent('191 · Sobrecarga');
+    // Decisão 56 (rodada 4): em 2026.1 ainda não há Amigos do Bem; quem muda as médias da equipe é a carga do Rogério,
+    // baixada para 0,2 (perfil 110 em dados/gerador.ts). Era 191.
+    expect(itens[0]).toHaveTextContent('189 · Sobrecarga');
     expect(screen.getByText(/Retrato de 2026\.1, calculado em 15\/06\/2026/)).toHaveTextContent(/proposta v5/);
   });
 

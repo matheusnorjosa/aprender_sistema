@@ -3,6 +3,7 @@
 Lê "Relatorio_Tempo_Deslocamento - TODOS MUNICÓPIOS..pdf" (Fortaleza → 92 municípios,
 nov/2026) e reescreve o trecho gerado de src/pages/Integra/dados/deslocamento.ts:
 municípios, regras do cálculo (páginas 2 e 3), faixas e observações (seção 4).
+Depois da leitura, aplica as correções do dono (`CORRECOES_DO_DONO`), onde o PDF se contradiz.
 Só lê o PDF; não toca em banco nem em rede.
 
 Os nomes de coordenador do PDF NÃO saem daqui: a linha deles é descartada, e antes de
@@ -27,15 +28,10 @@ from pathlib import Path
 
 import pdfplumber
 
-INICIO = (
-    "// <<< INÍCIO DO TRECHO GERADO por scripts/integra_extrair_deslocamento.py:"
-    " não editar à mão >>>"
-)
+INICIO = "// <<< INÍCIO DO TRECHO GERADO por scripts/integra_extrair_deslocamento.py:" " não editar à mão >>>"
 FIM = "// <<< FIM DO TRECHO GERADO >>>"
 
-SAIDA_PADRAO = (
-    Path(__file__).resolve().parent.parent / "src/pages/Integra/dados/deslocamento.ts"
-)
+SAIDA_PADRAO = Path(__file__).resolve().parent.parent / "src/pages/Integra/dados/deslocamento.ts"
 
 # A marca d'água ("APRENDER EDITORA" na vertical) usa corpo 33 a 46; o texto, até 15.
 CORPO_MAXIMO_DO_TEXTO = 20
@@ -45,9 +41,7 @@ TOLERANCIA_DA_LINHA = 2.5
 
 HORA = re.compile(r"^(\d+)h(\d{2})$")
 TITULO_UF = re.compile(r"^(.+) \(([A-Z]{2})\) · (\d+) municípios?$")
-RODAPE = re.compile(
-    r"^Tempo de deslocamento dos coordenadores pedagógicos · .* Página \d+$"
-)
+RODAPE = re.compile(r"^Tempo de deslocamento dos coordenadores pedagógicos · .* Página \d+$")
 CABECALHO_DA_PAGINA = (
     "Aprender Editora",
     "Coordenação Pedagógica · Superintendência de Coordenação",
@@ -60,12 +54,18 @@ FAIXAS = {
 }
 TAG_SUSPENSA = "ações suspensas"
 
+# Correções do dono, aplicadas depois da leitura do PDF, onde o relatório se contradiz.
+# Ficam aqui para não voltar o erro quando o PDF for lido de novo.
+# (nome, UF) -> {campo: valor}.
+CORRECOES_DO_DONO: dict[tuple[str, str], dict[str, str]] = {
+    # Decisão 54 (25/11/2026): Craíbas-AL tem 18h00 de ida e volta e a tabela a põe em
+    # "Muito longo"; pelo limite do próprio relatório (Longo até 18h) é "Longo".
+    ("Craíbas", "AL"): {"faixa": "longo"},
+}
+
 
 def sem_marca_dagua(pagina):
-    return pagina.filter(
-        lambda o: o.get("object_type") != "char"
-        or o.get("size", 0) < CORPO_MAXIMO_DO_TEXTO
-    )
+    return pagina.filter(lambda o: o.get("object_type") != "char" or o.get("size", 0) < CORPO_MAXIMO_DO_TEXTO)
 
 
 def linhas_da_pagina(pagina) -> list[list[dict]]:
@@ -86,11 +86,7 @@ def texto(linha: list[dict]) -> str:
 def por_coluna(linha: list[dict], bordas: list[float]) -> list[str]:
     celulas: list[list[str]] = [[] for _ in bordas]
     for palavra in linha:
-        indice = (
-            max(i for i, borda in enumerate(bordas) if palavra["x0"] >= borda)
-            if palavra["x0"] >= bordas[0]
-            else 0
-        )
+        indice = max(i for i, borda in enumerate(bordas) if palavra["x0"] >= borda) if palavra["x0"] >= bordas[0] else 0
         celulas[indice].append(palavra["text"])
     return [" ".join(c) for c in celulas]
 
@@ -99,11 +95,7 @@ def juntar(partes: list[str]) -> str:
     """Junta as linhas da célula; "Belo Horizonte/" + "Confins" fica sem espaço."""
     resultado = ""
     for parte in (p.strip() for p in partes if p.strip()):
-        resultado = (
-            parte
-            if not resultado
-            else resultado + ("" if resultado.endswith("/") else " ") + parte
-        )
+        resultado = parte if not resultado else resultado + ("" if resultado.endswith("/") else " ") + parte
     return resultado
 
 
@@ -128,9 +120,7 @@ class Linha:
     suspensas: bool = False
 
 
-def extrair_municipios(
-    pdf, proibidos: set[str]
-) -> tuple[list[Linha], dict[str, tuple[str, int]]]:
+def extrair_municipios(pdf, proibidos: set[str]) -> tuple[list[Linha], dict[str, tuple[str, int]]]:
     """Tabela da seção 2.
 
     `proibidos` recebe as linhas de coordenador, só para a conferência final.
@@ -144,11 +134,7 @@ def extrair_municipios(
             break
         linhas = linhas_da_pagina(sem_marca_dagua(pagina))
         cabecalho = next(
-            (
-                i
-                for i, linha in enumerate(linhas)
-                if texto(linha).startswith("Município e coordenador(es)")
-            ),
+            (i for i, linha in enumerate(linhas) if texto(linha).startswith("Município e coordenador(es)")),
             None,
         )
         if cabecalho is None:
@@ -158,15 +144,10 @@ def extrair_municipios(
             "Município": palavras[0]["x0"],
             "Rota": next(w["x0"] for w in palavras if w["text"] == "Rota"),
             "Ida": [w["x0"] for w in palavras if w["text"] == "Ida"],
-            "Alternativa": next(
-                w["x0"] for w in palavras if w["text"] == "Alternativa"
-            ),
+            "Alternativa": next(w["x0"] for w in palavras if w["text"] == "Alternativa"),
         }
         modal = next(
-            w["x0"]
-            for vizinha in linhas[cabecalho - 1 : cabecalho + 2]
-            for w in vizinha
-            if w["text"] == "Modal"
+            w["x0"] for vizinha in linhas[cabecalho - 1 : cabecalho + 2] for w in vizinha if w["text"] == "Modal"
         )
         bordas = [
             inicio_das["Município"] - RECUO_DA_COLUNA,
@@ -183,9 +164,7 @@ def extrair_municipios(
                 continue
             if RODAPE.match(corrido):
                 break
-            if corrido.startswith("Os municípios incluídos") or corrido.startswith(
-                "3. Tempo de deslocamento"
-            ):
+            if corrido.startswith("Os municípios incluídos") or corrido.startswith("3. Tempo de deslocamento"):
                 fim = True
                 break
             titulo = TITULO_UF.match(corrido)
@@ -214,9 +193,7 @@ def extrair_municipios(
                 municipios.append(atual)
                 continue
             if atual is None:
-                raise ValueError(
-                    f"linha fora de um município na página {pagina.page_number}"
-                )
+                raise ValueError(f"linha fora de um município na página {pagina.page_number}")
             if col[0]:
                 proibidos.update(p.strip() for p in col[0].split(",") if p.strip())
             atual.modal.append(col[1])
@@ -231,15 +208,9 @@ def extrair_regras(pdf) -> list[dict[str, str]]:
     regras: list[dict[str, list[str]]] = []
     for pagina in pdf.pages[1:3]:
         linhas = linhas_da_pagina(sem_marca_dagua(pagina))
-        cabecalho = next(
-            i
-            for i, linha in enumerate(linhas)
-            if texto(linha) == "Componente Tempo adotado Critério"
-        )
+        cabecalho = next(i for i, linha in enumerate(linhas) if texto(linha) == "Componente Tempo adotado Critério")
         bordas = [
-            w["x0"] - RECUO_DA_COLUNA
-            for w in linhas[cabecalho]
-            if w["text"] in ("Componente", "Tempo", "Critério")
+            w["x0"] - RECUO_DA_COLUNA for w in linhas[cabecalho] if w["text"] in ("Componente", "Tempo", "Critério")
         ]
         for linha in linhas[cabecalho + 1 :]:
             corrido = texto(linha)
@@ -257,9 +228,7 @@ def extrair_regras(pdf) -> list[dict[str, str]]:
             else:
                 regras[-1]["componente"].append(componente)
                 regras[-1]["criterio"].append(criterio)
-    return [
-        {chave: juntar(valor) for chave, valor in regra.items()} for regra in regras
-    ]
+    return [{chave: juntar(valor) for chave, valor in regra.items()} for regra in regras]
 
 
 def texto_corrido(pdf) -> list[str]:
@@ -291,9 +260,7 @@ def extrair_faixas(linhas: list[str]) -> list[dict]:
     if not achado:
         raise ValueError("não achei a definição das faixas")
     faixas = []
-    for rotulo, limite, numero in re.findall(
-        r"(Próximo|Médio|Muito longo|Longo) (até|acima de) (\d+)h", achado[1]
-    ):
+    for rotulo, limite, numero in re.findall(r"(Próximo|Médio|Muito longo|Longo) (até|acima de) (\d+)h", achado[1]):
         faixas.append(
             {
                 "faixa": FAIXAS[rotulo],
@@ -309,9 +276,7 @@ def grupo_terrestre_da_gestao(
     regras: list[dict[str, str]], estados: dict[str, tuple[str, int]]
 ) -> tuple[set[str], set[str]]:
     """UFs e municípios que a regra "Escolha do modal" nomeia como só terrestres."""
-    criterio = next(
-        r["criterio"] for r in regras if r["componente"] == "Escolha do modal"
-    )
+    criterio = next(r["criterio"] for r in regras if r["componente"] == "Escolha do modal")
     achado = re.search(r"exclusivamente terrestre \(([^)]+)\)", criterio)
     if not achado:
         raise ValueError("não achei o grupo terrestre da gestão")
@@ -335,15 +300,11 @@ def ts(valor) -> str:
 
 
 def objeto(campos: dict, recuo: str) -> str:
-    corpo = "".join(
-        f"{recuo}  {chave}: {ts(valor)},\n" for chave, valor in campos.items()
-    )
+    corpo = "".join(f"{recuo}  {chave}: {ts(valor)},\n" for chave, valor in campos.items())
     return f"{recuo}{{\n{corpo}{recuo}}},\n"
 
 
-def montar_trecho(
-    pdf_path: Path, municipios: list[dict], regras, faixas, observacoes
-) -> str:
+def montar_trecho(pdf_path: Path, municipios: list[dict], regras, faixas, observacoes) -> str:
     partes = [
         INICIO,
         "",
@@ -379,14 +340,19 @@ def montar_trecho(
     return "\n".join(partes)
 
 
+def aplicar_correcoes_do_dono(municipios: list[dict]) -> None:
+    """Aplica `CORRECOES_DO_DONO`; para se algum município corrigido não estiver no PDF."""
+    for (nome, uf), campos in CORRECOES_DO_DONO.items():
+        alvo = next((m for m in municipios if m["nome"] == nome and m["uf"] == uf), None)
+        if alvo is None:
+            raise ValueError(f"correção do dono para {nome}-{uf}, que não está no PDF")
+        alvo.update(campos)
+
+
 def principal() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
-        "pdf", type=Path, help="caminho do PDF de tempos de deslocamento"
-    )
-    parser.add_argument(
-        "--saida", type=Path, default=SAIDA_PADRAO, help="arquivo .ts com os marcadores"
-    )
+    parser.add_argument("pdf", type=Path, help="caminho do PDF de tempos de deslocamento")
+    parser.add_argument("--saida", type=Path, default=SAIDA_PADRAO, help="arquivo .ts com os marcadores")
     args = parser.parse_args()
 
     proibidos: set[str] = set()
@@ -394,9 +360,7 @@ def principal() -> int:
         linhas, estados = extrair_municipios(pdf, proibidos)
         regras = extrair_regras(pdf)
         corrido = texto_corrido(pdf)
-    if "Fortaleza (CE)" not in " ".join(
-        corrido[:20]
-    ) or "Novembro de 2026" not in " ".join(corrido[:20]):
+    if "Fortaleza (CE)" not in " ".join(corrido[:20]) or "Novembro de 2026" not in " ".join(corrido[:20]):
         raise ValueError("a página 1 não traz o ponto de partida e a data esperados")
     observacoes = extrair_observacoes(corrido)
     faixas = extrair_faixas(corrido)
@@ -405,9 +369,7 @@ def principal() -> int:
     for uf, (estado, esperado) in estados.items():
         achados = sum(1 for item in linhas if item.uf == uf)
         if achados != esperado:
-            raise ValueError(
-                f"{estado}: o título diz {esperado} municípios, a tabela tem {achados}"
-            )
+            raise ValueError(f"{estado}: o título diz {esperado} municípios, a tabela tem {achados}")
 
     municipios = []
     for item in linhas:
@@ -437,16 +399,12 @@ def principal() -> int:
             }
         )
 
+    aplicar_correcoes_do_dono(municipios)
     trecho = montar_trecho(args.pdf, municipios, regras, faixas, observacoes)
-    vazados = [
-        n
-        for n in proibidos
-        if n != "coordenador não informado" and n.lower() in trecho.lower()
-    ]
+    vazados = [n for n in proibidos if n != "coordenador não informado" and n.lower() in trecho.lower()]
     if vazados or "coordenador não informado" in trecho:
         print(
-            f"PARADO: {len(vazados)} nome(s) de coordenador iriam para o .ts."
-            " Nada foi gravado.",
+            f"PARADO: {len(vazados)} nome(s) de coordenador iriam para o .ts." " Nada foi gravado.",
             file=sys.stderr,
         )
         return 1

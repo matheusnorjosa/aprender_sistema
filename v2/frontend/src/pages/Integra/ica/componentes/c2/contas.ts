@@ -75,7 +75,7 @@ export function situacaoDoAlerta(tipo: TipoAlerta): string {
     case 'sem_municipios':
       return 'Aberto: sai quando a coordenadora ou o coordenador receber um município.';
     case 'contrato_sem_coordenador':
-      return 'Aberto: sai quando o contrato tiver um coordenador definido.';
+      return 'Aberto: sai quando o projeto tiver um coordenador definido.';
     case 'dado_incompleto':
     case 'dado_improvavel':
       return 'Aberto: sai quando o cadastro for corrigido ou conferido.';
@@ -86,7 +86,7 @@ export function situacaoDoAlerta(tipo: TipoAlerta): string {
 export const NOME_DO_ALERTA: Record<TipoAlerta, string> = {
   sobrecarga: 'Entrou em Sobrecarga',
   sem_municipios: 'Sem municípios',
-  contrato_sem_coordenador: 'Contrato sem coordenador',
+  contrato_sem_coordenador: 'Projeto sem coordenador',
   dado_incompleto: 'Dado incompleto',
   dado_improvavel: 'Valor improvável',
   fora_da_meta: 'Fora da meta',

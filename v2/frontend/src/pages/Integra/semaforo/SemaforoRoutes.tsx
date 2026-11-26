@@ -89,12 +89,13 @@ function IndiceSemaforo(): JSX.Element {
     {
       para: `${RAIZ}/comite`,
       titulo: 'Comitê de Satisfação',
-      texto: 'A cor que a regra sugere para cada município; o Comitê confirma ou altera, com justificativa.',
+      texto:
+        'A cor que a regra sugere para cada município; o Comitê confirma ou altera, com justificativa. Um indicador em vermelho ou três amarelos: o vermelho muda a cor em vigor na hora, e o Comitê confirma ou desfaz depois.',
     },
     {
       para: `${RAIZ}/municipio/${exemplo?.id ?? ''}`,
       titulo: 'Ficha do município',
-      texto: `Os 5 indicadores, o histórico, as tarefas, as ocorrências e as reuniões. Exemplo: ${exemplo ? `${exemplo.nome}-${exemplo.uf}` : ''}.`,
+      texto: `Os projetos, os 5 indicadores, o histórico, as tarefas, as ocorrências e as reuniões. Exemplo: ${exemplo ? `${exemplo.nome}-${exemplo.uf}` : ''}.`,
     },
     {
       para: `${RAIZ}/gestora`,
@@ -104,7 +105,7 @@ function IndiceSemaforo(): JSX.Element {
     {
       para: `${RAIZ}/pesquisa`,
       titulo: 'Pesquisa do articulador',
-      texto: 'A pesquisa de satisfação do ciclo, respondida na tela.',
+      texto: 'A pesquisa de satisfação do ciclo, respondida na tela: uma resposta por projeto.',
     },
     {
       para: `${RAIZ}/lider`,
@@ -124,7 +125,8 @@ function IndiceSemaforo(): JSX.Element {
         Semáforo de Risco Municipal
       </Title>
       <p>
-        Cada município ganha uma cor a cada dois meses: verde, amarelo ou vermelho. A cor sai de 5 indicadores e
+        Cada município ganha uma cor a cada dois meses: verde, amarelo ou vermelho. Um indicador em vermelho, ou três
+        amarelos, muda a cor para vermelho na hora, e o Comitê confirma ou desfaz depois. A cor sai de 5 indicadores e
         diz quem age e em quanto tempo. Nesta demonstração, hoje é {formatarDia(dados.data_referencia)}.
       </p>
       <ul aria-label="As 6 telas do Semáforo" className="m-0 grid list-none gap-3 p-0 md:grid-cols-2">

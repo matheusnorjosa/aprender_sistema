@@ -224,7 +224,7 @@ export default function FichaCoordenador(): JSX.Element {
           className="mb-3"
           type="info"
           showIcon
-          message={`Deslocamento estimado: ${estimados.join(', ')} sem localidade definida; a conta usa a mediana de ida e volta de todos os municípios (${formatarHoras(resultado.mediana)}).`}
+          message={`Deslocamento estimado: ${estimados.join(', ')} ${estimados.length === 1 ? 'não está' : 'não estão'} no relatório de tempos; a conta usa o tempo do meio do relatório (${formatarHoras(resultado.mediana)}).`}
         />
       )}
 

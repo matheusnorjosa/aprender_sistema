@@ -72,11 +72,15 @@ describe('ICA — Alertas', { timeout: 20000 }, () => {
     );
   });
 
-  test('contrato sem coordenador: Itaquiraí-MS, para a gestora operacional e a SPE', async () => {
+  test('projeto sem coordenador: Itaquiraí-MS, para a gestora operacional e a SPE', async () => {
     renderizar();
-    // Com a coleção no título: dois contratos sem coordenador no mesmo município não ficam iguais.
-    const cartao = (await screen.findByText(/^Contrato sem coordenador em Itaquiraí-MS \([A-Z ]+\)$/)).closest('li') as HTMLElement;
+    // Com a coleção no título: dois projetos sem coordenador no mesmo município não ficam iguais.
+    // Decisão 46: a palavra é "projeto", não "contrato".
+    const cartao = (await screen.findByText(/^Projeto sem coordenador em Itaquiraí-MS \([A-Z ]+\)$/)).closest('li') as HTMLElement;
     expect(cartao).toHaveTextContent('Seria enviado para: Gestora operacional, SPE');
+    expect(cartao).toHaveTextContent('Aberto: sai quando o projeto tiver um coordenador definido.');
+    expect(within(screen.getByLabelText('Mostrar')).getByRole('option', { name: /^Projeto sem coordenador \(\d+\)$/ })).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/contrato/i);
   });
 
   test('no papel, uma linha diz o que a lista filtrada mostra', async () => {

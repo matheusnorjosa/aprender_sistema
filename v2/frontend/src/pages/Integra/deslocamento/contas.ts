@@ -4,23 +4,22 @@
  * - `resumoDoRelatorio`: os números da página 1 do relatório de tempos (dados REAIS, `dados/deslocamento.ts`).
  * - `somaPorCoordenador`: o tempo de ida e volta somado na carteira de cada coordenador (FICTÍCIA, do
  *   gerador). É o mesmo valor do componente "Tempo de deslocamento" do ICA: só municípios ativos, e o
- *   município sem localidade conta a mediana (estimado).
+ *   local que não está no relatório conta o tempo do meio, 17h45 (estimado). A decisão 55 vale para o município sem
+ *   localidade definida; para o local conhecido fora do relatório, é leitura do protótipo (Para validar).
  */
 import type { UFCode } from '@/types/organizacao';
 
-import type { LinhaCarteira, ResultadoCoordenador, ResultadoEquipe } from '../ica/calculo';
+import { formatarHoras, type LinhaCarteira, type ResultadoCoordenador, type ResultadoEquipe } from '../ica/calculo';
 import {
   contarPorFaixa,
   contarPorMeio,
   DESLOCAMENTO_MUNICIPIOS,
-  medianaIdaVolta,
+  TEMPO_DO_MEIO_HORAS,
   type FaixaDeslocamento,
   type MunicipioDeslocamento,
 } from '../dados/deslocamento';
+import { localidadeDoMunicipio } from '../dados/municipios';
 import type { MeioDeslocamento, MunicipioIntegra } from '../dados/tipos';
-
-/** A mediana que a página 1 do relatório escreve. */
-const MEDIANA_DO_RELATORIO = '17h45';
 
 export interface ResumoDoRelatorio {
   total: number;
@@ -30,9 +29,8 @@ export interface ResumoDoRelatorio {
   porFaixa: Record<FaixaDeslocamento, number>;
   menor: MunicipioDeslocamento;
   maior: MunicipioDeslocamento;
+  /** A mediana que a página 1 do relatório escreve (17h45): o tempo do meio (decisão 55). */
   medianaDoRelatorio: string;
-  /** Mediana da coluna de ida e volta (o relatório arredonda cada tempo em 5 min). */
-  medianaCalculada: number;
 }
 
 export function resumoDoRelatorio(municipios: readonly MunicipioDeslocamento[]): ResumoDoRelatorio {
@@ -47,8 +45,7 @@ export function resumoDoRelatorio(municipios: readonly MunicipioDeslocamento[]):
     porFaixa: contarPorFaixa(municipios),
     menor,
     maior,
-    medianaDoRelatorio: MEDIANA_DO_RELATORIO,
-    medianaCalculada: medianaIdaVolta(municipios),
+    medianaDoRelatorio: formatarHoras(TEMPO_DO_MEIO_HORAS),
   };
 }
 
@@ -63,12 +60,16 @@ export function ufsNaOrdemDoRelatorio(municipios: readonly MunicipioDeslocamento
   return ufs;
 }
 
-/** A linha do relatório para um município do ICA (mesmo nome e UF); `undefined` se não estiver lá. */
+/**
+ * A linha do relatório para um município do ICA (mesmo nome e UF; a linha do Amigos do Bem usa a localidade
+ * dela, decisão 56); `undefined` se não estiver lá.
+ */
 export function linhaDoRelatorio(municipio: Pick<MunicipioIntegra, 'nome' | 'uf'>): MunicipioDeslocamento | undefined {
-  return DESLOCAMENTO_MUNICIPIOS.find((m) => m.nome === municipio.nome && m.uf === municipio.uf);
+  const nome = localidadeDoMunicipio(municipio.nome);
+  return DESLOCAMENTO_MUNICIPIOS.find((m) => m.nome === nome && m.uf === municipio.uf);
 }
 
-/** A faixa que o relatório dá ao município; `null` quando ele não tem localidade definida. */
+/** A faixa que o relatório dá ao município; `null` quando ele não tem tempo no relatório. */
 export function faixaDoMunicipio(municipio: MunicipioIntegra): FaixaDeslocamento | null {
   if (municipio.deslocamento_horas === null) return null;
   return linhaDoRelatorio(municipio)?.faixa ?? null;
@@ -85,7 +86,7 @@ export interface SomaDoCoordenador {
   /** O município ativo mais longe. */
   maior: LinhaCarteira | null;
   porFaixa: Record<FaixaDeslocamento, number>;
-  /** "Nome-UF" dos que entram com a mediana (sem localidade). */
+  /** "Nome-UF" dos que entram com o tempo do meio (sem tempo no relatório). */
   estimados: string[];
   /** "Nome-UF" dos suspensos: ficam fora da soma. */
   suspensos: string[];

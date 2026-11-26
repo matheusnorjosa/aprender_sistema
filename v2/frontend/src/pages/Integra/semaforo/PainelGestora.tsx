@@ -3,9 +3,11 @@
  *
  * Escolhida a gestora (também pelo endereço, `?gestora=<id>`): as tarefas em aberto da carteira dela,
  * com o que vence hoje primeiro, depois as vencidas e as que estão no prazo (do prazo mais perto ao mais
- * longe), as pendências da carteira (pesquisa sem resposta no ciclo, reunião de escuta a agendar; as atas o
- * protótipo não acompanha) e os municípios da carteira com a cor em vigor. Sem escolha, abre na primeira gestora
- * que tem tarefa vencendo hoje ou vencida. Requisitos: Requisitos_Modulo_Semaforo_Risco_Municipal.pdf, seções 5 e 7.
+ * longe), as pendências da carteira (pesquisa sem resposta no ciclo, por projeto: decisão 51; reunião de
+ * escuta a agendar e as já marcadas; atas a registrar e atrasadas: decisão 48) e os municípios da carteira com
+ * a cor em vigor. As tarefas canceladas e substituídas não somem (decisão 57): o painel diz quantas são, e a
+ * ficha do município as mostra. Sem escolha, abre na primeira gestora que tem tarefa vencendo hoje ou vencida.
+ * Requisitos: Requisitos_Modulo_Semaforo_Risco_Municipal.pdf, seções 5 e 7.
  */
 import type { JSX } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -14,9 +16,10 @@ import { Typography } from 'antd';
 import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../../components/ResponsiveTable';
 import { CLASSE_CAMPO, CLASSE_ROTULO, formatarDia } from '../ica/componentes/estilos';
 import { AvisoQuemVe } from './componentes/PecasDoRegistro';
+import { nasceuNaHora } from './componentes/corEAlerta';
 import { CorComNome, Mudanca } from './componentes/PecasDoAcompanhamento';
 import { mesesDoCiclo, periodoDoCiclo, type MunicipioSemaforo, type SituacaoMunicipio } from './dados';
-import { estadoDaTarefa, reuniaoEmDia } from './regras';
+import { estadoDaTarefa, reuniaoEmDia, situacaoDaReuniao, tarefaAberta, textoDaReuniao } from './regras';
 import { useSemaforoDemo } from './SemaforoDemoContext';
 import type { Cor, EstadoTarefa, TarefaResposta } from './tipos';
 import { useEstadoDaFicha } from './voltarDaFicha';
@@ -50,7 +53,7 @@ export default function PainelGestora(): JSX.Element {
     const ids = new Set(carteiraDe(gestora).map((m) => m.id));
     return dados.tarefas.filter((t) => ids.has(t.municipio));
   };
-  const abertasDe = (gestora: number): TarefaResposta[] => tarefasDe(gestora).filter((t) => t.concluida_em === null);
+  const abertasDe = (gestora: number): TarefaResposta[] => tarefasDe(gestora).filter(tarefaAberta);
   const urgente = (t: TarefaResposta): boolean => ['vence_hoje', 'vencida'].includes(estadoDaTarefa(t, hoje));
 
   const pedida = dados.pessoas.find((p) => String(p.id) === busca.get('gestora'));
@@ -70,26 +73,45 @@ export default function PainelGestora(): JSX.Element {
   const carteira = carteiraDe(gestora.id);
   const todas = tarefasDe(gestora.id);
   const concluidas = todas.filter((t) => t.concluida_em !== null).length;
+  const encerradas = todas.filter((t) => t.concluida_em === null && t.encerramento !== null).length;
   const municipioDe = (id: number): MunicipioSemaforo | undefined => carteira.find((m) => m.id === id);
 
   const linhas: LinhaMunicipio[] = carteira
     .map((m) => ({
       m,
       s: situacoes.find((x) => x.municipio === m.id)!,
-      abertas: todas.filter((t) => t.municipio === m.id && t.concluida_em === null).length,
+      abertas: todas.filter((t) => t.municipio === m.id && tarefaAberta(t)).length,
     }))
     .sort((a, b) => GRAVIDADE[a.s.cor_vigente] - GRAVIDADE[b.s.cor_vigente] || a.m.nome.localeCompare(b.m.nome, 'pt-BR'));
 
   // Pendências (seção 7 do PDF): na ordem da carteira (o pior primeiro).
+  // Decisão 51: a pesquisa é por projeto; o município fica aqui enquanto algum projeto dele não respondeu.
   const semResposta = linhas
-    .map((l) => l.m)
-    .filter((m) => !dados.respostas.some((r) => r.municipio === m.id && r.ciclo === dados.ciclo_atual));
+    .map(({ m }) => ({
+      m,
+      faltam: m.projetos.filter(
+        (p) => !dados.respostas.some((r) => r.municipio === m.id && r.projeto === p.id && r.ciclo === dados.ciclo_atual),
+      ),
+    }))
+    .filter(({ faltam }) => faltam.length > 0);
+  const reunioesDa = (m: MunicipioSemaforo) => dados.reunioes.filter((x) => x.municipio === m.id);
+  // Decisão 48: a reunião é marcada antes; a que já está marcada não entra em "a agendar".
+  const marcadas = linhas.flatMap(({ m }) =>
+    reunioesDa(m)
+      .filter((x) => situacaoDaReuniao(x, hoje) === 'agendada')
+      .map((x) => ({ m, x })),
+  );
   const aAgendar = linhas
     .map(({ m, s }) => {
-      const datas = dados.reunioes.filter((x) => x.municipio === m.id && x.data <= hoje).map((x) => x.data);
+      const datas = reunioesDa(m).filter((x) => x.data <= hoje).map((x) => x.data);
       return { m, s, datas, ultima: datas.reduce<string | null>((max, d) => (max === null || d > max ? d : max), null) };
     })
-    .filter(({ s, datas }) => !reuniaoEmDia(datas, s.cor_vigente, hoje));
+    .filter(({ m, s, datas }) => !marcadas.some((r) => r.m.id === m.id) && !reuniaoEmDia(datas, s.cor_vigente, hoje));
+  // Decisão 48: a ata vai até 5 dias úteis depois da reunião; a atrasada vem primeiro.
+  const atas = linhas
+    .flatMap(({ m }) => reunioesDa(m).map((x) => ({ m, x, situacao: situacaoDaReuniao(x, hoje) })))
+    .filter(({ situacao }) => situacao === 'ata_atrasada' || situacao === 'ata_a_registrar')
+    .sort((a, b) => (a.situacao === b.situacao ? a.x.data.localeCompare(b.x.data) : a.situacao === 'ata_atrasada' ? -1 : 1));
 
   const colunas: ColunaResponsiva<LinhaMunicipio>[] = [
     {
@@ -145,7 +167,9 @@ export default function PainelGestora(): JSX.Element {
       </div>
       <p>
         Hoje é {formatarDia(hoje)}. {carteira.length} municípios na carteira; {concluidas}{' '}
-        {concluidas === 1 ? 'tarefa já concluída' : 'tarefas já concluídas'}.
+        {concluidas === 1 ? 'tarefa já concluída' : 'tarefas já concluídas'}; {encerradas}{' '}
+        {encerradas === 1 ? 'tarefa encerrada' : 'tarefas encerradas'} sem fazer (canceladas pelo Comitê ou
+        substituídas), que continuam na ficha de cada município.
       </p>
 
       {GRUPOS.map(({ estado, titulo, vazio }) => {
@@ -163,14 +187,17 @@ export default function PainelGestora(): JSX.Element {
                 {doGrupo.map((t) => {
                   const m = municipioDe(t.municipio);
                   return (
-                    <li key={`${t.municipio}-${t.chave}-${t.criada_em}`} className="rounded border border-[#d9d9d9] bg-white p-3">
+                    <li key={t.id} className="rounded border border-[#d9d9d9] bg-white p-3">
                       <strong>{t.titulo}</strong>
                       {' · '}
                       {m ? <Link to={`/integra/semaforo/municipio/${m.id}`} state={estadoDaFicha}>{nomeDe(m)}</Link> : `Município ${t.municipio}`}
                       {' · '}prazo {formatarDia(t.prazo_em)}
                       {' · '}
                       <CorComNome cor={t.cor} rotulo="Da cor" />
-                      <span className="block text-sm text-[#3D3D3D]">Criada em {formatarDia(t.criada_em)}, quando a cor foi publicada.</span>
+                      <span className="block text-sm text-[#3D3D3D]">
+                        Criada em {formatarDia(t.criada_em)},{' '}
+                        {nasceuNaHora(t, dados.decisoes) ? 'quando a cor mudou na hora' : 'quando a cor foi publicada'}.
+                      </span>
                     </li>
                   );
                 })}
@@ -184,7 +211,7 @@ export default function PainelGestora(): JSX.Element {
         <Title level={2} id="semaforo-gestora-pendencias" style={{ fontSize: 20 }}>
           Pendências da carteira
         </Title>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <section aria-labelledby="semaforo-pendencia-pesquisa">
             <Title level={3} id="semaforo-pendencia-pesquisa" style={{ fontSize: 16 }}>
               Pesquisa sem resposta
@@ -197,9 +224,10 @@ export default function PainelGestora(): JSX.Element {
               <p>Todos os municípios da carteira já responderam.</p>
             ) : (
               <ul aria-label={`Pesquisa sem resposta no ciclo ${dados.ciclo_atual}`} className="m-0 pl-5">
-                {semResposta.map((m) => (
+                {semResposta.map(({ m, faltam }) => (
                   <li key={m.id}>
                     <Link to={`/integra/semaforo/municipio/${m.id}`} state={estadoDaFicha}>{nomeDe(m)}</Link>
+                    {m.projetos.length > 1 && ` (falta: ${faltam.map((p) => p.nome).join(', ')})`}
                   </li>
                 ))}
               </ul>
@@ -209,7 +237,10 @@ export default function PainelGestora(): JSX.Element {
             <Title level={3} id="semaforo-pendencia-reuniao" style={{ fontSize: 16 }}>
               Reunião de escuta a agendar
             </Title>
-            <p className="mb-2 text-sm">Sem reunião nos últimos 6 meses no verde, ou nos últimos 3 no amarelo e no vermelho.</p>
+            <p className="mb-2 text-sm">
+              Sem reunião nos últimos 6 meses no verde, ou nos últimos 3 no amarelo e no vermelho, e sem reunião já
+              marcada.
+            </p>
             {aAgendar.length === 0 ? (
               <p>Nenhuma reunião de escuta atrasada.</p>
             ) : (
@@ -228,10 +259,36 @@ export default function PainelGestora(): JSX.Element {
             <Title level={3} id="semaforo-pendencia-atas" style={{ fontSize: 16 }}>
               Atas a registrar
             </Title>
-            <p>
-              O protótipo não acompanha: a reunião de escuta entra já com o que ficou combinado. O prazo da ata (5 dias
-              úteis, sugestão do PDF) está em &ldquo;Para validar no dia 7&rdquo;.
-            </p>
+            <p className="mb-2 text-sm">A ata vai até 5 dias úteis depois da reunião; passado o prazo, fica atrasada.</p>
+            {atas.length === 0 ? (
+              <p>Nenhuma ata pendente.</p>
+            ) : (
+              <ul aria-label="Atas a registrar" className="m-0 pl-5">
+                {atas.map(({ m, x }) => (
+                  <li key={x.id}>
+                    <Link to={`/integra/semaforo/municipio/${m.id}`} state={estadoDaFicha}>{nomeDe(m)}</Link>
+                    {` · reunião de ${formatarDia(x.data)} · ${textoDaReuniao(x, hoje)}`}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <section aria-labelledby="semaforo-pendencia-marcadas">
+            <Title level={3} id="semaforo-pendencia-marcadas" style={{ fontSize: 16 }}>
+              Reuniões marcadas
+            </Title>
+            {marcadas.length === 0 ? (
+              <p>Nenhuma reunião de escuta marcada.</p>
+            ) : (
+              <ul aria-label="Reuniões marcadas" className="m-0 pl-5">
+                {marcadas.map(({ m, x }) => (
+                  <li key={x.id}>
+                    <Link to={`/integra/semaforo/municipio/${m.id}`} state={estadoDaFicha}>{nomeDe(m)}</Link>
+                    {` · ${formatarDia(x.data)}`}
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
         </div>
       </section>

@@ -19,7 +19,6 @@ import {
   type MunicipioDeslocamento,
 } from '../dados/deslocamento';
 import type { MeioDeslocamento } from '../dados/tipos';
-import { formatarHoras } from '../ica/calculo';
 import { CLASSE_CAMPO, CLASSE_ROTULO } from '../ica/componentes/estilos';
 import { EtiquetaFaixa } from './componentes';
 import { COR_FAIXA, ROTULO_MEIO } from './estilos';
@@ -117,7 +116,7 @@ export default function TemposPorMunicipio(): JSX.Element {
         de trabalho no município.
       </p>
 
-      <ul aria-label="Resumo do relatório" className="m-0 mb-3 grid list-none gap-2 p-0 sm:grid-cols-2 lg:grid-cols-3">
+      <ul aria-label="Resumo, com as correções do dono" className="m-0 mb-3 grid list-none gap-2 p-0 sm:grid-cols-2 lg:grid-cols-3">
         {[
           `${RESUMO.total} municípios`,
           `${RESUMO.porMeio.carro} por terra (carro)`,
@@ -131,9 +130,16 @@ export default function TemposPorMunicipio(): JSX.Element {
           </li>
         ))}
       </ul>
+      {/* Rodada 5: quem confere com o PDF na reunião vê por que os números diferem (decisões 53 e 54). */}
+      <p className="mb-2 text-sm">
+        Com as correções do dono, estes números diferem do PDF: {RESUMO.porMeio.carro} municípios só por terra, e não os
+        16 da página 1 (decisão 53); Craíbas-AL fica em Longo, e não em Muito longo (decisão 54), o que dá Longo{' '}
+        {RESUMO.porFaixa.longo} e Muito longo {RESUMO.porFaixa.muito_longo}, onde o PDF escreve 34 e 44.
+      </p>
       <p className="mb-6 text-sm">
-        O relatório calcula a mediana pela coluna Ida e dobra: dá {RESUMO.medianaDoRelatorio}. Com a coluna Ida e volta,
-        que o relatório arredondou à parte, a mediana dá {formatarHoras(RESUMO.medianaCalculada)}.
+        O tempo do meio é a mediana do relatório: {RESUMO.medianaDoRelatorio}. O ICA usa esse tempo, marcado como
+        estimado, para o município sem localidade definida. O protótipo usa o mesmo tempo para o local de formação que
+        não está no relatório (ponto em Para validar).
       </p>
 
       <div className="mb-6 grid gap-6 lg:grid-cols-2">

@@ -111,4 +111,18 @@ describe('quem vê cada tela na versão real', () => {
   test('as decisões já tomadas sobre acesso estão listadas', () => {
     expect(DECIDIDO.map((d) => d.numero)).toEqual(expect.arrayContaining([19, 20, 21, 22, 29]));
   });
+
+  test('as respostas do dono de 25/11 entram como decididas: decisões 30 a 57, uma vez cada, em ordem', () => {
+    const numeros = DECIDIDO.map((d) => d.numero);
+    const novas = Array.from({ length: 28 }, (_, i) => 30 + i);
+    expect(numeros.filter((n) => n >= 30)).toEqual(novas);
+    for (const d of DECIDIDO) expect(d.texto.trim(), `decisão ${d.numero}`).not.toBe('');
+    // Decisão 57: zerar contagem nunca apaga dado.
+    expect(DECIDIDO.find((d) => d.numero === 57)!.texto).toMatch(/nunca apaga/);
+  });
+
+  test('o Comitê: a SPE marca a data do ordinário e convoca o extraordinário (decisões 40 e 41); a pesquisa é por projeto (51)', () => {
+    expect(QUEM_VE.comite.quem.spe.nota).toMatch(/marca a data do Comitê ordinário e convoca o extraordinário/);
+    expect(QUEM_VE.pesquisa.aviso).toMatch(/uma vez por projeto/);
+  });
 });

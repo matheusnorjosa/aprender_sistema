@@ -10,7 +10,6 @@ import {
   PESOS_REVISADOS,
   calcularEquipe,
   compararPesos,
-  medianaDeslocamento,
 } from '../../ica/calculo';
 import { DESLOCAMENTO_MUNICIPIOS, medianaIdaVolta } from '../deslocamento';
 import { carregarDadosIntegra } from '../fonte';
@@ -53,8 +52,8 @@ describe('gerarDadosSimulados', () => {
 
   it('os 92 municípios do relatório de deslocamento, com o tempo real de ida e volta e o meio', () => {
     const ms = dados.base.municipios;
-    // 92 do relatório + o contrato sem município definido (Amigos do Bem).
-    expect(ms).toHaveLength(DESLOCAMENTO_MUNICIPIOS.length + 1);
+    // 92 do relatório + o Amigos do Bem, uma linha por localidade de formação (decisão 56: CE, AL e PE).
+    expect(ms).toHaveLength(DESLOCAMENTO_MUNICIPIOS.length + 3);
     expect(DESLOCAMENTO_MUNICIPIOS).toHaveLength(92);
     expect(new Set(ms.map((m) => `${m.nome}-${m.uf}`)).size).toBe(ms.length);
     for (const real of DESLOCAMENTO_MUNICIPIOS) {
@@ -81,13 +80,37 @@ describe('gerarDadosSimulados', () => {
     expect(suspensos.sort()).toEqual(doRelatorio.sort());
   });
 
-  it('um sem localidade (Amigos do Bem), que usa a mediana: a do relatório (17h45, até 5 min de arredondamento)', () => {
-    const semLocalidade = dados.base.municipios.filter((m) => m.deslocamento_horas === null);
-    expect(semLocalidade.map((m) => m.nome)).toEqual(['Amigos do Bem']);
-    expect(semLocalidade[0]?.deslocamento_meio).toBeNull();
-    const mediana = medianaDeslocamento(dados.base.municipios);
-    expect(mediana).toBe(medianaIdaVolta(DESLOCAMENTO_MUNICIPIOS));
-    expect(Math.abs(mediana - 17.75)).toBeLessThanOrEqual(5 / 60);
+  it('decisão 56: o Amigos do Bem tem uma linha por localidade de formação (CE, AL e PE), como no Aprender Sistema', () => {
+    const amigos = dados.base.municipios.filter((m) => m.nome.startsWith('Amigos do Bem'));
+    expect(amigos.map((m) => `${m.id} ${m.nome}-${m.uf}`)).toEqual([
+      // A linha de antes (id 93) continua no lugar; as novas vão no fim, para não mudar o sorteio do gerador.
+      '93 Amigos do Bem (Mauriti)-CE',
+      '94 Amigos do Bem (Santana do Ipanema)-AL',
+      '95 Amigos do Bem (Petrolina)-PE',
+    ]);
+    // O tempo é o da localidade quando ela está no relatório; Mauriti-CE não está: fica sem tempo (estimado).
+    const doRelatorio = (nome: string, uf: string) => DESLOCAMENTO_MUNICIPIOS.find((m) => m.nome === nome && m.uf === uf);
+    expect(amigos.map((m) => m.deslocamento_horas)).toEqual([
+      null,
+      doRelatorio('Santana do Ipanema', 'AL')?.ida_volta_horas,
+      doRelatorio('Petrolina', 'PE')?.ida_volta_horas,
+    ]);
+    expect(amigos.map((m) => m.deslocamento_meio)).toEqual([null, 'aviao', 'carro']);
+    const semTempo = dados.base.municipios.filter((m) => m.deslocamento_horas === null);
+    expect(semTempo.map((m) => m.nome)).toEqual(['Amigos do Bem (Mauriti)']);
+    // As três são da carteira do Rogério (110) e chegaram em 2026.2, com as turmas ainda não informadas.
+    for (const m of amigos) {
+      expect(dados.base.atendimentos.filter((a) => a.municipio === m.id).map((a) => a.coordenador)).toEqual([110]);
+      expect(dados.historico[1]?.base.atendimentos.some((a) => a.municipio === m.id)).toBe(false);
+    }
+  });
+
+  it('decisão 55: sem tempo no relatório, o ICA usa o tempo do meio do relatório (17h45 = 17,75 h)', () => {
+    expect(atual.mediana).toBe(17.75);
+    // A mediana da coluna Ida e volta (17h47,5) não entra mais na conta.
+    expect(atual.mediana).not.toBe(medianaIdaVolta(DESLOCAMENTO_MUNICIPIOS));
+    const rogerio = atual.coordenadores.find((r) => r.coordenador.id === 110);
+    expect(rogerio?.carteira.find((l) => l.municipio.nome === 'Amigos do Bem (Mauriti)')).toMatchObject({ horas: 17.75, estimado: true });
   });
 
   it('distribuição: 3 Sobrecarga (uma perto de 170), 2 Atenção, 6 Adequada, 5 Capacidade + 1 sem municípios', () => {

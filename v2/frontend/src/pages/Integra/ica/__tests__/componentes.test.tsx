@@ -53,6 +53,9 @@ describe('ICA — componentes de gráfico', { timeout: 20000 }, () => {
     expect(itens[0]).toHaveTextContent('130 ou mais');
     expect(itens[3]).toHaveTextContent('Capacidade disponível');
     expect(itens[3]).toHaveTextContent('abaixo de 80');
+    // Decisão 46: a palavra é "projeto", não "contrato".
+    expect(itens[3]).toHaveTextContent('Primeiros nomes para novos projetos ou retomadas.');
+    expect(lista).not.toHaveTextContent(/contrato/i);
     expect(screen.getByText(/Meta: todos entre 70 e 130/)).toBeInTheDocument();
   });
 

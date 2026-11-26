@@ -1,16 +1,17 @@
 /**
  * Peças comuns das telas do Semáforo que registram dados (Pesquisa, Relatório mensal) e da tela da Líder:
  * etiqueta de cor, aviso de quem vê na versão real, escolha do município e o retorno do registro
- * ("Antes: Verde → Agora: Vermelho", com o alerta que seria enviado).
+ * ("Antes: Verde → Agora: Vermelho", com o alerta que seria enviado e a cor em vigor, que no vermelho muda na
+ * hora: decisões 38 e 39).
  */
 import type { JSX } from 'react';
 
-import { CLASSE_CAMPO, CLASSE_ROTULO } from '../../ica/componentes/estilos';
+import { CLASSE_CAMPO, CLASSE_ROTULO, formatarDia } from '../../ica/componentes/estilos';
 import { QUEM_VE, type ChaveTela } from '../../quemVe';
 import { explicarCor, mudancaEntreCiclos, ROTULO_COR, textoSemDado } from '../regras';
 import { useSemaforoDemo } from '../SemaforoDemoContext';
 import type { CorIndicador } from '../tipos';
-import { COR_SEMAFORO, destinatariosDaPiora, nomeDoMunicipio, sugeridaAgora, type Retorno } from './corEAlerta';
+import { COR_SEMAFORO, coordenadoresDoMunicipio, destinatariosDaPiora, nomeDoMunicipio, sugeridaAgora, type Retorno } from './corEAlerta';
 
 /** A cor sempre com o nome escrito. */
 export function EtiquetaCor({ cor }: { cor: CorIndicador }): JSX.Element {
@@ -91,10 +92,26 @@ function RegistroFeito({ retorno }: { retorno: Extract<Retorno, { ok: true }> })
   const depois = sugeridaAgora(situacoes, retorno.municipio);
   if (!municipio || !situacao || !depois) return null;
   const { antes } = retorno;
+  // Registro que não mexe na cor (ex.: marcar uma reunião): só a frase do que foi feito.
+  if (!antes) {
+    return (
+      <div className="mt-3 rounded border border-[#8c8c8c] bg-white p-3">
+        <p className="m-0 font-semibold">{retorno.titulo}</p>
+      </div>
+    );
+  }
   const mudanca = mudancaEntreCiclos(antes.cor, depois.cor);
   const semDado = textoSemDado(depois);
   const gestora = dados.pessoas.find((p) => p.id === municipio.gestora_referencia)?.nome ?? 'Gestora de referência';
-  const coordenador = dados.coordenadores.find((c) => c.id === municipio.coordenador)?.nome ?? null;
+  // Decisão 46: os coordenadores de todos os projetos do município.
+  const coordenadores = coordenadoresDoMunicipio(municipio, dados.coordenadores).map((c) => c.nome);
+  // Decisões 38 e 42: o Comitê desfez o vermelho neste ciclo, e o mesmo alerta não muda a cor de novo
+  // (`aplicarVermelhoAutomatico`): a sugerida fica vermelha com outra cor em vigor.
+  const vigente = situacao.decisao_vigente;
+  const desfeito =
+    depois.vermelho_imediato && situacao.cor_vigente !== 'vermelho' && vigente?.ciclo === dados.ciclo_atual && vigente.origem !== 'vermelho_automatico'
+      ? vigente
+      : null;
 
   return (
     <div className="mt-3 rounded border border-[#8c8c8c] bg-white p-3">
@@ -107,20 +124,32 @@ function RegistroFeito({ retorno }: { retorno: Extract<Retorno, { ok: true }> })
       <p className="m-0">{explicarCor(depois)}</p>
       {semDado && <p className="m-0 text-sm">{semDado}</p>}
       <p className="m-0 mt-1 text-sm">
-        Cor em vigor (publicada pelo Comitê): {ROTULO_COR[situacao.cor_vigente]}. No protótipo, a cor em vigor só muda
-        quando o Comitê publicar.
+        Cor em vigor: {ROTULO_COR[situacao.cor_vigente]}
+        {situacao.aguardando_comite && retorno.aguardandoAntes ? ', ' : '. '}
+        {/* Decisões 38 e 39; o número fica fora do texto: não diz nada a quem registra. */}
+        {situacao.aguardando_comite && situacao.decisao_vigente
+          ? retorno.aguardandoAntes
+            ? `na hora desde ${formatarDia(situacao.decisao_vigente.publicada_em)}: as tarefas do vermelho começaram nessa data. O Comitê confirma ou desfaz depois.`
+            : `Mudou na hora com este registro: as tarefas do vermelho começaram em ${formatarDia(situacao.decisao_vigente.publicada_em)}. O Comitê confirma ou desfaz depois.`
+          : desfeito
+            ? `O Comitê desfez o vermelho em ${formatarDia(desfeito.publicada_em)}: o mesmo alerta não muda a cor em vigor de novo; só um alerta novo (outro indicador, ou um que piore) muda.`
+            : 'Só o vermelho muda a cor em vigor na hora; as outras mudanças esperam o Comitê.'}
       </p>
       {mudanca.mudanca === 'piorou' && depois.cor !== 'verde' && (
         <div className="mt-2 rounded border-l-4 border-[#A8251B] bg-[#FCE4E2] p-2 text-[#8A1C14]">
           <p className="m-0 font-semibold">
             Alerta: {nomeDoMunicipio(municipio)} passou para {ROTULO_COR[depois.cor].toLowerCase()}.
+            {/* Decisões 38 a 41 e 52: o vermelho vale na hora e a SPE decide se convoca o extraordinário; o aviso do amarelo continua. */}
             {depois.cor === 'vermelho'
-              ? ' Pelo PDF, a cor muda na hora e o Comitê pode ser convocado em reunião extraordinária; no protótipo, a cor em vigor espera o Comitê (ver "Para validar no dia 7").'
-              : ' O Comitê confirma a cor no fim do ciclo.'}
+              ? ' A SPE decide se convoca o Comitê extraordinário.'
+              : ' O Comitê ordinário confirma a cor, na data marcada pela SPE.'}
           </p>
-          <p className="m-0">Seria enviado para: {destinatariosDaPiora(depois.cor, gestora, coordenador).join(', ')}.</p>
+          <p className="m-0">Seria enviado para: {destinatariosDaPiora(depois.cor, gestora, coordenadores).join(', ')}.</p>
           {retorno.reservado && (
-            <p className="m-0">A Gestão Operacional não recebe este alerta: a queixa veio do momento reservado.</p>
+            <p className="m-0">
+              O alerta diz só a cor: o que foi dito no momento reservado não vai junto, e os coordenadores e a Gestão
+              Operacional não veem a queixa.
+            </p>
           )}
           <p className="m-0 text-sm">Nada é enviado no protótipo: o alerta só aparece aqui.</p>
         </div>

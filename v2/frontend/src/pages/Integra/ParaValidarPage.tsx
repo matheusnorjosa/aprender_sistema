@@ -15,7 +15,7 @@
  * protótipo só usa nomes fictícios; a matriz usa só papéis. Só listas e cartões (a matriz também: um
  * cartão por tela), e a página nunca rola para o lado.
  *
- * As perguntas que o dono respondeu em 25/11 (decisões 30 a 57, `liberacao/relatorios/integra_decisoes_2026-11-24.md`)
+ * As perguntas que o dono respondeu em 25/11 e 26/11 (decisões 30 a 94, `liberacao/relatorios/integra_decisoes_2026-11-24.md`)
  * ficam nos cartões com o selo "Decidido (decisão N)": o par "Para decidir" vira "Decidido", com a resposta. As
  * leituras que o protótipo teve de fazer para aplicar essas respostas continuam como pontos para decidir.
  */
@@ -58,7 +58,7 @@ const TEMAS: Tema[] = [
         oQueDiz:
           'O PDF sugere que o coordenador consulte o próprio ICA e a composição da carteira. Na reunião, ficou decidido que o ICA é só para gestores: o coordenador não vê nem a própria ficha.',
         prototipo:
-          'Segue a decisão 21 (em "Já decidido", abaixo): o coordenador não entra na Integra e não vê o ICA, nem a própria ficha. Só entram na Integra os superusuários, as gerentes da Superintendência (NFP) e quem está lotado como Equipe ou Gerente na gerência SPE. A Diretoria entra quando a gerência dela estiver cadastrada no Aprender Sistema, o que ainda não aconteceu.',
+          'Segue a decisão 21 (em "Já decidido", abaixo): o coordenador não entra na Integra e não vê o ICA, nem a própria ficha. Só entram na Integra os superusuários, as gerentes da Superintendência (NFP) e quem está lotado como Equipe ou Gerente na gerência SPE. A regra de hoje também abriria a Integra para a gerência Diretoria, se ela fosse cadastrada no Aprender Sistema. Mas a Diretoria não entra com login próprio (decisão 67): essa gerência não precisa ser criada, e a direção vê pelo login de quem apresenta (decisão 17). Na versão real, cada gerente ganha uma marca de cargo na Integra, que abre a Integra e define o que ela vê (decisão 87), e aprovar eventos fica separado (decisão 68).',
         paraDecidir: 'Nada: a decisão 21 já fechou este ponto. Ele fica na lista porque tira uma sugestão do PDF.',
       },
       {
@@ -67,7 +67,7 @@ const TEMAS: Tema[] = [
         oQueDiz:
           'O PDF diz que a Líder do NFP aprova os remanejamentos. Na reunião, a Líder ficou só com papel consultivo, sem aprovação.',
         prototipo:
-          'Segue a decisão 20 (em "Já decidido", abaixo): a gestora pedagógica propõe e a SPE aplica; a Líder do NFP só consulta. No simulador, o botão é "Aprovar (SPE)", e quem tem acesso aparece como "Você (demonstração)". Nos remanejamentos simulados dos semestres anteriores, quem aprovou ainda aparece como "Líder do NFP", como no PDF.',
+          'Segue a decisão 20 (em "Já decidido", abaixo): a gestora pedagógica propõe e a SPE aplica; a Líder do NFP só consulta. No simulador, o botão é "Aprovar (SPE)", e quem tem acesso aparece como "Você (demonstração)". Ao aplicar, a SPE escolhe a data em que o remanejamento passa a valer (decisão 71). Nos remanejamentos simulados dos semestres anteriores, quem aprovou ainda aparece como "Líder do NFP", como no PDF.',
         paraDecidir: 'Quem aprova já está decidido. Falta só: a Líder do NFP é avisada de cada remanejamento aplicado?',
       },
       {
@@ -76,8 +76,13 @@ const TEMAS: Tema[] = [
         oQueDiz:
           'O registro é confidencial: a gestora de referência e a SPE veem; a sugestão é que a Líder do NFP também veja. O coordenador do município nunca vê.',
         prototipo:
-          'A queixa do momento reservado entra junto com a reunião de escuta, na tela Relatório mensal e formulários. Ela conta nas ocorrências do município e aparece na ficha dele como "Momento reservado (confidencial)". No protótipo, quem tem acesso à Integra vê tudo (decisão de 24/11); quem vê na versão real está em "Quem vê o quê", abaixo.',
+          'A queixa do momento reservado entra junto com a reunião de escuta, na tela Relatório mensal e formulários. Ela conta nas ocorrências do município e aparece na ficha dele como "Momento reservado (confidencial)". No protótipo, quem tem acesso à Integra vê tudo (decisão de 24/11). A ata e o alerta dizem que só a gestora de referência principal, a Líder do NFP e a SPE leem.',
         paraDecidir: 'A Líder do NFP vê o momento reservado?',
+        decidido: {
+          numero: 78,
+          resposta:
+            'A Líder do NFP lê o momento reservado, junto com a gestora de referência principal e a SPE; ninguém mais. No município com gestora principal e compartilhada, só a principal lê (decisão 62).',
+        },
       },
       {
         titulo: 'Painel do coordenador no Semáforo',
@@ -85,8 +90,13 @@ const TEMAS: Tema[] = [
         oQueDiz:
           'O coordenador veria os relatórios mensais a preencher e o resultado agregado da pesquisa dos seus municípios, sem o momento reservado e sem saber quem respondeu.',
         prototipo:
-          'Segue a decisão 21: o coordenador não entra na Integra; o relatório mensal e as tarefas dele no amarelo ficam numa tela à parte do sistema. Essa tela ainda não existe no protótipo: o relatório mensal está na tela Relatório mensal e formulários, preenchido por quem entra na Integra.',
+          'Segue a decisão 21: o coordenador não entra na Integra; o relatório mensal e as tarefas dele no amarelo ficam numa tela à parte do sistema. Essa tela ainda não existe no protótipo: o relatório mensal está na tela Relatório mensal e formulários, preenchido por quem entra na Integra, e a nota dessa tela diz o que o coordenador verá na tela à parte.',
         paraDecidir: 'O que mais entra na tela à parte do coordenador? Por exemplo, o resultado agregado da pesquisa dos municípios dele, sem o momento reservado e sem saber quem respondeu.',
+        decidido: {
+          numero: 80,
+          resposta:
+            'A tela à parte do coordenador mostra o resultado juntado da pesquisa dos seus projetos, sem o momento reservado e sem saber quem respondeu.',
+        },
       },
     ],
   },
@@ -107,8 +117,14 @@ const TEMAS: Tema[] = [
         origem: 'Diferença entre o PDF do ICA (seção 2) e a ata de 23/11',
         oQueDiz:
           'O PDF conta 1 frente para cada município com cada coleção. A tabela de pesos da ata fala em município × coleção × segmento.',
-        prototipo: 'Segue o PDF: cada coleção em cada município é 1 frente, com qualquer número de segmentos.',
+        prototipo:
+          'Cada ano de cada coleção no município é uma frente: Novo Lendo com 1º e 2º ano, Tema com 1º e 2º ano e Infantil com 1, 2 e 3 dão 7 frentes. No ICA, a linha se chama "Frentes (cada ano de cada coleção)". Os anos de AMMA, Superativar e Primeiros Passos não foram ditos na reunião: o protótipo usa 1 ano por segmento, e na versão real os anos vêm do cadastro. No Histórico do protótipo, os semestres anteriores também foram refeitos com essa regra.',
         paraDecidir: 'Qual das duas vale?',
+        decidido: {
+          numero: 59,
+          resposta:
+            'Frente é cada ano (segmento) de cada coleção no município, como foi dito na reunião de 23/11, e não município × coleção, como no PDF.',
+        },
       },
       {
         titulo: 'Quem está sem municípios entra na conta de "Capacidade disponível"?',
@@ -118,6 +134,10 @@ const TEMAS: Tema[] = [
         prototipo:
           'Segue o PDF: quem está sem municípios fica fora dos estratos e tem um cartão próprio no Painel. Nos dados simulados, um dos 17 está sem municípios, por isso o Painel mostra 5 com capacidade disponível e 1 sem municípios.',
         paraDecidir: 'Confirmar que quem está sem municípios fica fora dos estratos. Na equipe real, alguém está sem municípios hoje?',
+        decidido: {
+          numero: 70,
+          resposta: 'Coordenador sem municípios fica à parte, fora das faixas e da média, como no protótipo.',
+        },
       },
       {
         titulo: 'Alerta de Sobrecarga: só quem entra, ou também quem continua?',
@@ -125,16 +145,26 @@ const TEMAS: Tema[] = [
         oQueDiz:
           'O PDF manda avisar quando o coordenador entra em Sobrecarga (130 ou mais). Na reunião, o alerta foi lido como "coordenador em Sobrecarga".',
         prototipo:
-          'Segue o PDF: o aviso "Entrou em Sobrecarga" compara com o cálculo anterior, que é o do semestre anterior ou, depois de um remanejamento ou de uma troca de pesos, o cálculo publicado do semestre. Quem já estava em Sobrecarga não recebe o aviso de novo e continua no alerta "Fora da meta", que vai só para a SPE, quando passa de 130 (a meta vai até 130). Com 130 exato, fica dentro da meta e sem alerta.',
+          'O alerta "está em Sobrecarga" sai a cada recálculo enquanto o coordenador estiver na faixa (130 ou mais), para a SPE, a gestora pedagógica dele e a Líder do NFP. Quem está em Sobrecarga não recebe também o alerta "Fora da meta", que fica para quem está abaixo de 70 e vai só para a SPE. Com 130 exato, o coordenador está dentro da meta, mas na faixa de Sobrecarga: recebe o alerta de Sobrecarga.',
         paraDecidir: 'Quem continua em Sobrecarga recebe o aviso de novo a cada recálculo? A gestora pedagógica e a Líder do NFP também recebem?',
+        decidido: {
+          numero: 69,
+          resposta:
+            'O alerta de Sobrecarga sai a cada recálculo enquanto o coordenador continuar na faixa, para a SPE, a gestora pedagógica dele e a Líder do NFP.',
+        },
       },
       {
         titulo: 'Publicação em até 5 dias úteis, depois da conferência da SPE',
         origem: 'Sugestão do PDF do ICA (seção 4)',
         oQueDiz:
           'Quando muda um projeto, uma coleção ou um status, o ICA é refeito na hora e publicado depois que a SPE confere, em até 5 dias úteis.',
-        prototipo: 'Não há etapa de publicação: a conta é refeita na hora, a cada mudança na tela.',
+        prototipo:
+          'Não há etapa de publicação: a conta é refeita na hora, a cada mudança na tela. A tela Histórico diz que, na versão real, a SPE confere o cálculo e o ICA é publicado em até 5 dias úteis depois da conferência.',
         paraDecidir: 'Manter a conferência da SPE antes de publicar? E o prazo de 5 dias úteis?',
+        decidido: {
+          numero: 72,
+          resposta: 'A SPE confere o cálculo, e o ICA é publicado em até 5 dias úteis depois da conferência.',
+        },
       },
     ],
   },
@@ -149,6 +179,30 @@ const TEMAS: Tema[] = [
           'Cada município terá uma gestora de referência, responsável pelo relacionamento. Duas gestoras (Tema e Novo Lendo) dividiriam o acesso a parte dos municípios.',
         prototipo: 'Cada município tem uma gestora de referência só (nomes fictícios). Não há acesso compartilhado.',
         paraDecidir: 'Um município pode ter duas gestoras? Ou uma responde e a outra só consulta?',
+        decidido: {
+          numero: 61,
+          resposta:
+            'A Gerente Operacional monta a lista de gestora de referência de cada município e propõe a troca; a SPE aprova (decisão 61). No município com gestora principal e compartilhada, só a principal lê o momento reservado (decisão 62). Coordenador não pode ser referência: a referência é sempre uma gestora (decisão 63).',
+        },
+      },
+      {
+        titulo: 'Gestora compartilhada: o que ela faz no município?',
+        origem: 'Leitura do protótipo: decisões 61 e 62 (a pergunta do acesso compartilhado foi respondida em parte)',
+        oQueDiz:
+          'No município com gestora principal e compartilhada, só a principal lê o momento reservado (decisão 62). Nenhuma decisão diz o que a compartilhada faz: as tarefas, a reunião de escuta, o link da pesquisa e o painel.',
+        prototipo: 'Cada município tem uma gestora de referência só (nomes fictícios). Não há gestora compartilhada.',
+        paraDecidir:
+          'A gestora compartilhada recebe as tarefas e os alertas do município, faz a reunião de escuta, manda o link da pesquisa e vê o município no painel dela? Ou só consulta?',
+      },
+      {
+        titulo: 'Quem grava na carteira o remanejamento aplicado?',
+        origem: 'Leitura do protótipo: decisões 20 e 58',
+        oQueDiz:
+          'A Gerente Operacional mantém a carteira; na ausência dela, a SPE registra (decisão 58). No remanejamento do ICA, a SPE aplica (decisão 20), e o remanejamento aplicado volta para a carteira no Aprender Sistema.',
+        prototipo:
+          'No Simulador, a SPE aplica o remanejamento e escolhe a data em que ele passa a valer (decisão 71). No protótipo, a carteira muda na hora; na versão real, muda nessa data. A Gerente Operacional não entra nesse caminho.',
+        paraDecidir:
+          'Ao aplicar, a SPE já grava a mudança na carteira (decisão 20), ou a Gerente Operacional, que mantém a carteira, é quem grava (decisão 58)?',
       },
       {
         titulo: 'A gestora com 29 municípios fica sozinha?',
@@ -156,6 +210,10 @@ const TEMAS: Tema[] = [
         oQueDiz: 'Uma gestora ficaria com 29 municípios; falou-se em ter um coordenador de referência para apoiar.',
         prototipo: 'Não existe o papel de coordenador de referência; cada município tem uma gestora só.',
         paraDecidir: 'Criar o papel de apoio ou dividir a carteira?',
+        decidido: {
+          numero: 66,
+          resposta: 'A gestora da gerência AMMA fica com os 29 municípios sozinha; não há coordenador de referência (decisão 63).',
+        },
       },
     ],
   },
@@ -168,17 +226,37 @@ const TEMAS: Tema[] = [
         origem: 'Sugestão do PDF do Semáforo (seção 2)',
         oQueDiz: 'A pesquisa do articulador é bimestral, e a resposta vale se chegar em até 10 dias depois do envio.',
         prototipo:
-          'Não há envio de link no protótipo, então o prazo é fixo: vale a resposta até o dia 20 do segundo mês do ciclo (no ciclo de novembro e dezembro, até 20/12). A tela da pesquisa mostra esse prazo. Contar 10 dias a partir do envio fica para a versão real, quando houver o link.',
+          'O prazo é de 10 dias úteis depois do envio do link. A tela da pesquisa e o painel da gestora mostram a data do envio e o prazo (ver o ponto abaixo).',
         paraDecidir: 'Confirmar os 10 dias a partir do envio.',
+        decidido: { numero: 76, resposta: 'O articulador responde a pesquisa em até 10 dias úteis.' },
+      },
+      {
+        titulo: 'Quando a gestora manda o link da pesquisa?',
+        origem: 'Leitura do protótipo: decisões 73 e 76 (a gestora de referência manda o link; a resposta vai até 10 dias úteis)',
+        oQueDiz:
+          'A gestora de referência manda o link ao articulador, sem o coordenador (decisão 73), e ele responde em até 10 dias úteis (decisão 76). Nenhuma decisão diz em que dia do ciclo o link sai.',
+        prototipo:
+          'O protótipo não manda link: considera que a gestora o manda no 1º dia útil do segundo mês do ciclo. No ciclo de novembro e dezembro, o link sai em 01/12/2026 e o prazo vai até 15/12/2026.',
+        paraDecidir: 'Em que dia do ciclo a gestora manda o link da pesquisa? É uma data fixa para todas, ou cada gestora escolhe?',
       },
       {
         titulo: 'Relatório mensal até o 5º dia útil do mês seguinte',
         origem: 'Sugestão do PDF do Semáforo (seção 2)',
         oQueDiz: 'O coordenador manda o relatório mensal até o 5º dia útil do mês seguinte.',
         prototipo:
-          'O relatório entra sem prazo e sem aviso de atraso, mas só para os meses do ciclo atual, até o mês corrente. Assim, o mês em andamento já pode entrar antes de o mês terminar, e o relatório do último mês de um ciclo não entra depois que o ciclo vira. A ocorrência tem a mesma trava: a ocorrência de um ciclo que já fechou não pode ser registrada depois. As formações e visitas realizadas sobre as previstas dão o cronograma cumprido do ciclo.',
+          'O formulário mostra o prazo de cada mês, até o 5º dia útil do mês seguinte (o de novembro de 2026 vence em 07/12/2026), e avisa "Atrasado" quando o prazo passou sem o relatório. As formações vêm preenchidas com o que o sistema tem, e as visitas vêm da Logística e da FRV (decisões 81 e 82) e ficam só para leitura; quem muda um número que veio do sistema escreve a justificativa. O relatório entra só para os meses do ciclo atual, até o mês corrente: o mês em andamento já pode entrar antes de o mês terminar. A ocorrência tem a mesma trava: a ocorrência de um ciclo que já fechou não pode ser registrada depois (ver o ponto abaixo). As formações e visitas realizadas sobre as previstas dão o cronograma cumprido do ciclo.',
+        paraDecidir: 'Confirmar o prazo.',
+        decidido: { numero: 77, resposta: 'O relatório mensal vence no 5º dia útil do mês seguinte.' },
+      },
+      {
+        titulo: 'Relatório do último mês do ciclo: entra depois que o ciclo vira?',
+        origem: 'Leitura do protótipo: decisão 77 (o relatório vence no 5º dia útil do mês seguinte)',
+        oQueDiz:
+          'O relatório de um mês vence no 5º dia útil do mês seguinte. O último mês de um ciclo vence, então, já no ciclo seguinte.',
+        prototipo:
+          'O relatório entra só para os meses do ciclo atual. O de dezembro, último mês do ciclo de novembro e dezembro, não entra depois que o ciclo vira, mesmo antes de vencer. A ocorrência de um ciclo que já fechou também não pode ser registrada depois.',
         paraDecidir:
-          'Confirmar o prazo. O relatório do último mês do ciclo pode entrar no começo do ciclo seguinte, até o 5º dia útil? O mês em andamento pode entrar antes de terminar? E a ocorrência de um ciclo que já fechou pode ser registrada depois, se ela conta na cor do ano (decisão 32)?',
+          'O relatório do último mês do ciclo pode entrar no começo do ciclo seguinte, até o prazo? O mês em andamento pode entrar antes de terminar? E a ocorrência de um ciclo que já fechou pode ser registrada depois, se ela conta na cor do ano (decisão 32)?',
       },
       {
         titulo: 'Ata da reunião de escuta em até 5 dias úteis',
@@ -220,6 +298,7 @@ const TEMAS: Tema[] = [
         prototipo:
           'Segue esta regra: o indicador sem dado aparece escrito "Sem dado" e não conta para a cor. Isso vale para a média, o NPS, o cronograma (nada previsto no período) e a resposta à pesquisa. Ocorrências nunca ficam sem dado: nenhuma ocorrência é verde.',
         paraDecidir: 'Confirmar.',
+        decidido: { numero: 79, resposta: 'Indicador sem dado fica fora da conta da cor, como no protótipo.' },
       },
       {
         titulo: 'Município que não responde à pesquisa',
@@ -227,8 +306,12 @@ const TEMAS: Tema[] = [
         oQueDiz:
           'Não responder é falta de compromisso ou insatisfação? Pelo PDF, não responder em um ciclo deixa o indicador amarelo; em dois ciclos seguidos, vermelho.',
         prototipo:
-          'Segue o PDF: um ciclo sem resposta deixa o indicador "Resposta à pesquisa" amarelo; dois seguidos, vermelho. Enquanto o prazo está aberto e ninguém respondeu, ele fica "sem dado", e não amarelo. Sem resposta, a média e o NPS também ficam sem dado, para a mesma falta não pesar duas vezes. O Comitê confirma a cor e pode mudá-la, com justificativa.',
+          'Segue o PDF: um ciclo sem resposta deixa o indicador "Resposta à pesquisa" amarelo; dois seguidos, vermelho. Enquanto o prazo está aberto (10 dias úteis depois do envio do link, decisão 76) e ninguém respondeu, ele fica "sem dado", e não amarelo. Sem resposta, a média e o NPS também ficam sem dado, para a mesma falta não pesar duas vezes. O Comitê confirma a cor e pode mudá-la, com justificativa.',
         paraDecidir: 'A regra do PDF basta, ou o "não respondeu" pede outro tratamento?',
+        decidido: {
+          numero: 75,
+          resposta: '1 ciclo sem resposta deixa o indicador amarelo; 2 seguidos, vermelho, como no PDF.',
+        },
       },
     ],
   },
@@ -597,7 +680,7 @@ const TEMAS: Tema[] = [
         oQueDiz:
           'O PDF põe a observação de uma formação entre as tarefas do amarelo, em que agem a gestora de referência e os coordenadores (seção 5). Na coleta 6, quem registra a observação é a gestora pedagógica. A decisão 36 respondeu só pelas tarefas do vermelho.',
         prototipo:
-          'O amarelo fica com a gestora de referência e os coordenadores, e o alerta de prazo da observação vai para eles e para a SPE. Já o formulário da observação, na tela Relatório mensal e formulários, é da gestora pedagógica.',
+          'O amarelo fica com a gestora de referência e os coordenadores, e o alerta de prazo da observação vai para eles e para a SPE. A observação em si é registrada na DFF (decisão 94), e o Semáforo lê de lá.',
         paraDecidir: 'Quem faz a observação de formação do amarelo, e quem recebe o alerta do prazo dela?',
       },
       {
@@ -634,8 +717,17 @@ const TEMAS: Tema[] = [
         oQueDiz:
           'O cronograma cumprido é o realizado dividido pelo previsto no ciclo. A formação adiada pode acontecer num mês seguinte, e as decisões não dizem se o realizado do mês pode passar do previsto.',
         prototipo:
-          'A tela aceita mais formações ou visitas realizadas que previstas, sem aviso. A conta soma o ciclo inteiro e pode passar de 100%: 2 de 5 em novembro e 8 de 5 em dezembro dão 100% e verde, e o mês fraco some. Um erro de digitação (40 no lugar de 4) também passa.',
+          'Só as formações são digitadas: vêm pré-preenchidas do sistema, e a tela aceita mais realizadas que previstas, sem aviso; quem muda um número que veio do sistema só precisa escrever a justificativa (decisão 81). As visitas vêm da Logística e do pedido de viagem (FRV) (decisão 82) e ficam só para leitura. A conta soma o ciclo inteiro e pode passar de 100%: 2 de 5 em novembro e 8 de 5 em dezembro dão 100% e verde, e o mês fraco some. Um erro de digitação (40 no lugar de 4) também passa, se vier com justificativa.',
         paraDecidir: 'O realizado pode passar do previsto no mês (reposição)? Se puder, o cronograma fica limitado a 100%? Se não puder, a tela recusa?',
+      },
+      {
+        titulo: 'Relatório mensal: quando o coordenador justifica, e as visitas podem ser corrigidas?',
+        origem: 'Leitura do protótipo: decisões 81 e 82',
+        oQueDiz:
+          'O relatório mensal vem pré-preenchido com as formações do sistema, e o coordenador confere e justifica (decisão 81). As visitas vêm da Logística e do pedido de viagem (FRV) (decisão 82). As decisões não dizem quando a justificativa é obrigatória, nem se o coordenador pode corrigir uma visita.',
+        prototipo:
+          'A justificativa é obrigatória só quando o coordenador muda um número que veio do sistema; sem mudança, o relatório entra sem ela. As visitas aparecem só para leitura: o coordenador não muda nem justifica uma visita que veio errada.',
+        paraDecidir: 'A justificativa vale só quando um número muda, ou sempre? O coordenador pode corrigir uma visita que veio errada da FRV? Se puder, com justificativa?',
       },
       {
         titulo: 'Alerta de prazo "um dia antes": dia corrido ou dia útil?',
@@ -751,15 +843,26 @@ const TEMAS: Tema[] = [
         origem: 'Ponto em aberto da reunião de 23/11',
         oQueDiz: 'Os gerentes já usam outras ferramentas, como o Formar, o Avaliar e a frequência.',
         prototipo:
-          'A Integra tem 5 cartões: ICA, Semáforo, Deslocamento, DFF (no link atual) e Avaliação do Coordenador (em breve). Formar e Avaliar já têm link no sistema e podem virar cartões.',
+          'A Integra tem 7 cartões: ICA, Semáforo, Deslocamento, DFF, Formar, Avaliar e Tríade (em breve). DFF, Formar e Avaliar são atalhos que abrem a plataforma em outra aba. A frequência e a ferramenta do formador ainda não têm endereço no sistema e ficam de fora por enquanto.',
         paraDecidir: 'Quais entram, e em que ordem?',
+        decidido: {
+          numero: 84,
+          resposta:
+            'Outras ferramentas (Formar, Avaliar, frequência, ferramenta do formador) entram só como botões de atalho para as plataformas delas, como a DFF. Por agora, só Formar e Avaliar.',
+        },
       },
       {
         titulo: 'Como avaliar a parte subjetiva da avaliação do gestor',
         origem: 'Ponto em aberto da reunião de 23/11',
         oQueDiz: 'A avaliação do gestor tem uma parte objetiva (prazos e entregas) e uma subjetiva (qualidade das entregas).',
-        prototipo: 'A Avaliação do Coordenador fica para depois do ICA e do Semáforo; o cartão aparece como "em breve".',
+        prototipo:
+          'A Avaliação do Coordenador agora se chama Tríade (decisão 86). Ela fica para depois do ICA e do Semáforo; o cartão aparece como "em breve".',
         paraDecidir: 'Notas, conceitos ou indicadores?',
+        decidido: {
+          numero: 88,
+          resposta:
+            'A parte subjetiva da gerência na Tríade usa só os 4 níveis: a marcação de cada indicador. A avaliação completa de um coordenador é vista pela gestora dele e pela SPE (decisão 89).',
+        },
       },
       {
         titulo: 'Filtrar na DFF os formadores que cada coordenador acompanhou',
@@ -767,6 +870,11 @@ const TEMAS: Tema[] = [
         oQueDiz: 'A ideia é mandar o link da avaliação só para os formadores que cada coordenador acompanhou.',
         prototipo: 'Não entra nesta entrega: a DFF abre no link atual, em outra aba.',
         paraDecidir: 'A DFF registra quem acompanhou quem? Se sim, o Aprender Sistema pode ler esse vínculo.',
+        decidido: {
+          numero: 93,
+          resposta:
+            'A DFF fica à parte, com um botão na Integra, até migrar para dentro do sistema (decisão 92). A lista de formadores de cada coordenador vem da DFF, e a gerente confirma, acrescenta ou tira, com registro de quem mudou.',
+        },
       },
       {
         titulo: 'Observação de formação: registrada no Semáforo ou feita na DFF?',
@@ -774,9 +882,13 @@ const TEMAS: Tema[] = [
         oQueDiz:
           'Pelo PDF do Semáforo, a gestora pedagógica registra as observações de formação num formulário do sistema, e elas vão para o PDI do coordenador na Plataforma DFF. O cartão da DFF, na página da Integra, diz que a observação de formação é feita lá.',
         prototipo:
-          'Segue o PDF: a observação é registrada na tela Relatório mensal e formulários do Semáforo e, na demonstração, fica só na lista do que foi registrado na sessão.',
+          'A tela Relatório mensal e formulários não tem mais o formulário da observação: ela diz que a observação é registrada na DFF, junto do PDI, e mostra só para leitura as observações (simuladas) lidas da DFF para cada município.',
         paraDecidir:
           'Onde a observação nasce: num formulário novo do Aprender Sistema, que manda para a DFF, ou na DFF, e o Aprender Sistema lê de lá?',
+        decidido: {
+          numero: 94,
+          resposta: 'A observação de formação é registrada na DFF, junto do PDI; o Aprender Sistema lê de lá para o Semáforo.',
+        },
       },
     ],
   },
@@ -808,19 +920,21 @@ const DADOS_ICA: Dado[] = [
   { dado: 'Município (nome e UF)', onde: ['aprender'], detalhe: 'Cadastro de municípios do Aprender Sistema.' },
   {
     dado: 'Coleções e frentes',
-    onde: ['aprender'],
-    detalhe: 'As coleções já estão cadastradas; o que cada município recebe está no Plano Anual (menu Controle).',
+    onde: ['aprender', 'falta'],
+    detalhe:
+      'As coleções já estão cadastradas; o que cada município recebe está no Plano Anual (menu Controle). Cada ano de cada coleção é uma frente (decisão 59), e os anos de cada coleção ainda não estão no cadastro.',
   },
   {
     dado: 'Coordenador de cada projeto',
     onde: ['aprender'],
     detalhe:
-      'O coordenador de cada projeto do município no Plano Anual e a equipe de cada gerência. Um município pode ter projetos de coordenadores diferentes.',
+      'O coordenador de cada projeto do município no Plano Anual e a equipe de cada gerência. Um município pode ter projetos de coordenadores diferentes. A carteira é mantida pela Gerente Operacional; na ausência dela, a SPE registra (decisão 58).',
   },
   {
     dado: 'Coordenador: atuação e gestora pedagógica',
     onde: ['aprender'],
-    detalhe: 'A gerência e a equipe dela. A atuação (Alfabetização + EI, AMMA, Educação Infantil) precisa ser conferida no cadastro.',
+    detalhe:
+      'A gerência e a equipe dela. A atuação (Alfabetização + EI, AMMA, Educação Infantil) precisa ser conferida no cadastro. O vínculo de cada coordenador com a sua gestora é mantido pela Gerente Operacional (decisão 64).',
   },
   {
     dado: 'Professores em formação',
@@ -837,7 +951,8 @@ const DADOS_ICA: Dado[] = [
   {
     dado: 'Gestora de referência',
     onde: ['falta'],
-    detalhe: 'Função nova, combinada em 23/11. É o mesmo cadastro para o ICA e o Semáforo.',
+    detalhe:
+      'Função nova, combinada em 23/11. É o mesmo cadastro para o ICA e o Semáforo. A Gerente Operacional monta a lista, e a SPE aprova a troca (decisão 61).',
   },
   {
     dado: 'Tempo de deslocamento',
@@ -848,7 +963,8 @@ const DADOS_ICA: Dado[] = [
   {
     dado: 'Pesos, versões e remanejamentos',
     onde: ['falta'],
-    detalhe: 'Registro novo no Aprender Sistema, com autor, data e valor anterior (trilha de auditoria).',
+    detalhe:
+      'Registro novo no Aprender Sistema, com autor, data e valor anterior (trilha de auditoria). O remanejamento guarda também a data em que passa a valer, escolhida pela SPE (decisão 71).',
   },
 ];
 
@@ -867,13 +983,13 @@ const DADOS_SEMAFORO: Dado[] = [
   {
     dado: 'Visitas previstas e realizadas',
     onde: ['logistica'],
-    detalhe: 'O pedido de viagem da FRV, quando migrar, pode dizer que visitas aconteceram.',
+    detalhe: 'O pedido de viagem da FRV, quando migrar, diz que visitas aconteceram; o relatório mensal mostra esse número só para leitura (decisão 82).',
   },
   {
     dado: 'Relatório mensal de cada projeto',
     onde: ['falta'],
     detalhe:
-      'Formulário novo, um por projeto e mês, mandado pelo coordenador do projeto. A parte das formações pode vir preenchida com o que o Aprender Sistema já tem. Se o coordenador corrige um mês, vale o novo, e a versão anterior fica guardada.',
+      'Formulário novo, um por projeto e mês, mandado pelo coordenador do projeto. As formações vêm preenchidas com o que o Aprender Sistema já tem, e o coordenador confere e justifica o que mudar (decisão 81). Se o coordenador corrige um mês, vale o novo, e a versão anterior fica guardada.',
   },
   {
     dado: 'Ocorrências',
@@ -893,14 +1009,15 @@ const DADOS_SEMAFORO: Dado[] = [
   },
   {
     dado: 'Observação de formação',
-    onde: ['falta'],
+    onde: ['dff'],
     detalhe:
-      'Formulário novo, pelo PDF do Semáforo (coleta 6): a gestora pedagógica registra a observação, e ela vai para o PDI do coordenador na Plataforma DFF. No protótipo, fica na tela Relatório mensal e formulários. Se a observação já é feita na DFF, a origem muda: ver "A Integra e as outras ferramentas", acima.',
+      'Registrada na DFF, junto do PDI do coordenador na Plataforma DFF (decisão 94); o Aprender Sistema lê de lá para o Semáforo. No protótipo, a tela Relatório mensal e formulários mostra as observações simuladas, só para leitura.',
   },
   {
     dado: 'Vínculo formador × coordenador',
     onde: ['dff'],
-    detalhe: 'Para a Avaliação do Coordenador: quais formadores cada coordenador acompanhou. A confirmar se a DFF registra.',
+    detalhe:
+      'Para a Tríade: a lista de formadores de cada coordenador vem da DFF, e a gerente confirma, acrescenta ou tira, com registro de quem mudou (decisão 93).',
   },
   {
     dado: 'Coleções, coordenadores e gestora do município',
@@ -945,15 +1062,16 @@ const DESTINOS: Destino[] = [
   {
     resultado: 'Cor do Semáforo',
     vaiPara:
-      'Comitê de Satisfação Municipal e quem age em cada cor, com as tarefas e os prazos: a gestora de referência; no amarelo, também os coordenadores dos projetos; no vermelho, também a gestora pedagógica. Pelo Aprender Sistema, os outros módulos, como o comercial e o relacionamento.',
+      'Comitê de Satisfação Municipal e quem age em cada cor, com as tarefas e os prazos: a gestora de referência; no amarelo, também os coordenadores dos projetos; no vermelho, também a gestora pedagógica. Pelo Aprender Sistema, os outros módulos, como o comercial e o relacionamento. Os avisos chegam no sistema e por e-mail institucional (decisão 83).',
   },
   {
     resultado: 'Resposta do articulador',
-    vaiPara: 'Semáforo e Avaliação do Coordenador ao mesmo tempo (combinado em 23/11).',
+    vaiPara: 'Semáforo e Tríade, a avaliação do coordenador, ao mesmo tempo (combinado em 23/11).',
   },
   {
     resultado: 'Observação de formação e relatório de visita',
-    vaiPara: 'PDI do coordenador na Plataforma DFF (PDF do Semáforo, seção 9).',
+    vaiPara:
+      'A observação nasce na Plataforma DFF, junto do PDI do coordenador, e o Semáforo lê de lá (decisão 94). O relatório de visita vai para o PDI (PDF do Semáforo, seção 9).',
   },
   {
     resultado: 'Tempo de deslocamento de cada município',
@@ -1045,7 +1163,7 @@ function CelulaQuemVe({ celula }: { celula: Celula }): JSX.Element {
   return (
     <span className="flex flex-col items-start gap-1">
       {celula.faz !== undefined && <Selo cor={celula.faz}>{ACOES[celula.faz]}</Selo>}
-      {celula.aberta !== undefined && <Selo cor="aberta">{`Em aberto (${celula.aberta === 'P2-painel' ? 'P2' : celula.aberta})`}</Selo>}
+      {celula.aberta !== undefined && <Selo cor="aberta">{`Em aberto (${celula.aberta})`}</Selo>}
       {celula.nota !== undefined && <span>{celula.nota}</span>}
       {celula.decisao !== undefined && <span className="text-xs">(decisão {celula.decisao})</span>}
     </span>
@@ -1105,7 +1223,9 @@ function QuemVeOQue(): JSX.Element {
       <p>
         No protótipo, quem entra na Integra vê tudo (decisão de 24/11). Na versão real, cada cargo verá só o que é
         seu. Os cartões abaixo, um por tela, mostram o que os documentos de requisitos, a reunião de 23/11 e as
-        decisões do dono já dizem. O que está marcado <strong>Em aberto</strong> é para decidir no dia 7.
+        decisões do dono já dizem. O que está marcado <strong>Em aberto</strong> é para decidir no dia 7. Os cargos têm
+        os nomes da decisão 87; nos textos e nos alertas, a &ldquo;gestora pedagógica&rdquo; de um coordenador é a
+        Gerente Pedagógica dele.
       </p>
       <ul className="m-0 mb-4 grid list-none gap-1 p-0" aria-label="O que quer dizer cada palavra dos cartões">
         {LEGENDA.map((l) => (
@@ -1116,9 +1236,9 @@ function QuemVeOQue(): JSX.Element {
       </ul>
       <MatrizQuemVe />
       <p className="mt-3">
-        O Comitê de Satisfação Municipal não é um cargo: são a SPE, a Gestão Operacional e as gestoras pedagógicas
+        O Comitê de Satisfação Municipal não é um cargo: são a SPE, a Gerente Operacional e as Gerentes Pedagógicas
         juntas. Sem conta no sistema, por link: articuladores e secretários municipais respondem à pesquisa; o
-        formador responde à Avaliação do Coordenador sem se identificar; o distribuidor registra ocorrências pelo
+        formador responde à Tríade sem se identificar; o distribuidor registra ocorrências pelo
         Comercial.
       </p>
 
@@ -1127,8 +1247,8 @@ function QuemVeOQue(): JSX.Element {
           Já decidido
         </Title>
         <p>
-          Inclui as respostas do dono de 25/11 sobre as regras (decisões 30 a 57), que também aparecem nos cartões da
-          primeira parte, com o selo &ldquo;Decidido&rdquo;.
+          Inclui as respostas do dono de 25/11 e 26/11 (decisões 30 a 94); as que respondem a um ponto da primeira
+          parte também aparecem no cartão dele, com o selo &ldquo;Decidido&rdquo;.
         </p>
         <ul className="m-0 grid list-none gap-3 p-0">
           {DECIDIDO.map((d) => (
@@ -1173,7 +1293,7 @@ export default function ParaValidarPage(): JSX.Element {
         documentos de requisitos do ICA e do Semáforo (não estavam na proposta v5), os pontos que ficaram em aberto
         na reunião de 23/11 e os lugares em que os documentos não fecham a conta ou se contradizem. Para cada um, o
         que o protótipo fez por enquanto e o que falta decidir. Os cartões com o selo{' '}
-        <strong>Decidido</strong> trazem a resposta do dono de 25/11 e o que o protótipo já faz com ela.
+        <strong>Decidido</strong> trazem a resposta do dono de 25/11 ou de 26/11 e o que o protótipo já faz com ela.
       </p>
       <p className="mb-4">
         <Link to="/integra">Voltar para a Integra</Link>

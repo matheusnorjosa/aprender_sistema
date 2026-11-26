@@ -30,7 +30,7 @@ function AplicarRemanejamento(): JSX.Element {
         const r = proporRemanejamento([{ municipioId, deCoordenadorId: 103, paraCoordenadorId: 117 }], 'Teste do histórico');
         if (!r.ok) throw new Error(r.erros.join(' '));
         aprovarRemanejamento(r.id);
-        aplicarRemanejamento(r.id);
+        aplicarRemanejamento(r.id, '2030-02-01');
       }}
     >
       aplicar remanejamento
@@ -57,6 +57,14 @@ describe('ICA — Histórico semestral', { timeout: 20000 }, () => {
   test('dispersão da equipe por semestre, com a versão de pesos de cada um', async () => {
     renderizar();
     expect(await screen.findByRole('heading', { level: 1, name: 'Histórico semestral' })).toBeInTheDocument();
+    // Decisão 72: conferência da SPE e publicação em até 5 dias úteis.
+    expect(screen.getByText(/guardado como foi publicado/)).toHaveTextContent(
+      /a SPE confere o cálculo e o ICA é publicado em até 5 dias úteis depois da conferência \(decisão 72\)/,
+    );
+    // Os retratos passados são recalculados com a regra de frentes da decisão 59: a tela não pode dizer que são os publicados.
+    expect(screen.getByText(/guardado como foi publicado/)).toHaveTextContent(
+      /No protótipo, os semestres anteriores foram refeitos com a regra de frentes da decisão 59/,
+    );
     const tabela = screen.getByRole('table', { name: /Dispersão da equipe/i });
     for (const s of SEMESTRES) {
       const linha = within(tabela).getByText(s.semestre).closest('tr') as HTMLElement;
@@ -97,10 +105,15 @@ describe('ICA — Histórico semestral', { timeout: 20000 }, () => {
     const itens = within(lista).getAllByRole('listitem').filter((li) => li.parentElement === lista);
     expect(itens).toHaveLength(2);
     expect(itens[0]).toHaveTextContent(/2026\.2/);
+    expect(itens[0]).toHaveTextContent('vale a partir de 03/08/2026');
+    expect(itens[1]).toHaveTextContent('vale a partir de 02/02/2026');
     expect(itens[0]).toHaveTextContent(/Jataí-GO: de Lucinéia Barreto para Rogério Assunção/);
     expect(itens[0]).toHaveTextContent(/Rondonópolis-MT: de Lucinéia Barreto para Rogério Assunção/);
     expect(itens[0]).toHaveTextContent(/Aprovado por Líder do NFP em 13\/07\/2026/);
     expect(itens[1]).toHaveTextContent(/Uiraúna-PB: de Edvaldo Quaresma para Ivonete Sampaio/);
+    // Decisões 64 e 87: o cargo tem um nome só, o mesmo dos Alertas e da página Para validar.
+    expect(itens[0]).toHaveTextContent(/\(gestora pedagógica\)/);
+    expect(document.body).not.toHaveTextContent(/gestora técnica/i);
   });
 
   test('remanejamento aplicado na sessão entra no registro e ganha a coluna "Agora"', async () => {
@@ -112,6 +125,10 @@ describe('ICA — Histórico semestral', { timeout: 20000 }, () => {
     expect(itens).toHaveLength(3);
     expect(itens[0]).toHaveTextContent(/Teste do histórico/);
     expect(itens[0]).toHaveTextContent(/Você \(demonstração\)/);
+    // Decisão 71: a data que a SPE escolheu ao aplicar.
+    expect(itens[0]).toHaveTextContent('vale a partir de 01/02/2030');
+    // O semestre é o da sessão (2026.2), o mesmo que o Painel mostra já com a mudança; a data só diz quando vale.
+    expect(itens[0]).toHaveTextContent(/^Semestre 2026\.2 · aplicado em/);
     const tabela = screen.getByRole('table', { name: /ICA por coordenador/i });
     expect(within(tabela).getByText('Agora (nesta demonstração)')).toBeInTheDocument();
   });

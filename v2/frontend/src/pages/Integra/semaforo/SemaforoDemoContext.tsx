@@ -16,6 +16,7 @@ import { createContext, useCallback, useContext, useMemo, useReducer, type JSX, 
 import {
   aplicarVermelhoAutomatico,
   avaliarMunicipio,
+  doSistema,
   gerarDadosSemaforo,
   mesesDoCiclo,
   periodoDoCiclo,
@@ -33,7 +34,7 @@ export interface EstadoSemaforoDemo {
   original: DadosSemaforo;
   /** Os dados com o que foi registrado na sessão. */
   dados: DadosSemaforo;
-  /** O que foi registrado na tela do relatório mensal, do mais novo ao mais antigo (inclusive a observação de formação). */
+  /** O que foi registrado na tela do relatório mensal, do mais novo ao mais antigo. */
   anotacoes: string[];
 }
 
@@ -146,7 +147,10 @@ export interface ValorSemaforoDemo {
   registrarOcorrencia: (ocorrencia: NovaOcorrencia) => Resultado;
   /** Registra quando a ocorrência foi respondida (AAAA-MM-DDTHH:MM). Decisão 50. */
   responderOcorrencia: (id: number, respondidaEm: string) => Resultado;
-  /** O coordenador é o do projeto; o relatório do mesmo projeto e mês substitui o anterior, que fica guardado (decisão 57). */
+  /**
+   * O coordenador é o do projeto; o relatório do mesmo projeto e mês substitui o anterior, que fica guardado (decisão 57).
+   * Decisão 81: mudar um número que veio do sistema (`doSistema`) exige a justificativa.
+   */
   registrarRelatorio: (relatorio: NovoRelatorio) => Resultado;
   /** Reunião já feita, com a ata registrada hoje. */
   registrarReuniao: (reuniao: NovaReuniao) => Resultado;
@@ -317,11 +321,23 @@ export function SemaforoDemoProvider({ children, dados }: SemaforoDemoProviderPr
       if (erros.length === 0 && !projeto) erros.push('Escolha um projeto do município.');
       const coordenador = projeto?.coordenador ?? null;
       if (erros.length === 0 && coordenador === null) erros.push('Este projeto ainda não tem coordenador.');
+      const sistema = doSistema(atual, r.projeto, r.mes);
+      const mudou =
+        sistema !== undefined &&
+        (r.formacoes_previstas !== sistema.formacoes_previstas ||
+          r.formacoes_realizadas !== sistema.formacoes_realizadas ||
+          r.visitas_previstas !== sistema.visitas_previstas ||
+          r.visitas_realizadas !== sistema.visitas_realizadas);
+      const justificativa = r.justificativa?.trim() ?? '';
+      if (erros.length === 0 && mudou && justificativa === '') erros.push('Você mudou um número que veio do sistema: escreva a justificativa.');
       if (erros.length > 0 || coordenador === null) return { ok: false, erros };
-      dispatch({ tipo: 'relatorio', relatorio: { ...r, id: proximoId(atual.relatorios), coordenador } });
+      const relatorio: RelatorioMensal = { ...r, id: proximoId(atual.relatorios), coordenador };
+      if (justificativa === '') delete relatorio.justificativa;
+      else relatorio.justificativa = justificativa;
+      dispatch({ tipo: 'relatorio', relatorio });
       return { ok: true };
     },
-    [atual.relatorios, atual.ciclo_atual, cicloAtual, hoje, errosBase, projetoDe],
+    [atual, cicloAtual, hoje, errosBase, projetoDe],
   );
 
   const registrarReuniao = useCallback(

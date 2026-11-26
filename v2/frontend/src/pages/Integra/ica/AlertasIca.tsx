@@ -10,7 +10,7 @@ import { Typography } from 'antd';
 
 import { formatFortaleza } from '../../../utils/datetime';
 import { useIntegraDemo } from '../dados/IntegraDemoContext';
-import type { Alerta, TipoAlerta } from './calculo';
+import { META_ICA, type Alerta, type TipoAlerta } from './calculo';
 import { BotoesExportar } from './componentes/c2/BotoesExportar';
 import { dataDoUltimoRecalculo, NOME_DO_ALERTA, situacaoDoAlerta } from './componentes/c2/contas';
 import { CLASSE_CAMPO, CLASSE_ROTULO, COR_ESTRATO, formatarDia } from './componentes/estilos';
@@ -41,7 +41,7 @@ export default function AlertasIca(): JSX.Element {
   const baixarPlanilha = (): void =>
     baixarCsv(
       'ica_alertas.csv',
-      ['Tipo', 'Alerta', 'Detalhe', 'Data', 'Quando', 'Situação', 'Seria enviado para'],
+      ['Tipo', 'Alerta', 'Detalhe', 'Data', 'Quando', 'Situação', 'Seria enviado no sistema e por e-mail institucional para'],
       mostrados.map((a: Alerta) => [
         NOME_DO_ALERTA[a.tipo],
         a.titulo,
@@ -60,8 +60,8 @@ export default function AlertasIca(): JSX.Element {
       </Title>
       <p className="mb-4 rounded border-l-4 border-primary-dark bg-[#EEF5F3] p-3">
         <strong>Nada é enviado.</strong> No protótipo, os alertas só aparecem nesta tela. Na versão real, cada um iria
-        para as pessoas em &ldquo;Seria enviado para&rdquo;. Eles mudam sozinhos quando a carteira ou os pesos mudam
-        nesta demonstração.
+        no sistema e por e-mail institucional para as pessoas escritas em cada alerta (decisão 83; o e-mail depende da
+        TI da empresa). Eles mudam sozinhos quando a carteira ou os pesos mudam nesta demonstração.
       </p>
 
       <Title level={2} id="alertas-resumo" style={{ fontSize: 20 }}>
@@ -75,11 +75,10 @@ export default function AlertasIca(): JSX.Element {
         ))}
       </ul>
       <p className="mb-4 text-sm">
-        &ldquo;{NOME_DO_ALERTA.sobrecarga}&rdquo; só aparece para quem chegou a 130 ou mais agora. Quem já estava em
-        Sobrecarga no cálculo anterior não recebe o aviso de novo e continua em &ldquo;{NOME_DO_ALERTA.fora_da_meta}
-        &rdquo; quando passa de 130 (a meta vai até 130). Com 130 exato, fica dentro da meta e sem alerta. O cálculo anterior é o do semestre anterior{historico.at(-2) ? ` (${historico.at(-2)?.semestre})` : ''};
-        depois de um remanejamento ou de uma troca de pesos nesta demonstração, é o cálculo publicado
-        {historico.at(-1) ? ` de ${historico.at(-1)?.semestre}` : ''}.
+        &ldquo;{NOME_DO_ALERTA.sobrecarga}&rdquo; sai a cada recálculo enquanto o ICA estiver em 130 ou mais, e não
+        só quando ele chega lá (decisão 69), para a SPE, a gestora pedagógica dele e a Líder do NFP. Quem está em Sobrecarga
+        não recebe também o &ldquo;{NOME_DO_ALERTA.fora_da_meta}&rdquo;, que fica para quem está abaixo de{' '}
+        {META_ICA.minimo}.
       </p>
 
       <div className="mb-4 max-w-sm print:hidden">
@@ -131,7 +130,7 @@ export default function AlertasIca(): JSX.Element {
                 <dd className="m-0">{a.quando}</dd>
                 <dt className="font-semibold">Situação:{' '}</dt>
                 <dd className="m-0">{situacaoDoAlerta(a.tipo)}</dd>
-                <dt className="font-semibold">Seria enviado para:{' '}</dt>
+                <dt className="font-semibold">Seria enviado no sistema e por e-mail institucional para:{' '}</dt>
                 <dd className="m-0">{a.quemReceberia.join(', ')}</dd>
               </dl>
               {a.coordenadorId !== null && (

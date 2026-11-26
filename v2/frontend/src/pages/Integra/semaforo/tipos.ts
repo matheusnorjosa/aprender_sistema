@@ -9,7 +9,7 @@
 
 export type Cor = 'verde' | 'amarelo' | 'vermelho';
 
-/** Cor de um indicador. `sem_dado` fica fora da regra do pior (sugestão do PDF, seção 3). */
+/** Cor de um indicador. `sem_dado` fica fora da regra do pior e da conta da cor (decisão 79). */
 export type CorIndicador = Cor | 'sem_dado';
 
 /** Os 5 indicadores, na ordem da tabela da seção 3 do PDF. */
@@ -33,7 +33,7 @@ export interface RespostaPesquisa {
   /** Respondeu dentro do prazo de resposta do ciclo. */
   no_prazo: boolean;
   funcao_respondente: string;
-  /** Identificação é opcional na pesquisa. */
+  /** Identificação é opcional na pesquisa (decisão 74). */
   identificacao: string | null;
   /** Os 6 itens, de 1 a 5, na ordem do PDF (cronograma, formações, coordenador, avaliações, materiais, avanço). */
   itens: readonly number[];
@@ -60,6 +60,11 @@ export interface RelatorioMensal {
   formacoes_realizadas: number;
   visitas_previstas: number;
   visitas_realizadas: number;
+  /**
+   * Decisão 81: por que o coordenador mudou um número que veio pré-preenchido do sistema (formações do Aprender
+   * Sistema; visitas da Logística e do pedido de viagem, FRV, decisão 82). Sem mudança, fica de fora.
+   */
+  justificativa?: string;
 }
 
 /** Ocorrência leve: dúvida, ajuste de agenda, pedido de material. Reclamação: sobre o coordenador ou os projetos. */

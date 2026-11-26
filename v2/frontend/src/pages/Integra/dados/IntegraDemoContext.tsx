@@ -15,6 +15,7 @@ import {
   type Alerta,
   type ResultadoEquipe,
 } from '../ica/calculo';
+import { formatFortaleza } from '../../../utils/datetime';
 import { carregarDadosIntegra } from './fonte';
 import type { BaseIca, DadosIntegra, Movimento, Pesos, Remanejamento, VersaoPesos } from './tipos';
 
@@ -36,7 +37,7 @@ export type AcaoIntegraDemo =
   | { tipo: 'trocar_pesos'; pesos: Pesos; justificativa: string; em: string }
   | { tipo: 'propor_remanejamento'; id: string; movimentos: Movimento[]; justificativa: string; em: string }
   | { tipo: 'aprovar_remanejamento'; id: string; em: string }
-  | { tipo: 'aplicar_remanejamento'; id: string; em: string }
+  | { tipo: 'aplicar_remanejamento'; id: string; em: string; vigencia_em: string }
   | { tipo: 'restaurar' };
 
 export function estadoInicial(dados: DadosIntegra): EstadoIntegraDemo {
@@ -81,6 +82,7 @@ export function reducerIntegraDemo(estado: EstadoIntegraDemo, acao: AcaoIntegraD
         aprovado_em: null,
         aplicado_em: null,
         semestre: null,
+        vigencia_em: null,
       };
       return { ...estado, remanejamentos: [...estado.remanejamentos, novo] };
     }
@@ -104,7 +106,7 @@ export function reducerIntegraDemo(estado: EstadoIntegraDemo, acao: AcaoIntegraD
         base,
         remanejamentos: estado.remanejamentos.map((x) =>
           x.id === acao.id
-            ? { ...x, status: 'aplicado', aplicado_em: acao.em, semestre: estado.dados.semestre_atual }
+            ? { ...x, status: 'aplicado', aplicado_em: acao.em, semestre: estado.dados.semestre_atual, vigencia_em: acao.vigencia_em }
             : x,
         ),
       };
@@ -140,14 +142,19 @@ export interface ValorIntegraDemo {
   trocarPesos: (pesos: Pesos, justificativa: string) => Resultado;
   proporRemanejamento: (movimentos: Movimento[], justificativa: string) => Resultado<{ id: string }>;
   aprovarRemanejamento: (id: string) => void;
-  /** Recusa a proposta que ficou velha (o município já não está com quem ia ceder). */
-  aplicarRemanejamento: (id: string) => Resultado;
+  /**
+   * Recusa a proposta que ficou velha (o município já não está com quem ia ceder). `vigencia` (AAAA-MM-DD) é a data
+   * em que passa a valer, escolhida pela SPE (decisão 71); sem ela, hoje. No protótipo, a carteira muda na hora.
+   */
+  aplicarRemanejamento: (id: string, vigencia?: string) => Resultado;
   restaurar: () => void;
 }
 
 const IntegraDemoContext = createContext<ValorIntegraDemo | undefined>(undefined);
 
 const agora = (): string => new Date().toISOString();
+/** Hoje no dia de Fortaleza (AAAA-MM-DD). */
+export const hojeEmFortaleza = (): string => formatFortaleza(new Date(), 'YYYY-MM-DD');
 
 function versaoPorId(versoes: readonly VersaoPesos[], id: string): VersaoPesos {
   const versao = versoes.find((v) => v.id === id) ?? versoes[0];
@@ -179,21 +186,16 @@ export function IntegraDemoProvider({ children, dados }: IntegraDemoProviderProp
     [estado.dados],
   );
 
-  // "Entra em Sobrecarga" (PDF, seção 6) compara com o cálculo imediatamente anterior ao atual: quem já
-  // estava lá não recebe o aviso de novo (continua no "fora da meta"). Sem mudança na sessão, o atual é
-  // o retrato publicado do semestre (último do histórico) e o anterior é o semestre de antes. Depois de
-  // aplicar um remanejamento ou trocar os pesos, o atual é um recálculo e o anterior é o retrato publicado.
   const mudouNaSessao = estado.base !== estado.dados.base || estado.versaoVigenteId !== estado.dados.versao_vigente;
-  const anterior = historico.at(mudouNaSessao ? -1 : -2)?.resultado;
+  // Decisão 69: o alerta de Sobrecarga sai a cada recálculo, sem comparar com o cálculo anterior.
   const alertas = useMemo(
     () =>
       gerarAlertas(estado.base, resultado, {
         gerencias: estado.dados.gerencias,
         pessoas: estado.dados.pessoas,
         colecoes: estado.dados.colecoes,
-        anterior,
       }),
-    [estado.base, estado.dados, resultado, anterior],
+    [estado.base, estado.dados, resultado],
   );
 
   const trocarPesos = useCallback((novos: Pesos, justificativa: string): Resultado => {
@@ -223,7 +225,9 @@ export function IntegraDemoProvider({ children, dados }: IntegraDemoProviderProp
 
   const aprovarRemanejamento = useCallback((id: string) => dispatch({ tipo: 'aprovar_remanejamento', id, em: agora() }), []);
   const aplicarRemanejamento = useCallback(
-    (id: string): Resultado => {
+    (id: string, vigencia: string = hojeEmFortaleza()): Resultado => {
+      // Datas AAAA-MM-DD comparam como texto; vazio também fica antes de hoje.
+      if (vigencia < hojeEmFortaleza()) return { ok: false, erros: ['Escolha a data em que passa a valer: hoje ou depois.'] };
       const proposta = estado.remanejamentos.find((r) => r.id === id);
       const invalidos = proposta ? aplicarMovimentos(estado.base, proposta.movimentos).invalidos : [];
       if (invalidos.length > 0) {
@@ -241,7 +245,7 @@ export function IntegraDemoProvider({ children, dados }: IntegraDemoProviderProp
           .join('; ');
         return { ok: false, erros: [`Esta proposta ficou velha: ${quais}. Proponha de novo a partir da carteira de agora.`] };
       }
-      dispatch({ tipo: 'aplicar_remanejamento', id, em: agora() });
+      dispatch({ tipo: 'aplicar_remanejamento', id, em: agora(), vigencia_em: vigencia });
       return { ok: true };
     },
     [estado.base, estado.remanejamentos],

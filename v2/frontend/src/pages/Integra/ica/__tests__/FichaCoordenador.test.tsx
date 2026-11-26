@@ -30,11 +30,15 @@ describe('Ficha do coordenador', { timeout: 20000 }, () => {
     await abrir(LUCINEIA);
     expect(screen.getByRole('heading', { level: 2, name: 'Lucinéia Barreto' })).toBeInTheDocument();
     const situacao = screen.getByRole('list', { name: 'Situação atual' });
-    expect(situacao).toHaveTextContent('ICA atual: 169 · Sobrecarga');
+    // Decisão 59 (frente = cada ano de cada coleção): era 169, e a variação era −20, de 189.
+    expect(situacao).toHaveTextContent('ICA atual: 167 · Sobrecarga');
     // Decisão 56 (rodada 4): quem muda o 2026.1 é a carga do Rogério, baixada para 0,2 (perfil 110 em dados/gerador.ts);
     // o Amigos do Bem só entra em 2026.2 (era −22, de 191).
-    expect(situacao).toHaveTextContent('Variação desde 2026.1: −20 (era 189 · Sobrecarga)');
+    expect(situacao).toHaveTextContent('Variação desde 2026.1: −20 (era 187 · Sobrecarga)');
     expect(situacao).toHaveTextContent('Fora da meta (70 a 130)');
+    // Decisões 64 e 87: o cargo tem um nome só, o mesmo dos Alertas e da página Para validar.
+    expect(screen.getByText(/gestora pedagógica: /)).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/gestora técnica/i);
   });
 
   test('contribuição de cada componente: legenda com nome e número, e a tabela da conta', async () => {
@@ -44,7 +48,8 @@ describe('Ficha do coordenador', { timeout: 20000 }, () => {
     expect(itens).toHaveLength(6);
     expect(itens[0]).toHaveTextContent(/Municípios ativos: \d+,\d pontos/);
     expect(itens[5]).toHaveTextContent('Estados (UFs): fora da conta');
-    expect(screen.getByText(/ICA: 168,9 → 169 · Sobrecarga/)).toBeInTheDocument();
+    // Decisão 59: era 168,9 → 169.
+    expect(screen.getByText(/ICA: 166,9 → 167 · Sobrecarga/)).toBeInTheDocument();
   });
 
   test('carteira: municípios com coleções, turmas, professores, deslocamento e quem divide', async () => {
@@ -55,6 +60,9 @@ describe('Ficha do coordenador', { timeout: 20000 }, () => {
     expect(pontaGrossa).toHaveTextContent('Rosimeire Cavalcante');
     // Tempo real do relatório de deslocamento (ida e volta).
     expect(pontaGrossa).toHaveTextContent('22h05');
+    // Decisão 59: a coluna Frentes mostra de onde vem o valor de Frentes na conta.
+    const carteira = screen.getByRole('region', { name: 'Carteira' });
+    expect(within(carteira).getByRole('columnheader', { name: 'Frentes' })).toBeInTheDocument();
   });
 
   test('município com ações suspensas aparece como "Suspenso" na carteira', async () => {
@@ -86,9 +94,10 @@ describe('Ficha do coordenador', { timeout: 20000 }, () => {
     expect(linhas.map((l) => l.textContent)).toEqual([
       // Decisão 56 (rodada 4): em 2025.2 e 2026.1 ainda não há Amigos do Bem; quem muda as médias da equipe é a carga
       // do Rogério, baixada para 0,2 (perfil 110 em dados/gerador.ts). Eram 190 e 191.
-      expect.stringMatching(/2025\.2.*188 · Sobrecarga.*proposta v5/),
-      expect.stringMatching(/2026\.1.*189 · Sobrecarga.*proposta v5/),
-      expect.stringMatching(/2026\.2.*169 · Sobrecarga.*revisada/),
+      // Decisão 59 (frente = cada ano de cada coleção): eram 188, 189 e 169.
+      expect.stringMatching(/2025\.2.*186 · Sobrecarga.*proposta v5/),
+      expect.stringMatching(/2026\.1.*187 · Sobrecarga.*proposta v5/),
+      expect.stringMatching(/2026\.2.*167 · Sobrecarga.*revisada/),
     ]);
   });
 
@@ -115,10 +124,10 @@ describe('Ficha do coordenador', { timeout: 20000 }, () => {
     const linhas = linhasDaTabela('Histórico semestral').map((l) => l.textContent);
     expect(linhas).toHaveLength(4);
     // Como no Histórico: o retrato publicado não é trocado pelo cálculo da sessão.
-    expect(linhas[2]).toMatch(/2026\.2.*169 · Sobrecarga.*revisada.*calculado em/);
+    expect(linhas[2]).toMatch(/2026\.2.*167 · Sobrecarga.*revisada.*calculado em/);
     expect(linhas[3]).toMatch(/Agora \(nesta demonstração\).*Versão 3 \(demonstração\).*nesta sessão/);
     expect(linhas[3]).not.toMatch(/calculado em/);
-    expect(screen.getByRole('list', { name: 'Situação atual' })).toHaveTextContent(/Variação desde 2026\.2: .* \(era 169 · Sobrecarga\)/);
+    expect(screen.getByRole('list', { name: 'Situação atual' })).toHaveTextContent(/Variação desde 2026\.2: .* \(era 167 · Sobrecarga\)/);
   });
 
   test('a conta de quem está sem municípios não termina em "Capacidade disponível"', async () => {

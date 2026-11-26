@@ -20,7 +20,9 @@ async function abrir(): Promise<void> {
 }
 
 const cartoes = (): HTMLElement[] => within(screen.getByRole('list', { name: /Municípios do ciclo 2026\.6/ })).getAllByRole('article');
-const cartao = (nome: string): HTMLElement => screen.getByRole('article', { name: nome });
+// Pelo texto do título, e não por getByRole('article', { name }): calcular o nome de todos os cartões a cada busca
+// deixava o teste lento demais na CI (passava de 20 s). O cartão continua achado pelo título dele.
+const cartao = (nome: string): HTMLElement => screen.getByText(nome, { selector: 'h3 a' }).closest('article')!;
 
 describe('Comitê', { timeout: 20000 }, () => {
   test('título, aviso de quem vê na versão real e o "sem dado" explicado', async () => {
@@ -29,7 +31,8 @@ describe('Comitê', { timeout: 20000 }, () => {
     expect(screen.getByText(QUEM_VE.comite.aviso)).toBeInTheDocument();
     const semDado = screen.getByText(/^Sem dado:/);
     expect(semDado).toHaveTextContent(/fica fora da regra/);
-    expect(semDado).toHaveTextContent(/20\/12\/2026/);
+    // Decisão 76: a pesquisa fica aberta 10 dias úteis depois do envio do link (01/12): até 15/12.
+    expect(semDado).toHaveTextContent(/15\/12\/2026/);
     // O ciclo vem com os meses: no ICA, o mesmo formato quer dizer semestre.
     const intro = screen.getByText(/^A cor sugerida sai da regra do Semáforo/);
     expect(intro).toHaveTextContent('com os dados do ciclo 2026.6 (novembro e dezembro de 2026) até hoje');

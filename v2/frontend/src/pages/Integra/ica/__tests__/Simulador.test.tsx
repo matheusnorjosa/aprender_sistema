@@ -3,10 +3,11 @@
  * cada envolvido, a mudança de estrato e a nova dispersão; depois propor → aprovar → aplicar, no
  * estado da sessão (IntegraDemoContext). Nada é gravado.
  */
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, test } from 'vitest';
 
+import { formatFortaleza } from '../../../../utils/datetime';
 import { carregarDadosIntegra } from '../../dados/fonte';
 import { PESOS_REVISADOS, simularRemanejamento } from '../calculo';
 import { textoDoEstrato } from '../componentes/EtiquetaEstrato';
@@ -52,7 +53,8 @@ describe('Simulador de remanejamento', { timeout: 20000 }, () => {
     expect(cartoes[1]).toHaveTextContent(/Passa a ter carteira e entra na média da equipe/);
 
     // Decisão 56: as localidades do Amigos do Bem entram na carteira do Rogério e mudam as médias da equipe (era desvio 30,9).
-    expect(screen.getByText(/Dispersão da equipe: desvio 30,8 →/)).toBeInTheDocument();
+    // Decisão 59: frente = cada ano de cada coleção; o desvio passou de 30,8 para 29,5.
+    expect(screen.getByText(/Dispersão da equipe: desvio 29,5 →/)).toBeInTheDocument();
   });
 
   test('adicionar sem município avisa; tirar um movimento volta ao início', async () => {
@@ -128,8 +130,9 @@ describe('Simulador de remanejamento', { timeout: 20000 }, () => {
 
     const proposta = within(screen.getByRole('list', { name: 'Propostas desta sessão' })).getAllByRole('listitem')[0] as HTMLElement;
     await user.click(within(proposta).getByRole('button', { name: 'Aprovar (SPE)' }));
-    expect(within(proposta).getByRole('button', { name: 'Aplicar' })).toHaveFocus();
-    expect(aviso).toHaveTextContent(/Proposta aprovada/);
+    // Decisão 71: o foco vai para a data em que passa a valer, que vem antes do botão Aplicar.
+    expect(within(proposta).getByLabelText('Data em que passa a valer')).toHaveFocus();
+    expect(aviso).toHaveTextContent('Proposta aprovada. Escolha a data em que passa a valer e aplique.');
 
     await user.click(within(proposta).getByRole('button', { name: 'Aplicar' }));
     expect(proposta).toHaveFocus();
@@ -180,7 +183,27 @@ describe('Simulador de remanejamento', { timeout: 20000 }, () => {
     expect(screen.getByRole('status')).not.toHaveTextContent(/Remanejamento aplicado/);
   });
 
-  test('propor → aprovar (SPE, decisão 20) → aplicar com data de vigência; a carteira muda', async () => {
+  test('data apagada: nada muda, o campo fica inválido, aponta o erro e recebe o foco; a dica "hoje ou depois" vem antes', async () => {
+    const user = userEvent.setup();
+    await montarMovimento(user);
+    await user.type(screen.getByLabelText('Justificativa'), 'Teste.');
+    await user.click(screen.getByRole('button', { name: 'Propor remanejamento' }));
+    const proposta = within(screen.getByRole('list', { name: 'Propostas desta sessão' })).getAllByRole('listitem')[0] as HTMLElement;
+    await user.click(within(proposta).getByRole('button', { name: 'Aprovar (SPE)' }));
+    const data = within(proposta).getByLabelText('Data em que passa a valer');
+    expect(data).toHaveAccessibleDescription('Hoje ou depois.');
+    expect(data).not.toHaveAttribute('aria-invalid');
+
+    fireEvent.change(data, { target: { value: '' } });
+    await user.click(within(proposta).getByRole('button', { name: 'Aplicar' }));
+
+    expect(within(proposta).getByText('Aprovada')).toBeInTheDocument();
+    expect(data).toHaveAttribute('aria-invalid', 'true');
+    expect(data).toHaveAccessibleDescription(/^Hoje ou depois\.\s+Escolha a data em que passa a valer: hoje ou depois\.$/);
+    expect(data).toHaveFocus();
+  });
+
+  test('propor → aprovar (SPE, decisão 20) → aplicar com a data escolhida pela SPE (decisão 71); a carteira muda', async () => {
     const user = userEvent.setup();
     await montarMovimento(user);
     await user.type(screen.getByLabelText('Justificativa'), 'Dar carteira a quem chegou.');
@@ -198,11 +221,19 @@ describe('Simulador de remanejamento', { timeout: 20000 }, () => {
     await user.click(within(proposta).getByRole('button', { name: 'Aprovar (SPE)' }));
     expect(within(proposta).getByText('Aprovada')).toBeInTheDocument();
     expect(proposta).toHaveTextContent('Aprovada por Você (demonstração)');
-    expect(proposta).toHaveTextContent('Data de vigência: semestre 2026.2');
+    // Decisão 71: campo de data com rótulo visível; começa em hoje e não aceita dia antes de hoje.
+    const data = within(proposta).getByLabelText('Data em que passa a valer');
+    const hoje = formatFortaleza(new Date(), 'YYYY-MM-DD');
+    expect(data).toHaveAttribute('type', 'date');
+    expect(data).toHaveValue(hoje);
+    expect(data).toHaveAttribute('min', hoje);
+    fireEvent.change(data, { target: { value: '2030-02-01' } });
 
     await user.click(within(proposta).getByRole('button', { name: 'Aplicar' }));
     expect(within(proposta).getByText('Aplicada')).toBeInTheDocument();
     expect(proposta).toHaveTextContent(/Aplicada em \d{2}\/\d{2}\/\d{4}/);
+    expect(proposta).toHaveTextContent('vale a partir de 01/02/2030');
+    expect(proposta).toHaveTextContent(/na versão real, ela muda na data escolhida/);
 
     // A carteira de origem já não tem Ponta Grossa.
     await user.selectOptions(screen.getByLabelText('Coordenador de origem'), String(LUCINEIA));

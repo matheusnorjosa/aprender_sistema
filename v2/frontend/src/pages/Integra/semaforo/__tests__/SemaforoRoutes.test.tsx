@@ -60,12 +60,12 @@ describe('Semáforo — rotas e índice', { timeout: 20000 }, () => {
     expect(screen.getByRole('link', { name: 'Integra' })).toHaveAttribute('href', '/integra');
   });
 
-  test('o índice cita os 4 formulários da tela do relatório mensal, com a observação de formação', async () => {
+  test('o índice cita os 4 formulários da tela do relatório mensal e a observação de formação lida da DFF (decisão 94)', async () => {
     renderTelaSemaforo('/integra/semaforo');
     const lista = await screen.findByRole('list', { name: 'As 6 telas do Semáforo' });
     const item = within(lista).getByRole('link', { name: 'Relatório mensal e formulários' }).closest('li')!;
     expect(item).toHaveTextContent(
-      'O relatório mensal do coordenador e os registros de ocorrência, de reunião de escuta e de observação de formação.',
+      'O relatório mensal do coordenador, os registros de ocorrência e de reunião de escuta, e a observação de formação lida da DFF.',
     );
   });
 

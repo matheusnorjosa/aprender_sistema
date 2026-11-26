@@ -5,6 +5,7 @@
 import { act, renderHook } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
+import { formatFortaleza } from '../../../../utils/datetime';
 import { PESOS_ORIGINAIS_V5, PESOS_REVISADOS } from '../../ica/calculo';
 import { IntegraDemoProvider, estadoInicial, reducerIntegraDemo, useIntegraDemo } from '../IntegraDemoContext';
 import { gerarDadosSimulados } from '../gerador';
@@ -39,13 +40,16 @@ describe('useIntegraDemo', { timeout: 20000 }, () => {
     expect(result.current.resultado.semMunicipios).toBe(1);
     expect(result.current.historico.map((h) => h.semestre)).toEqual(['2025.2', '2026.1', '2026.2']);
     expect(result.current.historico[0]?.versao.id).toBe('v5');
-    // Os 3 em Sobrecarga já estavam lá em 2026.1: não "entram" de novo (PDF, seção 6); ficam fora da meta.
-    expect(result.current.alertas.filter((a) => a.tipo === 'sobrecarga')).toHaveLength(0);
+    // Decisão 69: os 3 em Sobrecarga recebem o alerta a cada recálculo, mesmo já estando lá em 2026.1,
+    // e não recebem também o "fora da meta" (sem alerta duplo).
+    const sobrecarga = result.current.alertas.filter((a) => a.tipo === 'sobrecarga');
+    expect(sobrecarga.map((a) => a.coordenadorId)).toEqual([101, 102, 103]);
+    expect(sobrecarga.every((a) => / está em Sobrecarga \(\d+\)$/.test(a.titulo))).toBe(true);
     const foraDaMeta = result.current.alertas.filter((a) => a.tipo === 'fora_da_meta').map((a) => a.coordenadorId);
-    expect(foraDaMeta).toEqual(expect.arrayContaining([101, 102, 103]));
+    expect(foraDaMeta.some((id) => [101, 102, 103].includes(id ?? 0))).toBe(false);
   });
 
-  it('"entrou em Sobrecarga" compara com o semestre anterior: só quem não estava lá', () => {
+  it('decisão 69: quem entra em Sobrecarga recebe o alerta, e quem continua lá também', () => {
     const { result } = renderHook(() => useIntegraDemo(), { wrapper });
     let id = '';
     act(() => {
@@ -58,18 +62,20 @@ describe('useIntegraDemo', { timeout: 20000 }, () => {
       result.current.aplicarRemanejamento(id);
     });
     const sobrecarga = result.current.alertas.filter((a) => a.tipo === 'sobrecarga');
-    expect(sobrecarga.map((a) => a.titulo)).toEqual(['Heloísa Pimentel entrou em Sobrecarga (136)']);
-    expect(sobrecarga[0]?.quemReceberia[1]).toMatch(/^Gestora técnica \(/);
+    // Lucinéia (101) continua em Sobrecarga e recebe de novo; Heloísa (104) chega lá.
+    expect(sobrecarga.map((a) => a.titulo)).toContain('Heloísa Pimentel está em Sobrecarga (134)');
+    expect(sobrecarga.map((a) => a.coordenadorId)).toEqual(expect.arrayContaining([101, 104]));
+    expect(sobrecarga.every((a) => a.quemReceberia.join(' | ').match(/^SPE \| Gestora pedagógica \(.+\) \| Líder do NFP$/))).toBe(true);
   });
 
-  it('depois de mudar a carteira, "entrou em Sobrecarga" compara com o último cálculo publicado (2026.2)', () => {
+  it('depois de mudar a carteira, quem chega à Sobrecarga recebe o alerta "está em Sobrecarga"', () => {
     const { result } = renderHook(() => useIntegraDemo(), { wrapper });
-    const cianorte = dados.base.municipios.find((m) => m.nome === 'Cianorte');
-    if (!cianorte) throw new Error('sem Cianorte');
-    // Jucélia (107): Sobrecarga em 2026.1, Atenção no 2026.2 publicado; com Cianorte, volta à Sobrecarga.
+    const mandaguari = dados.base.municipios.find((m) => m.nome === 'Mandaguari');
+    if (!mandaguari) throw new Error('sem Mandaguari');
+    // Jucélia (107): Sobrecarga em 2026.1, Atenção no 2026.2 publicado; com Mandaguari, volta à Sobrecarga.
     let id = '';
     act(() => {
-      const r = result.current.proporRemanejamento([{ municipioId: cianorte.id, deCoordenadorId: 101, paraCoordenadorId: 107 }], 'teste');
+      const r = result.current.proporRemanejamento([{ municipioId: mandaguari.id, deCoordenadorId: 101, paraCoordenadorId: 107 }], 'teste');
       if (r.ok) id = r.id;
     });
     act(() => result.current.aprovarRemanejamento(id));
@@ -77,10 +83,10 @@ describe('useIntegraDemo', { timeout: 20000 }, () => {
       result.current.aplicarRemanejamento(id);
     });
     const sobrecarga = result.current.alertas.filter((a) => a.tipo === 'sobrecarga').map((a) => a.titulo);
-    expect(sobrecarga).toContain('Jucélia Montenegro entrou em Sobrecarga (131)');
+    expect(sobrecarga).toContain('Jucélia Montenegro está em Sobrecarga (135)');
   });
 
-  it('depois de trocar os pesos, a base do "entrou em Sobrecarga" também é o 2026.2 publicado', () => {
+  it('depois de trocar os pesos, quem passa de 130 recebe o alerta de Sobrecarga', () => {
     const { result } = renderHook(() => useIntegraDemo(), { wrapper });
     // Pesos só em turmas, professores e estados: Jucélia (107, Atenção no 2026.2 publicado) passa de 130.
     act(() => {
@@ -144,10 +150,45 @@ describe('useIntegraDemo', { timeout: 20000 }, () => {
     act(() => {
       result.current.aplicarRemanejamento(id);
     });
-    expect(result.current.remanejamentos.find((r) => r.id === id)).toMatchObject({ status: 'aplicado', semestre: '2026.2' });
+    // Decisão 71: sem data escolhida, passa a valer hoje (dia de Fortaleza).
+    const hoje = formatFortaleza(new Date(), 'YYYY-MM-DD');
+    expect(result.current.remanejamentos.find((r) => r.id === id)).toMatchObject({
+      status: 'aplicado',
+      semestre: dados.semestre_atual,
+      vigencia_em: hoje,
+    });
     expect(result.current.resultado.coordenadores.find((c) => c.coordenador.id === 117)?.semMunicipios).toBe(false);
     // O histórico e os dados originais não mudam.
     expect(result.current.dados).toEqual(dados);
+  });
+
+  it('decisão 71: a SPE escolhe a data em que o remanejamento passa a valer; data passada é recusada', () => {
+    const { result } = renderHook(() => useIntegraDemo(), { wrapper });
+    let id = '';
+    act(() => {
+      const r = result.current.proporRemanejamento([movimentoValido()], 'teste');
+      if (r.ok) id = r.id;
+    });
+    act(() => result.current.aprovarRemanejamento(id));
+    const respostas: ReturnType<typeof result.current.aplicarRemanejamento>[] = [];
+    act(() => {
+      respostas.push(result.current.aplicarRemanejamento(id, '2020-01-01'));
+    });
+    expect(respostas[0]).toEqual({ ok: false, erros: ['Escolha a data em que passa a valer: hoje ou depois.'] });
+    expect(result.current.remanejamentos.find((r) => r.id === id)).toMatchObject({ status: 'aprovado', vigencia_em: null });
+
+    act(() => {
+      respostas.push(result.current.aplicarRemanejamento(id, '2030-02-01'));
+    });
+    expect(respostas[1]).toEqual({ ok: true });
+    // No protótipo, a carteira muda na hora: o remanejamento é do semestre da sessão, e a data só diz quando vale.
+    expect(result.current.remanejamentos.find((r) => r.id === id)).toMatchObject({
+      status: 'aplicado',
+      vigencia_em: '2030-02-01',
+      semestre: dados.semestre_atual,
+    });
+    // No protótipo, a carteira muda na hora (na versão real, muda na data escolhida).
+    expect(result.current.resultado.coordenadores.find((c) => c.coordenador.id === 117)?.semMunicipios).toBe(false);
   });
 
   it('proposta que ficou velha não é aplicada: nada muda e a resposta diz por quê', () => {
@@ -272,10 +313,13 @@ describe('reducerIntegraDemo', () => {
       aprovado_em: '2026-11-24T10:00:00-03:00',
       aplicado_em: null,
       semestre: null,
+      vigencia_em: null,
     });
     const inicial = estadoInicial(dados);
     const comDuas = { ...inicial, remanejamentos: [...inicial.remanejamentos, aprovada('a', 104), aprovada('b', 105)] };
-    const depoisDeA = reducerIntegraDemo(comDuas, { tipo: 'aplicar_remanejamento', id: 'a', em: '2026-11-24T11:00:00-03:00' });
-    expect(reducerIntegraDemo(depoisDeA, { tipo: 'aplicar_remanejamento', id: 'b', em: '2026-11-24T12:00:00-03:00' })).toBe(depoisDeA);
+    const depoisDeA = reducerIntegraDemo(comDuas, { tipo: 'aplicar_remanejamento', id: 'a', em: '2026-11-24T11:00:00-03:00', vigencia_em: '2026-11-24' });
+    expect(
+      reducerIntegraDemo(depoisDeA, { tipo: 'aplicar_remanejamento', id: 'b', em: '2026-11-24T12:00:00-03:00', vigencia_em: '2026-11-24' }),
+    ).toBe(depoisDeA);
   });
 });

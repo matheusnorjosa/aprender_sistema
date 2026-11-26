@@ -11,13 +11,10 @@ import AlertasIca from '../AlertasIca';
 import * as exportar from '../exportar';
 
 const DADOS = gerarDadosSimulados();
-const SEMESTRE_ANTERIOR = DADOS.historico.at(-2)!;
-const PESOS_ANTERIOR = DADOS.versoes_pesos.find((v) => v.id === SEMESTRE_ANTERIOR.versao_pesos)!.pesos;
 const ALERTAS = gerarAlertas(DADOS.base, calcularEquipe(DADOS.base, PESOS_REVISADOS), {
   gerencias: DADOS.gerencias,
   pessoas: DADOS.pessoas,
   colecoes: DADOS.colecoes,
-  anterior: calcularEquipe(SEMESTRE_ANTERIOR.base, PESOS_ANTERIOR),
 });
 
 function renderizar(): void {
@@ -50,34 +47,45 @@ describe('ICA — Alertas', { timeout: 20000 }, () => {
     for (const a of ALERTAS) expect(screen.getByText(a.titulo)).toBeInTheDocument();
   });
 
-  test('cada alerta com data, situação e "seria enviado para"', async () => {
+  test('cada alerta com data, situação e para quem seria enviado, no sistema e por e-mail institucional (decisão 83)', async () => {
     renderizar();
-    const titulo = await screen.findByText('Lucinéia Barreto está fora da meta (169)');
+    const titulo = await screen.findByText('Lucinéia Barreto está em Sobrecarga (167)');
     const cartao = titulo.closest('li') as HTMLElement;
     expect(cartao).toHaveTextContent('Data: 17/11/2026');
     expect(cartao).toHaveTextContent(/Situação: Aberto/);
-    expect(cartao).toHaveTextContent('Seria enviado para: SPE');
+    expect(cartao).toHaveTextContent(
+      /Seria enviado no sistema e por e-mail institucional para: SPE, Gestora pedagógica \(.+\), Líder do NFP/,
+    );
+    expect(screen.getByText(/Nada é enviado/).closest('p')).toHaveTextContent(
+      /Na versão real, cada um iria no sistema e por e-mail institucional para as pessoas/,
+    );
     expect(within(cartao).getByRole('link', { name: /Ver a ficha de Lucinéia Barreto/ })).toHaveAttribute(
       'href',
       '/integra/ica/coordenador/101',
     );
   });
 
-  test('"Entrou em Sobrecarga" só para quem não estava no semestre anterior (PDF, seção 6), e a tela explica', async () => {
+  test('decisão 69: "Está em Sobrecarga" sai a cada recálculo para quem continua na faixa, sem o "Fora da meta" junto', async () => {
     renderizar();
     await screen.findByRole('heading', { level: 1, name: 'Alertas' });
-    expect(screen.queryByText(/Lucinéia Barreto (está|entrou) em Sobrecarga/)).not.toBeInTheDocument();
-    expect(screen.getByText(/já estava em Sobrecarga no cálculo anterior/)).toHaveTextContent(
-      /semestre anterior \(2026\.1\).*remanejamento ou de uma troca de pesos.*publicado de 2026\.2/,
+    // Lucinéia já estava em Sobrecarga em 2026.1 e recebe o alerta de novo.
+    expect(screen.getByText('Lucinéia Barreto está em Sobrecarga (167)')).toBeInTheDocument();
+    expect(screen.queryByText(/Lucinéia Barreto está fora da meta/)).not.toBeInTheDocument();
+    expect(screen.getByText(/sai a cada recálculo/)).toHaveTextContent(
+      /enquanto o ICA estiver em 130 ou mais, e não só quando ele chega lá \(decisão 69\)/,
     );
+    expect(within(screen.getByLabelText('Mostrar')).getByRole('option', { name: /^Está em Sobrecarga \(3\)$/ })).toBeInTheDocument();
+    // Um nome só para cada cargo: o mesmo da página Para validar (decisões 69 e 87).
+    expect(screen.getByText(/sai a cada recálculo/)).toHaveTextContent(/para a SPE, a gestora pedagógica dele e a Líder do NFP/);
+    expect(document.body).not.toHaveTextContent(/gestora técnica|gestora operacional/i);
   });
 
-  test('projeto sem coordenador: Itaquiraí-MS, para a gestora operacional e a SPE', async () => {
+  test('projeto sem coordenador: Itaquiraí-MS, para a Gerente Operacional e a SPE', async () => {
     renderizar();
     // Com a coleção no título: dois projetos sem coordenador no mesmo município não ficam iguais.
     // Decisão 46: a palavra é "projeto", não "contrato".
     const cartao = (await screen.findByText(/^Projeto sem coordenador em Itaquiraí-MS \([A-Z ]+\)$/)).closest('li') as HTMLElement;
-    expect(cartao).toHaveTextContent('Seria enviado para: Gestora operacional, SPE');
+    expect(cartao).toHaveTextContent('Seria enviado no sistema e por e-mail institucional para: Gerente Operacional, SPE');
     expect(cartao).toHaveTextContent('Aberto: sai quando o projeto tiver um coordenador definido.');
     expect(within(screen.getByLabelText('Mostrar')).getByRole('option', { name: /^Projeto sem coordenador \(\d+\)$/ })).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/contrato/i);
@@ -93,10 +101,10 @@ describe('ICA — Alertas', { timeout: 20000 }, () => {
     expect(linha).toHaveTextContent(`Mostrando: Dado incompleto, ${esperados} de ${ALERTAS.length}`);
   });
 
-  test('o texto da regra diz que 130 exato fica dentro da meta e sem alerta', async () => {
+  test('o texto da regra diz que quem está em Sobrecarga não recebe também o "Fora da meta"', async () => {
     renderizar();
-    expect(await screen.findByText(/continua em .Fora da meta. quando passa de 130/)).toHaveTextContent(
-      /Com 130 exato, fica dentro da meta e sem alerta/,
+    expect(await screen.findByText(/sai a cada recálculo/)).toHaveTextContent(
+      /Quem está em Sobrecarga não recebe também o .Fora da meta., que fica para quem está abaixo de 70/,
     );
   });
 
@@ -114,7 +122,7 @@ describe('ICA — Alertas', { timeout: 20000 }, () => {
     await userEvent.click(await screen.findByRole('button', { name: /Baixar planilha/i }));
     const [nome, cabecalho, linhas] = baixar.mock.calls[0]!;
     expect(nome).toBe('ica_alertas.csv');
-    expect(cabecalho).toContain('Seria enviado para');
+    expect(cabecalho).toContain('Seria enviado no sistema e por e-mail institucional para');
     expect(linhas).toHaveLength(ALERTAS.length);
   });
 });

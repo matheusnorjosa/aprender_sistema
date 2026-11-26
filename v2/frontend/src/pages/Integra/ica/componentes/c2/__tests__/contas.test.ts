@@ -21,7 +21,7 @@ const atendimento = (id: number, mun: number, coord: number, professores: number
   municipio: mun,
   projeto_geral: 1,
   coordenador: coord,
-  segmentos: [{ segmento: 'Anos Iniciais', turmas_qtde: 2, professor_qtde: professores, aluno_qtde: professores * 20 }],
+  segmentos: [{ segmento: 'Anos Iniciais', anos: 1, turmas_qtde: 2, professor_qtde: professores, aluno_qtde: professores * 20 }],
 });
 
 /** Gerência 1: Ana (municípios 1 e 2) e Bia (município 2, compartilhado). Gerência 2: Caio (3) e Duda (sem carteira). */
@@ -112,6 +112,7 @@ describe('dataDoUltimoRecalculo', () => {
     aprovado_em: null,
     aplicado_em,
     semestre: null,
+    vigencia_em: null,
   });
 
   test('sem mudança na sessão, é a data do último recálculo semestral', () => {

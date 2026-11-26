@@ -44,6 +44,8 @@ import {
   ocorrenciasForaDaContagem,
   percentualCronograma,
   prazoDaAta,
+  prazoDaPesquisa,
+  prazoDoRelatorio,
   respondeuNoPrazo,
   resumoNps,
   reuniaoEmDia,
@@ -611,6 +613,8 @@ describe('Seção 5: tarefas e prazos por cor, contados a partir da publicação
       ['observacao_formacao', '2027-01-25'],
     ]);
     expect(tarefas[0]).toMatchObject({ municipio: 7, cor: 'amarelo', criada_em: PUBLICADA, concluida_em: null, encerramento: null });
+    // Decisão 94: a tarefa continua; a observação é registrada na DFF e o sistema lê de lá.
+    expect(tarefas[1]?.titulo).toBe('Observação de uma formação (lida da DFF)');
     expect(RESPOSTA_POR_COR.amarelo.quem_age).toBe('Gestora de referência e coordenador(es)');
     expect(RESPOSTA_POR_COR.amarelo.rotina).toEqual(['Reunião de escuta a cada 3 meses']);
   });
@@ -740,6 +744,19 @@ describe('Decisão 48: a reunião de escuta é marcada antes e a ata registrada 
     ['2026-12-07', '2026-12-01', 'Ata registrada em 01/12/2026'],
   ] as const)('o texto da tela em %s (ata em %s): "%s"', (hoje, ata_em, texto) => {
     expect(textoDaReuniao({ ...reuniao, ata_em }, hoje)).toBe(texto);
+  });
+});
+
+describe('Decisões 76 e 77: o prazo da pesquisa e o do relatório mensal, em dias úteis', () => {
+  it('decisão 76: o articulador responde em até 10 dias úteis depois do envio do link (02/03/2026, segunda → 16/03)', () => {
+    expect(prazoDaPesquisa('2026-03-02')).toBe('2026-03-16');
+  });
+
+  it('decisão 77: o relatório mensal vence no 5º dia útil do mês seguinte', () => {
+    // 01/04/2027 é quinta-feira: 1, 2, 5, 6 e 7 de abril.
+    expect(prazoDoRelatorio('2027-03')).toBe('2027-04-07');
+    // 01/12/2026 é terça-feira: o de novembro vence na segunda, 07/12 (o "hoje" da demonstração).
+    expect(prazoDoRelatorio('2026-11')).toBe('2026-12-07');
   });
 });
 

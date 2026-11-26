@@ -151,6 +151,7 @@ export default function FichaCoordenador(): JSX.Element {
       responsive: VISIVEL_A_PARTIR.md,
       render: (_v, l) => l.colecoes.map(nomeDaColecao).join(', '),
     },
+    { title: 'Frentes', key: 'frentes', width: 80, responsive: VISIVEL_A_PARTIR.md, render: (_v, l) => formatarNumero(l.frentes) },
     { title: 'Turmas', key: 'turmas', width: 80, responsive: VISIVEL_A_PARTIR.lg, render: (_v, l) => formatarNumero(l.turmas) },
     { title: 'Professores', key: 'professores', width: 105, responsive: VISIVEL_A_PARTIR.lg, render: (_v, l) => formatarNumero(l.professores) },
     {
@@ -198,7 +199,7 @@ export default function FichaCoordenador(): JSX.Element {
       </Title>
       <p>
         Atuação: {ROTULO_ATUACAO[c.atuacao]} · {gerencia?.nome ?? `Gerência ${c.gerencia}`}
-        {gestora ? ` (gestora técnica: ${gestora.nome})` : ''}
+        {gestora ? ` (gestora pedagógica: ${gestora.nome})` : ''}
       </p>
 
       <ul aria-label="Situação atual" className="m-0 mb-4 grid list-none gap-2 p-0 md:grid-cols-3">

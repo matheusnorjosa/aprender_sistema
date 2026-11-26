@@ -144,14 +144,18 @@ function RegistroFeito({ retorno }: { retorno: Extract<Retorno, { ok: true }> })
               ? ' A SPE decide se convoca o Comitê extraordinário.'
               : ' O Comitê ordinário confirma a cor, na data marcada pela SPE.'}
           </p>
-          <p className="m-0">Seria enviado para: {destinatariosDaPiora(depois.cor, gestora, coordenadores).join(', ')}.</p>
+          {/* Decisão 83: o alerta chega dentro do sistema e por e-mail institucional. */}
+          <p className="m-0">
+            Seria enviado no sistema e por e-mail institucional para: {destinatariosDaPiora(depois.cor, gestora, coordenadores).join(', ')}.
+          </p>
           {retorno.reservado && (
             <p className="m-0">
-              O alerta diz só a cor: o que foi dito no momento reservado não vai junto, e os coordenadores e a Gestão
-              Operacional não veem a queixa.
+              {/* Decisão 78: quem lê o momento reservado. */}
+              O alerta diz só a cor: o que foi dito no momento reservado não vai junto; a queixa só é lida pela gestora
+              de referência principal, pela Líder do NFP e pela SPE.
             </p>
           )}
-          <p className="m-0 text-sm">Nada é enviado no protótipo: o alerta só aparece aqui.</p>
+          <p className="m-0 text-sm">Nada é enviado no protótipo, nem no sistema nem por e-mail: o alerta só aparece aqui.</p>
         </div>
       )}
     </div>

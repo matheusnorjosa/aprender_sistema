@@ -28,7 +28,7 @@ function IcaMedio({ resumo }: { resumo: ResumoGerencia }): JSX.Element {
 
 const COLUNAS: ColunaResponsiva<ResumoGerencia>[] = [
   { title: 'Gerência', key: 'gerencia', render: (_v, r) => <strong>{r.gerencia.nome}</strong> },
-  { title: 'Gestora técnica', key: 'gestora', responsive: VISIVEL_A_PARTIR.md, render: (_v, r) => r.gestoraTecnica },
+  { title: 'Gestora pedagógica', key: 'gestora', responsive: VISIVEL_A_PARTIR.md, render: (_v, r) => r.gestoraTecnica },
   {
     title: 'Coordenadores',
     key: 'coordenadores',
@@ -67,7 +67,7 @@ export default function VisaoGerencia(): JSX.Element {
       'ica_por_gerencia.csv',
       [
         'Gerência',
-        'Gestora técnica',
+        'Gestora pedagógica',
         'Coordenadores',
         'Coordenadores com municípios',
         'Municípios ativos',
@@ -145,7 +145,7 @@ export default function VisaoGerencia(): JSX.Element {
             <Title level={2} id={idTitulo} style={{ fontSize: 20 }}>
               {r.gerencia.nome}
             </Title>
-            <p className="mb-2 text-sm">Gestora técnica: {r.gestoraTecnica}</p>
+            <p className="mb-2 text-sm">Gestora pedagógica: {r.gestoraTecnica}</p>
             <ul aria-label={`Coordenadores da ${r.gerencia.nome}`} className="m-0 list-none divide-y p-0">
               {ordenados.map((c) => (
                 <li key={c.coordenador.id} className="flex flex-wrap items-center justify-between gap-2 py-2">

@@ -6,7 +6,7 @@ import { act, renderHook } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
 import { SemaforoDemoProvider, useSemaforoDemo } from '../SemaforoDemoContext';
-import { HISTORIAS_SEMAFORO, gerarDadosSemaforo } from '../dados';
+import { HISTORIAS_SEMAFORO, doSistema, gerarDadosSemaforo } from '../dados';
 import { estadoDaTarefa, tarefaAberta } from '../regras';
 
 const original = gerarDadosSemaforo();
@@ -222,6 +222,8 @@ describe('useSemaforoDemo', { timeout: 20000 }, () => {
       formacoes_realizadas: 1,
       visitas_previstas: 2,
       visitas_realizadas: 0,
+      // Decisão 81: os números são outros que os do sistema; a justificativa vai junto.
+      justificativa: 'Duas formações foram adiadas pela Secretaria.',
     };
     expect(result.current.registrarRelatorio({ ...base, projeto: 999999 })).toEqual({ ok: false, erros: ['Escolha um projeto do município.'] });
     // WCAG 3.3.1: o erro diz qual campo está errado, com o nome que a tela mostra.
@@ -248,6 +250,30 @@ describe('useSemaforoDemo', { timeout: 20000 }, () => {
     expect(result.current.dados.relatorios_corrigidos).toEqual([
       expect.objectContaining({ municipio: id, projeto: projeto.id, mes: '2026-12', formacoes_realizadas: base.formacoes_realizadas, corrigido_em: REF }),
     ]);
+  });
+
+  it('decisões 81 e 82: o relatório confere o que veio do sistema; mudar um número exige a justificativa', () => {
+    const { result } = renderHook(() => useSemaforoDemo(), { wrapper });
+    const id = verdeTranquilo(result.current);
+    const projeto = original.municipios.find((m) => m.id === id)!.projetos[0]!.id;
+    const sistema = doSistema(original, projeto, '2026-12')!;
+    let r: unknown;
+    act(() => {
+      r = result.current.registrarRelatorio(sistema);
+    });
+    expect(r).toEqual({ ok: true });
+    const mudado = { ...sistema, formacoes_realizadas: sistema.formacoes_realizadas - 1 };
+    const erro = 'Você mudou um número que veio do sistema: escreva a justificativa.';
+    expect(result.current.registrarRelatorio(mudado)).toEqual({ ok: false, erros: [erro] });
+    expect(result.current.registrarRelatorio({ ...mudado, justificativa: '   ' })).toEqual({ ok: false, erros: [erro] });
+    act(() => {
+      r = result.current.registrarRelatorio({ ...mudado, justificativa: '  A Secretaria adiou uma formação.  ' });
+    });
+    expect(r).toEqual({ ok: true });
+    expect(result.current.dados.relatorios.find((x) => x.projeto === projeto && x.mes === '2026-12')).toMatchObject({
+      formacoes_realizadas: sistema.formacoes_realizadas - 1,
+      justificativa: 'A Secretaria adiou uma formação.',
+    });
   });
 
   it('decisão 46: relatório de projeto sem coordenador é recusado', () => {

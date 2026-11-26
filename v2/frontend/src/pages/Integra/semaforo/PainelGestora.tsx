@@ -217,8 +217,10 @@ export default function PainelGestora(): JSX.Element {
               Pesquisa sem resposta
             </Title>
             <p className="mb-2 text-sm">
-              Ciclo {dados.ciclo_atual} ({mesesDoCiclo(dados.ciclo_atual)}) · prazo para responder:{' '}
-              {formatarDia(periodoDoCiclo(dados.ciclo_atual).prazo_pesquisa)}.
+              {/* Decisões 73 e 76: a gestora manda o link, sem o coordenador; a resposta vai até 10 dias úteis depois. */}
+              Ciclo {dados.ciclo_atual} ({mesesDoCiclo(dados.ciclo_atual)}) · link enviado pela gestora de referência em{' '}
+              {formatarDia(periodoDoCiclo(dados.ciclo_atual).envio_pesquisa)} · prazo para responder:{' '}
+              {formatarDia(periodoDoCiclo(dados.ciclo_atual).prazo_pesquisa)} (10 dias úteis).
             </p>
             {semResposta.length === 0 ? (
               <p>Todos os municípios da carteira já responderam.</p>

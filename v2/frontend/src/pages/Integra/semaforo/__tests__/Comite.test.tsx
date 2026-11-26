@@ -20,7 +20,9 @@ async function abrir(): Promise<void> {
 }
 
 const cartoes = (): HTMLElement[] => within(screen.getByRole('list', { name: /Municípios do ciclo 2026\.6/ })).getAllByRole('article');
-const cartao = (nome: string): HTMLElement => screen.getByRole('article', { name: nome });
+// Pelo texto do título, e não por getByRole('article', { name }): calcular o nome de todos os cartões a cada busca
+// deixava o teste lento demais na CI (passava de 20 s). O cartão continua achado pelo título dele.
+const cartao = (nome: string): HTMLElement => screen.getByText(nome, { selector: 'h3 a' }).closest('article')!;
 
 describe('Comitê', { timeout: 20000 }, () => {
   test('título, aviso de quem vê na versão real e o "sem dado" explicado', async () => {

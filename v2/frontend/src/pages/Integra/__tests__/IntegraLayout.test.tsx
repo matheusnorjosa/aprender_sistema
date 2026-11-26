@@ -64,14 +64,16 @@ describe('Integra — moldura e página', { timeout: 20000 }, () => {
     const ica = screen.getByRole('link', { name: /ICA/ });
     expect(ica).toHaveAttribute('href', '/integra/ica');
     expect(screen.getByRole('link', { name: /Semáforo/ })).toHaveAttribute('href', '/integra/semaforo');
-    expect(screen.getByRole('link', { name: /Deslocamento/ })).toHaveAttribute('href', '/integra/deslocamento');
+    // Cada link é buscado uma vez só: getByRole calcula o nome de todos os links e pesa na CI.
+    const deslocamento = screen.getByRole('link', { name: /Deslocamento/ });
+    expect(deslocamento).toHaveAttribute('href', '/integra/deslocamento');
     // O Deslocamento soma o tempo de referência de ida e volta; "viagens" são as registradas na tela de viagens.
-    expect(screen.getByRole('link', { name: /Deslocamento/ })).toHaveTextContent(/ida e volta/);
-    expect(screen.getByRole('link', { name: /Deslocamento/ })).not.toHaveTextContent(/viagens/);
-    expect(screen.getByRole('link', { name: /DFF/ })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /DFF/ })).toHaveTextContent(/Observação de formação e PDI/);
+    expect(deslocamento).toHaveTextContent(/ida e volta/);
+    expect(deslocamento).not.toHaveTextContent(/viagens/);
+    const dff = screen.getByRole('link', { name: /DFF/ });
+    expect(dff).toHaveTextContent(/Observação de formação e PDI/);
     // Decisão 94: a observação de formação fica na DFF, e o sistema lê de lá.
-    expect(screen.getByRole('link', { name: /DFF/ })).toHaveTextContent(/o sistema lê a observação de lá \(decisão 94\)/);
+    expect(dff).toHaveTextContent(/o sistema lê a observação de lá \(decisão 94\)/);
     expect(screen.getByRole('link', { name: /^Formar/ })).toHaveAttribute('href', EXTERNAL_URLS.FORMAR_PLATFORM);
     expect(screen.getByRole('link', { name: /^Avaliar/ })).toHaveAttribute('href', EXTERNAL_URLS.AVALIAR_PLATFORM);
     // Decisão 86: era "Avaliação do Coordenador".

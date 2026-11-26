@@ -200,7 +200,9 @@ describe('Comitê', { timeout: 20000 }, () => {
       // Desfazer o vermelho não oferece o próprio vermelho.
       expect(within(horizonte).getAllByRole('radio').map((r) => r.getAttribute('value'))).toEqual(['amarelo', 'verde']);
       await user.click(within(horizonte).getByRole('radio', { name: 'Amarelo' }));
-      await user.type(within(horizonte).getByLabelText('Justificativa do Comitê'), 'A reclamação foi resolvida com a Secretaria.');
+      // paste: digitar letra a letra numa tela com 88 cartões estoura o tempo na CI.
+      await user.click(within(horizonte).getByLabelText('Justificativa do Comitê'));
+      await user.paste('A reclamação foi resolvida com a Secretaria.');
       await user.click(within(horizonte).getByRole('button', { name: 'Publicar a cor alterada' }));
       expect(screen.getByRole('status')).toHaveTextContent(
         'Publicado: Horizonte-CE em Amarelo. As tarefas abertas do vermelho ficam canceladas pelo Comitê; as feitas continuam registradas.',
@@ -252,7 +254,8 @@ describe('Comitê', { timeout: 20000 }, () => {
       expect(within(horizonte).queryByRole('radio')).not.toBeInTheDocument();
       await user.click(within(horizonte).getByRole('button', { name: 'Publicar o vermelho' }));
       expect(within(horizonte).getByRole('alert')).toHaveTextContent('A cor é diferente da sugerida (Amarelo). Escreva a justificativa do Comitê.');
-      await user.type(within(horizonte).getByLabelText('Justificativa do Comitê'), 'A Secretaria confirmou a reclamação.');
+      await user.click(within(horizonte).getByLabelText('Justificativa do Comitê'));
+      await user.paste('A Secretaria confirmou a reclamação.');
       await user.click(within(horizonte).getByRole('button', { name: 'Publicar o vermelho' }));
       expect(screen.getByRole('status')).toHaveTextContent(
         'Publicado: Horizonte-CE em Vermelho. O Comitê confirmou o vermelho na hora: as tarefas seguem.',
@@ -280,7 +283,8 @@ describe('Comitê', { timeout: 20000 }, () => {
     await user.click(within(cartao(nome)).getByRole('button', { name: `Confirmar Amarelo para ${nome}` }));
     await user.click(within(cartao(nome)).getByRole('button', { name: `Alterar a cor de ${nome}` }));
     await user.click(within(cartao(nome)).getByRole('radio', { name: 'Vermelho' }));
-    await user.type(within(cartao(nome)).getByLabelText('Justificativa do Comitê'), 'A Secretaria pediu ajuda.');
+    await user.click(within(cartao(nome)).getByLabelText('Justificativa do Comitê'));
+    await user.paste('A Secretaria pediu ajuda.');
     await user.click(within(cartao(nome)).getByRole('button', { name: 'Publicar a cor alterada' }));
     const aviso = screen.getByRole('status');
     expect(aviso).toHaveTextContent(`Publicado: ${nome} em Vermelho.`);

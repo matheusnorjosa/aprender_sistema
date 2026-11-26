@@ -154,7 +154,7 @@ describe('Semáforo — Pesquisa do articulador', { timeout: 20000 }, () => {
     const projeto = screen.getByLabelText('Projeto');
     expect(projeto).toHaveValue('');
     expect(within(projeto).getAllByRole('option')).toHaveLength(VARIOS.projetos.length + 1);
-    expect(within(projeto).getByRole('option', { name: new RegExp(`^${livre.nome} · ${livre.articulador.replace(/[()]/g, '\\$&')}$`) })).toBeInTheDocument();
+    expect(within(projeto).getByRole('option', { name: `${livre.nome} · ${livre.articulador}` })).toBeInTheDocument();
 
     await responder(user, '5', '10');
     await user.click(screen.getByRole('button', { name: 'Enviar resposta' }));

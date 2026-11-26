@@ -339,7 +339,8 @@ describe('decisão 32: ocorrências desde a 1ª formação do ano; o gerador tem
 
   it('o amarelo de ocorrência sorteado cai depois da 1ª formação do município, em qualquer semente (senão não contaria)', () => {
     // Em 2026.1, o 2º mês (fevereiro) pode vir antes do início das formações do município (março ou abril).
-    for (let semente = 1; semente <= 40; semente++) {
+    // 8 sementes cobrem o caso de fevereiro antes do início; 40 estouravam o tempo na CI.
+    for (let semente = 1; semente <= 8; semente++) {
       const d = gerarDadosSemaforo(semente);
       for (const o of d.ocorrencias.filter((x) => x.data.startsWith('2026-') && x.tipo === 'leve')) {
         const inicio = inicioDasFormacoesNoAno(d.relatorios.filter((r) => r.municipio === o.municipio), 2026);

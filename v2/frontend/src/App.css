@@ -176,6 +176,19 @@ html:not(.dark) .ant-menu-dark .ant-menu-submenu-selected > .ant-menu-submenu-ti
   color: #000000 !important;
 }
 
+/* Cartões da Administração do DAT (links desde 27/11/2026): o reset do AntD zera o contorno do <a>
+   (`:where(.css-…) a:focus { outline: 0 }`, 0,1,1); esta regra tem 0,2,0 e vence. No escuro, o verde
+   clareado (o da marca some no fundo escuro). */
+.admin-dat-cartao:focus-visible {
+  outline: 2px solid var(--as-primary-dark);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+html.dark .admin-dat-cartao:focus-visible {
+  outline-color: var(--as-primary-dark-accent);
+}
+
 /* Foco no menu lateral: o reset do AntD tira o outline do <a>, e o anel do título de submenu
    (verde sobre verde) dá 1,7:1. Anel de duas cores, branco por fora e preto por dentro: em
    qualquer fundo do menu, nos dois temas (verde, verde-escuro do submenu, verde-claro do

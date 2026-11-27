@@ -141,10 +141,8 @@ export default function AdminDATHomePage(): JSX.Element {
       {/* Cards de módulos */}
       <nav aria-label="Módulos de administração">
       <Row gutter={[16, 16]}>
-        {modules.map((module) => (
-          <Col xs={24} sm={12} md={8} lg={6} key={module.key}>
-            {/* Link de verdade (Tab e Enter chegam), no lugar do Card com onClick (27/11/2026). */}
-            <Link to={module.path} style={{ display: 'block', height: '100%' }}>
+        {modules.map((module) => {
+          const cartao = (
             <Card
               hoverable
               style={{
@@ -168,9 +166,21 @@ export default function AdminDATHomePage(): JSX.Element {
                 {module.status}
               </Text>
             </Card>
-            </Link>
-          </Col>
-        ))}
+          );
+          return (
+            <Col xs={24} sm={12} md={8} lg={6} key={module.key}>
+              {/* Link de verdade (Tab e Enter chegam), no lugar do Card com onClick (27/11/2026); o
+                  cartão "Em breve" fica sem link. O anel de foco vem de .admin-dat-cartao (App.css). */}
+              {module.status === 'Disponível' ? (
+                <Link to={module.path} className="admin-dat-cartao" style={{ display: 'block', height: '100%' }}>
+                  {cartao}
+                </Link>
+              ) : (
+                cartao
+              )}
+            </Col>
+          );
+        })}
       </Row>
       </nav>
     </section>

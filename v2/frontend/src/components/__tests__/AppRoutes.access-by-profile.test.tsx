@@ -152,7 +152,7 @@ const CRITICAL_ROUTES = [
   '/solicitacoes/bloqueios',
   '/solicitacoes/deslocamentos',
   EDITAR,
-  '/controle',
+  '/controle/acoes',
   '/controle/compras',
   '/compras-materiais',
   '/dat/compras-materiais',
@@ -212,7 +212,7 @@ const ACTORS: ActorSnapshot[] = [
       '/dat/admin/feedbacks': true, // Feedbacks (11/11/2026): manage_admin_registries
       // PR 10: o DAT aprova (base 5) e opera a pré-agenda (seção Controle).
       '/solicitacoes/aprovacoes': true,
-      '/controle': true,
+      '/controle/acoes': true,
       // '/dat/importacoes' fica negada: importação pela tela é só do superusuário (02/10/2026)
     },
   },
@@ -227,7 +227,7 @@ const ACTORS: ActorSnapshot[] = [
       '/solicitacoes/aprovacoes': true,
       ...ESCOPO,
       // Sem create_solicitation: o servidor recusa o salvar (403), e a edição não abre.
-      '/controle': true,
+      '/controle/acoes': true,
       ...COMPRAS,
     },
   },
@@ -277,7 +277,7 @@ const ACTORS: ActorSnapshot[] = [
       '/solicitacoes/aprovacoes': true,
       ...ESCOPO,
       // Sem create_solicitation: o servidor recusa o salvar (403), e a edição não abre.
-      '/controle': true,
+      '/controle/acoes': true,
       ...COMPRAS,
     },
   },
@@ -383,6 +383,16 @@ describe('AppRoutes — telas de importação só abrem para superusuário', () 
 // OWASP — Forbidden é genérico, sem vazar nome de policy/recurso
 // ============================================================================
 
+// 27/11/2026 (dono): o Painel de Controle saiu. Quem tiver /controle salvo cai na Página Inicial
+// (rota curinga), em vez de uma página vazia ou de "Recurso indisponível".
+describe('AppRoutes — /controle (Painel de Controle removido)', () => {
+  test('quem abre /controle vai para a Página Inicial', async () => {
+    renderRotaDoAtor('/controle', atorRbac('Controle'));
+    expect(await screen.findByRole('heading', { name: 'Página Inicial' })).toBeInTheDocument();
+    expect(screen.queryByText('Painel de Controle')).not.toBeInTheDocument();
+  });
+});
+
 describe('AppRoutes — Forbidden é mensagem genérica (OWASP)', () => {
   const FORBIDDEN_LEAKAGE_PATTERNS = [
     /access_solicitation_approvals/i,
@@ -395,8 +405,8 @@ describe('AppRoutes — Forbidden é mensagem genérica (OWASP)', () => {
     /HasPerm/,
   ];
 
-  test('Forbidden em /controle (Coordenador) não vaza policy/setor', async () => {
-    renderRotaDoAtor('/controle', atorRbac('Coordenador'));
+  test('Forbidden em /controle/acoes (Coordenador) não vaza policy/setor', async () => {
+    renderRotaDoAtor('/controle/acoes', atorRbac('Coordenador'));
     expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
     for (const pat of FORBIDDEN_LEAKAGE_PATTERNS) {
       expect(screen.queryByText(pat)).not.toBeInTheDocument();

@@ -128,11 +128,13 @@ html:not(.dark) .ant-menu-dark .ant-menu-item a .ant-badge {
   color: #ffffff !important;
 }
 
-html:not(.dark) .ant-menu-dark .ant-menu-item-selected a .ant-badge {
+html:not(.dark) .ant-menu-dark .ant-menu-item-selected a .ant-badge,
+html:not(.dark) .ant-menu-dark .ant-menu-item-selected:hover a .ant-badge {
   color: #000000 !important;
 }
 
-html:not(.dark) .ant-menu-dark .ant-menu-item:hover a .ant-badge {
+/* Só item não selecionado: no selecionado, o branco sobre #C6E6C3 dava ~1,4:1 (Dashboard GCal). */
+html:not(.dark) .ant-menu-dark .ant-menu-item:not(.ant-menu-item-selected):hover a .ant-badge {
   color: #ffffff !important;
 }
 

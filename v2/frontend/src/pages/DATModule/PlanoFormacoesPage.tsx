@@ -757,7 +757,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
           <Col xs={24} sm={12} md={6}>
             <Card>
               <Statistic
-                title="Planos Ativos"
+                title="Total de planos"
                 value={stats.total_planos}
                 prefix={<ProjectOutlined />}
               />

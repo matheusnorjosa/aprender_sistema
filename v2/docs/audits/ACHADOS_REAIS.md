@@ -343,9 +343,9 @@ desta passagem.
 
 **Não são defeito, ficam só como nota.** #1899 (corrigida no código, fechada em 17/10/2026): a adoção do
 Event ID ainda não rodou (0 eventos adotados em 06/11); a proteção contra duplicata dos eventos futuros
-publicados pela planilha só vale depois dela, na virada (G24, plano da virada). #1984 (corrigida em parte,
-fechada em 09/09/2026): o hub `/controle` mostra só totais, sem os KPIs da opção (a), e um `Promise.all` zera
-o painel numa 403 isolada; esperar a reformulação dos dashboards para a Diretoria (decisão de 05/11). #2039,
+publicados pela planilha só vale depois dela, na virada (G24, plano da virada). #1984: o hub `/controle`
+saiu em 27/11/2026 (decisão do dono: repetia o submenu; os totais estão em cada lista), e com ele o `Promise.all`
+que zerava o painel numa 403 isolada. #2039,
 lado operacional: conferir que as contas do Controle reconectaram o Google e treinar o Controle não está em
 nenhum rastreador da liberação.
 

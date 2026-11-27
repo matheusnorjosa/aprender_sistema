@@ -34,11 +34,6 @@ test.describe('Fluxo de Solicitações', () => {
 });
 
 test.describe('Controle e Operações', () => {
-  test('5. Painel de Controle carrega', async ({ page }) => {
-    await page.goto('/controle');
-    await expect(page.getByRole('main')).toBeVisible();
-  });
-
   test('7. Deslocamentos carrega', async ({ page }) => {
     await page.goto('/deslocamentos');
     await expect(page.getByRole('main')).toBeVisible();

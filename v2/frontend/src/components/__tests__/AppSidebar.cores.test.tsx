@@ -92,6 +92,26 @@ describe('App.css — submenu da página atual na sidebar (tema claro)', () => {
   });
 });
 
+// 27/11/2026: o "Dashboard GCal" é o único item com contador (Badge) em volta do nome. O branco
+// do hover no contador não excluía o item selecionado e, por vir depois no App.css, vencia o preto
+// do selecionado: texto branco sobre #C6E6C3 (~1,4:1) com o mouse por cima.
+describe('App.css — contador do item selecionado com o mouse por cima (tema claro)', () => {
+  const CONTADOR_SELECIONADO = `${TEMA_CLARO} .ant-menu-item-selected a .ant-badge`;
+
+  test('continua com a cor do item selecionado', () => {
+    expect(valorImportante(`${TEMA_CLARO} .ant-menu-item-selected:hover a .ant-badge`, 'color')).toBe(
+      valorImportante(CONTADOR_SELECIONADO, 'color'),
+    );
+  });
+
+  test('o branco do hover vale só para item não selecionado, como no texto dos outros itens', () => {
+    expect(
+      valorImportante(`${TEMA_CLARO} .ant-menu-item:not(.ant-menu-item-selected):hover a .ant-badge`, 'color'),
+    ).toBe(valorImportante(`${TEMA_CLARO} .ant-menu-item:not(.ant-menu-item-selected):hover a`, 'color'));
+    expect(() => regra(`${TEMA_CLARO} .ant-menu-item:hover a .ant-badge`)).toThrow();
+  });
+});
+
 /** Luminância relativa (WCAG 2.x) de #rrggbb. */
 function luminancia(hex: string): number {
   const [r, g, b] = [1, 3, 5].map((i) => {

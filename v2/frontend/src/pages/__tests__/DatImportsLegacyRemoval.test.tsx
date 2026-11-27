@@ -3,7 +3,6 @@ import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-import ControlePage from '../Controle/ControlePage';
 import ComprasPage from '../DATModule/ComprasPage';
 import Disponibilidade from '../Disponibilidade';
 import DeslocamentosPage from '../Deslocamentos/DeslocamentosPage';
@@ -13,10 +12,6 @@ import {
   getProdutosOptions,
   getProjetosOptions,
   listCompras as listDatCompras,
-  getAcoesStats,
-  getComprasStats,
-  getPlanoFormacoesStats,
-  listCoordenadoresDAT,
 } from '../../api/datModule';
 import { useTableFilters } from '../../hooks/useTableFilters';
 import { DAT_IMPORTS_CENTRALIZED_MESSAGE } from '../../components/DatImportsCentralizedBanner';
@@ -50,11 +45,6 @@ vi.mock('../../api/datModule', () => ({
   getMunicipiosOptions: vi.fn(),
   getProjetosOptions: vi.fn(),
   getProdutosOptions: vi.fn(),
-  // #1984: ControlePage virou hub e lê estes /stats/ no mount.
-  getAcoesStats: vi.fn(),
-  getComprasStats: vi.fn(),
-  getPlanoFormacoesStats: vi.fn(),
-  listCoordenadoresDAT: vi.fn(),
 }));
 
 vi.mock('../../hooks/useTableFilters', () => ({
@@ -101,10 +91,6 @@ describe('DAT Imports PR-D — remoção de entrypoints legados', () => {
     vi.mocked(getMunicipiosOptions).mockResolvedValue([]);
     vi.mocked(getProjetosOptions).mockResolvedValue([]);
     vi.mocked(getProdutosOptions).mockResolvedValue([]);
-    vi.mocked(getAcoesStats).mockResolvedValue({ total: 0 });
-    vi.mocked(getComprasStats).mockResolvedValue({ total: 0 });
-    vi.mocked(getPlanoFormacoesStats).mockResolvedValue({ total_planos: 0 });
-    vi.mocked(listCoordenadoresDAT).mockResolvedValue({ count: 0, results: [] });
     vi.mocked(useTableFilters).mockReturnValue({
       data: [],
       loading: false,
@@ -147,19 +133,6 @@ describe('DAT Imports PR-D — remoção de entrypoints legados', () => {
         json: async () => ({}),
       };
     }));
-  });
-
-  test('ControlePage (hub Painel de Controle): sem cards de importação nem aviso para quem não é superusuário', async () => {
-    renderPage(<ControlePage />);
-
-    // #1984: /controle virou hub — heading "Painel de Controle" (não mais "Controle" + lista de compras).
-    expect(screen.getByRole('heading', { name: 'Painel de Controle' })).toBeInTheDocument();
-    // Controle não é superusuário: o aviso de DAT > Importações não aparece (02/10/2026).
-    await waitFor(() => expect(getMe).toHaveBeenCalled());
-    expect(screen.queryByLabelText(DAT_IMPORTS_CENTRALIZED_MESSAGE)).not.toBeInTheDocument();
-    // Invariante PR-D preservado: nenhum entrypoint de import legado.
-    expectLegacyImportsRemoved();
-    expect(screen.queryByRole('link', { name: 'DAT > Importações' })).not.toBeInTheDocument();
   });
 
   test('ComprasPage remove modo Importar e mantém fluxo principal de compras', async () => {

@@ -290,7 +290,6 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 
 | Rota | Página | Guard (`AppRoutes.tsx`) |
 |---|---|---|
-| `/controle` | `Controle/ControlePage` | policy `access_controle_section` |
 | `/controle/acoes` | `DATModule/AcoesPage` | policy `access_controle_section` |
 | `/controle/compras`, `/compras-materiais` | `DATModule/ComprasPage` | policy `view_compras_stats` (PR 7; antes `canControle \|\| canDAT`) |
 | `/controle/coordenadores` | `DATModule/CoordenadoresPage` | policy `access_controle_section` |
@@ -320,7 +319,7 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 >
 > **Marca de série (01/10/2026):** quem diz o que é série é o campo `Projeto.eh_serie`, e não mais o nome terminado em número. `/lookup/projetos/` (sem `include_kits=true`) e `/options/projetos/?exclude_kits=true` excluem `eh_serie=True`; o contrato HTTP não mudou. A migration `0114` preencheu a marca pela regra antiga (nome terminado em número), sem exceção, então o deploy não muda nenhuma lista; as exceções (projeto numerado que não é série, série sem número) são marcadas depois, pela tela Projetos ou por correção de dados. **Exceção do Plano Anual (decisão do dono, 02/10/2026):** `/options/projetos/?exclude_kits=true` (único consumidor: `PlanoFormacoesPage`) devolve os não-série **mais** toda série que já tem `PlanoFormacoes` — "Projeto Catavento 2" e "3" seguem série (na Nova Solicitação só aparece "Cataventos") e os planos deles continuam no filtro e no formulário. Valem os filtros de sempre (`ativo`, `is_test`) e o cache de 5 min (a série que ganha o primeiro plano por import entra na lista em até 5 min). `/lookup/projetos/` não tem a exceção: só não-série. O import marca só ao criar o projeto ([`imports.spec.md`](../backend/imports.spec.md)).
 
-> **#1984 (`/controle` = hub):** `ControlePage` deixou de ser a lista de compras legada (`core.Compra`, redundante com `/controle/compras`) e virou o **Painel de Controle** — KPIs de contagem reais (Ações/Compras/Planos/Coordenadores via os `/stats/`, sem valor financeiro) + atalhos pras sub-páginas.
+> **Painel de Controle removido (27/11/2026, decisão do dono):** o hub `/controle` (#1984) repetia, em atalhos, os itens do submenu Controle, e os 4 totais dele já aparecem em cada lista (Ações, Compras, Plano Anual, Coordenadores). A rota e o item do menu saíram; `/controle` cai na rota curinga (Página Inicial).
 
 ### DAT / AdminDAT
 

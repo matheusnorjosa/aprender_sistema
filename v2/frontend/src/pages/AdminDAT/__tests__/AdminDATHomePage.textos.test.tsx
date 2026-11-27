@@ -46,6 +46,15 @@ describe('AdminDATHomePage: textos dos cartões', { timeout: 20000 }, () => {
     expect(screen.queryByText(/CPF, grupos e perfis/)).not.toBeInTheDocument();
   });
 
+  // 27/11/2026: os cartões eram Card com onClick, fora do alcance do teclado (WCAG 2.1.1).
+  test('cada cartão é um link para a sua tela', async () => {
+    renderPage();
+
+    const usuarios = await screen.findByRole('link', { name: /Usuários/ });
+    expect(usuarios).toHaveAttribute('href', '/dat/admin/usuarios');
+    expect(screen.getByRole('link', { name: /Configurações/ })).toHaveAttribute('href', '/dat/admin/configuracoes');
+  });
+
   test('superusuário vê o cartão Grupos', async () => {
     vi.mocked(checkAuth).mockResolvedValue({ authenticated: true, user: { is_superuser: true } } as never);
     renderPage();

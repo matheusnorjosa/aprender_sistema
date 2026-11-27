@@ -245,7 +245,6 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
   },
   { path: '/perfil', perfil: 'coordenador', marco: 'Meu perfil' },
   { path: '/politica-privacidade', perfil: 'coordenador', marco: 'Política de Privacidade' },
-  { path: '/controle', perfil: 'controle', marco: 'Painel de Controle' },
   {
     path: '/controle/acoes',
     perfil: 'controle',

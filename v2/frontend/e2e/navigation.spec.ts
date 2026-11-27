@@ -80,9 +80,4 @@ test.describe('Navegação Principal', () => {
     await page.goto('/mapa-brasil');
     await expect(page.getByRole('main')).toBeVisible();
   });
-
-  test('13. Painel de Controle carrega', async ({ page }) => {
-    await page.goto('/controle');
-    await expect(page.getByRole('main')).toBeVisible();
-  });
 });

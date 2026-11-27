@@ -74,7 +74,7 @@ def chave_cache_grade(
     setor = (sector or "").strip() or None
     busca = (q or "").strip().lower()
     parametros = json.dumps([year, month, role, escopo, setor, busca, str(teto)], ensure_ascii=False)
-    return f"monthly:v9:{monthly_ver}:{hashlib.sha256(parametros.encode('utf-8')).hexdigest()}"
+    return f"monthly:v10:{monthly_ver}:{hashlib.sha256(parametros.encode('utf-8')).hexdigest()}"
 
 
 class MonthlyAvailabilityView(APIView):

@@ -25,7 +25,7 @@ import DetailsDrawer from './DetailsDrawer';
 import { rotuloSemana, semanaInicial, semanasDoMes } from './semanas';
 import { useResponsive } from '../../hooks/useResponsive';
 import type { ID } from '../../types';
-import type { PersonType, EventDetailType } from './DetailsDrawer';
+import type { PersonType, DetailItemType } from './DetailsDrawer';
 
 /** Filters type */
 interface FiltersType {
@@ -47,11 +47,11 @@ const BOTAO_SEMANA =
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ' +
   'aria-disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:hover:bg-gray-100';
 
-/** Selection type */
+/** Selection type (`dayIdx` nulo: o mês da pessoa, pelo clique no nome) */
 interface SelectionType {
   role: 'FORMADOR' | 'COORDENADOR';
   rowIdx: number;
-  dayIdx: number;
+  dayIdx: number | null;
 }
 
 export default function MonthlyPage(): JSX.Element {
@@ -60,7 +60,7 @@ export default function MonthlyPage(): JSX.Element {
   const [filters, setFilters] = useState<FiltersType>({
     year: now.year(),
     month: now.month() + 1,
-    gerenciaId: null, // null = Superintendência (default)
+    gerenciaId: null, // null = opção "Participantes de projetos SUPER" (default)
     sector: '',
     q: '',
   });
@@ -105,6 +105,14 @@ export default function MonthlyPage(): JSX.Element {
     setSelected({ role: 'COORDENADOR', rowIdx, dayIdx });
   };
 
+  const onSelectPessoaFormador = (rowIdx: number): void => {
+    setSelected({ role: 'FORMADOR', rowIdx, dayIdx: null });
+  };
+
+  const onSelectPessoaCoordenador = (rowIdx: number): void => {
+    setSelected({ role: 'COORDENADOR', rowIdx, dayIdx: null });
+  };
+
   /**
    * Dataset e detalhes baseados na seleção atual.
    */
@@ -112,10 +120,13 @@ export default function MonthlyPage(): JSX.Element {
     ? coordenadores.data
     : formadores.data;
 
-  const details = useMemo((): EventDetailType[] => {
+  // Dia: os itens da célula. Pessoa: os de todas as células da linha, na ordem dos dias.
+  const details = useMemo((): DetailItemType[] => {
     if (!dataset || !selected) return [];
-    const key = `${selected.rowIdx}:${selected.dayIdx}`;
-    return (dataset.details_index?.[key] as EventDetailType[] | undefined) ?? [];
+    const itensDe = (dayIdx: number): DetailItemType[] =>
+      (dataset.details_index?.[`${selected.rowIdx}:${dayIdx}`] as DetailItemType[] | undefined) ?? [];
+    if (selected.dayIdx === null) return dataset.days.flatMap((_, dayIdx) => itensDe(dayIdx));
+    return itensDe(selected.dayIdx);
   }, [dataset, selected]);
 
   /**
@@ -124,7 +135,8 @@ export default function MonthlyPage(): JSX.Element {
   const person: PersonType | null = selected && dataset?.people?.[selected.rowIdx]
     ? { ...dataset.people[selected.rowIdx] } as PersonType
     : null;
-  const day: number | null = (selected && dataset?.days?.[selected.dayIdx]) ?? null;
+  const day: number | null =
+    selected && selected.dayIdx !== null ? (dataset?.days?.[selected.dayIdx] ?? null) : null;
 
   // Falha ao atualizar com a grade na tela (uma mensagem só para as duas grades).
   const erroAtualizacao = formadores.erroAtualizacao ?? coordenadores.erroAtualizacao;
@@ -138,15 +150,15 @@ export default function MonthlyPage(): JSX.Element {
 
   return (
     <section className="min-h-screen bg-gray-50" aria-labelledby="grade-mensal-title">
-      <div className="p-6 md:p-10 space-y-6">
+      <div className="p-3 md:p-6 space-y-3 md:space-y-4">
         {/* Header semantico */}
         <header>
-          <h1 id="grade-mensal-title" className="text-3xl font-bold text-gray-900">
+          <h1 id="grade-mensal-title" className="text-xl md:text-3xl font-bold text-gray-900">
             Grade Mensal de Disponibilidade
           </h1>
           <p className="text-sm text-gray-600 mt-1">
             Visualize a disponibilidade mensal de formadores e coordenadores.
-            Clique em uma célula para ver detalhes dos eventos.
+            Clique num código para ver o dia, ou no nome para ver o mês da pessoa.
           </p>
           <div className="mt-2">
             <SyncIndicator
@@ -211,11 +223,11 @@ export default function MonthlyPage(): JSX.Element {
         )}
 
         {/* Grades */}
-        <div className="space-y-6">
+        <div className="space-y-4">
             {/* Grade de Formadores */}
             <article aria-labelledby="formadores-heading">
-              <header className="mb-4">
-                <h2 id="formadores-heading" className="text-xl font-semibold text-gray-900">Formadores</h2>
+              <header className="mb-1">
+                <h2 id="formadores-heading" className="text-lg font-semibold text-gray-900">Formadores</h2>
               </header>
 
               {formadores.loading ? (
@@ -242,15 +254,14 @@ export default function MonthlyPage(): JSX.Element {
                 </div>
               ) : formadores.data ? (
                 <Grid
-                  title="Formadores"
                   year={filters.year}
                   month={filters.month}
                   days={formadores.data.days}
                   diasVisiveis={diasVisiveis}
                   people={formadores.data.people}
                   cells={formadores.data.cells}
-                  detailsIndex={formadores.data.details_index || {}}
                   onSelect={onSelectFormador}
+                  onSelectPessoa={onSelectPessoaFormador}
                   selected={
                     selected?.role === 'FORMADOR'
                       ? { rowIdx: selected.rowIdx, dayIdx: selected.dayIdx }
@@ -268,8 +279,8 @@ export default function MonthlyPage(): JSX.Element {
 
             {/* Grade de Coordenadores */}
             <article aria-labelledby="coordenadores-heading">
-              <header className="mb-4">
-                <h2 id="coordenadores-heading" className="text-xl font-semibold text-gray-900">Coordenadores</h2>
+              <header className="mb-1">
+                <h2 id="coordenadores-heading" className="text-lg font-semibold text-gray-900">Coordenadores</h2>
               </header>
 
               {coordenadores.loading ? (
@@ -296,15 +307,14 @@ export default function MonthlyPage(): JSX.Element {
                 </div>
               ) : coordenadores.data ? (
                 <Grid
-                  title="Coordenadores"
                   year={filters.year}
                   month={filters.month}
                   days={coordenadores.data.days}
                   diasVisiveis={diasVisiveis}
                   people={coordenadores.data.people}
                   cells={coordenadores.data.cells}
-                  detailsIndex={coordenadores.data.details_index || {}}
                   onSelect={onSelectCoordenador}
+                  onSelectPessoa={onSelectPessoaCoordenador}
                   selected={
                     selected?.role === 'COORDENADOR'
                       ? { rowIdx: selected.rowIdx, dayIdx: selected.dayIdx }
@@ -329,6 +339,8 @@ export default function MonthlyPage(): JSX.Element {
         person={person}
         day={day}
         details={details}
+        modo={selected?.dayIdx === null ? 'pessoa' : 'dia'}
+        filtroProjeto={filters.sector}
       />
     </section>
   );

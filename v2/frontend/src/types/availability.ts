@@ -159,7 +159,8 @@ export interface MonthlyGridResponse {
   legend: Record<string, string>;
   people: MonthlyGridPerson[];
   cells: AvailabilityCode[][];
-  // Cada chave (célula) mapeia para uma LISTA de detalhes de evento — a shape real
-  // que o Grid consome (`DetailsIndexType = Record<string, unknown[]>`).
+  // Cada chave (célula com código, "linha:coluna") mapeia para uma LISTA de itens com
+  // `tipo_item`: eventos, depois deslocamentos, depois bloqueios (sem motivo). Os tipos de
+  // cada item ficam em `pages/Disponibilidade/DetailsDrawer.tsx` (`DetailItemType`).
   details_index: Record<string, unknown[]>;
 }

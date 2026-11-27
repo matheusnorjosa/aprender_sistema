@@ -13,7 +13,9 @@ Retorna uma grade mensal (ano/mês) com códigos por dia/pessoa:
 Precedência: X > D1 > 2 > E > T/P > D
 
 Calcula CH mês/ano (services/horas_formacao.py, teto por evento), ranking por CH mês (denso).
-Details_index para dias com E/2/X/D1 (lista de eventos).
+Details_index para toda célula com código: eventos, depois deslocamentos, depois bloqueios, cada
+item com `tipo_item`. Nunca leva o motivo do bloqueio nem a observação do deslocamento (podem ser
+pessoais).
 """
 
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportOptionalSubscript=false, reportArgumentType=false, reportMissingTypeStubs=false, reportAttributeAccessIssue=false, reportReturnType=false, reportGeneralTypeIssues=false, reportIndexIssue=false, reportOperatorIssue=false, reportUnknownLambdaType=false, reportMissingTypeArgument=false, reportUndefinedVariable=false
@@ -67,7 +69,8 @@ def build_monthly_grid(
             comportamento legado (apenas fluxo SUPER).
         sector: Filtro opcional pelo nome de um dos projetos do evento (#2036: qualquer vaga)
         q: Filtro opcional por nome (icontains); o e-mail só entra quando o termo não tem
-            dígito (acha "Conceição" por "conceicao" sem virar oráculo de CPF)
+            dígito (acha "Conceição" por "conceicao" sem virar oráculo de CPF). Só filtra as
+            linhas: a posição no mês é calculada antes, sobre todas as pessoas da grade.
         allowed_user_ids: Lista de IDs de usuários permitidos (None = todos)
 
     Returns:
@@ -76,7 +79,7 @@ def build_monthly_grid(
             "legend": {...},
             "people": [{"id", "name", "email", "ch_month", "ch_year", "position_month"}],
             "cells": [[code_row0_day1, ...], [code_row1_day1, ...]] (matriz 2D),
-            "details_index": {"row:day": [{event_data}]}
+            "details_index": {"row:day": [{"tipo_item": "evento"|"deslocamento"|"bloqueio", ...}]}
         }
     """
     tz = timezone.get_current_timezone()
@@ -110,10 +113,6 @@ def build_monthly_grid(
             papel=papel,
         )
 
-        if q and q.strip():
-            q_lower = q.strip().lower()
-            equipe_qs = equipe_qs.filter(busca_por_nome(q_lower, "usuario__"))
-
         user_ids = list(set(equipe_qs.values_list("usuario_id", flat=True)))
     else:
         # Fallback para comportamento anterior (via Participation, apenas fluxo SUPER). Na aba
@@ -122,10 +121,6 @@ def build_monthly_grid(
             role__in=(role, Participation.Role.COORD_ACOMPANHA) if role == "COORDENADOR" else (role,)
         )
         participations_qs = participations_qs.filter(solicitacao__projeto__fluxo="SUPER")
-
-        if q and q.strip():
-            q_lower = q.strip().lower()
-            participations_qs = participations_qs.filter(busca_por_nome(q_lower, "usuario__"))
 
         user_ids = list(set(participations_qs.values_list("usuario_id", flat=True)))
 
@@ -136,14 +131,41 @@ def build_monthly_grid(
         user_ids = [uid for uid in user_ids if uid in allowed_set]
 
     if not user_ids:
-        # Sem usuários, retorna vazio
-        return {
-            "days": list(range(1, days_in_month + 1)),
-            "legend": _build_legend(),
-            "people": [],
-            "cells": [],
-            "details_index": {},
-        }
+        return _grade_vazia(days_in_month)
+
+    # 1.5. CH mês e ano por usuário: a contagem única de horas de formação (teto por
+    # evento, dia do início, formador + responsável que acompanha, qualquer projeto;
+    # decisão do dono, 05/10/2026). Vale para as duas abas e não segue o filtro `sector`:
+    # é a CH da pessoa, a mesma do painel de Equipe. Uma chamada para o ano inteiro; o mês
+    # sai dos dias dele.
+    ch_month_by_user: dict[int, float] = {}
+    ch_year_by_user: dict[int, float] = {}
+    horas = horas_formacao(user_ids, de=year_start, ate=year_end)
+    for uid, ch in horas.items():
+        ch_year_by_user[uid] = round(ch.total, 2)
+        ch_month_by_user[uid] = round(sum(h for dia, h in ch.por_dia.items() if dia.month == month), 2)
+
+    # 1.6. Posição no mês: ranking denso por CH mês (desc) sobre TODAS as pessoas da grade, antes
+    # da busca por nome. Senão quem a busca acha fica sempre em 1º (2ª revisão do PR 8).
+    position_by_user: dict[int, int] = {}
+    rank = 0
+    last_ch = None
+    for uid in sorted(user_ids, key=lambda u: ch_month_by_user.get(u, 0.0), reverse=True):
+        ch_mes = ch_month_by_user.get(uid, 0.0)
+        if ch_mes != last_ch:
+            rank += 1
+            last_ch = ch_mes
+        position_by_user[uid] = rank
+
+    # 1.7. Busca por nome: só agora, e só tira linhas.
+    if q and q.strip():
+        user_ids = list(
+            Usuario.objects.filter(id__in=user_ids)
+            .filter(busca_por_nome(q.strip().lower()))
+            .values_list("id", flat=True)
+        )
+        if not user_ids:
+            return _grade_vazia(days_in_month)
 
     # 2. Eventos aprovados do mês (por pessoa). Coordenadores: só o que ocupa a agenda, a
     # mesma regra do motor de conflito (o responsável que não acompanha não ocupa).
@@ -235,8 +257,6 @@ def build_monthly_grid(
     events_by_user_day: dict[tuple[int, int], list[Any]] = defaultdict(list)
     blocks_by_user_day: dict[tuple[int, int], list[Any]] = defaultdict(list)
     desloc_by_user_day: dict[tuple[int, int], list[Any]] = defaultdict(list)
-    ch_month_by_user: dict[int, float] = defaultdict(float)
-    ch_year_by_user: dict[int, float] = defaultdict(float)
 
     month_last_day = last_day  # local date, end-of-month clamp
 
@@ -261,16 +281,6 @@ def build_monthly_grid(
             for uid in event_users:
                 events_by_user_day[(uid, day_num)].append(event)
             current += timedelta(days=1)
-
-    # 5.5. CH mês e ano por usuário: a contagem única de horas de formação (teto por
-    # evento, dia do início, formador + responsável que acompanha, qualquer projeto;
-    # decisão do dono, 05/10/2026). Vale para as duas abas e não segue o filtro `sector`:
-    # é a CH da pessoa, a mesma do painel de Equipe. Uma chamada para o ano inteiro; o mês
-    # sai dos dias dele.
-    horas = horas_formacao(user_ids, de=year_start, ate=year_end)
-    for uid, ch in horas.items():
-        ch_year_by_user[uid] = ch.total
-        ch_month_by_user[uid] = sum(h for dia, h in ch.por_dia.items() if dia.month == month)
 
     # 6. Distribuir bloqueios por dia/pessoa
     for block in blocks:
@@ -322,8 +332,9 @@ def build_monthly_grid(
                 "id": uid,
                 "name": name,
                 "email": email_sem_cpf(row["email"]),
-                "ch_month": round(ch_month_by_user.get(uid, 0.0), 2),
-                "ch_year": round(ch_year_by_user.get(uid, 0.0), 2),
+                "ch_month": ch_month_by_user.get(uid, 0.0),
+                "ch_year": ch_year_by_user.get(uid, 0.0),
+                "position_month": position_by_user[uid],
             }
         )
 
@@ -373,21 +384,12 @@ def build_monthly_grid(
             col_idx = day_num - 1
             cells[row_idx][col_idx] = code
 
-            if code in ("E", "2", "X", "D1"):
-                details_index[f"{row_idx}:{col_idx}"] = [_event_to_detail(e, tz) for e in events_day]
-
-    # 10. Ranking denso por CH mês (desc).
-    # `sorted()` retorna os mesmos objetos dict — a atribuição abaixo já mutua
-    # os dicts referenciados por `people`, então não precisamos re-aplicar o
-    # rank num segundo loop O(U²) (ASQ-004).
-    people_sorted_by_ch = sorted(people, key=lambda p: p["ch_month"], reverse=True)
-    rank = 0
-    last_ch = None
-    for p in people_sorted_by_ch:
-        if p["ch_month"] != last_ch:
-            rank += 1
-            last_ch = p["ch_month"]
-        p["position_month"] = rank
+            # Todo quadradinho abre detalhe (27/11/2026): eventos, deslocamentos, bloqueios.
+            details_index[f"{row_idx}:{col_idx}"] = (
+                [_event_to_detail(e, tz) for e in events_day]
+                + [_desloc_to_detail(d) for d in deslocamentos_day]
+                + [_block_to_detail(b, tz) for b in blocks_day]
+            )
 
     return {
         "days": list(range(1, days_in_month + 1)),
@@ -395,6 +397,17 @@ def build_monthly_grid(
         "people": people,
         "cells": cells,
         "details_index": details_index,
+    }
+
+
+def _grade_vazia(days_in_month: int) -> dict[str, Any]:
+    """Grade sem ninguém: os dias e a legenda, sem linhas."""
+    return {
+        "days": list(range(1, days_in_month + 1)),
+        "legend": _build_legend(),
+        "people": [],
+        "cells": [],
+        "details_index": {},
     }
 
 
@@ -420,12 +433,44 @@ def _event_to_detail(event: Solicitacao, tz) -> dict[str, Any]:
     end_local = event.fim.astimezone(tz)
 
     return {
+        "tipo_item": "evento",
         "id": event.id,
         "municipio": event.municipio.nome if event.municipio else "",
         "data": start_local.strftime("%Y-%m-%d"),
         "inicio": start_local.strftime("%H:%M"),
         "fim": end_local.strftime("%H:%M"),
         "tipo": event.tipo_evento.nome,
+    }
+
+
+def _desloc_to_detail(desloc: Deslocamento) -> dict[str, Any]:
+    """Deslocamento no detalhe da célula: datas em YYYY-MM-DD. Sem `observacao` (pode ser pessoal)."""
+    return {
+        "tipo_item": "deslocamento",
+        "id": desloc.pk,
+        "origem": desloc.origem,
+        "destino": desloc.destino,
+        "inicio": desloc.start_date.isoformat(),
+        "fim": desloc.end_date.isoformat(),
+        "meio_transporte": desloc.get_meio_transporte_display() or "",
+    }
+
+
+def _block_to_detail(block: AvailabilityBlock, tz) -> dict[str, Any]:
+    """Bloqueio no detalhe da célula: "Total"/"Parcial", datas e horário locais. Sem `motivo` (pode ser pessoal).
+
+    As datas vão junto porque o bloqueio pode durar vários dias: no dia do meio, só HH:MM enganaria.
+    """
+    inicio = block.inicio.astimezone(tz)
+    fim = block.fim.astimezone(tz)
+    return {
+        "tipo_item": "bloqueio",
+        "id": block.pk,
+        "tipo": block.get_tipo_display(),
+        "data_inicio": inicio.strftime("%Y-%m-%d"),
+        "data_fim": fim.strftime("%Y-%m-%d"),
+        "inicio": inicio.strftime("%H:%M"),
+        "fim": fim.strftime("%H:%M"),
     }
 
 

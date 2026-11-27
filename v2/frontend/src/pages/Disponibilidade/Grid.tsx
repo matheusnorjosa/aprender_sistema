@@ -9,12 +9,16 @@
  *
  * Sem rolagem horizontal (C4): só os dias de `diasVisiveis` (a semana abaixo de 1280 px, o mês
  * inteiro a partir dele) e `table-fixed`, com a coluna do dia sem largura fixa.
+ *
+ * Grade enxuta (27/11/2026): sem título (a página já tem o h2), quadradinho baixo, horas só
+ * quando passam de zero, todo código abre o dia e o nome abre o mês da pessoa.
  */
 
 import type { JSX } from 'react';
 import dayjs from 'dayjs';
 import { FORTALEZA_TZ } from '../../utils/datetime';
 import { CODE_LABEL } from './codes';
+import { formatarHoras } from './horas';
 import type { ID } from '../../types';
 
 /** Code type for grid cells */
@@ -27,32 +31,31 @@ export interface GridPersonType {
   ch_month?: number;
 }
 
-/** Selected cell type */
+/** Selected cell type (`dayIdx` nulo: o mês da pessoa, pelo nome) */
 export interface SelectedCellType {
   rowIdx: number;
-  dayIdx: number;
+  dayIdx: number | null;
 }
-
-/** Details index type */
-export type DetailsIndexType = Record<string, unknown[]>;
 
 interface GridProps {
   year: number;
   month: number;
-  title: string;
   days: number[];
   /** Índices de `days` mostrados, na ordem. A chave da célula continua sendo o índice no mês. */
   diasVisiveis: readonly number[];
   people: GridPersonType[];
   cells: CellCode[][];
-  detailsIndex: DetailsIndexType;
   onSelect: (rowIdx: number, dayIdx: number) => void;
+  /** Clique no nome: o mês da pessoa. */
+  onSelectPessoa: (rowIdx: number) => void;
   selected: SelectedCellType | null;
 }
 
 /**
  * Mapeamento de códigos para cores (barras horizontais).
  */
+const FOCO = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600';
+
 const CODE_COLOR: Record<CellCode, string> = {
   E: 'bg-green-500',      // 1 evento - verde
   '2': 'bg-green-600',    // >=2 eventos - verde escuro
@@ -77,32 +80,32 @@ const isToday = (year: number, month: number, day: number): boolean => {
   );
 };
 
+/** Primeiro e último nome, como a planilha ("Adriana Pinheiro"). */
+const nomeCurto = (nome: string): string => {
+  const partes = nome.trim().split(/\s+/);
+  return partes.length > 2 ? `${partes[0]} ${partes[partes.length - 1]}` : nome.trim();
+};
+
 export default function Grid({
   year,
   month,
-  title,
   days,
   diasVisiveis,
   people,
   cells,
-  detailsIndex,
   onSelect,
+  onSelectPessoa,
   selected,
 }: GridProps): JSX.Element {
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-      {/* Título da grade */}
-      <div className="px-4 py-3 border-b bg-gray-50">
-        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-      </div>
-
       {/* Tabela sem rolagem: colunas dos dias repartem o que sobra do Nome */}
       <div>
         <table className="w-full table-fixed border-collapse">
           <thead>
             <tr className="bg-gray-50 border-b">
               {/* Coluna de nomes */}
-              <th className="bg-gray-50 px-3 py-2 text-left text-xs font-semibold text-gray-900 border-r w-28 sm:w-40">
+              <th className="bg-gray-50 px-1.5 py-0.5 text-left text-[11px] font-semibold text-gray-900 border-r w-24 sm:w-40">
                 Nome
               </th>
               {/* Colunas dos dias */}
@@ -112,7 +115,7 @@ export default function Grid({
                 return (
                   <th
                     key={dayIdx}
-                    className={`px-0 py-2 text-center text-xs font-semibold ${
+                    className={`px-0 py-0.5 text-center text-[11px] font-semibold ${
                       today ? 'bg-blue-100 text-blue-700' : 'text-gray-700'
                     }`}
                   >
@@ -126,12 +129,21 @@ export default function Grid({
             {people.map((person, rowIdx) => (
               <tr key={person.id} className="border-b hover:bg-gray-50">
                 {/* Nome da pessoa */}
-                <td className="bg-white px-3 py-1.5 text-xs font-medium text-gray-900 border-r">
-                  <div className="flex flex-col">
-                    <span className="break-words [overflow-wrap:anywhere]" title={person.name}>{person.name}</span>
-                    {person.ch_month !== undefined && (
-                      <span className="text-[10px] text-gray-500">
-                        {person.ch_month}h
+                <td className="bg-white px-1.5 py-0 text-[11px] font-medium text-gray-900 border-r">
+                  {/* Como a planilha: nome curto numa linha e as horas ao lado; o nome inteiro fica no título e na gaveta. */}
+                  <div className="flex items-baseline gap-1 min-w-0">
+                    <button
+                      type="button"
+                      title={person.name}
+                      aria-label={`Ver o mês de ${person.name}`}
+                      onClick={() => onSelectPessoa(rowIdx)}
+                      className={`min-w-0 truncate text-left hover:underline rounded ${FOCO}`}
+                    >
+                      {nomeCurto(person.name)}
+                    </button>
+                    {(person.ch_month ?? 0) > 0 && (
+                      <span className="ml-auto shrink-0 text-[10px] text-gray-500">
+                        {formatarHoras(person.ch_month ?? 0)}
                       </span>
                     )}
                   </div>
@@ -140,8 +152,6 @@ export default function Grid({
                 {diasVisiveis.map((dayIdx) => {
                   const day = days[dayIdx] ?? 0;
                   const code = cells[rowIdx]?.[dayIdx];
-                  const key = `${rowIdx}:${dayIdx}`;
-                  const hasDetails = (detailsIndex[key])?.length ?? 0 > 0;
                   const sel = selected?.rowIdx === rowIdx && selected?.dayIdx === dayIdx;
                   const today = isToday(year, month, day);
                   const conflict = code === 'X';
@@ -155,21 +165,21 @@ export default function Grid({
                   return (
                     <td
                       key={dayIdx}
-                      className={`px-0.5 py-1.5 text-center relative ${cellClass}`}
+                      className={`px-px py-px text-center relative ${cellClass}`}
                     >
                       {code && (
                         <button
                           type="button"
                           title={CODE_LABEL[code as keyof typeof CODE_LABEL] || code}
-                          onClick={() => hasDetails && onSelect(rowIdx, dayIdx)}
+                          aria-label={`${code}, ${(CODE_LABEL[code as keyof typeof CODE_LABEL] || code).toLowerCase()}: ${person.name}, dia ${day}`}
+                          onClick={() => onSelect(rowIdx, dayIdx)}
                           className={`
-                            w-full max-w-12 mx-auto min-w-0 h-7 rounded flex items-center justify-center
-                            transition-all hover:scale-110
+                            w-full max-w-10 mx-auto min-w-0 h-4 rounded-sm flex items-center justify-center
+                            hover:opacity-80 cursor-pointer ${FOCO}
                             ${CODE_COLOR[code]}
-                            ${hasDetails ? 'cursor-pointer' : 'cursor-default opacity-70'}
                           `}
                         >
-                          <span className="text-white text-xs font-bold">
+                          <span className="text-white text-[10px] leading-none font-bold">
                             {code}
                           </span>
                         </button>

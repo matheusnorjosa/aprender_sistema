@@ -12,6 +12,7 @@ import {
   PENDENTES,
   PENDENTES_SO_LINUX,
   PERFIS,
+  PESSOA_NA_GRADE,
   ROTAS_MEDIDAS,
   MARCO_TROCA_DE_SENHA,
   SENHA_PERFIS,
@@ -506,7 +507,7 @@ export function registrarGradeComEvento(larguras: readonly Largura[]): void {
         await afirmarSemRolagem(page, `${rota.path}#com-evento`, largura, rede);
 
         // `td + td`: o 1º código do dia (o 1º botão da linha é o nome, que abre o mês da pessoa).
-        const linha = page.locator('main#main tr').filter({ hasText: TEXTOS_DO_SEED.pessoa }).first();
+        const linha = page.locator('main#main tr').filter({ hasText: PESSOA_NA_GRADE }).first();
         await linha.locator('td + td button').first().click();
         await garantirTela(page, { marco: rota.marco, dados: { em: 'li', texto: TEXTOS_DO_SEED.municipio } }, rede);
         await afirmarSemRolagem(page, `${rota.path}#detalhe`, largura, rede);

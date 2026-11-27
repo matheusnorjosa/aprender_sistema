@@ -36,6 +36,13 @@ export const SENHA_PERFIS = 'testpass123';
  * O Vitest confere que cada um existe no seed, para a medição não depender de um texto
  * que o backend deixou de criar.
  */
+/**
+ * A Grade Mensal mostra o nome curto (primeiro e último, como a planilha; 27/11/2026): a pessoa do seed
+ * aparece na linha como "Aaa Figueiredo" (o nome inteiro fica no title e no nome acessível do botão).
+ * Fora de TEXTOS_DO_SEED de propósito: não é um trecho contínuo do nome gravado no seed.
+ */
+export const PESSOA_NA_GRADE = 'Aaa Figueiredo';
+
 export const TEXTOS_DO_SEED = {
   municipio: 'Aaa São Sebastião dos Campos Gerais',
   pessoa: 'Aaa Maria Aparecida da Conceição',
@@ -205,7 +212,7 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     path: '/solicitacoes/disponibilidade',
     perfil: 'controle',
     marco: 'Grade Mensal de Disponibilidade',
-    dados: { em: 'tr', texto: T.pessoa },
+    dados: { em: 'tr', texto: PESSOA_NA_GRADE },
     // A Grade desenha o mês de hoje do navegador. Desde o C4 (05/11/2026), abaixo de 1280 px ela
     // mostra uma semana (com ‹ ›) e, a partir de 1280, o mês inteiro, com a coluna do dia sem
     // largura fixa (table-fixed): a largura não depende mais de haver evento. O relógio fica em

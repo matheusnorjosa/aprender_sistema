@@ -97,7 +97,7 @@ const DASHBOARDS_CHILDREN = [
 type DashboardsChild = (typeof DASHBOARDS_CHILDREN)[number];
 
 const DAT_CHILDREN = ['Administração', 'Cadastros', 'Importações', 'Registros de Turmas', 'Feedbacks'] as const;
-const CONTROLE_CHILDREN = ['Ações', 'Compras', 'Coordenadores', 'Painel de Controle', 'Plano Anual', 'Pré-agenda'] as const;
+const CONTROLE_CHILDREN = ['Ações', 'Compras', 'Coordenadores', 'Plano Anual', 'Pré-agenda'] as const;
 const SOLICITACOES_CHILDREN = ['Minhas Solicitações', 'Nova Solicitação', 'Publicar na agenda'] as const;
 
 interface ActorSnapshot {
@@ -363,6 +363,13 @@ describe('AppSidebar — filhos dos submenus por perfil', () => {
     expect(filhosDoSubmenu('Controle', CONTROLE_CHILDREN), `Drift de Controle para ${actor}`).toEqual(
       expectedControleChildren,
     );
+  });
+
+  // 27/11/2026 (dono): o Painel de Controle repetia o submenu e saiu; os números estão em cada lista.
+  test.each(ACTORS)('$actor: o submenu Controle não tem mais "Painel de Controle"', ({ actor }) => {
+    renderAtor(actor);
+    openSubmenuByTitle('Controle');
+    expect(screen.queryByRole('link', { name: /^Painel de Controle$/i })).not.toBeInTheDocument();
   });
 
   test.each(ACTORS)('$actor: filhos de Solicitações', ({ actor, expectedSolicitacoesChildren }) => {

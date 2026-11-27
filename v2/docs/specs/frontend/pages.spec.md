@@ -60,7 +60,7 @@ Esta spec é o **índice canônico do inventário de páginas**: domínio, rota 
 ## Fonte de verdade no código
 
 - [`v2/frontend/src/App.tsx`](../../../frontend/src/App.tsx) — shell: carrega `getMe()` + `getMyPolicies()`, decide login vs app, monta sidebar/header/`<AppRoutes>`. `LoginPage` é a única página lazy fora de `AppRoutes` (`App.tsx`, const `LoginPage`); sem `user`, o app renderiza só a `LoginPage` (`App.tsx`, `AppContent` → ramo `if (!user)`) — é daí que vem o guard "autenticado" das rotas sem gate próprio.
-- [`v2/frontend/src/components/AppRoutes.tsx`](../../../frontend/src/components/AppRoutes.tsx) — **registro único de rotas**. **41 páginas lazy** (`AppRoutes.tsx`) e **53 `<Route>`**, dos quais **6 são redirects** de URLs legadas e 1 é a rota coringa `*` (`<Navigate replace>`).
+- [`v2/frontend/src/components/AppRoutes.tsx`](../../../frontend/src/components/AppRoutes.tsx) — **registro único de rotas**. **42 páginas lazy** (`AppRoutes.tsx`) e **54 `<Route>`**, dos quais **6 são redirects** de URLs legadas e 1 é a rota coringa `*` (`<Navigate replace>`).
 - [`v2/frontend/src/components/access/RequirePolicy.tsx`](../../../frontend/src/components/access/RequirePolicy.tsx) — guard único. Decisão no componente `RequirePolicy` (local `granted`): `allow` (boolean explícito) tem precedência; senão alguma das `policy` em `policies`; **sem `policy` nem `allow` → fail-secure** (`granted = false`). Fallback padrão é `DefaultForbidden`.
 - [`v2/frontend/src/contexts/AcessoContext.ts`](../../../frontend/src/contexts/AcessoContext.ts) — **fonte única de acesso** (PR 7): `useAcesso()` dá `caps` (as policies de `/api/me/policies/`) e `ehSuperusuario`. `AppRoutes`, `AppSidebar`, a Página Inicial e os botões das páginas leem daqui; `usePermissions`/`useCanAccess` foram apagados.
 - [`v2/frontend/src/components/AppSidebar.tsx`](../../../frontend/src/components/AppSidebar.tsx) — menu lateral; cada item lê a mesma policy da rota (`useAcesso().caps`) e, em DAT > Importações, `ehSuperusuario`. É UX, não é o gate autoritativo.
@@ -290,7 +290,6 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 
 | Rota | Página | Guard (`AppRoutes.tsx`) |
 |---|---|---|
-| `/controle` | `Controle/ControlePage` | policy `access_controle_section` |
 | `/controle/acoes` | `DATModule/AcoesPage` | policy `access_controle_section` |
 | `/controle/compras`, `/compras-materiais` | `DATModule/ComprasPage` | policy `view_compras_stats` (PR 7; antes `canControle \|\| canDAT`) |
 | `/controle/coordenadores` | `DATModule/CoordenadoresPage` | policy `access_controle_section` |
@@ -320,7 +319,7 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 >
 > **Marca de série (01/10/2026):** quem diz o que é série é o campo `Projeto.eh_serie`, e não mais o nome terminado em número. `/lookup/projetos/` (sem `include_kits=true`) e `/options/projetos/?exclude_kits=true` excluem `eh_serie=True`; o contrato HTTP não mudou. A migration `0114` preencheu a marca pela regra antiga (nome terminado em número), sem exceção, então o deploy não muda nenhuma lista; as exceções (projeto numerado que não é série, série sem número) são marcadas depois, pela tela Projetos ou por correção de dados. **Exceção do Plano Anual (decisão do dono, 02/10/2026):** `/options/projetos/?exclude_kits=true` (único consumidor: `PlanoFormacoesPage`) devolve os não-série **mais** toda série que já tem `PlanoFormacoes` — "Projeto Catavento 2" e "3" seguem série (na Nova Solicitação só aparece "Cataventos") e os planos deles continuam no filtro e no formulário. Valem os filtros de sempre (`ativo`, `is_test`) e o cache de 5 min (a série que ganha o primeiro plano por import entra na lista em até 5 min). `/lookup/projetos/` não tem a exceção: só não-série. O import marca só ao criar o projeto ([`imports.spec.md`](../backend/imports.spec.md)).
 
-> **#1984 (`/controle` = hub):** `ControlePage` deixou de ser a lista de compras legada (`core.Compra`, redundante com `/controle/compras`) e virou o **Painel de Controle** — KPIs de contagem reais (Ações/Compras/Planos/Coordenadores via os `/stats/`, sem valor financeiro) + atalhos pras sub-páginas.
+> **Painel de Controle removido (27/11/2026, decisão do dono):** o hub `/controle` (#1984) repetia, em atalhos, os itens do submenu Controle, e os 4 totais dele já aparecem em cada lista (Ações, Compras, Plano Anual, Coordenadores). A rota e o item do menu saíram; `/controle` cai na rota curinga (Página Inicial).
 
 ### DAT / AdminDAT
 

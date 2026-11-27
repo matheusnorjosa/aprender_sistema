@@ -73,6 +73,23 @@ describe('Plano Anual: erro das estatísticas não derruba a lista', () => {
     20000,
   );
 
+  // 27/11/2026: o número conta todos os planos (ativos e inativos); "Planos Ativos" enganava.
+  test(
+    'o total diz "Total de planos", não "Planos Ativos"',
+    async () => {
+      getPlanoFormacoesStatsMock.mockResolvedValue({ total_planos: 7 });
+      render(
+        <MemoryRouter>
+          <PlanoFormacoesPage />
+        </MemoryRouter>,
+      );
+
+      expect(await screen.findByText('Total de planos', {}, { timeout: 15000 })).toBeTruthy();
+      expect(screen.queryByText('Planos Ativos')).toBeNull();
+    },
+    20000,
+  );
+
   // Rodada 2 (BAIXA): o aviso oferece "Tentar de novo" ali mesmo.
   test(
     '"Tentar de novo" no aviso busca as estatísticas outra vez',

@@ -9,7 +9,6 @@ import type { CurrentUser } from '../types';
 // Lazy-loaded pages (code-splitting)
 const DisponibilidadeBlocks = lazy(() => import('../pages/Disponibilidade'));
 const MonthlyPage = lazy(() => import('../pages/Disponibilidade/MonthlyPage'));
-const ControlePage = lazy(() => import('../pages/Controle/ControlePage'));
 const DATImportacoesPage = lazy(() => import('../pages/DAT/ImportacoesPage'));
 const PerfilPage = lazy(() => import('../pages/Perfil/PerfilPage'));
 const PoliticaPrivacidadePage = lazy(() => import('../pages/Politica/PoliticaPrivacidadePage'));
@@ -128,8 +127,9 @@ export function AppRoutes({ user }: AppRoutesProps): JSX.Element {
         <Route path="/meus-eventos" element={<Navigate to="/solicitacoes/meus-eventos" replace />} />
 
         {/* Controle Module — #1271: policy access_controle_section; Compras: view_compras_stats
-            (Controle e DAT, a mesma policy das estatísticas de compras). */}
-        <Route path="/controle" element={<RequirePolicy policy="access_controle_section" policies={policies}><ControlePage /></RequirePolicy>} />
+            (Controle e DAT, a mesma policy das estatísticas de compras). O Painel de Controle (/controle)
+            saiu em 27/11/2026: repetia o submenu, e os números estão em cada lista; /controle cai na
+            rota curinga (Página Inicial). */}
         <Route path="/controle/acoes" element={<RequirePolicy policy="access_controle_section" policies={policies}><AcoesPage /></RequirePolicy>} />
         <Route path="/controle/compras" element={<RequirePolicy policy="view_compras_stats" policies={policies}><DATComprasPage /></RequirePolicy>} />
         <Route path="/controle/coordenadores" element={<RequirePolicy policy="access_controle_section" policies={policies}><CoordenadoresPage /></RequirePolicy>} />

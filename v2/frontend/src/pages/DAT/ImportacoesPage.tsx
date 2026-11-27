@@ -47,7 +47,7 @@ import type { JSX } from "react";
 
 const { Title, Text } = Typography;
 
-/** Helper para converter ImportResult → ValidationResult (mesmo padrão de ControlePage). */
+/** Helper para converter ImportResult → ValidationResult. */
 function toValidationResult(result: ImportResult): ValidationResult {
   return {
     stats: {

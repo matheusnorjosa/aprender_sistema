@@ -9,8 +9,15 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 vi.mock('../../../api/auth', () => ({ checkAuth: vi.fn() }));
 
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { checkAuth } from '../../../api/auth';
 import AdminDATHomePage from '../AdminDATHomePage';
+
+// `?raw` de CSS volta vazio no Vitest (CSS desligado): lê o arquivo do disco.
+const appCss = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../App.css'), 'utf-8');
 
 function renderPage(): void {
   render(
@@ -44,6 +51,18 @@ describe('AdminDATHomePage: textos dos cartões', { timeout: 20000 }, () => {
     expect(screen.getByText('Buffer de deslocamento e teto de horas')).toBeInTheDocument();
     expect(screen.queryByText(/Django Admin/)).not.toBeInTheDocument();
     expect(screen.queryByText(/CPF, grupos e perfis/)).not.toBeInTheDocument();
+  });
+
+  // 27/11/2026: os cartões eram Card com onClick, fora do alcance do teclado (WCAG 2.1.1).
+  test('cada cartão é um link para a sua tela', async () => {
+    renderPage();
+
+    const usuarios = await screen.findByRole('link', { name: /Usuários/ });
+    expect(usuarios).toHaveAttribute('href', '/dat/admin/usuarios');
+    expect(screen.getByRole('link', { name: /Configurações/ })).toHaveAttribute('href', '/dat/admin/configuracoes');
+    // O reset do AntD zera o contorno do <a>: o anel vem da classe (regra no App.css).
+    expect(usuarios).toHaveClass('admin-dat-cartao');
+    expect(appCss).toMatch(/\.admin-dat-cartao:focus-visible\s*\{[^}]*outline:\s*2px solid/);
   });
 
   test('superusuário vê o cartão Grupos', async () => {

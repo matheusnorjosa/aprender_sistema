@@ -14,7 +14,7 @@
 import { useEffect, useState, type ReactNode, type JSX } from 'react';
 import { Card, Row, Col, Typography } from 'antd';
 import { UserOutlined, EnvironmentOutlined, TeamOutlined, ProjectOutlined, SettingOutlined, SafetyOutlined, BankOutlined, ShoppingOutlined, ClusterOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { checkAuth } from '../../api/auth';
 import { ehSuperusuario } from '../../contexts/AcessoContext';
 
@@ -33,7 +33,6 @@ interface ModuleConfig {
 }
 
 export default function AdminDATHomePage(): JSX.Element {
-  const navigate = useNavigate();
   // Grupos (todos, inclusive os sem classificação) é tela de superusuário. Falha ao consultar = sem o cartão.
   const [superusuario, setSuperusuario] = useState(false);
   useEffect(() => {
@@ -142,20 +141,14 @@ export default function AdminDATHomePage(): JSX.Element {
       {/* Cards de módulos */}
       <nav aria-label="Módulos de administração">
       <Row gutter={[16, 16]}>
-        {modules.map((module) => (
-          <Col xs={24} sm={12} md={8} lg={6} key={module.key}>
+        {modules.map((module) => {
+          const cartao = (
             <Card
               hoverable
               style={{
                 textAlign: 'center',
                 height: '100%',
-                cursor: module.status === 'Disponível' ? 'pointer' : 'not-allowed',
                 opacity: module.status === 'Disponível' ? 1 : 0.6,
-              }}
-              onClick={() => {
-                if (module.status === 'Disponível') {
-                  void navigate(module.path);
-                }
               }}
             >
               <div style={{ marginBottom: '16px' }}>{module.icon}</div>
@@ -173,8 +166,21 @@ export default function AdminDATHomePage(): JSX.Element {
                 {module.status}
               </Text>
             </Card>
-          </Col>
-        ))}
+          );
+          return (
+            <Col xs={24} sm={12} md={8} lg={6} key={module.key}>
+              {/* Link de verdade (Tab e Enter chegam), no lugar do Card com onClick (27/11/2026); o
+                  cartão "Em breve" fica sem link. O anel de foco vem de .admin-dat-cartao (App.css). */}
+              {module.status === 'Disponível' ? (
+                <Link to={module.path} className="admin-dat-cartao" style={{ display: 'block', height: '100%' }}>
+                  {cartao}
+                </Link>
+              ) : (
+                cartao
+              )}
+            </Col>
+          );
+        })}
       </Row>
       </nav>
     </section>

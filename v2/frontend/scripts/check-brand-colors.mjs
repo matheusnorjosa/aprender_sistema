@@ -22,8 +22,10 @@ import { fileURLToPath } from 'node:url';
 
 const SRC = fileURLToPath(new URL('../src', import.meta.url));
 
-// Verdes de marca (= BRAND_COLORS.primary / primaryDark / primaryLight / sidebarBackground).
-const BRAND_GREENS = /#(006B52|004B3D|E5EDE5)\b/i;
+// Verdes de marca (= BRAND_COLORS.primary / primaryDark / primaryLight / sidebarBackground): o verde do DFF
+// desde 26/11/2026 (#055441 / #033a2d) e os dois de antes (#006B52 / #004B3D), que não devem voltar, também
+// escritos em rgb/rgba (0, 107, 82 / 0, 75, 61). Transparência da marca: color-mix com var(--as-*).
+const BRAND_GREENS = /#(055441|033a2d|E5EDE5|006B52|004B3D)\b|rgba?\(\s*0\s*,\s*(107\s*,\s*82|75\s*,\s*61)\b/i;
 
 // Os SSOTs são os únicos lugares onde esses literais podem existir:
 //  - contexts/ThemeContext.tsx: BRAND_COLORS (TS/AntD)

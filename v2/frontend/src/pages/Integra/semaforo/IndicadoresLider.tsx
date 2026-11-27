@@ -543,7 +543,7 @@ export default function IndicadoresLider(): JSX.Element {
                     Vermelho {l.contagem.vermelho}
                   </p>
                   <div aria-hidden="true" className="flex h-4 w-full overflow-hidden rounded border border-[#8c8c8c] bg-white">
-                    {/* Os tons forte têm quase a mesma luminância (1,05:1 entre vizinhos): a divisória branca separa as cores. */}
+                    {/* Os tons forte têm quase a mesma luminância (1,00 a 1,25:1 entre vizinhos): a divisória branca separa as cores. */}
                     {CORES.filter((c) => l.contagem[c] > 0).map((c, i) => (
                       <div
                         key={c}

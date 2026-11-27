@@ -9,12 +9,15 @@
  * As rotas filhas ficam em `IntegraRoutes` (um `<Routes>` descendente) e não em `<Route>` aninhado no
  * AppRoutes: o teste de cobertura sem rolagem horizontal lê o AppRoutes e não aceita rota aninhada.
  */
-import { useEffect, useRef, type JSX } from 'react';
+import { useContext, useEffect, useRef, type JSX } from 'react';
 import { useLocation, useNavigationType } from 'react-router';
+import { ConfigProvider } from 'antd';
 import { ExperimentOutlined } from '@ant-design/icons';
 
+import ThemeContext from '../../contexts/ThemeContext';
 import { IntegraDemoProvider } from './dados/IntegraDemoContext';
 import IntegraRoutes from './IntegraRoutes';
+import { TEMA_DA_INTEGRA, VARIAVEIS_DFF } from './visual';
 
 import './integra.css';
 
@@ -48,22 +51,27 @@ function useTopoAoTrocarDeTela(): void {
 
 export default function IntegraLayout(): JSX.Element {
   useTopoAoTrocarDeTela();
+  // Desenho do DFF (decisão do dono, 26/11/2026) só no tema claro: o DFF não tem modo escuro. Sem o ThemeProvider
+  // (testes da moldura), vale o claro, o padrão do sistema.
+  const escuro = useContext(ThemeContext)?.isDark ?? false;
   return (
     <IntegraDemoProvider>
-      <div className="integra">
-        <p
-          role="note"
-          className="sticky top-0 z-10 m-0 flex flex-wrap items-center gap-x-2 px-6 py-2 text-sm print:static"
-          style={{ background: FAIXA.fundo, color: FAIXA.texto, borderBottom: `2px solid ${FAIXA.borda}` }}
-        >
-          <ExperimentOutlined aria-hidden="true" />
-          <strong>DADOS SIMULADOS</strong>
-          <span>Pessoas fictícias; municípios reais; tempos estimados pelo relatório. Nada é gravado.</span>
-        </p>
-        <div className="p-6">
-          <IntegraRoutes />
+      <ConfigProvider theme={escuro ? {} : TEMA_DA_INTEGRA}>
+        <div className={escuro ? 'integra' : 'integra integra-dff'} style={escuro ? undefined : VARIAVEIS_DFF}>
+          <p
+            role="note"
+            className="sticky top-0 z-10 m-0 flex flex-wrap items-center gap-x-2 px-6 py-2 text-sm print:static"
+            style={{ background: FAIXA.fundo, color: FAIXA.texto, borderBottom: `2px solid ${FAIXA.borda}` }}
+          >
+            <ExperimentOutlined aria-hidden="true" />
+            <strong>DADOS SIMULADOS</strong>
+            <span>Pessoas fictícias; municípios reais; tempos estimados pelo relatório. Nada é gravado.</span>
+          </p>
+          <div className="p-6">
+            <IntegraRoutes />
+          </div>
         </div>
-      </div>
+      </ConfigProvider>
     </IntegraDemoProvider>
   );
 }

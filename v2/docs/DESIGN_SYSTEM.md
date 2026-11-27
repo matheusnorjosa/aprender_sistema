@@ -1,7 +1,7 @@
 ---
 title: Design System — Cores, Tema e Tokens (Frontend)
 status: active
-last_verified: 2026-11-17
+last_verified: 2026-11-26
 owner: frontend
 related:
   - ./INDEX_DOCUMENTACAO.md
@@ -9,6 +9,7 @@ related:
   - ../frontend/src/contexts/ThemeContext.tsx
   - ../frontend/src/index.css
   - ../frontend/tailwind.config.js
+  - ../frontend/src/pages/Integra/visual.ts
 ---
 
 # Design System — Cores, Tema e Tokens (AS v2 Frontend)
@@ -36,7 +37,7 @@ CSS (`:root`). O resto **deriva** ou **espelha** — nunca é uma terceira cópi
 
 ```mermaid
 flowchart TD
-    BC["BRAND_COLORS<br/>(ThemeContext.tsx)<br/>#006B52 / #004B3D / #E5EDE5"]
+    BC["BRAND_COLORS<br/>(ThemeContext.tsx)<br/>#055441 / #033a2d / #E5EDE5"]
     DA["DARK_ACCENT<br/>(ThemeContext.tsx)<br/>#2FA37D"]
     ROOT[":root CSS vars<br/>(index.css)<br/>--as-primary* + --as-primary-dark-accent"]
     ANTD["Ant Design<br/>ConfigProvider token<br/>(colorPrimary por tema)"]
@@ -71,12 +72,20 @@ Espelhada nas `--as-*` de [`index.css`](../frontend/src/index.css).
 
 | Papel | Hex | Token AntD / CSS var | Uso |
 |---|---|---|---|
-| Primária (marca) | `#006B52` | `colorPrimary` (light) · `--as-primary` | botões, links, seleção — tema claro |
-| Primária escura | `#004B3D` | `--as-primary-dark` | hover/pressionado, sidebar collapse |
+| Primária (marca) | `#055441` | `colorPrimary` (light) · `--as-primary` | botões, links, seleção — tema claro |
+| Primária escura | `#033a2d` | `--as-primary-dark` | hover/pressionado, sidebar collapse |
 | Primária clara | `#E5EDE5` | `--as-primary-light` | fundos suaves, chips |
 | Fundo de página | `#f0f2f5` | `pageBackground` | layout claro (dark → `#141414`) |
 | Fundo de card | `#ffffff` | `cardBackground` | cards claros (dark → `#1f1f1f`) |
-| Sidebar | `#006B52` | `sidebarBackground` | menu lateral (dark → `#141414`) |
+| Sidebar | `#055441` | `sidebarBackground` | menu lateral (dark → `#141414`) |
+
+**O verde é o do DFF desde 26/11/2026** (decisão do dono): `#055441` e o escuro `#033a2d` no lugar de
+`#006B52` / `#004B3D`, no sistema inteiro (menu, botões, links). Contraste medido: `#055441` dá **8,93:1**
+no branco, **7,96:1** na página `#f0f2f5`, **7,48:1** no `#E5EDE5` e **7,19:1** no verde-claro da Integra
+`#d8edcb`; texto branco no `#055441` dá **8,93:1** e no `#033a2d` **12,75:1**; o item selecionado do menu
+(`#C6E6C3`, texto preto 15,51:1) dá **6,60:1** contra o menu. O `primaryLight` (`#E5EDE5`) ficou como estava.
+A trava `scripts/check-brand-colors.mjs` vigia os hex novos e os dois de antes. Teste:
+`contexts/__tests__/ThemeContext.link.test.tsx`.
 
 **Status (tokens AntD, não são a marca):** sucesso `#52c41a` · aviso `#faad14` ·
 erro `#ff4d4f` · info `#1890ff`, com fundos `successBg #f6ffed` / `warningBg #fffbe6` /
@@ -92,8 +101,8 @@ Dois conjuntos de token AntD (`lightThemeTokens` / `darkThemeTokens`) trocados p
 
 | Aspecto | Claro | Escuro |
 |---|---|---|
-| `colorPrimary` (acento de interação) | `#006B52` (marca) | `#2FA37D` (`DARK_ACCENT`) — ver seção 4 |
-| `colorLink` / hover / active | `#006B52` (6,51:1 no branco) / `#004B3D` (10,13:1) / derivado `#004537` (11,02:1) | seed `#34BC8F` → `#2FA37D` (5,22:1 no `#1f1f1f`; 4,80:1 no `#262626`) / `#4FB08C` (6,22:1) / `#2FA37D` |
+| `colorPrimary` (acento de interação) | `#055441` (marca) | `#2FA37D` (`DARK_ACCENT`) — ver seção 4 |
+| `colorLink` / hover / active | `#055441` (8,93:1 no branco) / `#033a2d` (12,75:1) / derivado `#002e25` | seed `#34BC8F` → `#2FA37D` (5,22:1 no `#1f1f1f`; 4,80:1 no `#262626`) / `#4FB08C` (6,22:1) / `#2FA37D` |
 | Fundo container | `#ffffff` | `#1f1f1f` |
 | Fundo layout | `#f0f2f5` | `#141414` |
 | Fundo elevado | (default AntD) | `#262626` |
@@ -186,7 +195,8 @@ relativa) sobre o container escuro `#1f1f1f`:
 | Cor | Sobre `#1f1f1f` | Sobre `#141414` | Veredito |
 |---|---|---|---|
 | `#ea2a33` (vermelho antigo) | **3.83:1** | — | Contraste **passava** (≥3:1). O problema era só semântico. |
-| `#006B52` (verde da marca, cru) | **2.53:1** | 2.26:1 | ❌ **Reprova** SC 1.4.11 (≥3:1). Por isso o swap ingênuo não serve. |
+| `#006B52` (verde da marca até 26/11/2026, cru) | **2.53:1** | 2.26:1 | ❌ **Reprova** SC 1.4.11 (≥3:1). Por isso o swap ingênuo não serve. |
+| `#055441` (verde do DFF, a marca desde 26/11/2026, cru) | **1,85:1** | 2,06:1 | ❌ **Reprova** também. |
 | `#2FA37D` (`DARK_ACCENT`, verde clareado) | **5.22:1** | **5.84:1** | ✅ Passa folgado — inclusive o mínimo de texto (4.5:1). |
 
 O raciocínio, em três passos:
@@ -194,7 +204,7 @@ O raciocínio, em três passos:
 1. **Vermelho = perigo/erro.** Um acento de interação (hover/seleção/sucesso implícito) em
    vermelho colide com o significado universal do vermelho e com os tokens de status. Trocar
    por **verde da marca** alinha identidade + semântica.
-2. **Verde da marca cru (`#006B52`) reprova WCAG no dark** (2.53:1 < 3:1). Escuro-sobre-escuro.
+2. **Verde da marca cru reprova WCAG no dark** (`#006B52` 2.53:1; o `#055441` do DFF, 1,85:1). Escuro-sobre-escuro.
    Não dá para usar o mesmo hex do tema claro.
 3. **Solução:** o **mesmo verde clareado**, `#2FA37D` (5.22:1). Mantém a identidade da marca,
    passa o contraste com folga, e libera o vermelho para significar **só erro/danger**.
@@ -232,6 +242,18 @@ com `aplicarTemaNosDialogos` (`contexts/temaNosDialogos.tsx`, que usa o `ConfigP
 holderRender })` do AntD) e repete o registro a cada troca de tema. Não é preciso trocar as chamadas por
 `App.useApp()`. Teste: `contexts/__tests__/temaNosDialogos.test.tsx`.
 
+**Integra: o desenho do DFF (26/11/2026).** Só nas telas da Integra (e só no tema claro, porque o DFF não tem
+modo escuro): fundo verde-claro `#d8edcb`, telas das ferramentas num cartão branco arredondado (16 px) com
+borda `#e2e8f0` e sombra leve, cabeçalho de tabela cinza (`#f8fafc`, texto `#475569`, 7,24:1) em maiúsculas,
+títulos em negrito e botões arredondados (8 px). Os tokens ficam num lugar só,
+[`pages/Integra/visual.ts`](../frontend/src/pages/Integra/visual.ts): o `TEMA_DA_INTEGRA` vai num
+`ConfigProvider` na moldura (`IntegraLayout`), e o `integra.css` lê as cores pelas variáveis `--integra-*`.
+Nenhum texto cinza fica direto no verde-claro (o conteúdo das telas fica no cartão branco); a borda de campo
+continua `#8c8c8c`. As cores de cada ferramenta (faixas do ICA, cores do Semáforo, faixas do Deslocamento)
+seguem os documentos de requisitos de cada uma; a cor do documento que falha como texto fica como
+preenchimento e o texto ganha um tom escuro. Testes: `pages/Integra/__tests__/IntegraLayout.test.tsx`,
+`ica/__tests__/componentes.test.tsx`, `deslocamento/__tests__/estilos.test.ts`, `semaforo/__tests__/corEAlerta.test.ts`.
+
 Número ou texto de erro em tela usa o token (`token.colorErrorText` via `theme.useToken()`, ou
 `<Text type="danger">`), nunca `#ff4d4f`/`#f5222d` à mão: esses reprovam como texto no branco.
 
@@ -244,7 +266,8 @@ Número ou texto de erro em tela usa o token (`token.colorErrorText` via `theme.
 1. `BRAND_COLORS.primary/primaryDark/primaryLight` em `ThemeContext.tsx`.
 2. `lightThemeTokens.colorPrimary` (se mudou a primária).
 3. As 3 linhas `--as-primary* ` em `:root` de `index.css` (o espelho manual).
-4. Rode a verificação de contraste sobre `#ffffff` (texto ≥ 4.5:1, UI ≥ 3:1).
+4. O padrão de `scripts/check-brand-colors.mjs` (a trava da CI) com os hex novos, e os testes que fixam a cor.
+5. Rode a verificação de contraste sobre `#ffffff` (texto ≥ 4.5:1, UI ≥ 3:1).
 
 **Trocar o acento do tema escuro:**
 
@@ -294,3 +317,5 @@ inclua o `#262626` (fundo elevado) no escuro.
   lote D): `colorLink`/`colorLinkHover` no claro e seed `#34BC8F` no escuro (seção 3).
 - **2026-11-17** — Diálogos estáticos herdam o tema (DEF-33, #2245): o parágrafo da seção 3 que
   os dava como fora do alcance passou a apontar para a seção 5.
+- **2026-11-26** — Verde do DFF no sistema inteiro (`#006B52`/`#004B3D` → `#055441`/`#033a2d`) e o desenho
+  do DFF só na Integra, com o fundo verde-claro `#d8edcb` (decisões do dono; seções 2 e 5).

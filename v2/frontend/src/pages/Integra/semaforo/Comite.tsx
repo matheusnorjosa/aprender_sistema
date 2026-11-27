@@ -285,7 +285,7 @@ export default function Comite(): JSX.Element {
               {dica}
             </p>
             {aberta.erros.length > 0 && (
-              <div role="alert" className="mb-2 rounded border border-[#8A1C14] bg-[#FCE4E2] p-2 text-sm text-[#8A1C14]">
+              <div role="alert" className="mb-2 rounded border border-[#C0392B] bg-[#FBE6E5] p-2 text-sm text-[#C0392B]">
                 {aberta.erros.map((e) => (
                   <p key={e} className="m-0">
                     {e}
@@ -385,7 +385,7 @@ export default function Comite(): JSX.Element {
             className={`${CLASSE_CAMPO} mb-2`}
           />
           {errosData.length > 0 && (
-            <div id="comite-data-erro" role="alert" className="mb-2 rounded border border-[#8A1C14] bg-[#FCE4E2] p-2 text-sm text-[#8A1C14]">
+            <div id="comite-data-erro" role="alert" className="mb-2 rounded border border-[#C0392B] bg-[#FBE6E5] p-2 text-sm text-[#C0392B]">
               {errosData.map((e) => (
                 <p key={e} className="m-0">
                   {e}
@@ -433,7 +433,7 @@ export default function Comite(): JSX.Element {
         </div>
       </fieldset>
 
-      <p role="status" className={aviso ? 'mb-3 rounded bg-[#DDF3E4] p-2 text-[#0F5A2E]' : 'sr-only'}>
+      <p role="status" className={aviso ? 'mb-3 rounded bg-[#E8F5EB] p-2 text-[#1E7B3A]' : 'sr-only'}>
         {aviso}
       </p>
 

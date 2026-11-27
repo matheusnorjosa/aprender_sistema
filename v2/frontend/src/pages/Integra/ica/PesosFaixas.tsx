@@ -130,7 +130,7 @@ export default function PesosFaixas(): JSX.Element {
         <>
           {v.nome}
           {v.id === versaoVigente.id && (
-            <span className="ml-2 inline-block rounded bg-[#DDF3E4] px-1.5 text-xs font-semibold text-[#0F5A2E]">Em vigor</span>
+            <span className="ml-2 inline-block rounded bg-[#E8F5EB] px-1.5 text-xs font-semibold text-[#1E7B3A]">Em vigor</span>
           )}
         </>
       ),
@@ -204,7 +204,7 @@ export default function PesosFaixas(): JSX.Element {
           role="status"
           aria-label="Soma dos pesos"
           className={`mt-3 inline-block rounded px-2 py-1 font-semibold ${
-            validacao.valido ? 'bg-[#DDF3E4] text-[#0F5A2E]' : 'bg-[#FCE4E2] text-[#8A1C14]'
+            validacao.valido ? 'bg-[#E8F5EB] text-[#1E7B3A]' : 'bg-[#FBE6E5] text-[#C0392B]'
           }`}
         >
           Soma: {somaTexto}
@@ -244,7 +244,7 @@ export default function PesosFaixas(): JSX.Element {
           </Button>
         </div>
         {/* Região viva sempre montada: só o texto muda, para o leitor de tela anunciar (WCAG 4.1.3). */}
-        <p role="status" className={salvou ? 'mt-3 rounded bg-[#DDF3E4] p-2 text-[#0F5A2E]' : 'sr-only'}>
+        <p role="status" className={salvou ? 'mt-3 rounded bg-[#E8F5EB] p-2 text-[#1E7B3A]' : 'sr-only'}>
           {salvou ? `${versaoVigente.nome} criada e em vigor. O ICA de todos foi recalculado com ela.` : ''}
         </p>
       </section>

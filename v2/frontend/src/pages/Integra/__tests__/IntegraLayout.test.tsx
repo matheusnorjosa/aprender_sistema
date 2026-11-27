@@ -5,13 +5,15 @@
  * `AppRoutes.access-by-profile.test.tsx`); aqui a moldura é montada direto.
  */
 import { MemoryRouter, Route, Routes } from 'react-router';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { EXTERNAL_URLS } from '../../../constants/urls';
+import { BRAND_COLORS } from '../../../contexts/ThemeContext';
 import IntegraLayout from '../IntegraLayout';
 import { QUEM_VE, type ChaveTela } from '../quemVe';
+import { VISUAL_DFF } from '../visual';
 
 function renderIntegra(rota: string): void {
   render(
@@ -254,5 +256,58 @@ describe('Integra — Para validar no dia 7', { timeout: 20000 }, () => {
   test('a tela abre com o título', async () => {
     renderIntegra('/integra/para-validar');
     expect(await screen.findByRole('heading', { level: 1, name: /Para validar no dia 7/i })).toBeInTheDocument();
+  });
+});
+
+/** Contraste WCAG entre duas cores #RRGGBB. */
+function contraste(a: string, b: string): number {
+  const lum = (hex: string): number => {
+    const canais = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const [r, g, bl] = canais.map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)) as [number, number, number];
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m) as [number, number];
+  return (x + 0.05) / (y + 0.05);
+}
+
+// Decisão do dono (26/11/2026): as telas da Integra ganham o desenho do DFF, com o fundo verde-claro só nela.
+describe('Integra — desenho do DFF', { timeout: 20000 }, () => {
+  test('a moldura leva o fundo verde-claro do DFF (tema claro)', async () => {
+    renderIntegra('/integra');
+    await screen.findByRole('heading', { level: 1, name: 'Integra' });
+    const moldura = document.querySelector<HTMLElement>('.integra');
+    expect(moldura).toHaveClass('integra-dff');
+    expect(moldura?.style.getPropertyValue('--integra-fundo')).toBe('#d8edcb');
+  });
+
+  test('as telas das ferramentas ficam num cartão branco; a página da Integra, com os cartões direto no fundo', async () => {
+    renderIntegra('/integra/ica');
+    const painel = await screen.findByRole('heading', { level: 1, name: 'Painel do ICA' });
+    expect(painel.closest('.integra-cartao')).not.toBeNull();
+    cleanup();
+    renderIntegra('/integra');
+    const integra = await screen.findByRole('heading', { level: 1, name: 'Integra' });
+    expect(integra.closest('.integra-cartao')).toBeNull();
+  });
+
+  test('os 7 cartões levam o bloco de ícone do DFF: fundo verde-claro e o ícone no verde da marca, 3:1', async () => {
+    renderIntegra('/integra');
+    await screen.findByText('ICA');
+    const titulos = screen.getAllByRole('heading', { level: 2 });
+    expect(titulos).toHaveLength(7);
+    for (const titulo of titulos) {
+      const bloco = titulo.closest('.ant-card')?.querySelector<HTMLElement>('[aria-hidden="true"]');
+      expect(bloco?.style.backgroundColor, titulo.textContent ?? '').toBe('rgb(216, 237, 203)');
+      expect(bloco?.style.color, titulo.textContent ?? '').toBe('rgb(5, 84, 65)');
+    }
+    expect(contraste(BRAND_COLORS.primary, VISUAL_DFF.fundo)).toBeGreaterThanOrEqual(3);
+  });
+
+  test('contraste: texto no fundo verde-claro e cabeçalho da tabela, 4,5:1', () => {
+    // A página da Integra põe o título (texto do antd, #1f1f1f) e o texto de apoio (#595959) direto no verde-claro.
+    expect(contraste('#1f1f1f', VISUAL_DFF.fundo)).toBeGreaterThanOrEqual(4.5);
+    expect(contraste('#595959', VISUAL_DFF.fundo)).toBeGreaterThanOrEqual(4.5);
+    expect(contraste(VISUAL_DFF.textoCabecalho, VISUAL_DFF.cabecalho)).toBeGreaterThanOrEqual(4.5);
+    expect(contraste(VISUAL_DFF.textoCabecalho, '#ffffff')).toBeGreaterThanOrEqual(4.5);
   });
 });

@@ -56,6 +56,7 @@ vi.mock('../../../components/google/GoogleIntegrationCard', () => ({
   default: () => <div data-testid="google-card" />,
 }));
 
+import { BRAND_COLORS } from '../../../contexts/ThemeContext';
 import { fetchAPI } from '../../../api/config';
 import { definirLarguraTela } from '../../../test/larguraTela';
 import PreAgendaPage from '../PreAgendaPage';
@@ -155,12 +156,12 @@ describe('PreAgendaPage — status do Google em pt-BR, com o motivo do erro', ()
     expect((await screen.findByText('Reaplicar selecionados')).closest('button')).toHaveStyle({ color: '#ad4e00' });
   });
 
-  // O AntD tira o fundo da linha selecionada do colorPrimary (#006B52 → #9aaba4; com o mouse,
+  // O AntD tira o fundo da linha selecionada do colorPrimary (com o verde de antes, #006B52 → #9aaba4; com o mouse,
   // #659e89) e o motivo do erro caía para 2,72 e 2,12:1 justo no caso do "Reenviar selecionados".
   test('linha marcada para o lote: o motivo do erro mantém 4,5:1, parada e com o mouse em cima', async () => {
     mockRows([row({ id: 1, municipio_nome: 'Crato', gcal_status: 'ERROR', gcal_last_error: 'Motivo do Google.' })]);
     render(
-      <ConfigProvider theme={{ token: { colorPrimary: '#006B52' } }}>
+      <ConfigProvider theme={{ token: { colorPrimary: BRAND_COLORS.primary } }}>
         <PreAgendaPage />
       </ConfigProvider>,
     );

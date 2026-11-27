@@ -71,7 +71,7 @@ export function RetornoDoRegistro({ retorno }: { retorno: Retorno | null }): JSX
   return (
     <>
       {retorno && !retorno.ok && (
-        <div role="alert" className="mt-3 rounded border border-[#A8251B] bg-[#FCE4E2] p-3 text-[#8A1C14]">
+        <div role="alert" className="mt-3 rounded border border-[#D9473B] bg-[#FBE6E5] p-3 text-[#C0392B]">
           <p className="m-0 font-semibold">Falta corrigir:</p>
           <ul className="m-0 pl-5">
             {retorno.erros.map((e) => (
@@ -136,7 +136,7 @@ function RegistroFeito({ retorno }: { retorno: Extract<Retorno, { ok: true }> })
             : 'Só o vermelho muda a cor em vigor na hora; as outras mudanças esperam o Comitê.'}
       </p>
       {mudanca.mudanca === 'piorou' && depois.cor !== 'verde' && (
-        <div className="mt-2 rounded border-l-4 border-[#A8251B] bg-[#FCE4E2] p-2 text-[#8A1C14]">
+        <div className="mt-2 rounded border-l-4 border-[#D9473B] bg-[#FBE6E5] p-2 text-[#C0392B]">
           <p className="m-0 font-semibold">
             Alerta: {nomeDoMunicipio(municipio)} passou para {ROTULO_COR[depois.cor].toLowerCase()}.
             {/* Decisões 38 a 41 e 52: o vermelho vale na hora e a SPE decide se convoca o extraordinário; o aviso do amarelo continua. */}

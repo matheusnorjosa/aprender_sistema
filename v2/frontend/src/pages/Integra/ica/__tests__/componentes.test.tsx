@@ -1,6 +1,9 @@
 /**
  * Componentes de gráfico do ICA: cor sempre com nome e número, e o gráfico com texto equivalente.
  */
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
 
@@ -41,6 +44,33 @@ describe('ICA — componentes de gráfico', { timeout: 20000 }, () => {
     for (const cor of Object.values(COR_ESTRATO)) {
       expect(contraste(cor.texto, cor.fundo)).toBeGreaterThanOrEqual(4.5);
       for (const faixa of faixas) expect(contraste(cor.forte, faixa)).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  // Decisão do dono (26/11/2026): as cores seguem o documento de requisitos do ICA (seção "Estratos e cores" e o
+  // painel ilustrativo). A cor do documento que falha como texto vira só preenchimento, e o texto ganha um tom escuro.
+  test('as cores dos estratos são as do documento de requisitos do ICA', () => {
+    expect(COR_ESTRATO).toEqual({
+      sobrecarga: { fundo: '#FBE6E5', texto: '#C0392B', forte: '#D9473B' },
+      // #A86F00 (texto do documento) dá 3,89:1: vira a barra; o texto fica num âmbar escuro.
+      atencao: { fundo: '#FDF4E3', texto: '#8A5A00', forte: '#A86F00' },
+      // #2BA84A (barra do documento) dá 2,75:1 no fundo: a barra usa o verde do texto.
+      adequada: { fundo: '#E8F5EB', texto: '#1E7B3A', forte: '#1E7B3A' },
+      // #8A958D (barra do documento) dá 2,77:1: a barra usa o cinza do número do painel.
+      capacidade: { fundo: '#F1F2F1', texto: '#444444', forte: '#6B7A70' },
+    });
+  });
+
+  // Os selos e avisos das telas do ICA e do Semáforo usam os mesmos tons: dois amarelos (ou dois verdes) na mesma tela
+  // confundiam, e o azul que saiu da Capacidade não volta em selo de status.
+  test('as telas do ICA e do Semáforo não usam a paleta antiga das faixas', () => {
+    const antiga = /#(FCE4E2|8A1C14|A8251B|FFF0C2|6B4A00|DDF3E4|0F5A2E|DCEBFA|0B4A80)\b/i;
+    const raiz = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+    for (const pasta of ['ica', 'semaforo']) {
+      for (const nome of readdirSync(resolve(raiz, pasta), { recursive: true }) as string[]) {
+        if (!/\.tsx?$/.test(nome) || nome.includes('__tests__')) continue;
+        expect(readFileSync(resolve(raiz, pasta, nome), 'utf-8'), `${pasta}/${nome}`).not.toMatch(antiga);
+      }
     }
   });
 

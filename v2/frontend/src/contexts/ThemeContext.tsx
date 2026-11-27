@@ -59,15 +59,15 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 // Issue #439: Centralized Brand Colors
 // ============================================================================
 export const BRAND_COLORS: BrandColors = {
-  // Primary brand colors
-  primary: '#006B52',
-  primaryDark: '#004B3D',
+  // Primary brand colors: o verde do DFF (decisão do dono, 26/11/2026; antes #006B52 / #004B3D)
+  primary: '#055441',
+  primaryDark: '#033a2d',
   primaryLight: '#E5EDE5',
 
   // Backgrounds
   pageBackground: '#f0f2f5',
   cardBackground: '#ffffff',
-  sidebarBackground: '#006B52',
+  sidebarBackground: '#055441',
 
   // Borders
   borderLight: 'rgba(255, 255, 255, 0.1)',
@@ -87,8 +87,8 @@ export const BRAND_COLORS: BrandColors = {
 
 // Acento de interação do tema ESCURO (colorPrimary → hover/focus/ativo/selecionado
 // que o AntD deriva). Antes era '#ea2a33' (vermelho): criava conflito semântico
-// (vermelho = erro/danger) e divergia da marca verde. O verde da marca cru (#006B52)
-// REPROVA WCAG no fundo dark (~2.5:1); este é o verde clareado p/ 5.2:1 sobre #1f1f1f
+// (vermelho = erro/danger) e divergia da marca verde. O verde da marca cru (#055441)
+// REPROVA WCAG no fundo dark (1,85:1); este é o verde clareado p/ 5.2:1 sobre #1f1f1f
 // — mantém a marca e libera o vermelho só para erro. Espelha a CSS var
 // `--as-primary-dark-accent` em index.css.
 const DARK_ACCENT = '#2FA37D';
@@ -116,9 +116,9 @@ const darkThemeTokens = {
 
 // Cores customizadas para o tema claro
 const lightThemeTokens = {
-  colorPrimary: '#006B52',
+  colorPrimary: BRAND_COLORS.primary,
   // A11y (WCAG AA): sem colorLink o AntD usa o azul #1677ff (4,10:1 no branco; hover 2,25:1).
-  // A marca dá 6,5:1 e o hover escuro 10:1; o active derivado (#004537) já passa.
+  // A marca (verde do DFF, 26/11/2026) dá 8,93:1 e o hover escuro 12,75:1; o active derivado (#002e25) já passa.
   colorLink: BRAND_COLORS.primary,
   colorLinkHover: BRAND_COLORS.primaryDark,
   borderRadius: 6,
@@ -133,6 +133,10 @@ const lightThemeTokens = {
   // Texto de exemplo (placeholder): o default é o quaternário rgba(0,0,0,0.25), 1,83:1 no campo.
   // O cinza do terciário dá 4,76:1 no campo e 4,63:1 na página; o texto desabilitado segue no quaternário.
   colorTextPlaceholder: 'rgba(0, 0, 0, 0.55)',
+  // Fundo do item selecionado (opção do Select, linha marcada, item do menu): o AntD o deriva da marca, e o verde do
+  // DFF dava #85948e e o hover #5f8778 (texto 4,10:1). No verde-claro: texto 13,80:1 e 12,17:1; marca 7,48:1 e 6,60:1.
+  colorPrimaryBg: BRAND_COLORS.primaryLight,
+  colorPrimaryBgHover: '#C6E6C3',
 };
 
 export function ThemeProvider({ children }: ThemeProviderProps): JSX.Element {
@@ -177,13 +181,13 @@ export function ThemeProvider({ children }: ThemeProviderProps): JSX.Element {
         darkSubMenuItemBg: '#1f1f1f',
         darkItemSelectedBg: DARK_ACCENT,
       } : {
-        darkItemBg: '#006B52',
-        darkSubMenuItemBg: '#004B3D',
+        darkItemBg: BRAND_COLORS.primary,
+        darkSubMenuItemBg: BRAND_COLORS.primaryDark,
         darkItemSelectedBg: '#C6E6C3',
         darkItemColor: '#ffffff',
         darkItemHoverColor: '#ffffff',
         darkItemSelectedColor: '#000000',
-        darkPopupBg: '#006B52',
+        darkPopupBg: BRAND_COLORS.primary,
         itemColor: '#ffffff',
         itemHoverColor: '#ffffff',
         itemSelectedColor: '#000000',

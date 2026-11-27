@@ -21,6 +21,7 @@ import {
 
 import { EXTERNAL_URLS } from '../../constants/urls';
 import { BRAND_COLORS } from '../../contexts/ThemeContext';
+import { VISUAL_DFF } from './visual';
 
 const { Title, Paragraph } = Typography;
 
@@ -29,7 +30,7 @@ const COR_TEXTO_APOIO = '#595959';
 
 /** Contorno de foco visível nos cartões que são link (WCAG 2.4.7). */
 const CLASSE_FOCO =
-  'block h-full rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-dark';
+  'block h-full rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-dark';
 
 type Destino = { tipo: 'interno'; para: string } | { tipo: 'externo'; href: string } | { tipo: 'em-breve' };
 
@@ -93,7 +94,12 @@ function CorpoDoCartao({ ferramenta, idTitulo }: { ferramenta: Ferramenta; idTit
       style={{ height: '100%', ...(emBreve && { background: '#f5f5f5', cursor: 'default' }) }}
     >
       <div className="flex items-start justify-between gap-2">
-        <span aria-hidden="true" style={{ fontSize: 32, color: BRAND_COLORS.primaryDark }}>
+        {/* Bloco de ícone do DFF: quadrado arredondado verde-claro, ícone no verde da marca (7,19:1). */}
+        <span
+          aria-hidden="true"
+          className="flex h-12 w-12 items-center justify-center rounded-xl"
+          style={{ fontSize: 24, color: BRAND_COLORS.primary, backgroundColor: VISUAL_DFF.fundo }}
+        >
           {ferramenta.icone}
         </span>
         {emBreve && <Tag>Em breve</Tag>}

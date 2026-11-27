@@ -78,6 +78,15 @@ describe('Tema claro: vermelho de erro e texto de exemplo com contraste AA', { t
     expect(valorNoCss(appCss, '.login-page .login-card .ant-input-affix-wrapper input::placeholder', 'color')).toBe(exemplo);
     const campo = valorNoCss(appCss, '.login-page .login-card .ant-input', 'background-color');
     expect(contraste(exemplo, campo), `${exemplo} sobre ${campo}`).toBeGreaterThanOrEqual(4.5);
+    // O ícone de mostrar a senha é controle: 3:1 (WCAG 1.4.11).
+    const icone = valorNoCss(appCss, '.login-page .login-card .ant-input-password-icon', 'color');
+    expect(contraste(icone, campo), `${icone} sobre ${campo}`).toBeGreaterThanOrEqual(3);
+  });
+
+  test('botão Entrar do login: o hover é mais escuro que o botão parado', () => {
+    const parado = valorNoCss(appCss, '.login-page .login-card .login-submit.ant-btn-primary', 'background');
+    const hover = valorNoCss(appCss, '.login-page .login-card .login-submit.ant-btn-primary:hover', 'background');
+    expect(luminancia(sobre(hover, '#ffffff')), `${hover} e ${parado}`).toBeLessThan(luminancia(sobre(parado, '#ffffff')));
   });
 
   test('texto de exemplo dos <input> comuns (index.css, fora do token): 4,5:1 no campo branco', () => {
@@ -181,6 +190,14 @@ function valorNoCss(css: string, seletor: string, propriedade: string, bloco?: s
 function canais(cor: string): [number, number, number, number] {
   const hex = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(cor.trim());
   if (hex) return [parseInt(hex[1]!, 16), parseInt(hex[2]!, 16), parseInt(hex[3]!, 16), 1];
+  // A marca no App.css: `var(--as-…)`, a cor do index.css, ou com transparência `color-mix(in srgb, var(--as-…) N%, transparent)`.
+  const marca = /^(?:color-mix\(in srgb, )?var\((--as-[\w-]+)\)(?: (\d+)%, transparent\))?$/.exec(cor.trim());
+  if (marca) {
+    const variavel = new RegExp(`${marca[1]!}:\\s*(#[0-9a-f]{6})`, 'i').exec(indexCss);
+    if (!variavel) throw new Error(`index.css sem ${marca[1]!}`);
+    const [r, g, b] = canais(variavel[1]!);
+    return [r, g, b, marca[2] ? Number(marca[2]) / 100 : 1];
+  }
   const rgb = /^rgba?\(([^)]*)\)$/.exec(cor.trim());
   if (!rgb) throw new Error(`cor ilegível: ${cor}`);
   const [r, g, b, a = 1] = rgb[1]!.split(',').map(Number);

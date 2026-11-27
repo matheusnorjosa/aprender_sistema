@@ -16,11 +16,17 @@ export interface CorEstrato {
   forte: string;
 }
 
+/**
+ * As cores do documento de requisitos do ICA (seção "Estratos e cores" e o painel ilustrativo; decisão do dono,
+ * 26/11/2026). A cor do documento que falha como texto (menos de 4,5:1) fica só como preenchimento, e o texto ganha
+ * um tom escuro: Atenção #A86F00 vira a barra e o texto fica #8A5A00. As barras do painel do documento que não dão
+ * 3:1 nas faixas (#E5A21C, #2BA84A, #8A958D) dão lugar ao texto do estrato ou ao cinza do número do painel.
+ */
 export const COR_ESTRATO: Record<Estrato, CorEstrato> = {
-  sobrecarga: { fundo: '#FCE4E2', texto: '#8A1C14', forte: '#A8251B' },
-  atencao: { fundo: '#FFF0C2', texto: '#6B4A00', forte: '#7A5300' },
-  adequada: { fundo: '#DDF3E4', texto: '#0F5A2E', forte: '#1E6B3A' },
-  capacidade: { fundo: '#DCEBFA', texto: '#0B4A80', forte: '#1D5E9E' },
+  sobrecarga: { fundo: '#FBE6E5', texto: '#C0392B', forte: '#D9473B' },
+  atencao: { fundo: '#FDF4E3', texto: '#8A5A00', forte: '#A86F00' },
+  adequada: { fundo: '#E8F5EB', texto: '#1E7B3A', forte: '#1E7B3A' },
+  capacidade: { fundo: '#F1F2F1', texto: '#444444', forte: '#6B7A70' },
 };
 
 /** Traço fino nas divisas 80, 110 e 130 dos gráficos (3:1 sobre o fundo de qualquer faixa). */

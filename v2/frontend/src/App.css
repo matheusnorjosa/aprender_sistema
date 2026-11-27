@@ -24,10 +24,10 @@
   color: var(--as-primary-dark);
 }
 
-/* Texto de exemplo: 4,57:1 no campo branco (WCAG AA, DEF-28; com 0,45 dava 2,40:1) */
+/* Texto de exemplo: 5,29:1 no campo branco (WCAG AA, DEF-28; com 0,45 dava 2,40:1) */
 .login-page .login-card .ant-input::placeholder,
 .login-page .login-card .ant-input-affix-wrapper input::placeholder {
-  color: rgba(0, 75, 61, 0.71);
+  color: color-mix(in srgb, var(--as-primary-dark) 71%, transparent);
 }
 
 .login-page .login-card .ant-input:hover,
@@ -38,11 +38,12 @@
 .login-page .login-card .ant-input:focus,
 .login-page .login-card .ant-input-affix-wrapper-focused {
   border-color: var(--as-primary);
-  box-shadow: 0 0 0 2px rgba(0, 107, 82, 0.15);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--as-primary) 15%, transparent);
 }
 
 .login-page .login-card .ant-input-password-icon {
-  color: rgba(0, 75, 61, 0.45);
+  /* Ícone de controle: 3,34:1 no campo branco (WCAG 1.4.11 pede 3:1; com 45% dava 2,59:1). */
+  color: color-mix(in srgb, var(--as-primary-dark) 55%, transparent);
 }
 
 .login-page .login-card .ant-input-password-icon:hover {
@@ -59,8 +60,9 @@
 .login-page .login-card .login-submit.ant-btn-primary:hover,
 .login-page .login-card .login-submit.ant-btn-primary:focus,
 .login-page .login-card .login-submit.ant-btn-primary:active {
-  background: #005a45 !important;
-  border-color: #005a45 !important;
+  /* Mais escuro que o botão parado (1,43:1 entre os dois); antes #005a45 ficava mais claro. */
+  background: var(--as-primary-dark) !important;
+  border-color: var(--as-primary-dark) !important;
   color: #ffffff !important;
 }
 

@@ -23,6 +23,61 @@
 }
 
 /*
+ * Desenho do DFF (decisão do dono, 26/11/2026), só no tema claro (classe `integra-dff`, posta pelo IntegraLayout).
+ * As cores vêm de `visual.ts` pelas variáveis `--integra-*`. O fundo verde-claro fica só na Integra; as telas das
+ * ferramentas vão num cartão branco (IntegraRoutes), então nenhum texto cinza fica direto no verde-claro e os fundos
+ * claros das faixas (ex.: o da Adequada, 1,11:1 no verde-claro) ficam no branco.
+ * Classe própria, e não `p-6`/`p-5` do Tailwind: o index.css encolhe o `.p-6` no celular com `!important`.
+ */
+.integra-dff {
+  background: var(--integra-fundo);
+  /* A mesma altura mínima da área principal (`Content` do App.tsx, abaixo do cabeçalho de 64 px): o verde-claro vai
+     até o fim da tela, sem a faixa cinza do layout embaixo quando o conteúdo é curto. */
+  min-height: calc(100vh - 64px);
+}
+
+.integra-dff .integra-cartao,
+.integra-dff .ant-card {
+  border: 1px solid var(--integra-borda);
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+}
+
+.integra-dff .integra-cartao {
+  background: #fff;
+  border-radius: 16px;
+  padding: 12px;
+}
+
+@media (min-width: 576px) {
+  .integra-dff .integra-cartao {
+    padding: 20px;
+  }
+}
+
+/* Tabela do DFF: cabeçalho cinza em maiúsculas. Na tabela do antd as cores vêm do tema (visual.ts) e vencem esta
+   regra; nas tabelas HTML (ex.: "Municípios por faixa") valem as daqui, as mesmas. */
+.integra-dff thead th {
+  background: var(--integra-cabecalho);
+  color: var(--integra-texto-cabecalho);
+  font-size: 12px;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+/* Na impressão, sem fundo, borda nem sombra: o papel fica como antes. */
+@media print {
+  .integra-dff {
+    background: none;
+  }
+
+  .integra-dff .integra-cartao {
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+}
+
+/*
  * A faixa "DADOS SIMULADOS" fica presa no topo (sticky). Sem folga, o título de destino de um link
  * "#seção" (o índice do "Para validar") e o campo que recebe foco por Tab encostam no topo e ficam
  * embaixo dela. A folga cobre a faixa com quebra de linha no celular (3 linhas, 78 px, de 320 a 400 px)

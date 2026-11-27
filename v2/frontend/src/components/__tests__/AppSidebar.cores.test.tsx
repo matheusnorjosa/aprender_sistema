@@ -82,7 +82,7 @@ describe('App.css — submenu da página atual na sidebar (tema claro)', () => {
             modo="recolhida"
             sidebarCollapsed
             toggleSidebar={() => {}}
-            colors={{ sidebarBackground: '#006B52', borderLight: '#303030' }}
+            colors={{ sidebarBackground: '#055441', borderLight: '#303030' }}
           />
         </ComAcesso>
       </MemoryRouter>,
@@ -115,7 +115,7 @@ function hexDe(cor: string): string {
 
 /** Fundos de item do menu (tokens `Menu` do ThemeContext): normal, submenu aberto e selecionado. */
 const FUNDOS_DO_MENU = {
-  claro: ['#006B52', '#004B3D', '#C6E6C3'],
+  claro: ['#055441', '#033a2d', '#C6E6C3'],
   escuro: ['#141414', '#1f1f1f', '#2FA37D'],
 };
 
@@ -160,7 +160,7 @@ describe('App.css — foco visível nos links do menu lateral', () => {
           modo="aberta"
           sidebarCollapsed={false}
           toggleSidebar={() => {}}
-          colors={{ sidebarBackground: '#006B52', borderLight: '#303030' }}
+          colors={{ sidebarBackground: '#055441', borderLight: '#303030' }}
         />
       </MemoryRouter>,
     );
@@ -183,7 +183,7 @@ describe('App.css — foco visível nos links do menu lateral', () => {
           modo="sobreposta"
           sidebarCollapsed={false}
           toggleSidebar={() => {}}
-          colors={{ sidebarBackground: '#006B52', borderLight: '#303030' }}
+          colors={{ sidebarBackground: '#055441', borderLight: '#303030' }}
         />
       </MemoryRouter>,
     );

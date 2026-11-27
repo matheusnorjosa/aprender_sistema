@@ -136,7 +136,7 @@ describe('Semáforo — Pesquisa do articulador', { timeout: 20000 }, () => {
     // Rodada 3: logo depois do envio, o campo não mostra o aviso vermelho de recusa, e sim que a resposta entrou.
     const registrada = screen.getByText(/^Resposta deste projeto registrada hoje/);
     expect(registrada).toHaveTextContent('Resposta deste projeto registrada hoje, 07/12/2026. A pesquisa é uma por projeto.');
-    expect(registrada).not.toHaveClass('text-[#8A1C14]');
+    expect(registrada).not.toHaveClass('text-[#C0392B]');
     expect(screen.getByLabelText('Projeto')).not.toHaveAccessibleDescription(/uma segunda resposta não entra/);
     // A segunda resposta é recusada com o motivo.
     await responder(user, '1', '0');

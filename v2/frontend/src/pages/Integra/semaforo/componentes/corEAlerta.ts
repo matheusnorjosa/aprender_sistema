@@ -1,8 +1,9 @@
 /**
  * Cores e alertas das telas do Semáforo (Pesquisa, Indicadores da Líder, Relatório mensal).
  *
- * As cores são as do ICA (`ica/componentes/estilos.ts`), com o contraste já conferido lá: texto 4,5:1
- * sobre o fundo e barra 3:1. Toda cor vai para a tela com o nome escrito ao lado.
+ * O documento de requisitos do Semáforo usa os mesmos tons do ICA (vermelho, amarelo e verde; ver
+ * `__tests__/corEAlerta.test.ts`), então as cores vêm de `ica/componentes/estilos.ts`, com o contraste já conferido
+ * lá: texto 4,5:1 sobre o fundo e barra 3:1. Toda cor vai para a tela com o nome escrito ao lado.
  */
 import { COR_ESTRATO, type CorEstrato } from '../../ica/componentes/estilos';
 import type { MunicipioSemaforo, SituacaoMunicipio } from '../dados';

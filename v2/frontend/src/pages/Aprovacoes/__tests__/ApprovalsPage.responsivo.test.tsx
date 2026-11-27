@@ -169,13 +169,13 @@ describe('ApprovalsPage responsiva', () => {
   }, 20000);
 
   // Achado da revisão do item 36: o AntD tira o fundo da linha selecionada do colorPrimary
-  // (#006B52 → #9aaba4) e os ícones de link do AcoesLinha (sem fundo próprio) caíam para 1,71:1
+  // (com o verde de antes, #006B52 → #9aaba4) e os ícones de link do AcoesLinha (sem fundo próprio) caíam para 1,71:1
   // (Aprovar, então #1677ff) e 1,36:1 (Reprovar, #ff4d4f); o projeto, small gray-500, para 2,01:1.
   // Desde o D5 o link do tema é a cor da marca (colorLink no ThemeContext); este ConfigProvider
   // não passa pelo ThemeContext, então repete o colorLink para renderizar a mesma cor.
   test('linha marcada para o lote: Aprovar e Reprovar com 3:1 e o texto cinza com 4,5:1', async () => {
     render(
-      <ConfigProvider theme={{ token: { colorPrimary: '#006B52', colorLink: BRAND_COLORS.primary } }}>
+      <ConfigProvider theme={{ token: { colorPrimary: BRAND_COLORS.primary, colorLink: BRAND_COLORS.primary } }}>
         <AcessoContext.Provider value={montarAcesso(['access_solicitation_approvals'], null)}>
           <MemoryRouter>
             <ApprovalsPage />

@@ -77,12 +77,12 @@ function Escolha({ legenda, nome, opcoes, valor, aoEscolher, descricao, semRespo
   const descritoPor = [descricao, semResposta ? idErro : undefined].filter(Boolean).join(' ') || undefined;
   return (
     <fieldset
-      className={`m-0 rounded border p-3 ${semResposta ? 'border-2 border-[#A8251B]' : 'border-[#d9d9d9]'}`}
+      className={`m-0 rounded border p-3 ${semResposta ? 'border-2 border-[#D9473B]' : 'border-[#d9d9d9]'}`}
       aria-describedby={descritoPor}
     >
       <legend className="px-1 font-semibold">{legenda}</legend>
       {semResposta && (
-        <p id={idErro} className="mb-2 mt-0 font-semibold text-[#8A1C14]">
+        <p id={idErro} className="mb-2 mt-0 font-semibold text-[#C0392B]">
           Falta responder este item.
         </p>
       )}
@@ -269,7 +269,7 @@ export default function PesquisaArticulador(): JSX.Element {
                 projeto.
               </p>
             ) : jaRespondeu ? (
-              <p id="pesquisa-projeto-aviso" className="m-0 mt-1 text-sm font-semibold text-[#8A1C14]">
+              <p id="pesquisa-projeto-aviso" className="m-0 mt-1 text-sm font-semibold text-[#C0392B]">
                 Este projeto já respondeu neste ciclo, em {formatarDia(jaRespondeu.respondida_em)}. A pesquisa é uma por
                 projeto: uma segunda resposta não entra.
               </p>

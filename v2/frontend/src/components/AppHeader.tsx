@@ -157,7 +157,7 @@ export function AppHeader({
                     renderItem={(item: NotificacaoInterna) => (
                       <List.Item
                         style={{
-                          background: item.lida ? undefined : 'rgba(0, 107, 82, 0.06)',
+                          background: item.lida ? undefined : 'color-mix(in srgb, var(--as-primary) 6%, transparent)',
                           padding: '8px 12px',
                           cursor: item.lida ? 'default' : 'pointer',
                         }}

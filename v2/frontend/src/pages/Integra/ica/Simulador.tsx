@@ -50,9 +50,9 @@ const ROTULO_STATUS: Record<StatusRemanejamento, string> = {
 };
 
 const COR_STATUS: Record<StatusRemanejamento, string> = {
-  proposto: 'bg-[#FFF0C2] text-[#6B4A00]',
-  aprovado: 'bg-[#DCEBFA] text-[#0B4A80]',
-  aplicado: 'bg-[#DDF3E4] text-[#0F5A2E]',
+  proposto: 'bg-[#FDF4E3] text-[#8A5A00]',
+  aprovado: 'bg-[#F1F2F1] text-[#444444]',
+  aplicado: 'bg-[#E8F5EB] text-[#1E7B3A]',
 };
 
 function etiqueta(r: ResultadoCoordenador): string {
@@ -362,7 +362,7 @@ export default function Simulador(): JSX.Element {
           id={ID_AVISO}
           role="status"
           tabIndex={-1}
-          className={aviso ? `mt-3 rounded bg-[#DDF3E4] p-2 text-[#0F5A2E] ${CLASSE_FOCO}` : 'sr-only'}
+          className={aviso ? `mt-3 rounded bg-[#E8F5EB] p-2 text-[#1E7B3A] ${CLASSE_FOCO}` : 'sr-only'}
         >
           {aviso}
         </p>

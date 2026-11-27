@@ -38,7 +38,7 @@ const { Title } = Typography;
 
 /** Aviso curto ao lado do nome (texto 4,5:1 no fundo). */
 function Aviso({ texto }: { texto: string }): JSX.Element {
-  return <span className="mr-1 mt-1 inline-block rounded bg-[#FFF0C2] px-1.5 text-xs font-semibold text-[#6B4A00]">{texto}</span>;
+  return <span className="mr-1 mt-1 inline-block rounded bg-[#FDF4E3] px-1.5 text-xs font-semibold text-[#8A5A00]">{texto}</span>;
 }
 
 function avisosDe(r: ResultadoCoordenador): string[] {

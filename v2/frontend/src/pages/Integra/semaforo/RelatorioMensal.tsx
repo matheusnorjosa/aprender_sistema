@@ -512,7 +512,7 @@ export default function RelatorioMensal(): JSX.Element {
                   </Campo>
                 </div>
                 {erros.length > 0 && (
-                  <div id={idErro} role="alert" className="mb-2 rounded border border-[#A8251B] bg-[#FCE4E2] p-2 text-sm text-[#8A1C14]">
+                  <div id={idErro} role="alert" className="mb-2 rounded border border-[#D9473B] bg-[#FBE6E5] p-2 text-sm text-[#C0392B]">
                     {erros.map((e) => (
                       <p key={e} className="m-0">
                         {e}

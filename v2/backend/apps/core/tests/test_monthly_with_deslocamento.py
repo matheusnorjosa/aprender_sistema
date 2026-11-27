@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 import pytest
@@ -192,10 +194,10 @@ class TestMonthlyWithDeslocamento:
         assert "D1" in result["legend"]
         assert result["legend"]["D1"] == "Evento + deslocamento"
 
-        # Details para D1 devem conter o evento
+        # Details para D1: o evento e o deslocamento (27/11/2026)
         detail_key_day10 = "0:9"
         assert detail_key_day10 in result["details_index"]
-        assert len(result["details_index"][detail_key_day10]) == 1
+        assert [item["tipo_item"] for item in result["details_index"][detail_key_day10]] == ["evento", "deslocamento"]
 
     def test_code_X_event_block_deslocamento(self):
         """
@@ -541,3 +543,216 @@ class TestMonthlyWithDeslocamento:
             assert result["people"][row]["ch_month"] == 4.0
             # Detalhes com uma entrada, não duplicada.
             assert len(result["details_index"][f"{row}:14"]) == 1
+
+
+@pytest.mark.django_db
+class TestDetalheDeTodaCelula:
+    """Grade enxuta (27/11/2026): todo quadradinho com código abre detalhe.
+
+    Cada item tem `tipo_item` ("evento", "deslocamento" ou "bloqueio"); na célula vêm os eventos,
+    depois os deslocamentos, depois os bloqueios. O motivo do bloqueio e a observação do
+    deslocamento podem ser pessoais: nunca saem na grade.
+    """
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        self.tz = timezone.get_current_timezone()
+        self.pessoa = UsuarioFactory(first_name="Pessoa", last_name="Ficticia")
+        self.municipio = MunicipioFactory(nome="Sobral", uf="CE", ativo=True)
+        self.projeto = ProjetoFactory(nome="Projeto Detalhe", ativo=True, fluxo="SUPER")
+        self.tipo_evento = TipoEventoFactory(nome="Formação")
+        # Evento no dia 20 só para a pessoa entrar na grade (fluxo SUPER).
+        self.evento_20 = self._evento(20)
+
+    def _evento(self, dia: int):
+        sol = SolicitacaoFactory(
+            usuario=self.pessoa,
+            municipio=self.municipio,
+            projeto=self.projeto,
+            tipo_evento=self.tipo_evento,
+            inicio=timezone.make_aware(datetime(2025, 10, dia, 8, 0), self.tz),
+            fim=timezone.make_aware(datetime(2025, 10, dia, 12, 0), self.tz),
+            status="aprovado",
+        )
+        Participation.objects.create(solicitacao=sol, usuario=self.pessoa, role="FORMADOR")
+        return sol
+
+    def _bloqueio(self, dia: int, tipo: str):
+        return AvailabilityBlock.objects.create(
+            usuario=self.pessoa,
+            tipo=tipo,
+            inicio=timezone.make_aware(datetime(2025, 10, dia, 14, 0), self.tz),
+            fim=timezone.make_aware(datetime(2025, 10, dia, 18, 0), self.tz),
+            motivo="Consulta médica",
+            status="aprovado",
+        )
+
+    def _deslocamento(self, dia: int):
+        return Deslocamento.objects.create(
+            usuario=self.pessoa,
+            origem="Fortaleza",
+            destino="Sobral",
+            start_date=date(2025, 10, dia),
+            end_date=date(2025, 10, dia + 1),
+            meio_transporte=Deslocamento.MeioTransporte.ONIBUS,
+            observacao="Volta mais cedo por assunto de família",
+        )
+
+    def _celula(self, dia: int):
+        grade = build_monthly_grid(year=2025, month=10, role="FORMADOR")
+        return grade["cells"][0][dia - 1], grade["details_index"].get(f"0:{dia - 1}")
+
+    def test_D_traz_o_deslocamento_sem_observacao(self):
+        desloc = self._deslocamento(10)
+
+        codigo, detalhe = self._celula(10)
+
+        assert codigo == "D"
+        assert detalhe == [
+            {
+                "tipo_item": "deslocamento",
+                "id": desloc.pk,
+                "origem": "Fortaleza",
+                "destino": "Sobral",
+                "inicio": "2025-10-10",
+                "fim": "2025-10-11",
+                "meio_transporte": "Ônibus",
+            }
+        ]
+        assert "observacao" not in str(detalhe)
+        assert "família" not in str(detalhe)
+
+    @pytest.mark.parametrize(("tipo", "rotulo"), [("P", "Parcial"), ("T", "Total")])
+    def test_P_e_T_trazem_o_bloqueio_sem_motivo(self, tipo, rotulo):
+        bloqueio = self._bloqueio(5, tipo)
+
+        codigo, detalhe = self._celula(5)
+
+        assert codigo == tipo
+        assert detalhe == [
+            {
+                "tipo_item": "bloqueio",
+                "id": bloqueio.pk,
+                "tipo": rotulo,
+                "data_inicio": "2025-10-05",
+                "data_fim": "2025-10-05",
+                "inicio": "14:00",
+                "fim": "18:00",
+            }
+        ]
+        assert "motivo" not in str(detalhe)
+        assert "Consulta" not in str(detalhe)
+
+    def test_bloqueio_de_varios_dias_traz_as_datas_no_dia_do_meio(self):
+        """Bloqueio de 10/10 08:00 a 12/10 17:00: no dia 11, só HH:MM diria "08:00 a 17:00"."""
+        bloqueio = AvailabilityBlock.objects.create(
+            usuario=self.pessoa,
+            tipo="T",
+            inicio=timezone.make_aware(datetime(2025, 10, 10, 8, 0), self.tz),
+            fim=timezone.make_aware(datetime(2025, 10, 12, 17, 0), self.tz),
+            motivo="Consulta médica",
+            status="aprovado",
+        )
+
+        codigo, detalhe = self._celula(11)
+
+        assert codigo == "T"
+        assert detalhe == [
+            {
+                "tipo_item": "bloqueio",
+                "id": bloqueio.pk,
+                "tipo": "Total",
+                "data_inicio": "2025-10-10",
+                "data_fim": "2025-10-12",
+                "inicio": "08:00",
+                "fim": "17:00",
+            }
+        ]
+        assert "Consulta" not in str(detalhe)
+
+    def test_X_traz_evento_e_depois_bloqueio(self):
+        evento = self._evento(15)
+        bloqueio = self._bloqueio(15, "T")
+
+        codigo, detalhe = self._celula(15)
+
+        assert codigo == "X"
+        assert [(item["tipo_item"], item["id"]) for item in detalhe] == [
+            ("evento", evento.pk),
+            ("bloqueio", bloqueio.pk),
+        ]
+
+    def test_D1_traz_evento_e_depois_deslocamento(self):
+        evento = self._evento(12)
+        desloc = self._deslocamento(12)
+
+        codigo, detalhe = self._celula(12)
+
+        assert codigo == "D1"
+        assert [(item["tipo_item"], item["id"]) for item in detalhe] == [
+            ("evento", evento.pk),
+            ("deslocamento", desloc.pk),
+        ]
+
+    def test_evento_mantem_os_campos_de_antes_e_ganha_tipo_item(self):
+        codigo, detalhe = self._celula(20)
+
+        assert codigo == "E"
+        assert detalhe == [
+            {
+                "tipo_item": "evento",
+                "id": self.evento_20.pk,
+                "municipio": "Sobral",
+                "data": "2025-10-20",
+                "inicio": "08:00",
+                "fim": "12:00",
+                "tipo": "Formação",
+            }
+        ]
+
+
+@pytest.mark.django_db
+class TestPosicaoNoMesComBusca:
+    """A posição no mês é sobre as pessoas da grade, antes da busca por nome (2ª revisão do PR 8).
+
+    Antes, o ranking era feito depois do `q`: quem a busca achava ficava sempre em 1º.
+    """
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        tz = timezone.get_current_timezone()
+        municipio = MunicipioFactory(nome="Iguatu", uf="CE", ativo=True)
+        projeto = ProjetoFactory(nome="Projeto Ranking", ativo=True, fluxo="SUPER")
+        tipo_evento = TipoEventoFactory(nome="Formação")
+        # Horas no mês: Alfa 6h, Beta 4h, Gama 2h.
+        for nome, horas in (("Alfa", 6), ("Beta", 4), ("Gama", 2)):
+            pessoa = UsuarioFactory(first_name=nome, last_name="Ranking")
+            sol = SolicitacaoFactory(
+                usuario=pessoa,
+                municipio=municipio,
+                projeto=projeto,
+                tipo_evento=tipo_evento,
+                inicio=timezone.make_aware(datetime(2025, 10, 7, 8, 0), tz),
+                fim=timezone.make_aware(datetime(2025, 10, 7, 8 + horas, 0), tz),
+                status="aprovado",
+            )
+            Participation.objects.create(solicitacao=sol, usuario=pessoa, role="FORMADOR")
+
+    def test_busca_nao_muda_a_posicao(self):
+        sem_busca = build_monthly_grid(year=2025, month=10, role="FORMADOR")
+        posicao = {p["name"]: p["position_month"] for p in sem_busca["people"]}
+        assert posicao == {"Alfa Ranking": 1, "Beta Ranking": 2, "Gama Ranking": 3}
+
+        com_busca = build_monthly_grid(year=2025, month=10, role="FORMADOR", q="gama")
+
+        assert [(p["name"], p["ch_month"], p["position_month"]) for p in com_busca["people"]] == [
+            ("Gama Ranking", 2.0, 3)
+        ]
+
+    def test_busca_acrescenta_no_maximo_uma_consulta(self, django_assert_max_num_queries):
+        with CaptureQueriesContext(connection) as sem_busca:
+            build_monthly_grid(year=2025, month=10, role="FORMADOR")
+
+        # A busca só acrescenta a consulta que filtra os nomes.
+        with django_assert_max_num_queries(len(sem_busca) + 1):
+            build_monthly_grid(year=2025, month=10, role="FORMADOR", q="gama")

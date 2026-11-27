@@ -6,7 +6,7 @@ Valida:
 - CH mês/ano corretos (horas decimais)
 - Ranking denso por mês
 - Cache Redis 5 minutos
-- Details_index para E/2/X
+- Details_index para toda célula com código
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
@@ -194,7 +194,7 @@ def test_monthly_availability_codes(api_client, user_auth, setup_data):
     Valida:
     - Ana: 03/out "E"; 08/out "2"; 05/out "P"; 20/out "X"
     - Bruno: 01/out "E"
-    - details_index contém E/2/X
+    - details_index contém E/2/X e também P (bloqueio)
     """
     # Debug: verificar se Participations foram criadas
     from apps.core.models import Participation
@@ -263,6 +263,9 @@ def test_monthly_availability_codes(api_client, user_auth, setup_data):
     assert "0:7" in details_index  # Ana, dia 08 (col 7)
     assert "0:19" in details_index  # Ana, dia 20 (col 19)
     assert len(details_index["0:7"]) == 2  # 2 eventos no dia 8
+    # Grade enxuta (27/11/2026): o P também abre detalhe, o bloqueio sem o motivo.
+    assert [item["tipo_item"] for item in details_index["0:4"]] == ["bloqueio"]
+    assert [item["tipo_item"] for item in details_index["0:19"]] == ["evento", "bloqueio"]
 
     # Validar formato de detalhe
     detail = details_index["0:2"][0]
@@ -272,6 +275,7 @@ def test_monthly_availability_codes(api_client, user_auth, setup_data):
     assert detail["inicio"] == "08:00"
     assert detail["fim"] == "12:00"
     assert detail["tipo"] == "Formação"
+    assert detail["tipo_item"] == "evento"
 
 
 def test_monthly_availability_ch_and_ranking(api_client, user_auth, setup_data):
@@ -405,8 +409,8 @@ def test_f8_chave_nao_colide_por_dois_pontos_nem_por_setor_ausente():
 
 
 def test_grade_guardada_na_chave_antiga_nao_e_lida(api_client, user_auth):
-    """A aba Coordenadores passou a seguir a regra de ocupação (item 38, 20/10/2026): a grade
-    guardada antes do deploy marcava quem não acompanha e não pode ser servida por até 5 min."""
+    """A grade guardada antes do deploy não pode ser servida por até 5 min. Hoje (27/11/2026) a
+    chave antiga é a v9, cujo `details_index` não trazia bloqueio nem deslocamento."""
     from unittest.mock import patch
 
     api_client.force_authenticate(user=user_auth)
@@ -414,7 +418,7 @@ def test_grade_guardada_na_chave_antiga_nao_e_lida(api_client, user_auth):
 
     def get_com_chave_antiga_povoada(key, *args, **kwargs):
         lidas.append(key)
-        return {"grade": "ANTIGA"} if key.startswith("monthly:v8:") else None
+        return {"grade": "ANTIGA"} if key.startswith("monthly:v9:") else None
 
     with patch("apps.core.views_availability_monthly.cache") as cache_mock:
         cache_mock.get.side_effect = get_com_chave_antiga_povoada
@@ -422,7 +426,7 @@ def test_grade_guardada_na_chave_antiga_nao_e_lida(api_client, user_auth):
 
     assert resposta.status_code == 200
     assert resposta.json() != {"grade": "ANTIGA"}
-    assert lidas and not any(key.startswith("monthly:v8:") for key in lidas)
+    assert lidas and not any(key.startswith("monthly:v9:") for key in lidas)
 
 
 def test_item38_bloqueio_de_ana_aparece_e_some_na_hora_na_grade_vista_por_outra_pessoa(user_auth, setup_data):

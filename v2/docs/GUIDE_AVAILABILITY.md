@@ -75,10 +75,23 @@ GET /api/availability/monthly?year=2026&month=1&role=FORMADOR&gerencia_id=2&sect
   ],
   "cells": [["E", "", "2", ...], ...],
   "details_index": {
-    "0:2": [{"id": 456, "municipio": "Fortaleza", ...}]
+    "0:2": [{"tipo_item": "evento", "id": 456, "municipio": "Fortaleza", "data": "2026-01-03",
+             "inicio": "08:00", "fim": "12:00", "tipo": "Formação"}],
+    "0:9": [{"tipo_item": "deslocamento", "id": 54, "origem": "Fortaleza", "destino": "Sobral",
+             "inicio": "2026-01-10", "fim": "2026-01-11", "meio_transporte": "Ônibus"}],
+    "0:4": [{"tipo_item": "bloqueio", "id": 77, "tipo": "Parcial", "data_inicio": "2026-01-05",
+             "data_fim": "2026-01-05", "inicio": "14:00", "fim": "18:00"}]
   }
 }
 ```
+
+`details_index` (chave `"linha:coluna"`, base 0) tem entrada para toda célula com código (E, 2, X, D1,
+D, P, T; desde 27/11/2026). Na lista vêm os eventos, depois os deslocamentos, depois os bloqueios;
+`tipo_item` diz qual é qual. Datas em AAAA-MM-DD; horas em HH:MM no fuso local. O bloqueio traz
+`data_inicio` e `data_fim` além das horas, porque pode durar vários dias: num bloqueio de 10 a 12,
+o dia 11 mostra as datas, e a tela escreve "10/01/2026 08:00 a 12/01/2026 17:00" (no mesmo dia,
+só a hora de início e de fim). O `motivo` do bloqueio e a `observacao` do deslocamento nunca saem
+na grade, porque podem ser pessoais.
 
 ### GET /api/availability-blocks/
 
@@ -185,7 +198,7 @@ A grade mensal é cacheada no Redis por 5 minutos + jitter de até 30 s
 Chave real (`chave_cache_grade` em `views_availability_monthly.py`, a SSOT):
 
 ```
-monthly:v9:{monthly_ver}:{sha256 do JSON [year, month, role, cache_scope, setor, busca, teto]}
+monthly:v10:{monthly_ver}:{sha256 do JSON [year, month, role, cache_scope, setor, busca, teto]}
 ```
 
 - `v8` (F8, scan de 16/10/2026): os parâmetros entram num JSON e a chave usa o hash dele. O setor
@@ -195,6 +208,8 @@ monthly:v9:{monthly_ver}:{sha256 do JSON [year, month, role, cache_scope, setor,
 - `v9` (item 38, 20/10/2026): a aba Coordenadores passou a marcar só quem ocupa a agenda
   (`ocupa_agenda_q`). Com o prefixo novo, a grade antiga do cache, que marcava quem não acompanha,
   deixa de ser servida.
+- `v10` (grade enxuta, 27/11/2026): o `details_index` passou a ter detalhe de toda célula
+  (deslocamento e bloqueio, com `tipo_item`). A grade antiga do cache não tinha esses itens.
 
 - `teto` = o teto de horas por evento vigente (`parametros_disponibilidade()`); salvar um teto
   novo em Configurações vale na consulta seguinte. `v6` entrou em 05/10/2026 com a CH com teto;

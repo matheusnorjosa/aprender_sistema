@@ -37,16 +37,16 @@ export default function Legend({ legend }: LegendProps): JSX.Element {
   const entries = Object.entries(map).filter(([code]) => code in CODE_COLOR);
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-4">
-      <h3 className="font-bold mb-3 text-gray-900">Legenda</h3>
-      <div className="flex flex-wrap gap-4">
+    <div className="bg-white rounded-lg shadow-sm px-3 py-2">
+      <h3 className="text-sm font-bold mb-1 text-gray-900">Legenda</h3>
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
         {entries.map(([code, label]) => (
           <div key={code} className="flex items-center gap-2">
             <div
-              className="w-4 h-4 rounded-full flex-shrink-0"
+              className="w-3 h-3 rounded-full flex-shrink-0"
               style={{ backgroundColor: CODE_COLOR[code as LegendCode] }}
             ></div>
-            <span className="text-sm text-gray-700 whitespace-nowrap">
+            <span className="text-xs text-gray-700 whitespace-nowrap">
               <span className="font-semibold">{code}</span> - {label}
             </span>
           </div>

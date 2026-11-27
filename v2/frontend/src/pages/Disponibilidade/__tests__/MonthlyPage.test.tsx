@@ -344,10 +344,48 @@ describe('MonthlyPage — semana abaixo de 1280 px, mês inteiro a partir de 128
 
     const formadores = grades()[0] as HTMLElement;
     const linha = within(formadores).getByText('Ana Formadora').closest('tr') as HTMLElement;
-    // Semana de 19 a 25: o 3º dia é o 21, o único com detalhe.
-    fireEvent.click(within(linha).getAllByRole('button')[2] as HTMLElement);
+    // Semana de 19 a 25: a célula 0 é o nome, e a 3ª célula de dia é o 21, o único com detalhe.
+    fireEvent.click(within(within(linha).getAllByRole('cell')[3] as HTMLElement).getByRole('button'));
 
     expect(screen.getByRole('heading', { name: 'Detalhes: Ana Formadora - Dia 21' })).toBeInTheDocument();
     expect(screen.getByText('Crato')).toBeInTheDocument();
+  });
+
+  // Grade enxuta (27/11/2026): todo código abre a gaveta, mesmo sem detalhe no índice.
+  test('código sem detalhe também abre a gaveta do dia', async () => {
+    await abrirEm(1024);
+
+    const formadores = grades()[0] as HTMLElement;
+    const linha = within(formadores).getByText('Ana Formadora').closest('tr') as HTMLElement;
+    // Semana de 12 a 18: a 1ª célula de dia é o 12, sem detalhe no índice.
+    fireEvent.click(within(within(linha).getAllByRole('cell')[1] as HTMLElement).getByRole('button'));
+
+    expect(screen.getByRole('heading', { name: 'Detalhes: Ana Formadora - Dia 12' })).toBeInTheDocument();
+    expect(screen.getByText('Nada neste dia.')).toBeInTheDocument();
+  });
+
+  test('o nome abre o mês da pessoa, juntando o detalhe de todos os dias da linha (até fora da semana)', async () => {
+    await abrirEm(1024);
+
+    // Semana de 12 a 18 na tela; o único detalhe é do dia 21.
+    fireEvent.click(within(grades()[0] as HTMLElement).getByRole('button', { name: 'Ver o mês de Ana Formadora' }));
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Mês de Ana Formadora' })).toBeInTheDocument();
+    const eventos = within(screen.getByRole('region', { name: 'Eventos do mês' })).getAllByRole('listitem');
+    expect(eventos).toHaveLength(1);
+    expect(eventos[0]).toHaveTextContent('Crato');
+    expect(screen.queryByText(/Horas de todos os projetos/)).not.toBeInTheDocument();
+  });
+
+  // 2ª revisão do PR 8: com o filtro Projeto, a lista é do projeto e a CH é de todos.
+  test('com o filtro Projeto, o mês da pessoa avisa que as horas são de todos os projetos', async () => {
+    await abrirEm(1024);
+
+    fireEvent.change(screen.getByLabelText('Projeto'), { target: { value: 'Superativar' } });
+    // A grade busca de novo com o filtro: espera o nome voltar (a 1ª é a grade dos formadores).
+    const nomes = await screen.findAllByRole('button', { name: 'Ver o mês de Ana Formadora' }, ESPERA);
+    fireEvent.click(nomes[0] as HTMLElement);
+
+    expect(screen.getByText('Horas de todos os projetos; a lista mostra só o projeto filtrado.')).toBeInTheDocument();
   });
 });

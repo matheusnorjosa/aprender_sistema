@@ -462,6 +462,7 @@ function comEventoTodoDia(grade: GradeMensal, anoMes: string): GradeMensal {
     grade.days.map((dia, idx) => {
       details_index[`${linha}:${idx}`] = [
         {
+          tipo_item: 'evento',
           id: linha * 100 + idx,
           municipio: TEXTOS_DO_SEED.municipio,
           tipo: TEXTOS_DO_SEED.projeto,
@@ -489,7 +490,7 @@ export function registrarGradeComEvento(larguras: readonly Largura[]): void {
   const anoMes = rota.relogio.slice(0, 7);
   test.describe(`Sem rolagem horizontal: Grade Mensal com evento todo dia (${larguras.join(' e ')} px)`, () => {
     for (const largura of larguras) {
-      test(`${rota.path}#com-evento e #detalhe @ ${largura}px (${rota.perfil})`, async ({ page, baseURL }) => {
+      test(`${rota.path}#com-evento, #detalhe e #mes-da-pessoa @ ${largura}px (${rota.perfil})`, async ({ page, baseURL }) => {
         const rede = vigiarRede(page, baseURL);
         await entrar(page, rota.perfil, largura);
         await page.route(
@@ -504,9 +505,17 @@ export function registrarGradeComEvento(larguras: readonly Largura[]): void {
         await garantirTela(page, rota, rede);
         await afirmarSemRolagem(page, `${rota.path}#com-evento`, largura, rede);
 
-        await page.locator('main#main tr').filter({ hasText: TEXTOS_DO_SEED.pessoa }).first().locator('button').first().click();
+        // `td + td`: o 1º código do dia (o 1º botão da linha é o nome, que abre o mês da pessoa).
+        const linha = page.locator('main#main tr').filter({ hasText: TEXTOS_DO_SEED.pessoa }).first();
+        await linha.locator('td + td button').first().click();
         await garantirTela(page, { marco: rota.marco, dados: { em: 'li', texto: TEXTOS_DO_SEED.municipio } }, rede);
         await afirmarSemRolagem(page, `${rota.path}#detalhe`, largura, rede);
+
+        // O nome abre o mês da pessoa: os eventos de todos os dias da linha, numa lista.
+        await page.getByRole('dialog').getByRole('button', { name: 'Fechar' }).click();
+        await linha.getByRole('button', { name: `Ver o mês de ${TEXTOS_DO_SEED.pessoa}` }).click();
+        await garantirTela(page, { marco: rota.marco, dados: { em: 'li', texto: TEXTOS_DO_SEED.municipio } }, rede);
+        await afirmarSemRolagem(page, `${rota.path}#mes-da-pessoa`, largura, rede);
       });
     }
   });

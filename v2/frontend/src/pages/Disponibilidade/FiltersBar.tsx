@@ -106,7 +106,7 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
   };
 
   return (
-    <div className="flex flex-wrap items-end gap-3 p-4 bg-white rounded-lg shadow-sm">
+    <div className="flex flex-wrap items-end gap-2 px-3 py-2 bg-white rounded-lg shadow-sm">
       {/* Navegação mês/ano */}
       <div className="flex items-center gap-2">
         <button
